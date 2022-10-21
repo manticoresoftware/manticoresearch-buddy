@@ -1,0 +1,7 @@
+#!/usr/bin/expect -f
+set password [lindex $argv 0]
+set files [lrange $argv 1 1 ]
+spawn debsigs --sign=origin -k 3D2730E2 $files
+expect "Enter passphrase:"
+send -- "$password\r"
+expect eof

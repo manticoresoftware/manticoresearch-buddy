@@ -1,0 +1,12 @@
+version: '2'
+services:
+ manticore-executor:
+  cap_add:
+    - SYS_ADMIN
+  build:
+    context: .
+    args:
+      TARGET_ARCH: amd64
+  working_dir: /var/www
+  volumes:
+     - .:/var/www

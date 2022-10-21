@@ -1,0 +1,115 @@
+#!/usr/bin/env -S php -dphar.readonly=0
+<?php
+define('BUILD_DIR', './build');
+
+$opts = getopt('', ['index:', 'name:', 'package:']);
+if (!$opts) {
+  die('Usage: bin/build --name="Package name" --package=package --index="src/main.php"' . PHP_EOL);
+}
+
+if (!isset($opts['name'])) {
+  die('Error: you should pass --name with name of project to build' . PHP_EOL);
+}
+
+if (!isset($opts['package'])) {
+  die('Error: you should pass --package with binary name to build' . PHP_EOL);
+}
+
+if (!isset($opts['index']) || !is_file($opts['index'])) {
+  die('Error: you should pass --index and set correct path to the entrypoint PHP file' . PHP_EOL);
+}
+
+$binFile = BUILD_DIR . '/' . $opts['package'];
+$pharFile = $binFile . '.phar';
+if (file_exists($pharFile)) {
+  unlink($pharFile);
+}
+
+if (file_exists($pharFile . '.gz')) {
+  unlink($pharFile . '.gz');
+}
+
+if (!is_dir(BUILD_DIR)) {
+  mkdir(BUILD_DIR, 0755);
+}
+
+$phar = new Phar($pharFile);
+$phar->startBuffering();
+$default_stub = $phar->createDefaultStub($opts['index']);
+$phar->buildFromDirectory('.', '/src\/.+$/');
+$phar->setStub($default_stub);
+$phar->addFile(BUILD_DIR . '/../PHP_VERSION', 'PHP_VERSION');
+// $phar['PHP_VERSION']->setMetadata(['mime-type' => 'text/plain']);
+
+// Now add all deps required by composer
+// We create new fake vendor and install only no dev packages
+// just because there is no way to dump autoload config of non dev-only
+copy('composer.json', BUILD_DIR . '/composer.json');
+copy('composer.lock', BUILD_DIR . '/composer.lock');
+shell_exec('cd ' . BUILD_DIR . ' && composer install --no-dev --optimize-autoloader');
+$buildVendorDir = BUILD_DIR . '/vendor';
+add_directory_to_phar($buildVendorDir, $phar, 'vendor');
+// Done with composer
+
+$phar->stopBuffering();
+// TODO: we should add gz to manticore-executor or do not use it
+// $phar->compressFiles(Phar::GZ);
+
+$minPhpVersion = trim($phar['PHP_VERSION']->getContent());
+// Rewrite the resulting file to support dynamic executor
+$bash = implode(PHP_EOL, [
+  '#!/usr/bin/env bash',
+  'executor=$(which manticore-executor || which php)',
+  'if [[ -z "$executor" ]]; then',
+  "echo >&2 {$opts['name']} requires php or manticore-executor. Please install package 'manticore-extra'.",
+  'exit 1',
+  'fi',
+  // Validate minimum php version
+  "min_version=$minPhpVersion",
+  'executor_version=$($executor -v | head -n 1 | cut -d" " -f2)',
+  'if [[ executor_version < min_version ]]; then',
+  "echo >&2 {$opts['name']} requires php \$min_version+",
+  'fi',
+  'tmp=$($executor -r \'echo sys_get_temp_dir();\')',
+  "php_file=\"\$tmp\"/{$opts['package']}.phar",
+  'self_ts=$(date -r "$0" +%s)',
+  'phar_ts=$(test -f "$php_file" && date -r $_ +%s || echo 0)',
+  'test "$self_ts" -gt "$phar_ts" && echo \'<?php file_put_contents("\'$php_file\'", hex2bin("' . bin2hex(file_get_contents($pharFile)) . '"));\' | $executor',
+  // 'EOF',
+  'exec $executor -n "$php_file" "$@"',
+  '',
+]);
+file_put_contents($binFile, $bash);
+chmod($binFile, 0777);
+
+echo 'The script was successfully built: ' . $binFile . PHP_EOL;
+
+/**
+ * This is helper to add directory files recursively to the phar archive
+ *
+ * @param string $dir
+ * @param Phar $phar
+ * @param ?string $alias
+ * @return void
+ */
+function add_directory_to_phar(string $dir, Phar $phar, ?string $alias = null): void {
+  if (!is_dir($dir)) {
+    die("The directory to add does not exist: '$dir'");
+  }
+
+  $iterator = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($dir),
+    RecursiveIteratorIterator::CHILD_FIRST
+  );
+
+  $prefixLen = strlen($dir);
+  $prefix = $alias ?: $dir;
+  /** @var SplFile $file */
+  foreach ($iterator as $file) {
+    if (!$file->isFile()) {
+      continue;
+    }
+    $filePath = $file->getPathName();
+    $phar->addFile($filePath, $prefix . substr($filePath, $prefixLen));
+  }
+}

@@ -1,0 +1,8 @@
+#!/usr/bin/expect -f
+set timeout -1
+set password [lindex $argv 0]
+set files [lrange $argv 1 1 ]
+spawn rpm --define "_gpg_name support@manticoresearch.com" --addsign $files
+expect -exact "Enter pass phrase: "
+send -- "$password\r"
+expect eof
