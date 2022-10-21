@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+./vendor/bin/phpstan analyse -c "$(pwd)/phpstan.neon"

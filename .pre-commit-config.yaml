@@ -1,0 +1,31 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v2.3.0
+  hooks:
+  - id: check-yaml
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+  - id: check-executables-have-shebangs
+  - id: check-added-large-files
+- repo: local
+  hooks:
+  - id: codestyle-fix
+    name: codestyle-fix
+    entry: bin/codestyle-fix
+    language: system
+    types: [php]
+    pass_filenames: false
+  - id: codestyle
+    name: codestyle
+    entry: bin/codestyle
+    language: system
+    types: [php]
+    pass_filenames: false
+  - id: codeanalyze
+    name: codeanalyze
+    entry: bin/codeanalyze
+    language: system
+    types: [php]
+    pass_filenames: false

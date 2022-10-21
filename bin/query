@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+query="$1"
+if [[ -z "$query" ]]; then
+  echo >&2 "Usage: $0 [query]"
+  exit 1
+fi
+
+executor=$(which manticore-executor 2> /dev/null || which php 2> /dev/null)
+if [[ -z "$executor" ]]; then
+  echo >&2 'You should install manticore-executor or PHP'
+  exit 1
+fi
+
+query=${query//\'/\\\'}
+$executor -n <<CODE
+<?php declare(strict_types=1);
+define('STDOUT', fopen('/dev/stdout', 'wb+'));
+define('STDERR', fopen('/dev/stderr', 'wb+'));
+include_once __DIR__ . '/vendor/autoload.php';
+
+use Manticoresearch\Buddy\Lib\SQLQueryProcessor;
+echo 'Running query: $query' . PHP_EOL. PHP_EOL;
+try {
+  \$task = SQLQueryProcessor::process('$query')->run();
+  \$status = \$task->wait(true);
+  printf('Status code: %s' . PHP_EOL, \$status->name);
+  printf('Result: %s' . PHP_EOL, \$task->getResult());
+} catch (Throwable \$e) {
+  echo 'Error:' . PHP_EOL;
+  echo ' ' . \$e::class . ': ' . \$e->getMessage() . PHP_EOL;
+  exit(1);
+}
+echo 'done' . PHP_EOL;
+
+CODE

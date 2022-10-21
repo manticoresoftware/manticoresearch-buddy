@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+./vendor/bin/phpcs -v --no-cache -s --standard="$(pwd)/ruleset.xml" src/ test/

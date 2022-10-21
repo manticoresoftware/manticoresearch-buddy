@@ -1,0 +1,64 @@
+name: tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run unit tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Run tests inside docker container
+        uses: manticoresoftware/addnab-docker-run-action@main
+        with:
+          image: manticoresearch/manticoresearch-buddy-test-kit:5.0.3
+          options: -v ${{ github.workspace }}:/src --cap-add SYS_ADMIN --security-opt apparmor=unconfined
+          run: |
+            # the entrypoint is rewritten so we need to launch searchd manually
+            searchd
+            cd /src
+            composer install --prefer-dist
+            bin/test
+
+  codestyle:
+    name: PHPCS validation
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Run PHPCS to check following the standard
+        uses: manticoresoftware/addnab-docker-run-action@main
+        with:
+          image: manticoresearch/manticoresearch-buddy-test-kit:5.0.3
+          options: -v ${{ github.workspace }}:/src
+          run: |
+            cd /src
+            composer install --prefer-dist
+            bin/codestyle
+
+  codeanalyze:
+    name: PHPStan static analysis
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Run PHPStan to analyze the codebase
+        uses: manticoresoftware/addnab-docker-run-action@main
+        with:
+          image: manticoresearch/manticoresearch-buddy-test-kit:5.0.3
+          options: -v ${{ github.workspace }}:/src
+          run: |
+            cd /src
+            composer install --prefer-dist
+            bin/codeanalyze

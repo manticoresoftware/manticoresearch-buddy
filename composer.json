@@ -1,0 +1,27 @@
+{
+	"name": "manticoresoftware/manticoresearch-buddy",
+	"description": "Buddy assistant for the Manticore Search",
+	"keywords": ["search", "backup", "manticoresearch"],
+	"license": "GPL-2.0-or-later",
+	"type": "project",
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	},
+	"autoload": {
+		"psr-4": {
+			"Manticoresearch\\Buddy\\": "src/"
+		}
+	},
+	"require": {
+		"manticoresoftware/manticoresearch-backup": "^0.2.25"
+	},
+	"require-dev": {
+		"phpstan/phpstan": "^1.8",
+		"slevomat/coding-standard": "^8.5",
+		"squizlabs/php_codesniffer": "^3.7",
+		"phpunit/phpunit": "^9.5"
+	},
+	"bin": ["manticore-buddy"]
+}
