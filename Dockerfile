@@ -7,8 +7,8 @@ ENV DEB_PKG=manticore-executor_${EXECUTOR_VERSION}-${EXECUTOR_SUFFIX}_${TARGET_A
 ENV MANTICORE_VERSION=5.0.3-221020-cd2335eec
 RUN apt -y update && apt -y upgrade && \
   apt -y install figlet git zip unzip wget curl gpg && \
-  git clone https://github.com/flavioheleno/parallel.git && \
-    cd parallel && git checkout fix/php81 && phpize && \
+  git clone https://github.com/krakjoe/parallel.git && \
+    cd parallel && git checkout 25ba1ee594c350b0e3e239c6b995d772d0e4fc9c && phpize && \
     ./configure && make && make install && \
     echo extension=parallel > /usr/local/etc/php/conf.d/docker-php-ext-parallel.ini && \
   \
