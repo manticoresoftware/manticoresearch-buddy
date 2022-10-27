@@ -1,83 +1,74 @@
 <?php declare(strict_types=1);
 
-include 'utils.php';
+namespace Manticoresearch\Buddy;
 
+use Manticoresearch\Buddy\Exception\BuddyRequestError;
+use Manticoresearch\Buddy\Exception\ParserLocationError;
+use Manticoresearch\Buddy\Exception\SocketError;
+use Manticoresearch\Buddy\Lib\Buddy;
+use Manticoresearch\Buddy\Lib\QueryParserLocator;
+use Manticoresearch\Buddy\Lib\SocketHandler;
+use Manticoresearch\Buddy\Lib\StatementBuilder;
+use RuntimeException;
+use Throwable;
 
 $longopts  = [
 	'pid:',
 	'pid_path:',
+	'listen:',
+	'sockAddr::',
+	'sockPort::',
 ];
-/** @var string $pid */
-/** @var string $pidPath */
-// @phpstan-ignore-next-line
-['pid' => $pid, 'pid_path' => $pidPath] = getopt('', $longopts);
-
-const ACTION_MAP = [
-	'NO_INDEX' => [
-		'INSERT_QUERY' => 'CREATE_INDEX',
-	],
-	'UNKNOWN_COMMAND' => [
-		'SHOW_QUERIES_QUERY' => 'SELECT_SYSTEM_SESSIONS',
-	],
+$defaultOpts = [
+	'sockAddr' => '127.0.0.1',
+	'sockPort' => 0,
 ];
+/** @var string $clPid */
+/** @var string $clPidPath */
+/** @var string $clAddrPort */
+/** @var string $sockAddr */
+/** @var string $sockPort */
+[
+	'pid' => $clPid,
+	'pid_path' => $clPidPath,
+	'listen' => $clAddrPort,
+	'sockAddr' => $sockAddr,
+	'sockPort' => $sockPort,
+] = getopt('', $longopts) + $defaultOpts;
 
-const ENDPOINT_MAP = [
-	'/sql?mode=raw' => ['CREATE_INDEX'],
-	'/sql' => ['SELECT_SYSTEM_SESSIONS'],
-];
+$sockPort = (int)$sockPort;
+$socketHandler = new SocketHandler($sockAddr, $sockPort, new SocketError());
+$parserLocator = new QueryParserLocator(new ParserLocationError());
+$buddy = new Buddy($clAddrPort, $parserLocator, new StatementBuilder(), new BuddyRequestError());
 
-// bundles are sorted by type priority from the highest to the lowest
-const TYPE_BUNDLES = [
-	['json'],
-	['multi64', 'multi'],
-	['float', 'bigint', 'int'],
-	['text', 'string'],
-];
-
-$socket = setup();
-
-file_put_contents('/tmp/test.txt', "\n");
 // listening socket in loop
 while (true) {
-	$conn = socket_accept($socket);
-	if ($conn === false) {
-		if (!check_client($pid, $pidPath)) {
-			send_die_msg('Client is dead');
+	if ($socketHandler->hasMsg() === false) {
+		if (Buddy::isClientAlive($clPid, $clPidPath) === false) {
+			die('Client is dead');
 		}
 		usleep(1000);
-		//echo "iter empty\n"; // !COMMIT
 	} else {
-		// receiving request from the Manticore server
-		$req = read_socket_msg($conn);
-		if ($req === false) {
-			die('failed to read socket msg');
-		}
+		try {
+			$req = $socketHandler->readMsg();
 
-		['type' => $errorMsg, 'message' => $query/*, 'endpoint' => $reqURI*/] = $req;
-		file_put_contents('/tmp/test.txt', "1-$errorMsg\n", FILE_APPEND);
-		file_put_contents('/tmp/test.txt', "2-$query\n", FILE_APPEND);
-		$handleAction = get_handle_action($errorMsg, $query);
-		file_put_contents('/tmp/test.txt', "5-$handleAction\n", FILE_APPEND);
-		if ($handleAction) {
-			$respContent = build_resp_content($handleAction, $query);
-			if ($respContent === false) {
-				die('Failed to build response content');
+			foreach ($req as $k => $v) {
+				$req[$k] = strval($v);
 			}
+			[
+				'type' => $errorMsg,
+				'message' => $query,
+				'reqest_type' => $format,
+			] = $req;
 
-			['type' => $respType, 'message' => $respMsg] = $respContent;
-			// sending response to the Manticore server
-			$respURI = get_resp_uri($handleAction);
-			if ($respURI === false) {
-				die('Failed to find a response endpoint');
+			$resp = $buddy->getResponse($errorMsg, $query, $format);
+			$socketHandler->writeMsg($resp);
+		} catch (Throwable $e) {
+			$resp = $buddy->buildResponse(message: '', error: $e->getMessage());
+			try {
+				$socketHandler->writeMsg($resp);
+			} catch (RuntimeException $e) {
 			}
-			// extra formatting and encoding of response for /sql endpoint
-			if (str_starts_with($respURI, '/sql')) {
-				$respMsg = encode_response($respMsg);
-			}
-			$resp = ['type' => $respType, 'message' => $respMsg, 'endpoint' => $respURI];
-			write_socket_msg($conn, $resp);
-			//echo "iter send\n"; // !COMMIT
 		}
-		file_put_contents('/tmp/test.txt', "6\n", FILE_APPEND);
 	}
 }
