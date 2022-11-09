@@ -11,15 +11,14 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
-use Iterable;
-use Manticoresearch\Buddy\Enum\DATALIM;
-use Manticoresearch\Buddy\Enum\DATATYPE;
+use Manticoresearch\Buddy\Enum\Datalim;
+use Manticoresearch\Buddy\Enum\Datatype;
+use Manticoresearch\Buddy\Exception\QueryParserError;
 use Manticoresearch\Buddy\Interface\CheckInsertInterface;
-use Manticoresearch\Buddy\Interface\QueryParserInterface;
+use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 use Manticoresearch\Buddy\Lib\QueryParser;
-use RuntimeException;
 
-class SQLInsertParser extends QueryParser implements CheckInsertInterface, QueryParserInterface {
+class SQLInsertParser extends QueryParser implements InsertQueryParserInterface, CheckInsertInterface {
 
 	use \Manticoresearch\Buddy\Trait\CheckInsertDataTrait;
 
@@ -34,26 +33,36 @@ class SQLInsertParser extends QueryParser implements CheckInsertInterface, Query
 
 	/**
 	 * @param string $query
-	 * @return array{data?:array{name:string,cols:array<string>,colTypes:array<string>},error?:string}
+	 * @return array{name:string,cols:array<string>,colTypes:array<string>}
 	 */
 	public function parse($query): array {
+		$this->cols = $this->colTypes = [];
 		$matches = [];
 		preg_match_all('/\s*INSERT\s+INTO\s+(.*?)\s*\((.*?)\)\s+VALUES\s*(.*?)\s*;?\s*$/i', $query, $matches);
 		$name = $matches[1][0];
 		$colExpr = $matches[2][0];
-		$this->cols = explode(',', $colExpr);
+		$this->cols = array_map('trim', explode(',', $colExpr));
 		$valExpr = $matches[3][0];
 
 		$rows = $this->parseInsertRows($valExpr);
-
 		foreach ($rows as $row) {
-			$this->checkInsertRow($row);
-			if ($this->error !== '') {
-				return ['error' => $this->error];
-			}
+// 			$rowVals = $this->parseInsertValues($row);
+// 			$curColTypes = array_map([$this, 'detectValType'], $rowVals);
+// 			$this->error = self::checkColTypesError($curColTypes, $this->colTypes, $this->cols);
+// 			if ($this->error !== '') {
+// 				throw new QueryParserError($this->error);
+// 			}
+			self::checkUnescapedChars($row, QueryParserError::class);
+			self::checkColTypesError(
+				[$this, 'detectValType'],
+				$this->parseInsertValues($row),
+				$this->colTypes,
+				$this->cols,
+				QueryParserError::class
+			);
 		}
 
-		return ['data' => ['name' => $name, 'cols' => $this->cols, 'colTypes' => $this->colTypes]];
+		return ['name' => $name, 'cols' => $this->cols, 'colTypes' => self::stringifyColTypes($this->colTypes)];
 	}
 
 	/**
@@ -98,19 +107,19 @@ class SQLInsertParser extends QueryParser implements CheckInsertInterface, Query
 	/**
 	 * Splitting insert row values expression into separate values
 	 *
-	 * @param mixed $insertRow
+	 * @param string|array<mixed> $insertRow
 	 * @return array<string>
 	 */
-	protected function parseInsertValues(mixed $insertRow): array {
+	protected function parseInsertValues(string|array $insertRow): array {
 		$this->insertVals = $this->blocksReplaced = [];
-		$insertRow = strval($insertRow);
-		$this->replaceCommaBlocks($insertRow);
-		if (!empty($this->blocksReplaced)) {
+		if (!is_array($insertRow)) {
+			$insertRow = (string)$insertRow;
+			$insertRow = $this->replaceCommaBlocks($insertRow);
 			$this->insertVals = explode(',', $insertRow);
-			$this->restoreCommaBlocks();
-			foreach ($this->insertVals as $i => $val) {
-				$this->insertVals[$i] = trim($val);
+			if (!empty($this->blocksReplaced)) {
+				$this->restoreCommaBlocks();
 			}
+			$this->insertVals = array_map('trim', $this->insertVals);
 		}
 
 		return $this->insertVals;
@@ -118,17 +127,17 @@ class SQLInsertParser extends QueryParser implements CheckInsertInterface, Query
 
 	/**
 	 * Temporarily replacing column values that can contain commas to tokens
-	 * before splitting expression
+	 * before splitting row values expression
 	 *
 	 * @param string $row
-	 * @return array<array<string>>
+	 * @return string
 	 */
-	protected function replaceCommaBlocks(string $row): array {
+	protected function replaceCommaBlocks(string $row): string {
 		$this->blocksReplaced = [];
 		$replInfo = [
-			[ '{', '}' ],
-			[ '\(', '\)' ],
-			[ "'", "'" ],
+			['{', '}'],
+			['\(', '\)'],
+			["'", "'"],
 		];
 
 		foreach ($replInfo as $i => $replItem) {
@@ -143,14 +152,14 @@ class SQLInsertParser extends QueryParser implements CheckInsertInterface, Query
 			preg_match_all($pattern, $row, $matches);
 			foreach ($matches[0] as $m) {
 				$row = preg_replace($pattern, $repl, $row);
-				if ($row === null) {
-					throw new RuntimeException('Comma replace error');
+				if (!isset($row)) {
+					throw new QueryParserError('Comma replace error');
 				}
-				$this->blocksReplaced[$repl] = $m;
+				$this->blocksReplaced[$repl][] = $m;
 			}
 		}
 
-		return $this->blocksReplaced;
+		return $row;
 	}
 
 	/**
@@ -159,9 +168,9 @@ class SQLInsertParser extends QueryParser implements CheckInsertInterface, Query
 	 * @return bool
 	 */
 	protected function restoreSingleCommaBlock(string $replaced, int $valInd): bool {
-		if (strpos($this->insertVals[$valInd], $replaced) !== false) {
+		if (str_contains($this->insertVals[$valInd], $replaced)) {
 			$restored = array_shift($this->blocksReplaced[$replaced]);
-			if ($restored !== null) {
+			if (isset($restored)) {
 				$this->insertVals[$valInd] = str_replace($replaced, $restored, $this->insertVals[$valInd]);
 				return true;
 			}
@@ -186,25 +195,25 @@ class SQLInsertParser extends QueryParser implements CheckInsertInterface, Query
 
 	/**
 	 * @param string $val
-	 * @return DATATYPE
+	 * @return Datatype
 	 */
-	protected static function detectValType(string $val): DATATYPE {
+	protected static function detectValType(string $val): Datatype {
 		// numeric types
 		if (is_numeric($val)) {
 			$int = (int)$val;
 			if ((string)$int !== $val) {
-				return DATATYPE::T_FLOAT;
+				return Datatype::Float;
 			}
 
-			if ($int > DATALIM::MYSQL_MAX_INT->value) {
-				return DATATYPE::T_BIGINT;
+			if ($int > Datalim::MySqlMaxInt->value) {
+				return Datatype::Bigint;
 			}
 
-			return DATATYPE::T_INT;
+			return Datatype::Int;
 		}
 		// json type
 		if (substr($val, 0, 1) === '{' && substr($val, -1) === '}') {
-			return DATATYPE::T_JSON;
+			return Datatype::Json;
 		}
 		// mva types
 		if (substr($val, 0, 1) === '(' && substr($val, -1) === ')') {
@@ -212,36 +221,18 @@ class SQLInsertParser extends QueryParser implements CheckInsertInterface, Query
 			array_walk(
 				$subVals,
 				function (&$v) {
-					return trim($v);
+					$v = trim($v);
 				}
 			);
 			foreach ($subVals as $v) {
-				if (self::detectValType($v) === DATATYPE::T_BIGINT) {
-					return DATATYPE::T_MULTI_64;
+				if (self::detectValType($v) === Datatype::Bigint) {
+					return Datatype::Multi64;
 				}
 			}
-			return DATATYPE::T_MULTI;
-		}
-		// determining if type is text or string, using Elastic's logic
-		$regexes = [
-			// so far only email regex is implemented for the prototype
-			'email' => '/^\s*(?:[a-z0-9!#$%&\'*+\/=?^_`{|}~-]+'
-			. '(?:\.[a-z0-9!#$%&\'*+\/=?^_`{|}~-]+)*|"'
-			. '(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|'
-			. '\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")\\\@'
-			. '(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+'
-			. '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}'
-			. '(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*'
-			. '[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|'
-			. '\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])\s*$/i',
-		];
-		foreach ($regexes as $r) {
-			if (preg_match($r, substr($val, 0, -1))) {
-				return DATATYPE::T_STRING;
-			}
+			return Datatype::Multi;
 		}
 
-		return DATATYPE::T_TEXT;
+		return (self::isManticoreString($val) === true) ? Datatype::String : Datatype::Text;
 	}
 
 }

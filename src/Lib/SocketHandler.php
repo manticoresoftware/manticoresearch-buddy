@@ -11,13 +11,12 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
-use Manticoresearch\Buddy\Interface\CustomErrorInterface;
+use Manticoresearch\Buddy\Exception\SocketError;
 use Manticoresearch\Buddy\Interface\SocketHandlerInterface;
 use \Socket;
+use \Throwable;
 
 class SocketHandler implements SocketHandlerInterface {
-
-	use \Manticoresearch\Buddy\Trait\CustomErrorTrait;
 
 	protected Socket $conn;
 	protected Socket $socket;
@@ -25,28 +24,26 @@ class SocketHandler implements SocketHandlerInterface {
 	/**
 	 * @param string $addr
 	 * @param int $port
-	 * @param CustomErrorInterface $exceptionHandler
 	 * @param int $retryCount
 	 * @param bool $blockingMode
 	 * @return void
 	 */
 	public function __construct(
-		protected string $addr,
-		protected int $port,
-		protected CustomErrorInterface $exceptionHandler = null,
+		public string $addr,
+		public int $port,
 		protected int $retryCount = 10,
 		protected bool $blockingMode = false
 	) {
 		$socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 		if ($socket === false) {
-			$this->error('Cannot create a socket');
+			throw new SocketError('Cannot create a socket');
 		} else {
 			$this->socket = $socket;
 		}
 
 		$this->bindSocketPort();
 
-		socket_listen($this->socket) || $this->error('Cannot listen to the socket created');
+		socket_listen($this->socket) || throw new SocketError('Cannot listen to the socket created');
 		if ($this->blockingMode === false) {
 			socket_set_nonblock($this->socket);
 		}
@@ -62,38 +59,42 @@ class SocketHandler implements SocketHandlerInterface {
 		$conn = socket_accept($this->socket);
 		if ($conn !== false) {
 			$this->conn = $conn;
+			if ($this->blockingMode === false) {
+				echo 'non block' . "\n";
+				socket_set_nonblock($this->conn);
+			}
 			return true;
 		}
 		return false;
 	}
 
 	/**
-	 * @return array<mixed>
+	 * @return array{type:string,message:string,reqest_type:string}|false
 	 */
-	public function readMsg(): array {
-		$srcData = $this->readSocketData();
+	public function readMsg(): array|false {
+		$srcData = $this->read();
 		$lines = preg_split("/\r\n|\n|\r/", $srcData);
 		$reqJson = $bodySep = false;
 		if ($lines === false) {
-			$this->error('HTTP request read error', true);
+			throw new SocketError('HTTP request read error');
 		} else {
 			$bodySep = array_search('', $lines);
 			//var_dump ($body_sep);
 			//var_dump (count($lines));
 			if ($bodySep === false) {
-				$this->error('HTTP request without body', true);
-			} else {
-				$body = trim(implode(array_slice($lines, $bodySep)));
-				$reqJson = json_decode($body, true);
+				throw new SocketError('HTTP request without body');
 			}
+			$body = trim(implode(array_slice($lines, $bodySep)));
+			/** @var array{type:string,message:string,reqest_type:string}|false */
+			$reqJson = json_decode($body, true);
 		}
 
 		//var_dump ( $reqJson ); // !COMMIT
 		if ($reqJson === false) {
-			$this->error('JSON data decode error', true);
+			throw new SocketError('JSON data decode error');
 		}
 
-		return (array)$reqJson;
+		return $reqJson;
 	}
 
 	/**
@@ -103,16 +104,21 @@ class SocketHandler implements SocketHandlerInterface {
 	public function writeMsg(array $msgData): void {
 		$body = json_encode($msgData);
 		if ($body === false) {
-			$this->error('JSON data encode error', true);
-		} else {
-			$body_len = strlen($body);
-			$msg = "HTTP/1.1 200\r\nServer: buddy\r\nContent-Type: application/json; charset=UTF-8\r\n";
-			$msg .= "Content-Length: $body_len\r\n\r\n" . $body;
-			//var_dump ($msg);
+			throw new SocketError('JSON data encode error');
+		}
+		$body_len = strlen($body);
+		$msg = "HTTP/1.1 200\r\nServer: buddy\r\nContent-Type: application/json; charset=UTF-8\r\n";
+		$msg .= "Content-Length: $body_len\r\n\r\n" . $body;
+		$this->write($msg);
+	}
 
-			if (!socket_write($this->conn, $msg, strlen($msg))) {
-				$this->error('Socket data write error', true);
-			}
+	/**
+	 * @param string $msg
+	 * @return void
+	 */
+	public function write(string $msg): void {
+		if (!socket_write($this->conn, $msg, strlen($msg))) {
+			throw new SocketError('Socket data write error');
 		}
 	}
 
@@ -121,20 +127,24 @@ class SocketHandler implements SocketHandlerInterface {
 	 */
 	protected function bindSocketPort(): void {
 		if ($this->port > 0) {
-			if (socket_bind($this->socket, $this->addr, $this->port) === false
-				|| socket_getsockname($this->socket, $this->addr, $this->port) === false) {
-				$this->error("Cannot bind to a defined addr:port {$this->addr}:{$this->port}");
+			if (!socket_bind($this->socket, $this->addr, $this->port)
+				|| !socket_getsockname($this->socket, $this->addr, $this->port)) {
+				throw new SocketError("Cannot bind to the defined addr:port {$this->addr}:{$this->port}");
 			}
 		} else {
 			//trying to bind to any port available on the host machine
 			while ($this->port === 0 && $this->retryCount > 0) {
-				socket_bind($this->socket, $this->addr, $this->port);
+				try {
+					socket_bind($this->socket, $this->addr, $this->port);
+				} catch (Throwable $e) {
+					throw new SocketError("Cannot bind to the random port {$this->port} at addr {$this->addr}");
+				}
 				socket_getsockname($this->socket, $this->addr, $this->port);
 				usleep(1000);
 				$this->retryCount--;
 			}
 			if ($this->port === 0) {
-				$this->error("Cannot find a port available at addr {$this->addr}");
+				throw new SocketError("Cannot find a port available at addr {$this->addr}");
 			}
 		}
 	}
@@ -142,27 +152,40 @@ class SocketHandler implements SocketHandlerInterface {
 	/**
 	 * @return string
 	 */
-	protected function readSocketData(): string {
+	public function read(): string {
 		$data = '';
-		$ok = false;
+		$isOk = false;
+		$isFinishing = false;
 		do {
-			switch ($data_packet = socket_read($this->conn, 2048, PHP_BINARY_READ)) {
+			$dataPacket = socket_read($this->conn, 2048, PHP_BINARY_READ);
+			switch ($dataPacket) {
 				case false:
-					$this->error('Socket data read error');
-					break;
+					if (in_array(
+						socket_last_error(),
+						[SOCKET_EINPROGRESS, SOCKET_EALREADY, SOCKET_EAGAIN, SOCKET_EWOULDBLOCK]
+					)) {
+						if ($isFinishing === false) {
+							usleep(10000);
+							$isFinishing = true;
+							$isOk = true;
+						} else {
+							$isOk = false;
+						}
+						break;
+					}
+					throw new SocketError('Socket data read error');
 				case '':
-					$ok = false;
+					$isOk = false;
 					break;
 				default:
-					$data .= trim($data_packet);
-					$ok = true;
+					$data .= $dataPacket;
+					$isFinishing = false;
+					$isOk = true;
 					break;
 			}
-			//var_dump ( $data_packet );
-		} while ($ok);
+		} while ($isOk);
 
-		//var_dump ( $data );
-
+		$data = trim($data);
 		return $data;
 	}
 

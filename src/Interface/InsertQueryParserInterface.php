@@ -11,6 +11,10 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
-interface CustomErrorInterface {
-	public function throw(string $errorMsg): void;
+interface InsertQueryParserInterface extends QueryParserInterface {
+	/**
+	 * @param string $query
+	 * @return array{name:string,cols:array<string>,colTypes:array<string>}
+	 */
+	public function parse(string $query): array;
 }

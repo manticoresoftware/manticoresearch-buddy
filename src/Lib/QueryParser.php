@@ -11,7 +11,9 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
-use Manticoresearch\Buddy\Interface\CustomErrorInterface;
+// @codingStandardsIgnoreStart
+use Manticoresearch\Buddy\Enum\Datatype;
+// @codingStandardsIgnoreEnd
 use Manticoresearch\Buddy\Interface\QueryParserInterface;
 
 abstract class QueryParser implements QueryParserInterface {
@@ -25,7 +27,7 @@ abstract class QueryParser implements QueryParserInterface {
 	 */
 	protected array $cols = [];
 	/**
-	 * @var array<string> $colTypes
+	 * @var array<Datatype> $colTypes
 	 */
 	protected array $colTypes = [];
 	/**
@@ -36,14 +38,5 @@ abstract class QueryParser implements QueryParserInterface {
 	 * @var string $name
 	 */
 	protected string $error = '';
-
-	/**
-	 * @param CustomErrorInterface $exceptionHandler
-	 * @return void
-	 */
-	public function __construct(
-		protected CustomErrorInterface $exceptionHandler = null,
-	) {
-	}
 
 }

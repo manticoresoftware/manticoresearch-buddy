@@ -40,12 +40,13 @@ class BackupRequest implements CommandRequestInterface {
   /**
    * Create instance by parsing query into parameters
    *
-   * @param string $query
+   * @param array{query:string} $mntRequest
    *  The query itself without command prefix already
    * @return BackupRequest
    * @throws SQLQueryParsingError
    */
-	public static function fromQuery(string $query): BackupRequest {
+	public static function fromMntRequest(array $mntRequest): BackupRequest {
+		$query = $mntRequest['query'];
 		$whatPattern = '(?P<all>ALL)|(?:TABLES?\s*(?P<table>(,?\s*[\w]+\s*)+))';
 		$toPattern = 'TO\s*local\(\s*(?P<path>[\\_\-a-z/0-9]+)\s*\)';
 		$optionsKeys = implode('|', array_keys(static::OPTIONS));

@@ -11,10 +11,8 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-use Manticoresearch\Buddy\Exception\DetailedError;
+class UnvalidMntRequestError extends DetailedError {
 
-class ParserLocationError extends DetailedError {
-
-	const ERROR_MSG = 'Parser location error: ';
+	const ERROR_MSG = 'Manticore request parse error';
 
 }

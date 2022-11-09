@@ -17,12 +17,23 @@ interface SocketHandlerInterface {
 	 */
 	public function hasMsg(): bool;
 	/**
-	 * @return array<mixed>
+	 * @return array{type:string,message:string,reqest_type:string}|false
 	 */
-	public function readMsg(): array;
+	public function readMsg(): array|false;
 	/**
 	 * @param array{type:string,message:string} $msgData
 	 * @return void
 	 */
 	public function writeMsg(array $msgData): void;
+
+	/**
+	 * @return string
+	 */
+	public function read(): string;
+
+	/**
+	 * @param string $response
+	 * @return void
+	 */
+	public function write(string $response): void;
 }

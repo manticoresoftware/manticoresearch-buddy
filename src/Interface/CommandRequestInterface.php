@@ -12,5 +12,9 @@
 namespace Manticoresearch\Buddy\Interface;
 
 interface CommandRequestInterface {
-	public static function fromQuery(string $query): CommandRequestInterface;
+	/**
+	 * @param array{query:string} $mntRequest
+	 * @return CommandRequestInterface
+	 */
+	public static function fromMntRequest(array $mntRequest): CommandRequestInterface;
 }

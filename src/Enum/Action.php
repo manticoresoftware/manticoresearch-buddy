@@ -11,8 +11,8 @@
 
 namespace Manticoresearch\Buddy\Enum;
 
-enum ACTION {
-	case CREATE_INDEX;
-	case INSERT;
-	case SELECT_SYSTEM_SESSIONS;
+enum Action {
+	case CreateIndex;
+	case Insert;
+	case SelectSystemSessions;
 }

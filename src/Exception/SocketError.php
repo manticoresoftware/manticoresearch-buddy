@@ -11,21 +11,17 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-use Manticoresearch\Buddy\Interface\CustomErrorInterface;
-use RuntimeException;
+use \RuntimeException;
+use \Throwable;
 
-final class SocketError implements CustomErrorInterface {
+final class SocketError extends RuntimeException {
 
-	/**
-	 * @param string|null $message
-	 * @return void
-	 * @throws RuntimeException
-	 */
-	public function throw(string $message = null): void {
-		if ($message !== null) {
+	public function __construct(string $message = null, int $code = 0, ?Throwable $previous = null) {
+		if (isset($message)) {
 			$message .= ': ';
 		}
 		$message .= socket_strerror(socket_last_error());
-		throw new RuntimeException($message);
+		parent::__construct($message, $code, $previous);
 	}
+
 }

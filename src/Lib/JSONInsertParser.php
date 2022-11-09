@@ -11,25 +11,68 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
-use Manticoresearch\Buddy\Enum\DATATYPE;
+use Manticoresearch\Buddy\Enum\Datalim;
+use Manticoresearch\Buddy\Enum\Datatype;
+use Manticoresearch\Buddy\Exception\QueryParserError;
 use Manticoresearch\Buddy\Interface\CheckInsertInterface;
+use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 use Manticoresearch\Buddy\Lib\JSONParser;
 
-class JSONInsertParser extends JSONParser implements CheckInsertInterface {
+class JSONInsertParser extends JSONParser implements InsertQueryParserInterface, CheckInsertInterface {
 
 	use \Manticoresearch\Buddy\Trait\CheckInsertDataTrait;
 
 	/**
-	 * @param array{index:string, doc:array<mixed>} $query
+	 * @param string $query
+	 * @return array{name:string,cols:array<string>,colTypes:array<string>}
+	 */
+	public function parse($query): array {
+		$res = parent::parse($query);
+		$res += ['cols' => $this->cols, 'colTypes' => self::stringifyColTypes($this->colTypes)];
+		return $res;
+	}
+
+	/**
+	 * @param array{index:string,id:int,doc:array<mixed>}|array<
+	 * string, array{index:string,id:int,doc:array<mixed>}> $query
 	 * @return array<mixed>
 	 */
 	public function parseJSONRow(array $query): array {
+		if ($this->isNdJSON) {
+			if (!array_key_exists('insert', $query)) {
+				throw new QueryParserError("Operation name 'insert' is missing");
+			}
+			$query = $query['insert'];
+		}
+		if (!is_array($query)) {
+			throw new QueryParserError("Mandatory request field 'insert' must be an object");
+		}
+		if (!array_key_exists('index', $query)) {
+			throw new QueryParserError("Mandatory request field 'index' is missing");
+		}
+		if (!is_string($query['index'])) {
+			throw new QueryParserError("Mandatory request field 'index' must be a string");
+		}
+		$this->name = $query['index'];
+		if (!array_key_exists('doc', $query)) {
+			throw new QueryParserError("Mandatory request field 'doc' is missing");
+		}
+		if (!is_array($query['doc'])) {
+			throw new QueryParserError("Mandatory request field 'doc' must be an object");
+		}
 		if (empty($this->cols)) {
-			$this->name = $query['index'];
 			$this->cols = array_keys($query['doc']);
 		}
-		$row = array_values($query['doc']);
-		$this->checkInsertRow($row);
+		$row = $query['doc'];
+		self::checkUnescapedChars($row, QueryParserError::class);
+		self::checkColTypesError(
+			[$this, 'detectValType'],
+			$this->parseInsertValues($row),
+			$this->colTypes,
+			$this->cols,
+			QueryParserError::class
+		);
+
 		return $row;
 	}
 
@@ -45,14 +88,31 @@ class JSONInsertParser extends JSONParser implements CheckInsertInterface {
 
 	/**
 	 * @param mixed $val
-	 * @return DATATYPE
+	 * @return Datatype
 	 */
-	protected static function detectValType(mixed $val): DATATYPE {
-		//!TODO
-		if ($val === null) {
-			return DATATYPE::T_JSON;
+	protected static function detectValType(mixed $val): Datatype {
+		if (is_float($val)) {
+			return Datatype::Float;
 		}
-		return DATATYPE::T_JSON;
+		if (is_int($val)) {
+			if ($val > Datalim::MySqlMaxInt->value) {
+				return Datatype::Bigint;
+			}
+			return Datatype::Int;
+		}
+		if (is_array($val)) {
+			if (!array_is_list($val)) {
+				return Datatype::Json;
+			}
+			foreach ($val as $subVal) {
+				if (self::detectValType($subVal) === Datatype::Bigint) {
+					return Datatype::Multi64;
+				}
+			}
+			return Datatype::Multi;
+		}
+
+		return (is_string($val) && self::isManticoreString($val) === true) ? Datatype::String : Datatype::Text;
 	}
 
 }

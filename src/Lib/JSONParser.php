@@ -11,39 +11,61 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
+use Manticoresearch\Buddy\Exception\QueryParserError;
 use Manticoresearch\Buddy\Interface\JSONParserInterface;
 use Manticoresearch\Buddy\Lib\QueryParser;
-use Throwable;
 
 abstract class JSONParser extends QueryParser implements JSONParserInterface {
 
-	use \Manticoresearch\Buddy\Trait\CustomErrorTrait;
-	use \Manticoresearch\Buddy\Trait\NDJSONTrait;
+	/**
+	 * @var bool $isNdJSON
+	 */
+	protected bool $isNdJSON = false;
 
 	/**
 	 * @param string $query
-	 * @return array{data?:array<mixed>,error?:string}
+	 * @return array{name:string}
 	 */
 	public function parse($query): array {
-		$row = json_decode($query);
-		if ($row === null) {
+		$this->cols = $this->colTypes = [];
+		$row = json_decode($query, true);
+		if (!is_array($row)) {
 			// checking if query has ndjson format
-			try {
-				$queries = static::parseNDJSON($query);
-				foreach ($queries as $query) {
-					$row = json_decode($query);
-					if ($row === null) {
-						return ['error' => 'Unvalid JSON in query'];
-					}
-					$this->parseJSONRow((array)$row);
+			$queries = static::parseNdJSON($query);
+			foreach ($queries as $query) {
+				$row = json_decode($query, true);
+				if (!is_array($row)) {
+					throw new QueryParserError('Unvalid JSON in query');
 				}
-			} catch (Throwable $e) {
-				$this->error($e->getMessage());
+				$this->isNdJSON = true;
+				$this->parseJSONRow($row);
 			}
 		} else {
-			$this->parseJSONRow((array)$row);
+			$this->parseJSONRow($row);
 		}
-		return ['data' => ['name' => $this->name, 'cols' => $this->cols, 'colTypes' => $this->colTypes] ];
+
+		if ($this->error !== '') {
+			throw new QueryParserError($this->error);
+		}
+		return ['name' => $this->name];
+	}
+
+	/**
+	 * @param string $query
+	 * @return Iterable<string>
+	 */
+	public static function parseNdJSON($query): Iterable {
+		do {
+			$eolPos = strpos($query, PHP_EOL);
+			if ($eolPos === false) {
+				$eolPos = strlen($query);
+			}
+			$row = substr($query, 0, $eolPos);
+			if ($row !== '') {
+				yield $row;
+			}
+			$query = substr($query, $eolPos + 1);
+		} while (strlen($query) > 0);
 	}
 
 }

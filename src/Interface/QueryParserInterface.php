@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Interface;
 interface QueryParserInterface {
 	/**
 	 * @param string $query
-	 * @return array{data:array<mixed>,error?:string}
+	 * @return array<mixed>
 	 */
 	public function parse(string $query): array;
 }

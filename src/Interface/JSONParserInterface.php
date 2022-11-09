@@ -11,14 +11,12 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
-use \Iterable;
-
 interface JSONParserInterface extends QueryParserInterface {
 	/**
 	 * @param string $query
 	 * @return Iterable<string>
 	 */
-	public static function parseNDJSON(string $query): Iterable;
+	public static function parseNdJSON(string $query): Iterable;
 	/**
 	 * @param array<mixed> $query
 	 * @return array<mixed>

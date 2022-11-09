@@ -11,6 +11,6 @@
 
 namespace Manticoresearch\Buddy\Enum;
 
-enum DATALIM: int {
-	case MYSQL_MAX_INT = 2147483647;
+enum Datalim: int {
+	case MySqlMaxInt = 2147483647;
 }
