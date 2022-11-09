@@ -9,6 +9,8 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+namespace Manticoresearch\BuddyUnitTest\Lib;
+
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Lib\TaskStatus;
 use PHPUnit\Framework\TestCase;
@@ -22,7 +24,6 @@ class TaskTest extends TestCase {
 				return true;
 			}
 		);
-
 		$this->assertEquals(TaskStatus::Pending, $Task->getStatus());
 		$Task->run();
 		$this->assertEquals(TaskStatus::Running, $Task->getStatus());

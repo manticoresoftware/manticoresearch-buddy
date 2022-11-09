@@ -11,78 +11,149 @@
 
 namespace Manticoresearch\Buddy\Trait;
 
-use Manticoresearch\Buddy\Enum\DATATYPE;
+use Manticoresearch\Buddy\Enum\Datatype;
+// @codingStandardsIgnoreStart
+use RuntimeException;
+// @codingStandardsIgnoreEnd
 
 trait CheckInsertDataTrait {
 
 	/**
+	 * Checking for unescaped characters. Just as a test feature so far
+	 *
 	 * @param string|array<mixed> $row
+	 * @param class-string<RuntimeException> $errorHandler
 	 * @return void
 	 */
-	public function checkInsertRow(string|array $row): void {
-		$rowVals = $this->parseInsertValues($row);
-		$curColTypes = [];
-		foreach ($rowVals as $v) {
-			$curColTypes[] = static::detectValType($v);
+	public static function checkUnescapedChars(mixed $row, string $errorHandler): void {
+		if (!is_string($row)) {
+			return;
 		}
-		$this->checkColTypes($curColTypes);
-	}
-
-	/**
-	 * Checking potentially ambiguous datatypes and datatype errors
-	 *
-	 * @param array<DATATYPE> $curTypes
-	 * @return void
-	 */
-	protected function checkColTypes(array $curTypes): void {
-		if (!empty($this->colTypes)) {
-			// checking for column count in different rows
-			if (sizeof($curTypes) !== sizeof($this->colTypes) or sizeof($curTypes) !== sizeof($this->cols)) {
-				$this->error = 'Column count mismatch in INSERT statement';
-			} else {
-				$this->checkColTypesCompatibility($curTypes);
+		$charsToEsc = ['"'];
+		foreach ($charsToEsc as $ch) {
+			if (preg_match("/(?<!\\\\)$ch/", $row)) {
+				throw new $errorHandler("Unescaped '$ch' character found in INSERT statement");
 			}
-		} else {
-			$this->colTypes = array_map(
-				function ($v) {
-					return $v->value;
-				}, $curTypes
-			);
 		}
 	}
 
 	/**
-	 * Checking for incompatible column datatypes in different rows
+	 * Checking potentially incompatible Datatypes among values inserted
 	 *
-	 * @param array<DATATYPE> $curTypes
+	 * @param callable $checker
+	 * @param array<mixed> $rowVals
+	 * @param array<Datatype> $types
+	 * @param array<string> $cols
+	 * @param class-string<RuntimeException> $errorHandler
 	 * @return void
 	 */
-	protected function checkColTypesCompatibility(array $curTypes) {
+	public static function checkColTypesError(
+		callable $checker,
+		array $rowVals,
+		array &$types,
+		array $cols,
+		string $errorHandler
+	): void {
+		$curTypes = array_map($checker, $rowVals);
+		if (!empty($types)) {
+			// checking for column count in different rows
+			if (sizeof($curTypes) !== sizeof($types) or sizeof($curTypes) !== sizeof($cols)) {
+				throw new $errorHandler('Column count mismatch in INSERT statement');
+			}
+			self::checkColTypesCompatibilityError($curTypes, $types, $cols, $errorHandler);
+		} else {
+			$types = $curTypes;
+		}
+	}
+
+	/**
+	 * Checking for incompatible column Datatypes in different rows
+	 *
+	 * @param array<Datatype> $curTypes
+	 * @param array<Datatype> $types
+	 * @param array<string> $cols
+	 * @param class-string<RuntimeException> $errorHandler
+	 * @return void
+	 */
+	protected static function checkColTypesCompatibilityError(
+		array $curTypes,
+		array &$types,
+		array $cols,
+		string $errorHandler
+	): void {
 		$TYPE_BUNDLES = [
-			[DATATYPE::T_JSON],
-			[DATATYPE::T_MULTI_64, DATATYPE::T_MULTI],
-			[DATATYPE::T_FLOAT, DATATYPE::T_BIGINT, DATATYPE::T_INT],
-			[DATATYPE::T_TEXT, DATATYPE::T_STRING],
+			[Datatype::Json],
+			[Datatype::Multi64, Datatype::Multi],
+			[Datatype::Float, Datatype::Bigint, Datatype::Int],
+			[Datatype::Text, Datatype::String],
 		];
+		$error = '';
 		foreach ($curTypes as $i => $t) {
+			$i0 = $i;
 			foreach ($TYPE_BUNDLES as $tb) {
 				$i1 = array_search($t, $tb);
-				$i2 = array_search($this->colTypes[$i], $tb);
-				if (($i1 === false && $i2) || ($i2 === false && $i1)) {
-					if (!isset($this->error)) {
-						$this->error = "Incompatible data types for columns {$this->cols[$i]}: ";
-						$this->error .= "{$t->value} {$this->colTypes[$i]}";
-					} else {
-						$this->error .= ", {$this->cols[$i]}";
+				$i2 = array_search($types[$i], $tb);
+				if (($i1 === false && $i2 !== false) || ($i2 === false && $i1 !== false)) {
+					if ($error === '') {
+						$error = "Incompatible types in '{$cols[$i]}': ";
+					} elseif ($i !== $i0) {
+						$error .= "; '{$cols[$i]}': ";
 					}
+					$error .= "'{$t->value} {$types[$i]->value}',";
+					break;
 				}
-				// updating possible datatype by priority
+				// updating possible Datatype by priority set in TYPE_BUNDLES
 				if ($i1 >= $i2) {
 					continue;
 				}
-				$this->colTypes[$i] = $tb[$i1]->value;
+				$types[$i] = $tb[$i1];
 			}
+		}
+
+		if ($error !== '') {
+			throw new $errorHandler($error);
 		}
 	}
 
+	/**
+	 * Detecting if type is text or string, following Elastic's logic
+	 *
+	 * @param string $val
+	 * @return bool
+	 */
+	protected static function isManticoreString(string $val): bool {
+		$regexes = [
+			// so far only email regex is implemented for the prototype
+			'email' => '/^\s*(?:[a-z0-9!#$%&\'*+\/=?^_`{|}~-]+'
+			. '(?:\.[a-z0-9!#$%&\'*+\/=?^_`{|}~-]+)*|"'
+			. '(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|'
+			. '\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")\\@'
+			. '(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+'
+			. '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}'
+			. '(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*'
+			. '[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|'
+			. '\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])\s*$/i',
+		];
+		foreach ($regexes as $r) {
+			if (preg_match($r, substr($val, 0, -1))) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Converting enum Datatypes to their string values
+	 *
+	 * @param array<Datatype> $types
+	 * @return array<string>
+	 */
+	protected function stringifyColTypes(array $types): array {
+		return array_map(
+			function ($v) {
+				return $v->value;
+			}, $types
+		);
+	}
 }

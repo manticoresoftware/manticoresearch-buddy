@@ -9,13 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Interface;
+namespace Manticoresearch\Buddy\Enum;
 
-interface QueryParserLocatorInterface {
-	/**
-	 * @param string $reqFormat
-	 * @param string $queryType
-	 * @return object
-	 */
-	public function getQueryParser(string $reqFormat, string $queryType): object;
+enum RequestFormat: string {
+	case SQL = 'sphinqxl';
+	case JSON = 'http';
 }

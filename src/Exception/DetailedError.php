@@ -11,20 +11,18 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-use Manticoresearch\Buddy\Interface\CustomErrorInterface;
 use RuntimeException;
+use Throwable;
 
-abstract class DetailedError implements CustomErrorInterface {
+abstract class DetailedError extends RuntimeException {
 
 	const ERROR_MSG = '';
+	const NO_DETAILS_MSG = 'No details specified';
 
-	/**
-	 * @param string|null $message
-	 * @return void
-	 */
-	public function throw(string $message = null): void {
-		$message = static::ERROR_MSG . ($message ?? '');
-		throw new RuntimeException($message);
+	final public function __construct(string $message = '', int $code = 0, ?Throwable $previous = null) {
+		$basicErrorMsg = (static::ERROR_MSG !== '') ? static::ERROR_MSG . ': ' : '';
+		$message = $basicErrorMsg . ($message !== '' ? $message : self::NO_DETAILS_MSG);
+		parent::__construct($message, $code, $previous);
 	}
 
 }

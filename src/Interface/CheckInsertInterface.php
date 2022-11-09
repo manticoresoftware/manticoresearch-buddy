@@ -11,10 +11,34 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
+// @codingStandardsIgnoreStart
+use Manticoresearch\Buddy\Enum\Datatype;
+use RuntimeException;
+// @codingStandardsIgnoreEnd
+
 interface CheckInsertInterface {
 	/**
+	 * Checking for unescaped characters. Just as a test feature so far
+	 *
 	 * @param string|array<mixed> $row
+	 * @param class-string<RuntimeException> $errorHandler
 	 * @return void
 	 */
-	public function checkInsertRow(string|array $row): void;
+	public static function checkUnescapedChars(mixed $row, string $errorHandler): void;
+
+	/**
+	 * @param callable $checker
+	 * @param array<mixed> $rowVals
+	 * @param array<Datatype> $types
+	 * @param array<string> $cols
+	 * @param class-string<RuntimeException> $errorHandler
+	 * @return void
+	 */
+	public static function checkColTypesError(
+		callable $checker,
+		array $rowVals,
+		array &$types,
+		array $cols,
+		string $errorHandler
+	): void;
 }

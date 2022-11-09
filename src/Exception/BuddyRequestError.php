@@ -11,10 +11,8 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-use Manticoresearch\Buddy\Exception\DetailedError;
-
 final class BuddyRequestError extends DetailedError {
 
-	const ERROR_MSG = 'Build request error: ';
+	const ERROR_MSG = 'Build request error';
 
 }

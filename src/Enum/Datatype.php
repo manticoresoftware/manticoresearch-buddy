@@ -11,13 +11,13 @@
 
 namespace Manticoresearch\Buddy\Enum;
 
-enum DATATYPE: string {
-	case T_JSON = 'json';
-	case T_MULTI = 'multi';
-	case T_MULTI_64 = 'multi64';
-	case T_FLOAT = 'float';
-	case T_INT = 'int';
-	case T_BIGINT = 'bigint';
-	case T_TEXT = 'text';
-	case T_STRING = 'string';
+enum Datatype: string {
+	case Json = 'json';
+	case Multi = 'multi';
+	case Multi64 = 'multi64';
+	case Float = 'float';
+	case Int = 'int';
+	case Bigint = 'bigint';
+	case Text = 'text';
+	case String = 'string';
 }

@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Interface;
 interface StatementBuilderInterface {
 	/**
 	 * @param string $stmtName
-	 * @param array<string> $stmtData
+	 * @param array<mixed> $stmtData
 	 * @return string
 	 */
 	public function build(string $stmtName, array $stmtData): string;

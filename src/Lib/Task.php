@@ -55,20 +55,25 @@ final class Task {
 			function (Closure $fn, string $argv): bool|string {
 				define('STDOUT', fopen('/dev/stdout', 'wb+'));
 				define('STDERR', fopen('/dev/stderr', 'wb+'));
-
 				include_once __DIR__ . '/../../vendor/autoload.php';
 				try {
 					/** @var mixed[] $args */
 					$args = unserialize($argv);
-					$fn(...$args);
+					$res = $fn(...$args);
 				} catch (Throwable $e) {
 					return $e->getMessage();
 				}
-				return true;
+				if (!isset($res)) {
+					return true;
+				}
+				if (is_bool($res) || is_string($res)) {
+					return $res;
+				}
+				throw new RuntimeException("Task {$this->id} failed to return value of required bool|string type");
 			}, $this->argv
 		);
 
-		if ($future === null) {
+		if (!isset($future)) {
 			$this->status = TaskStatus::Failed;
 			throw new RuntimeException("Failed to run task: {$this->id}");
 		}
