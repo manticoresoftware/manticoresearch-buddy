@@ -11,27 +11,24 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
+use Exception;
 use Manticoresearch\Buddy\Enum\MntEndpoint;
 use Manticoresearch\Buddy\Interface\BuddyLocatorClientInterface;
 use Manticoresearch\Buddy\Interface\BuddyLocatorInterface;
-use Manticoresearch\Buddy\Interface\BuddyResponseInterface;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Interface\ErrorQueryRequestInterface;
 use Manticoresearch\Buddy\Interface\MntHTTPClientInterface;
-use Manticoresearch\Buddy\Interface\MntResponseBuilderInterface;
 // @codingStandardsIgnoreStart
+use Manticoresearch\Buddy\Interface\MntResponseBuilderInterface;
 use Manticoresearch\Buddy\Interface\StatementInterface;
 // @codingStandardsIgnoreEnd
-use Manticoresearch\Buddy\Trait\BuddyResponseTrait;
+use Manticoresearch\Buddy\Network\Response;
 use \RuntimeException;
 
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClientInterface, BuddyResponseInterface {
-
-	use BuddyResponseTrait;
-
+class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClientInterface {
 	const CANCEL_EXECUTION_MSG = 'The query cannot be corrected by Buddy';
 	const DEFAULT_ENDPOINT = MntEndpoint::Cli;
 	const DEFAULT_SERVER_URL = '127.0.0.1:9308';
@@ -79,9 +76,9 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$Task = Task::create(
-			$taskId, function (ErrorQueryExecutor $that, array $statements, MntEndpoint $finalEndpoint): string {
+			$taskId, function (ErrorQueryExecutor $that, array $statements, MntEndpoint $finalEndpoint): Response {
 				if (empty($statements)) {
-					return $this->buildResponse('', $that::CANCEL_EXECUTION_MSG);
+					return Response::fromError(new Exception($that::CANCEL_EXECUTION_MSG));
 				}
 				$mntClient = $that->getMntClient();
 				while (!empty($statements)) {
@@ -93,8 +90,8 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 					}
 					$resp = $mntClient->sendRequest($stmt->getBody());
 					if ($resp->hasError()) {
-						return $that->buildResponse(
-							$that->getRequest()->getOrigMsg(), (string)$resp->getError()
+						return Response::fromStringAndError(
+							$that->getRequest()->getOrigMsg(), new Exception((string)$resp->getError())
 						);
 					}
 				}
@@ -105,7 +102,7 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 					}
 				}
 
-				return $that->buildResponse($resp->getBody(), '');
+				return Response::fromString($resp->getBody());
 			}, [$this, $statements, $endpoint]
 		);
 

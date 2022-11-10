@@ -13,6 +13,7 @@ use Manticoresearch\Buddy\Enum\MntEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\ErrorQueryExecutor;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
+use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -25,33 +26,37 @@ class RunErrorQueryTaskTest extends TestCase {
 	}
 
 	/**
-	 * @param array{origMsg: string, query: string, format: RequestFormat, endpoint: MntEndpoint} $mntRequest
+	 * @param Request $request
 	 * @param string $mockServerUrl
 	 * @param string $resp
 	 */
-	protected function runTask($mntRequest, $mockServerUrl, $resp): void {
-		$request = ErrorQueryRequest::fromMntRequest($mntRequest);
+	protected function runTask(Request $request, $mockServerUrl, $resp): void {
+		$request = ErrorQueryRequest::fromNetworkRequest($request);
 		$executor = new ErrorQueryExecutor($request);
 		$executor->setMntClient($mockServerUrl);
 		$task = $executor->run();
-		sleep(1);
-		$task->getStatus();
+		// TODO: fix infinite loop here
+		while ($task->isRunning()) {
+			sleep(1);
+		};
 		$this->assertEquals($resp, $task->getResult());
 	}
 
-	public function testTaskRunWithInsertQuery():void {
+	public function testTaskRunWithInsertQuery(): void {
 		echo "\nTesting the execution of a task with INSERT query request\n";
 		$resp = "HTTP/1.1 200\r\nServer: buddy\r\nContent-Type: application/json; charset=UTF-8\r\n"
 			. "Content-Length: 95\r\n\r\n"
 			. '{"type":"http response","message":"[{\"total\":1,\"error\":\"\",\"warning\":\"\"}]","error":""}';
 		$mockServerUrl = self::setUpMockMntServer(false);
-		$mntRequest = [
-			'origMsg' => "index 'test' absent, or does not support INSERT",
-			'query' => 'INSERT INTO test(col1) VALUES(1)',
-			'format' => RequestFormat::SQL,
-			'endpoint' => MntEndpoint::Cli,
-		];
-		$this->runTask($mntRequest, $mockServerUrl, $resp);
+		$request = Request::fromArray(
+			[
+				'origMsg' => "index 'test' absent, or does not support INSERT",
+				'query' => 'INSERT INTO test(col1) VALUES(1)',
+				'format' => RequestFormat::SQL,
+				'endpoint' => MntEndpoint::Cli,
+			]
+		);
+		$this->runTask($request, $mockServerUrl, $resp);
 	}
 
 	public function testTaskRunWithShowQuery():void {
@@ -63,12 +68,14 @@ class RunErrorQueryTaskTest extends TestCase {
 			. '\n\"data\":[{\"proto\":\"http\",\"host\":\"127.0.0.1:584\",\"ID\":19,\"query\":\"select\"}'
 			. '\n],\n\"total\":1,\n\"error\":\"\",\n\"warning\":\"\"\n}]","error":""}';
 		$mockServerUrl = self::setUpMockMntServer(false);
-		$mntRequest = [
-			'origMsg' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
-			'query' => 'SHOW QUERIES',
-			'format' => RequestFormat::SQL,
-			'endpoint' => MntEndpoint::Cli,
-		];
-		$this->runTask($mntRequest, $mockServerUrl, $resp);
+		$request = Request::fromArray(
+			[
+				'origMsg' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
+				'query' => 'SHOW QUERIES',
+				'format' => RequestFormat::SQL,
+				'endpoint' => MntEndpoint::Cli,
+			]
+		);
+		$this->runTask($request, $mockServerUrl, $resp);
 	}
 }

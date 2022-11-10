@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
-use \Closure;
+use Closure;
 use Manticoresearch\Buddy\Enum\Action;
 use Manticoresearch\Buddy\Enum\MntEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
@@ -21,7 +21,8 @@ use Manticoresearch\Buddy\Interface\BuddyLocatorInterface;
 use Manticoresearch\Buddy\Interface\ErrorQueryRequestInterface;
 use Manticoresearch\Buddy\Interface\QueryParserLoaderInterface;
 use Manticoresearch\Buddy\Interface\StatementInterface;
-use \RuntimeException;
+use Manticoresearch\Buddy\Network\Request;
+use RuntimeException;
 
 class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClientInterface {
 
@@ -56,19 +57,19 @@ class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClien
 	protected array $correctionStmts;
 
 	/**
-	 * @param array{origMsg:string,query:string,format:RequestFormat,endpoint:MntEndpoint} $mntRequest
+	 * @param Request $request
 	 * @param ?BuddyLocatorInterface $locator
 	 * @param ?QueryParserLoaderInterface $queryParserLoader
 	 * @param ?StatementInterface $statementBuilder
 	 * @return void
 	 */
 	protected function __construct(
-		array $mntRequest,
+		Request $request,
 		protected ?BuddyLocatorInterface $locator = null,
 		protected ?QueryParserLoaderInterface $queryParserLoader = null,
 		protected ?StatementInterface $statementBuilder = null
 	) {
-		foreach ($mntRequest as $k => $v) {
+		foreach (get_object_vars($request) as $k => $v) {
 			$this->$k = $v;
 		}
 		// Resolve the possible ambiguity with Manticore query format as it may not correspond to request format
@@ -78,12 +79,11 @@ class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClien
 	}
 
 	/**
-	 * @param array{
-	 * origMsg:string,query:string,format:RequestFormat,endpoint:MntEndpoint} $mntRequest
+	 * @param Request $request
 	 * @return ErrorQueryRequest
 	 */
-	public static function fromMntRequest(array $mntRequest): ErrorQueryRequest {
-		return new self($mntRequest);
+	public static function fromNetworkRequest(Request $request): ErrorQueryRequest {
+		return new self($request);
 	}
 
 	/**
