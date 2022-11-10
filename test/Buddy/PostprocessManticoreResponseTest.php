@@ -13,10 +13,11 @@ use Manticoresearch\Buddy\Enum\MntEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\BuddyLocator;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
-use Manticoresearch\Buddy\Lib\MntHTTPClient;
 // use Manticoresearch\Buddy\Lib\MntResponse;
-use Manticoresearch\Buddy\Lib\MntResponseBuilder;
+use Manticoresearch\Buddy\Lib\MntHTTPClient;
 // use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
+use Manticoresearch\Buddy\Lib\MntResponseBuilder;
+use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -38,15 +39,17 @@ class PostprocessManticoreResponseTest extends TestCase {
 			. "\n"
 			. '"warning":""'
 			. "\n}]";
-		$mntRequest = [
-			'origMsg' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
-			'query' => 'SHOW QUERIES',
-			'format' => RequestFormat::SQL,
-			'endpoint' => MntEndpoint::Cli,
-		];
+		$request = Request::fromArray(
+			[
+				'origMsg' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
+				'query' => 'SHOW QUERIES',
+				'format' => RequestFormat::SQL,
+				'endpoint' => MntEndpoint::Cli,
+			]
+		);
 		$serverUrl = self::setUpMockMntServer(false);
 		$mntClient = new MntHTTPClient(new MntResponseBuilder(), $serverUrl);
-		$request = ErrorQueryRequest::fromMntRequest($mntRequest);
+		$request = ErrorQueryRequest::fromNetworkRequest($request);
 		$request->setLocator(new BuddyLocator());
 		$request->generateCorrectionStatements();
 		$statements = $request->getCorrectionStatements();

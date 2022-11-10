@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
 use Manticoresearch\Buddy\Interface\CommandRequestInterface;
+use Manticoresearch\Buddy\Network\Request;
 use RuntimeException;
 
 /**
@@ -40,13 +41,13 @@ class BackupRequest implements CommandRequestInterface {
   /**
    * Create instance by parsing query into parameters
    *
-   * @param array{query:string} $mntRequest
+   * @param Request $request
    *  The query itself without command prefix already
    * @return BackupRequest
    * @throws SQLQueryParsingError
    */
-	public static function fromMntRequest(array $mntRequest): BackupRequest {
-		$query = $mntRequest['query'];
+	public static function fromNetworkRequest(Request $request): BackupRequest {
+		$query = $request->query;
 		$whatPattern = '(?P<all>ALL)|(?:TABLES?\s*(?P<table>(,?\s*[\w]+\s*)+))';
 		$toPattern = 'TO\s*local\(\s*(?P<path>[\\_\-a-z/0-9]+)\s*\)';
 		$optionsKeys = implode('|', array_keys(static::OPTIONS));

@@ -11,10 +11,12 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
+use Manticoresearch\Buddy\Network\Request;
+
 interface CommandRequestInterface {
 	/**
-	 * @param array{query:string} $mntRequest
+	 * @param Request $request
 	 * @return CommandRequestInterface
 	 */
-	public static function fromMntRequest(array $mntRequest): CommandRequestInterface;
+	public static function fromNetworkRequest(Request $request): CommandRequestInterface;
 }

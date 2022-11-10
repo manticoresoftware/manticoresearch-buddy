@@ -13,7 +13,6 @@ use Manticoresearch\Buddy\Enum\Datatype;
 use Manticoresearch\Buddy\Trait\CheckInsertDataTrait;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
-use \RuntimeException;
 
 class CheckInsertDataTraitTest extends TestCase {
 

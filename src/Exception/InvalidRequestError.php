@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-class UnvalidMntRequestError extends DetailedError {
+class InvalidRequestError extends DetailedError {
 
 	const ERROR_MSG = 'Manticore request parse error';
 

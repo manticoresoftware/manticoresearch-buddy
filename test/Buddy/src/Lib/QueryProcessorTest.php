@@ -9,15 +9,17 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Enum\MntEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandMissing;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\Exception\UnvalidMntRequestError;
 use Manticoresearch\Buddy\Lib\BackupExecutor;
 use Manticoresearch\Buddy\Lib\BackupRequest;
 use Manticoresearch\Buddy\Lib\ErrorQueryExecutor;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -74,19 +76,19 @@ class QueryProcessorTest extends TestCase {
 			'endpoint' => 'cli',
 			'listen' => '127.0.0.1:9308',
 		];
-		$this->expectException(UnvalidMntRequestError::class);
+		$this->expectException(InvalidRequestError::class);
 		$this->expectExceptionMessage("Manticore request parse error: Unknown request type 'test'");
 		try {
 			self::invokeMethod(QueryProcessor::class, 'validateMntRequest', [$request]);
 		} finally {
 			$request['reqest_type'] = [];
-			$this->expectException(UnvalidMntRequestError::class);
+			$this->expectException(InvalidRequestError::class);
 			$this->expectExceptionMessage("Manticore request parse error: Field 'reqest_type' must be a string");
 			try {
 				self::invokeMethod(QueryProcessor::class, 'validateMntRequest', [$request]);
 			} finally {
 				unset($request['reqest_type']);
-				$this->expectException(UnvalidMntRequestError::class);
+				$this->expectException(InvalidRequestError::class);
 				$this->expectExceptionMessage(
 					"Manticore request parse error: Mandatory field 'reqest_type' is missing"
 				);
@@ -110,13 +112,13 @@ class QueryProcessorTest extends TestCase {
 	public function testManticoreQueryValidationFail(): void {
 		echo "\nTesting the validation of an incorrect request query from Manticore\n";
 		$query = '';
-		$this->expectException(UnvalidMntRequestError::class);
+		$this->expectException(InvalidRequestError::class);
 		$this->expectExceptionMessage('Manticore request parse error: Query is missing');
 		try {
 			self::invokeMethod(QueryProcessor::class, 'validateMntQuery', [$query]);
 		} finally {
 			$query = "Unvalid query\nis passed\nagain";
-			$this->expectException(UnvalidMntRequestError::class);
+			$this->expectException(InvalidRequestError::class);
 			$this->expectExceptionMessage(
 				"Manticore request parse error: Request body is missing in query '{$query}'"
 			);
@@ -124,7 +126,7 @@ class QueryProcessorTest extends TestCase {
 				self::invokeMethod(QueryProcessor::class, 'validateMntQuery', [$query]);
 			} finally {
 				$query = 'Query\nwith unvalid\n\n{"request_body"}';
-				$this->expectException(UnvalidMntRequestError::class);
+				$this->expectException(InvalidRequestError::class);
 				$this->expectExceptionMessage(
 					"Manticore request parse error: Unvalid request body '{\"request_body\"}' is passed"
 				);
@@ -135,15 +137,29 @@ class QueryProcessorTest extends TestCase {
 
 	public function testCommandProcessOk(): void {
 		echo "\nTesting the processing of execution command\n";
-		$command = 'BACKUP';
-		$executor = QueryProcessor::processCommand($command);
+		$request = Request::fromArray(
+			[
+				'origMsg' => '',
+				'query' => 'BACKUP',
+				'format' => RequestFormat::SQL,
+				'endpoint' => MntEndpoint::Cli,
+			]
+		);
+		$executor = QueryProcessor::process($request);
 		$this->assertInstanceOf(BackupExecutor::class, $executor);
 		$refCls = new ReflectionClass($executor);
 		$request = $refCls->getProperty('request')->getValue($executor);
 		$this->assertInstanceOf(BackupRequest::class, $request);
 
-		$command = 'ERROR QUERY';
-		$executor = QueryProcessor::processCommand($command);
+		$request = Request::fromArray(
+			[
+				'origMsg' => '',
+				'query' => 'ERROR QUERY',
+				'format' => RequestFormat::SQL,
+				'endpoint' => MntEndpoint::Cli,
+			]
+		);
+		$executor = QueryProcessor::process($request);
 		$this->assertInstanceOf(ErrorQueryExecutor::class, $executor);
 		$refCls = new ReflectionClass($executor);
 		$request = $refCls->getProperty('request')->getValue($executor);
@@ -154,7 +170,15 @@ class QueryProcessorTest extends TestCase {
 		echo "\nTesting the processing of incorrect execution command\n";
 		$this->expectException(SQLQueryCommandNotSupported::class);
 		$this->expectExceptionMessage("Command 'TEST' is not supported");
-		QueryProcessor::processCommand('TEST');
+		$request = Request::fromArray(
+			[
+				'origMsg' => '',
+				'query' => 'BACKUP',
+				'format' => RequestFormat::SQL,
+				'endpoint' => MntEndpoint::Cli,
+			]
+		);
+		QueryProcessor::process($request);
 	}
 
 }
