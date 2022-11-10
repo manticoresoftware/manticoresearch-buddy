@@ -17,9 +17,9 @@ use Manticoresearch\Buddy\Interface\QueryParserLoaderInterface;
 use Manticoresearch\Buddy\Interface\StatementInterface;
 use Manticoresearch\Buddy\Lib\BuddyLocator;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
+use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
-use \ReflectionClass;
 
 class GenerateCorrectionStatementsTest extends TestCase {
 
@@ -36,13 +36,15 @@ class GenerateCorrectionStatementsTest extends TestCase {
 	private static ReflectionClass $refCls;
 
 	public static function setUpBeforeClass(): void {
-		$mntRequest = [
-			'origMsg' => "index 'test' absent, or does not support INSERT",
-			'query' => 'INSERT INTO test(col1) VALUES(1)',
-			'format' => RequestFormat::SQL,
-			'endpoint' => MntEndpoint::Cli,
-		];
-		self::$request = ErrorQueryRequest::fromMntRequest($mntRequest);
+		$request = Request::fromArray(
+			[
+				'origMsg' => "index 'test' absent, or does not support INSERT",
+				'query' => 'INSERT INTO test(col1) VALUES(1)',
+				'format' => RequestFormat::SQL,
+				'endpoint' => MntEndpoint::Cli,
+			]
+		);
+		self::$request = ErrorQueryRequest::fromNetworkRequest($request);
 		self::$refCls = new ReflectionClass(self::$request);
 	}
 

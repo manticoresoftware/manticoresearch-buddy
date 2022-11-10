@@ -12,10 +12,11 @@
 use Manticoresearch\Buddy\Enum\Action;
 use Manticoresearch\Buddy\Enum\MntEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
 // @codingStandardsIgnoreStart
 use Manticoresearch\Buddy\Interface\ErrorQueryRequestInterface;
 // @codingStandardsIgnoreEnd
+use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
+use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -34,17 +35,19 @@ class ErrorQueryRequestTest extends TestCase {
 	private $refCls;
 
 	protected function setUp(): void {
-		$mntRequest = [
-			'origMsg' => '',
-			'query' => 'INSERT INTO test(col1) VALUES(1)',
-			'format' => RequestFormat::SQL,
-			'endpoint' => MntEndpoint::Cli,
-		];
-		$this->request = ErrorQueryRequest::fromMntRequest($mntRequest);
+		$request = Request::fromArray(
+			[
+				'origMsg' => '',
+				'query' => 'INSERT INTO test(col1) VALUES(1)',
+				'format' => RequestFormat::SQL,
+				'endpoint' => MntEndpoint::Cli,
+			]
+		);
+		$this->request = ErrorQueryRequest::fromNetworkRequest($request);
 		$this->refCls = new ReflectionClass($this->request);
 	}
 
-	public function testCreationFromMntRequest(): void {
+	public function testCreationFromNetworkRequest(): void {
 		echo "\nTesting the creation of ErrorQueryRequest from manticore request data struct\n";
 		$this->assertInstanceOf(ErrorQueryRequest::class, $this->request);
 	}

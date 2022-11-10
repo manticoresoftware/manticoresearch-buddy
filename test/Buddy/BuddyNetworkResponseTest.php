@@ -10,38 +10,33 @@
  */
 
 use Manticoresearch\Buddy\Exception\BuddyRequestError;
-use Manticoresearch\Buddy\Trait\BuddyResponseTrait;
+use Manticoresearch\Buddy\Network\Response;
 use PHPUnit\Framework\TestCase;
-use \RuntimeException;
 
-class BuddyResponseTraitTest extends TestCase {
-
-	use BuddyResponseTrait;
+class BuddyNetworkResponseTest extends TestCase {
 
 	public function testBuddyResponseBuildOk():void {
 		echo "\nTesting the building of Buddy response\n";
 		$msg = 'test message';
 		$err = 'test error';
 		$resp = "\"type\":\"http response\",\"message\":$msg,\"error\":$err";
-		$resp = "HTTP/1.1 200\r\nServer: buddy\r\nContent-Type: application/json; charset=UTF-8\r\n"
+		$resp = "HTTP/1.1 200\r\n"
+			. "Server: buddy\r\n"
+			. "Content-Type: application/json; charset=UTF-8\r\n"
 			. "Content-Length: 70\r\n\r\n{\"type\":\"http response\",\"message\":\"$msg\",\"error\":\"$err\"}";
-		$this->assertEquals($resp, $this->buildResponse($msg, $err));
+		$this->assertEquals($resp, (string)Response::fromStringAndError($msg, new Exception($err)));
 	}
 
 	public function testBuddyResponseBuildFail():void {
 		echo "\nTesting the fail on the building of Buddy response\n";
-		$this->expectException(RuntimeException::class);
-		$this->expectExceptionMessage('JSON data encode error');
+
 		$msg = chr(193);
 		$err = 'test error';
-		try {
-			$this->buildResponse($msg, $err);
-		} finally {
-			echo "\nTesting the fail with custom error handler previously passed\n";
-			$this->expectException(BuddyRequestError::class);
-			$this->expectExceptionMessage('Build request error: JSON data encode error');
-			$this->buildResponse($msg, $err, BuddyRequestError::class);
-		}
+		$resp = (string)Response::fromStringAndError($msg, new BuddyRequestError($err));
+		$this->assertStringContainsString(
+			'{"type":"http response","message":"","error":"Build request error: test error"}',
+			$resp
+		);
 	}
 
 }

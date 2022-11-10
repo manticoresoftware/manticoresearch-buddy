@@ -9,8 +9,10 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+use Manticoresearch\Buddy\Enum\MntEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\BackupRequest;
+use Manticoresearch\Buddy\Network\Request;
 use PHPUnit\Framework\TestCase;
 
 class BackupRequestTest extends TestCase {
@@ -132,8 +134,8 @@ class BackupRequestTest extends TestCase {
 	public function testSQLQueryParsing(): void {
 		echo 'Testing queries:' . PHP_EOL;
 		foreach (static::PARSING_SETS as ['args' => $args, 'checks' => $checks]) {
-			$request = BackupRequest::fromMntRequest(
-				static::buildSQLQuery($args)
+			$request = BackupRequest::fromNetworkRequest(
+				Request::fromArray(static::buildSQLQuery($args))
 			);
 			$this->assertEquals(true, is_a($request, BackupRequest::class));
 
@@ -150,7 +152,7 @@ class BackupRequestTest extends TestCase {
    * ! each assigment to query should end with space
    *
    * @param array{path?:string,tables?:string[],options?:array{async?:bool,compress?:bool}} $args
-   * @return array{origMsg:string,query:string,format:RequestFormat,endpoint:string}
+   * @return array{origMsg:string,query:string,format:RequestFormat,endpoint:MntEndpoint}
    */
 	protected static function buildSQLQuery(array $args): array {
 		$query = '';
@@ -178,7 +180,7 @@ class BackupRequestTest extends TestCase {
 			'origMsg' => '',
 			'query' => $query,
 			'format' => RequestFormat::SQL,
-			'endpoint' => '',
+			'endpoint' => MntEndpoint::Sql,
 		];
 	}
 }
