@@ -11,15 +11,15 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 
-interface MntHTTPClientInterface {
+interface ManticoreHTTPClientInterface {
 
 	/**
-	 * @param MntResponseBuilderInterface $responseBuilder
+	 * @param ManticoreResponseBuilderInterface $responseBuilder
 	 * @return void
 	 */
-	public function setResponseBuilder(MntResponseBuilderInterface $responseBuilder): void;
+	public function setResponseBuilder(ManticoreResponseBuilderInterface $responseBuilder): void;
 
 	/**
 	 * @param string $url
@@ -28,15 +28,15 @@ interface MntHTTPClientInterface {
 	public function setServerUrl(string $url): void;
 
 	/**
-	 * @param MntEndpoint $endpoint
+	 * @param ManticoreEndpoint $endpoint
 	 * @return void
 	 */
-	public function setEndpoint(MntEndpoint $endpoint): void;
+	public function setEndpoint(ManticoreEndpoint $endpoint): void;
 
 	/**
 	 * @param string $request
-	 * @param ?MntEndpoint $endpoint
-	 * @return MntResponseInterface
+	 * @param ?ManticoreEndpoint $endpoint
+	 * @return ManticoreResponseInterface
 	 */
-	public function sendRequest(string $request, MntEndpoint $endpoint = null): MntResponseInterface;
+	public function sendRequest(string $request, ManticoreEndpoint $endpoint = null): ManticoreResponseInterface;
 }

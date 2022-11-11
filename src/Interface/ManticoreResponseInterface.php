@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
-interface MntResponseInterface {
+interface ManticoreResponseInterface {
 	/**
 	 * @return bool
 	 */

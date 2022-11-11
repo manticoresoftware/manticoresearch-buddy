@@ -9,7 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\BackupRequest;
 use Manticoresearch\Buddy\Network\Request;
@@ -152,7 +152,7 @@ class BackupRequestTest extends TestCase {
    * ! each assigment to query should end with space
    *
    * @param array{path?:string,tables?:string[],options?:array{async?:bool,compress?:bool}} $args
-   * @return array{origMsg:string,query:string,format:RequestFormat,endpoint:MntEndpoint}
+   * @return array{origMsg:string,query:string,format:RequestFormat,endpoint:ManticoreEndpoint}
    */
 	protected static function buildSQLQuery(array $args): array {
 		$query = '';
@@ -180,7 +180,7 @@ class BackupRequestTest extends TestCase {
 			'origMsg' => '',
 			'query' => $query,
 			'format' => RequestFormat::SQL,
-			'endpoint' => MntEndpoint::Sql,
+			'endpoint' => ManticoreEndpoint::Sql,
 		];
 	}
 }

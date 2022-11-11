@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\BuddyTest\Lib;
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\SocketError;
 use RuntimeException;
 // @codingStandardsIgnoreStart
@@ -199,7 +199,7 @@ final class MockManticoreServer {
 			$resp = $this->hasErrorResponse ? self::CREATE_RESPONSE_FAIL : self::CREATE_RESPONSE_OK;
 		} elseif (stripos($request, 'INSERT') === 0) {
 			$resp = $this->hasErrorResponse ? self::SQL_INSERT_RESPONSE_FAIL : self::SQL_INSERT_RESPONSE_OK;
-		} elseif (MntEndpoint::from($this->reqEndpoint) === MntEndpoint::Insert) {
+		} elseif (ManticoreEndpoint::from($this->reqEndpoint) === ManticoreEndpoint::Insert) {
 			$resp = $this->hasErrorResponse ? self::JSON_INSERT_RESPONSE_FAIL : self::JSON_INSERT_RESPONSE_OK;
 		} elseif (stripos($request, 'SELECT') === 0) {
 			$resp = $this->hasErrorResponse ? self::SHOW_QUERIES_RESPONSE_FAIL : self::SHOW_QUERIES_RESPONSE_OK;

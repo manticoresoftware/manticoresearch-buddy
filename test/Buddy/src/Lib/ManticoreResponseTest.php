@@ -9,22 +9,22 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Exception\MntResponseError;
-use Manticoresearch\Buddy\Lib\MntResponse;
+use Manticoresearch\Buddy\Exception\ManticoreResponseError ;
+use Manticoresearch\Buddy\Lib\ManticoreResponse;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
-class MntResponseTest extends TestCase {
+class ManticoreResponseTest extends TestCase {
 
 	use TestProtectedTrait;
 
 	/**
-	 * @var MntResponse
+	 * @var ManticoreResponse
 	 */
 	protected $response;
 
 	/**
-	 * @var ReflectionClass<MntResponse> $refCls
+	 * @var ReflectionClass<ManticoreResponse> $refCls
 	 */
 	protected $refCls;
 
@@ -46,11 +46,11 @@ class MntResponseTest extends TestCase {
 			. "\n"
 			. '"a": 3'
 			. "\n}\n]\n}\n]";
-		$this->response = new MntResponse($responseBody);
-		$this->refCls = new \ReflectionClass(MntResponse::class);
+		$this->response = new ManticoreResponse($responseBody);
+		$this->refCls = new \ReflectionClass(ManticoreResponse::class);
 	}
 
-	public function testMntResponseCreateOk():void {
+	public function testManticoreResponseCreateOk():void {
 		echo "\nTesting the creation of Manticore response\n";
 		$columns = [
 			[
@@ -63,17 +63,17 @@ class MntResponseTest extends TestCase {
 		$data = [
 			['id' => 1, 'a' => 3],
 		];
-		$this->assertInstanceOf(MntResponse::class, $this->response);
+		$this->assertInstanceOf(ManticoreResponse::class, $this->response);
 		$this->assertNull($this->refCls->getProperty('error')->getValue($this->response));
 		$this->assertEquals($data, $this->refCls->getProperty('data')->getValue($this->response));
 		$this->assertEquals($columns, $this->refCls->getProperty('columns')->getValue($this->response));
 	}
 
-	public function testMntResponseFail(): void {
+	public function testManticoreResponseFail(): void {
 		echo "\nTesting the fail on the creation of Manticore response\n";
-		$this->expectException(MntResponseError::class);
+		$this->expectException(ManticoreResponseError ::class);
 		$this->expectExceptionMessage('Manticore response error: Unvalid JSON found');
-		new MntResponse('{"some unvalid json"}');
+		new ManticoreResponse('{"some unvalid json"}');
 	}
 
 	public function testHasError(): void {
@@ -115,7 +115,7 @@ class MntResponseTest extends TestCase {
 		$processor = function ($body, $data, $columns) {
 			return isset($body, $data, $columns) ? 'some unvalid json' : null;
 		};
-		$this->expectException(MntResponseError::class);
+		$this->expectException(ManticoreResponseError ::class);
 		$this->expectExceptionMessage('Manticore response error: Unvalid JSON found');
 		$this->response->postprocess($processor);
 	}

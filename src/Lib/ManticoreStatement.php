@@ -13,10 +13,10 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Closure;
 use Manticoresearch\Buddy\Enum\Action;
-use Manticoresearch\Buddy\Exception\MntStatementError;
+use Manticoresearch\Buddy\Exception\ManticoreStatementError;
 use Manticoresearch\Buddy\Interface\StatementInterface;
 
-final class MntStatement implements StatementInterface {
+final class ManticoreStatement implements StatementInterface {
 
 	/**
 	 * @var mixed $postprocessorGetter
@@ -94,13 +94,13 @@ final class MntStatement implements StatementInterface {
 			return $this->postprocessor;
 		}
 		if (!(isset($this->action, $this->postprocessorGetter)) || !is_callable($this->postprocessorGetter)) {
-			throw new MntStatementError('Cannot get a postprocessor');
+			throw new ManticoreStatementError('Cannot get a postprocessor');
 		}
 		$postprocessor = call_user_func_array($this->postprocessorGetter, [$this->action]);
 		if ($postprocessor instanceof Closure) {
 			return $postprocessor;
 		}
-		throw new MntStatementError('Unvalid postprocessor passed');
+		throw new ManticoreStatementError('Unvalid postprocessor passed');
 	}
 
 	/**

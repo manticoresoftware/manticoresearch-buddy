@@ -9,12 +9,10 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Interface;
+namespace Manticoresearch\Buddy\Exception;
 
-interface MntResponseBuilderInterface {
-	/**
-	 * @param string $body
-	 * @return MntResponseInterface
-	 */
-	public static function buildFromBody(string $body): MntResponseInterface;
+final class ManticoreStatementError extends DetailedError {
+
+	const ERROR_MSG = 'Manticore statement error';
+
 }

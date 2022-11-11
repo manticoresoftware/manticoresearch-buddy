@@ -13,7 +13,7 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Closure;
 use Manticoresearch\Buddy\Enum\Action;
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Enum\Statement;
 use Manticoresearch\Buddy\Interface\BuddyLocatorClientInterface;
@@ -47,8 +47,8 @@ class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClien
 	/** @var RequestFormat $format */
 	protected RequestFormat $queryFormat;
 
-	/** @var MntEndpoint $endpoint */
-	protected MntEndpoint $endpoint;
+	/** @var ManticoreEndpoint $endpoint */
+	protected ManticoreEndpoint $endpoint;
 
 	/**
 	 * List of Manticore statements to be used to execute original erroneous query
@@ -73,7 +73,7 @@ class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClien
 			$this->$k = $v;
 		}
 		// Resolve the possible ambiguity with Manticore query format as it may not correspond to request format
-		$this->queryFormat = in_array($this->endpoint, [MntEndpoint::Cli, MntEndpoint::Sql])
+		$this->queryFormat = in_array($this->endpoint, [ManticoreEndpoint::Cli, ManticoreEndpoint::Sql])
 		? RequestFormat::SQL : RequestFormat::JSON;
 		$this->locateHelpers();
 	}
@@ -125,9 +125,9 @@ class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClien
 	}
 
 	/**
-	 * @return MntEndpoint
+	 * @return ManticoreEndpoint
 	 */
-	public function getEndpoint(): MntEndpoint {
+	public function getEndpoint(): ManticoreEndpoint {
 		return $this->endpoint;
 	}
 

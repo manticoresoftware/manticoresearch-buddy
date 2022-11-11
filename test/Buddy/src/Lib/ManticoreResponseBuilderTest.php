@@ -9,11 +9,11 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Lib\MntResponse;
-use Manticoresearch\Buddy\Lib\MntResponseBuilder;
+use Manticoresearch\Buddy\Lib\ManticoreResponse;
+use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
 use PHPUnit\Framework\TestCase;
 
-class MntResponseBuilderTest extends TestCase {
+class ManticoreResponseBuilderTest extends TestCase {
 
 	public function testBuildFromBody(): void {
 		$responseBody = "[\n{\n"
@@ -33,8 +33,8 @@ class MntResponseBuilderTest extends TestCase {
 			. "\n"
 			. '"a": 3'
 			. "\n}\n]\n}\n]";
-		$mntResponse = MntResponseBuilder::buildFromBody($responseBody);
-		$this->assertInstanceOf(MntResponse::class, $mntResponse);
+		$mntResponse = ManticoreResponseBuilder::buildFromBody($responseBody);
+		$this->assertInstanceOf(ManticoreResponse::class, $mntResponse);
 		$this->assertEquals($responseBody, $mntResponse->getBody());
 	}
 
