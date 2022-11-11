@@ -85,7 +85,7 @@ class ManticoreResponse implements ManticoreResponseInterface {
 	protected function parse(): void {
 		$bodyJSON = json_decode($this->body, true);
 		if (!is_array($bodyJSON)) {
-			throw new ManticoreResponseError('Unvalid JSON found');
+			throw new ManticoreResponseError('Invalid JSON found');
 		}
 		if (empty($bodyJSON)) {
 			return;

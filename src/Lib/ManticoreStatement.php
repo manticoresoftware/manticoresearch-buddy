@@ -100,7 +100,7 @@ final class ManticoreStatement implements StatementInterface {
 		if ($postprocessor instanceof Closure) {
 			return $postprocessor;
 		}
-		throw new ManticoreStatementError('Unvalid postprocessor passed');
+		throw new ManticoreStatementError('Invalid postprocessor passed');
 	}
 
 	/**
