@@ -44,9 +44,7 @@ class RunErrorQueryTaskTest extends TestCase {
 
 	public function testTaskRunWithInsertQuery(): void {
 		echo "\nTesting the execution of a task with INSERT query request\n";
-		$resp = "HTTP/1.1 200\r\nServer: buddy\r\nContent-Type: application/json; charset=UTF-8\r\n"
-			. "Content-Length: 95\r\n\r\n"
-			. '{"type":"http response","message":"[{\"total\":1,\"error\":\"\",\"warning\":\"\"}]","error":""}';
+		$resp = '{"type":"http response","message":"[{\"total\":1,\"error\":\"\",\"warning\":\"\"}]","error":""}';
 		$mockServerUrl = self::setUpMockManticoreServer(false);
 		$request = Request::fromArray(
 			[
@@ -61,9 +59,7 @@ class RunErrorQueryTaskTest extends TestCase {
 
 	public function testTaskRunWithShowQuery():void {
 		echo "\nTesting the execution of a task with SHOW query request\n";
-		$resp = "HTTP/1.1 200\r\nServer: buddy\r\nContent-Type: application/json; charset=UTF-8\r\n"
-			. "Content-Length: 348\r\n\r\n"
-			. '{"type":"http response","message":"[{\n\"columns\":[{\"proto\":{\"type\":\"string\"}},'
+		$resp = '{"type":"http response","message":"[{\n\"columns\":[{\"proto\":{\"type\":\"string\"}},'
 			. '{\"host\":{\"type\":\"string\"}},{\"ID\":{\"type\":\"long long\"}},{\"query\":{\"type\":\"string\"}}],'
 			. '\n\"data\":[{\"proto\":\"http\",\"host\":\"127.0.0.1:584\",\"ID\":19,\"query\":\"select\"}'
 			. '\n],\n\"total\":1,\n\"error\":\"\",\n\"warning\":\"\"\n}]","error":""}';

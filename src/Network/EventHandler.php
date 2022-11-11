@@ -17,6 +17,8 @@ use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Lib\Task;
 // @codingStandardsIgnoreEnd
 use Manticoresearch\Buddy\Lib\TaskStatus;
+use Psr\Http\Message\ServerRequestInterface;
+use React\Http\Message\Response as HttpResponse;
 use Throwable;
 
 /**
@@ -33,7 +35,7 @@ final class EventHandler {
 	 * @param string $data
 	 * @return Response
 	 */
-	public static function data(string $data): Response {
+	protected static function data(string $data): Response {
 		try {
 			$request = Request::fromString($data);
 			$executor = QueryProcessor::process($request);
@@ -43,6 +45,27 @@ final class EventHandler {
 		}
 
 		return Response::none();
+	}
+
+	/**
+	 * Main handler for HTTP request that returns HttpResponse
+	 *
+	 * @param ServerRequestInterface $request
+	 * @return HttpResponse
+	 */
+	public static function request(ServerRequestInterface $request): HttpResponse {
+		static $headers = ['Content-Type' => 'application/json'];
+
+		// Allow only post and otherwise send bad request
+		if ($request->getMethod() !== 'POST') {
+			return new HttpResponse(
+				400, $headers, (string)Response::none()
+			);
+		}
+		$data = (string)$request->getBody();
+		$response = static::data($data);
+
+		return new HttpResponse(200, $headers, (string)$response);
 	}
 
 	/**
