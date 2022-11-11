@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
-use \Closure;
+use Closure;
 use Manticoresearch\Buddy\Enum\Action;
 
 interface StatementInterface {

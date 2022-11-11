@@ -13,8 +13,8 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Manticoresearch\Buddy\Exception\SocketError;
 use Manticoresearch\Buddy\Interface\SocketHandlerInterface;
-use \Socket;
-use \Throwable;
+use Socket;
+use Throwable;
 
 class SocketHandler implements SocketHandlerInterface {
 

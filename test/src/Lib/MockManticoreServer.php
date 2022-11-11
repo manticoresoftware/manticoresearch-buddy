@@ -13,7 +13,7 @@ namespace Manticoresearch\BuddyTest\Lib;
 
 use Manticoresearch\Buddy\Enum\MntEndpoint;
 use Manticoresearch\Buddy\Exception\SocketError;
-use \RuntimeException;
+use RuntimeException;
 // @codingStandardsIgnoreStart
 use Socket;
 // @codingStandardsIgnoreEnd
