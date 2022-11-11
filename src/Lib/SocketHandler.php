@@ -69,7 +69,7 @@ class SocketHandler implements SocketHandlerInterface {
 	}
 
 	/**
-	 * @return array{type:string,message:string,reqest_type:string}|false
+	 * @return array{type:string,message:string,request_type:string}|false
 	 */
 	public function readMsg(): array|false {
 		$srcData = $this->read();
@@ -85,7 +85,7 @@ class SocketHandler implements SocketHandlerInterface {
 				throw new SocketError('HTTP request without body');
 			}
 			$body = trim(implode(array_slice($lines, $bodySep)));
-			/** @var array{type:string,message:string,reqest_type:string}|false */
+			/** @var array{type:string,message:string,request_type:string}|false */
 			$reqJson = json_decode($body, true);
 		}
 

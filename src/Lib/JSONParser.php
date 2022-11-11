@@ -35,7 +35,7 @@ abstract class JSONParser extends QueryParser implements JSONParserInterface {
 			foreach ($queries as $query) {
 				$row = json_decode($query, true);
 				if (!is_array($row)) {
-					throw new QueryParserError('Unvalid JSON in query');
+					throw new QueryParserError('Invalid JSON in query');
 				}
 				$this->isNdJSON = true;
 				$this->parseJSONRow($row);

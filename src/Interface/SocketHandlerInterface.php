@@ -17,7 +17,7 @@ interface SocketHandlerInterface {
 	 */
 	public function hasMsg(): bool;
 	/**
-	 * @return array{type:string,message:string,reqest_type:string}|false
+	 * @return array{type:string,message:string,request_type:string}|false
 	 */
 	public function readMsg(): array|false;
 	/**
