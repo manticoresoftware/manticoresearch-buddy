@@ -11,7 +11,9 @@
 
 namespace Manticoresearch\Buddy\Network;
 
+use Exception;
 use React\EventLoop\Loop;
+use React\Http\HttpServer;
 use React\Socket\ConnectionInterface;
 use React\Socket\SocketServer;
 
@@ -59,7 +61,6 @@ final class Server {
 			default => $host,
 		};
 
-		// Create the socket for future use
 		$this->socket = new SocketServer(
 			"$this->host:$this->port",
 			array_replace(static::SOCKET_CONFIG, $config)
@@ -122,11 +123,18 @@ final class Server {
 		}
 
 		// Handle connections and subscribe to all events in handlers
+		// Create the socket for future use
+		if (!isset($this->handlers['request'])) {
+			throw new Exception('You are missing "request" handler to handle requeests');
+		}
+		$http = new HttpServer($this->handlers['request']);
+		unset($this->handlers['request']);
+
 		$this->socket->on(
 			'connection', function (ConnectionInterface $connection) {
 				echo 'New connection from ' . $connection->getRemoteAddress() . PHP_EOL;
 
-			// First add all ticks to run periodically
+				// First add all ticks to run periodically
 				foreach ($this->ticks['client'] as [$fn, $period]) {
 					Loop::addPeriodicTimer($period, $this->wrapFn($fn, $connection));
 				}
@@ -136,6 +144,8 @@ final class Server {
 				}
 			}
 		);
+
+		$http->listen($this->socket);
 
 		return $this;
 	}
