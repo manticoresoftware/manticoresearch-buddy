@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
-use \Closure;
+use Closure;
 use Manticoresearch\Buddy\Enum\Action;
 use Manticoresearch\Buddy\Exception\MntStatementError;
 use Manticoresearch\Buddy\Interface\StatementInterface;
