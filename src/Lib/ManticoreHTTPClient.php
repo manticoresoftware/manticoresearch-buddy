@@ -11,14 +11,14 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
-use Manticoresearch\Buddy\Exception\MntHTTPClientError;
-use Manticoresearch\Buddy\Interface\MntHTTPClientInterface;
-use Manticoresearch\Buddy\Interface\MntResponseBuilderInterface;
-use Manticoresearch\Buddy\Interface\MntResponseInterface;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
+use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
+use Manticoresearch\Buddy\Interface\ManticoreHTTPClientInterface;
+use Manticoresearch\Buddy\Interface\ManticoreResponseBuilderInterface;
+use Manticoresearch\Buddy\Interface\ManticoreResponseInterface;
 use RuntimeException;
 
-class MntHTTPClient implements MntHTTPClientInterface {
+class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 
 	const CONTENT_TYPE_HEADER = 'Content-Type: text/plain';
 	const CUSTOM_REDIRECT_DISABLE_HEADER = 'X-Manticore-Error-Redirect: disable';
@@ -30,23 +30,23 @@ class MntHTTPClient implements MntHTTPClientInterface {
 	protected string $response;
 
 	/**
-	 * @param ?MntResponseBuilderInterface $responseBuilder
+	 * @param ?ManticoreResponseBuilderInterface $responseBuilder
 	 * @param ?string $url
-	 * @param MntEndpoint $endpoint
+	 * @param ManticoreEndpoint $endpoint
 	 * @return void
 	 */
 	public function __construct(
-		protected ?MntResponseBuilderInterface $responseBuilder = null,
+		protected ?ManticoreResponseBuilderInterface $responseBuilder = null,
 		protected ?string $url = null,
-		protected MntEndpoint $endpoint = MntEndpoint::Cli
+		protected ManticoreEndpoint $endpoint = ManticoreEndpoint::Cli
 	) {
 	}
 
 	/**
-	 * @param MntResponseBuilderInterface $responseBuilder
+	 * @param ManticoreResponseBuilderInterface $responseBuilder
 	 * @return void
 	 */
-	public function setResponseBuilder(MntResponseBuilderInterface $responseBuilder): void {
+	public function setResponseBuilder(ManticoreResponseBuilderInterface $responseBuilder): void {
 		$this->responseBuilder = $responseBuilder;
 	}
 
@@ -60,22 +60,22 @@ class MntHTTPClient implements MntHTTPClientInterface {
 			$url = self::URL_PREFIX . $url;
 		}
 		if (!filter_var($url, FILTER_VALIDATE_URL)) {
-			throw new MntHTTPClientError("Malformed request url '$origUrl' passed");
+			throw new ManticoreHTTPClientError("Malformed request url '$origUrl' passed");
 		}
 		$this->url = $url;
 	}
 
 	/**
 	 * @param string $request
-	 * @param ?MntEndpoint $endpoint
-	 * @return MntResponseInterface
+	 * @param ?ManticoreEndpoint $endpoint
+	 * @return ManticoreResponseInterface
 	 */
-	public function sendRequest($request, MntEndpoint $endpoint = null): MntResponseInterface {
+	public function sendRequest($request, ManticoreEndpoint $endpoint = null): ManticoreResponseInterface {
 		if (!isset($this->responseBuilder)) {
-			throw new RuntimeException("'responseBuilder' property of MntHTTPClient class is not instantiated");
+			throw new RuntimeException("'responseBuilder' property of ManticoreHTTPClient class is not instantiated");
 		}
 		if ($request === '') {
-			throw new MntHTTPClientError('Empty request passed');
+			throw new ManticoreHTTPClientError('Empty request passed');
 		}
 		if (!isset($endpoint)) {
 			$endpoint = $this->endpoint;
@@ -83,7 +83,7 @@ class MntHTTPClient implements MntHTTPClientInterface {
 		$fullReqUrl = "{$this->url}/{$endpoint->value}";
 		$conn = curl_init($fullReqUrl);
 		if ($conn === false) {
-			throw new MntHTTPClientError("Cannot connect to server at $fullReqUrl");
+			throw new ManticoreHTTPClientError("Cannot connect to server at $fullReqUrl");
 		} else {
 			curl_setopt_array(
 				$conn,
@@ -100,7 +100,7 @@ class MntHTTPClient implements MntHTTPClientInterface {
 			$this->response = (string)curl_exec($conn);
 			curl_close($conn);
 			if ($this->response === '') {
-				throw new MntHTTPClientError('No response passed from server');
+				throw new ManticoreHTTPClientError('No response passed from server');
 			}
 		}
 
@@ -108,10 +108,10 @@ class MntHTTPClient implements MntHTTPClientInterface {
 	}
 
 	/**
-	 * @param MntEndpoint $endpoint
+	 * @param ManticoreEndpoint $endpoint
 	 * @return void
 	 */
-	public function setEndpoint(MntEndpoint $endpoint): void {
+	public function setEndpoint(ManticoreEndpoint $endpoint): void {
 		$this->endpoint = $endpoint;
 	}
 

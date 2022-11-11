@@ -9,10 +9,11 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Exception;
+namespace Manticoresearch\Buddy\Enum;
 
-final class MntResponseError extends DetailedError {
-
-	const ERROR_MSG = 'Manticore response error';
-
+enum ManticoreEndpoint: string {
+	case Cli = 'cli';
+	case Insert = 'insert';
+	case Sql = 'sql';
+	case Bulk = 'bulk';
 }

@@ -11,14 +11,14 @@
 
 namespace Manticoresearch\Buddy\Network;
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use ValueError;
 
 final class Request {
 	public RequestFormat $requestType;
-	public MntEndpoint $endpoint;
+	public ManticoreEndpoint $endpoint;
 	public RequestFormat $format;
 	public string $origMsg;
 	public string $query;
@@ -52,7 +52,7 @@ final class Request {
 	 * Helper to create request from prepare array data
 	 * It can be useful for tests
 	 *
-	 * @param array{origMsg:string,query:string,format:RequestFormat,endpoint:MntEndpoint} $data
+	 * @param array{origMsg:string,query:string,format:RequestFormat,endpoint:ManticoreEndpoint} $data
 	 * @return static
 	 */
 	public static function fromArray(array $data): static {
@@ -103,7 +103,7 @@ final class Request {
 		}
 		// Checking if request format and endpoint are supported
 		try {
-			$endpoint = MntEndpoint::from($payload['endpoint']);
+			$endpoint = ManticoreEndpoint::from($payload['endpoint']);
 			unset($payload['endpoint']);
 		} catch (ValueError) {
 			throw new InvalidRequestError("Unknown request endpoint '{$payload['endpoint']}'");

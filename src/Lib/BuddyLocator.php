@@ -13,8 +13,8 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Manticoresearch\Buddy\Exception\BuddyLocatorError;
 use Manticoresearch\Buddy\Interface\BuddyLocatorInterface;
-use Manticoresearch\Buddy\Interface\MntHTTPClientInterface;
-use Manticoresearch\Buddy\Interface\MntResponseBuilderInterface;
+use Manticoresearch\Buddy\Interface\ManticoreHTTPClientInterface;
+use Manticoresearch\Buddy\Interface\ManticoreResponseBuilderInterface;
 use Manticoresearch\Buddy\Interface\QueryParserLoaderInterface;
 use Manticoresearch\Buddy\Interface\StatementInterface;
 
@@ -27,9 +27,9 @@ class BuddyLocator implements BuddyLocatorInterface {
 	protected function getClassByInterface(string $interface): string {
 		return match ($interface) {
 			QueryParserLoaderInterface::class => QueryParserLoader::class,
-			MntHTTPClientInterface::class => MntHTTPClient::class,
-			MntResponseBuilderInterface::class => MntResponseBuilder::class,
-			StatementInterface::class => MntStatement::class,
+			ManticoreHTTPClientInterface::class => ManticoreHTTPClient::class,
+			ManticoreResponseBuilderInterface::class => ManticoreResponseBuilder::class,
+			StatementInterface::class => ManticoreStatement::class,
 			default => throw new BuddyLocatorError("Unsupported interface $interface passed"),
 		};
 	}

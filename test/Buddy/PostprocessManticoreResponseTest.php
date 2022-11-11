@@ -9,14 +9,14 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\BuddyLocator;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
-// use Manticoresearch\Buddy\Lib\MntResponse;
-use Manticoresearch\Buddy\Lib\MntHTTPClient;
+// use Manticoresearch\Buddy\Lib\ManticoreResponse;
+use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
 // use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
-use Manticoresearch\Buddy\Lib\MntResponseBuilder;
+use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
 use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
@@ -25,7 +25,7 @@ class PostprocessManticoreResponseTest extends TestCase {
 
 	use TestHTTPServerTrait;
 
-	public function testMntResponsePostprocess(): void {
+	public function testManticoreResponsePostprocess(): void {
 		echo "\nTesting the postprocessing of Manticore response received\n";
 		$respBody = "[{\n"
 			. '"columns":[{"proto":{"type":"string"}},{"host":{"type":"string"}},'
@@ -44,23 +44,23 @@ class PostprocessManticoreResponseTest extends TestCase {
 				'origMsg' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
 				'query' => 'SHOW QUERIES',
 				'format' => RequestFormat::SQL,
-				'endpoint' => MntEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
-		$serverUrl = self::setUpMockMntServer(false);
-		$mntClient = new MntHTTPClient(new MntResponseBuilder(), $serverUrl);
+		$serverUrl = self::setUpMockManticoreServer(false);
+		$manticoreClient = new ManticoreHTTPClient(new ManticoreResponseBuilder(), $serverUrl);
 		$request = ErrorQueryRequest::fromNetworkRequest($request);
 		$request->setLocator(new BuddyLocator());
 		$request->generateCorrectionStatements();
 		$statements = $request->getCorrectionStatements();
 		$stmt = $statements[0];
-		$resp = $mntClient->sendRequest($stmt->getBody());
+		$resp = $manticoreClient->sendRequest($stmt->getBody());
 		$processor = $stmt->getPostprocessor();
 		if (isset($processor)) {
 			$resp->postprocess($processor);
 		}
 		$this->assertEquals($respBody, $resp->getBody());
-		self::finishMockMntServer();
+		self::finishMockManticoreServer();
 	}
 
 }

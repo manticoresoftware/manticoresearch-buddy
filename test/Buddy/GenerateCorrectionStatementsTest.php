@@ -10,7 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Enum\Action;
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Enum\Statement;
 use Manticoresearch\Buddy\Interface\QueryParserLoaderInterface;
@@ -41,7 +41,7 @@ class GenerateCorrectionStatementsTest extends TestCase {
 				'origMsg' => "index 'test' absent, or does not support INSERT",
 				'query' => 'INSERT INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,
-				'endpoint' => MntEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
 		self::$request = ErrorQueryRequest::fromNetworkRequest($request);
@@ -83,7 +83,7 @@ class GenerateCorrectionStatementsTest extends TestCase {
 		$jsonQuery = '{"index":"test","id":1,"doc":{"col1" : 1}}';
 		self::$refCls->getProperty('format')->setValue(self::$request, RequestFormat::JSON);
 		self::$refCls->getProperty('queryFormat')->setValue(self::$request, RequestFormat::JSON);
-		self::$refCls->getProperty('endpoint')->setValue(self::$request, MntEndpoint::Insert);
+		self::$refCls->getProperty('endpoint')->setValue(self::$request, ManticoreEndpoint::Insert);
 		self::$refCls->getProperty('query')->setValue(self::$request, $jsonQuery);
 		$stmts = [
 			'CREATE TABLE IF NOT EXISTS test (col1 int)',
@@ -102,7 +102,7 @@ class GenerateCorrectionStatementsTest extends TestCase {
 		);
 		self::$refCls->getProperty('format')->setValue(self::$request, RequestFormat::SQL);
 		self::$refCls->getProperty('queryFormat')->setValue(self::$request, RequestFormat::SQL);
-		self::$refCls->getProperty('endpoint')->setValue(self::$request, MntEndpoint::Cli);
+		self::$refCls->getProperty('endpoint')->setValue(self::$request, ManticoreEndpoint::Cli);
 		self::$refCls->getProperty('query')->setValue(self::$request, 'SHOW QUERIES');
 		$stmts = ['SELECT * FROM @@system.sessions'];
 		$this->generate($stmts);
