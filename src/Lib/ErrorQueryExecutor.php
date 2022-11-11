@@ -23,7 +23,7 @@ use Manticoresearch\Buddy\Interface\MntResponseBuilderInterface;
 use Manticoresearch\Buddy\Interface\StatementInterface;
 // @codingStandardsIgnoreEnd
 use Manticoresearch\Buddy\Network\Response;
-use \RuntimeException;
+use RuntimeException;
 
 /**
  * This is the parent class to handle erroneous Manticore queries

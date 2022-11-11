@@ -16,7 +16,7 @@ use Manticoresearch\Buddy\Exception\MntHTTPClientError;
 use Manticoresearch\Buddy\Interface\MntHTTPClientInterface;
 use Manticoresearch\Buddy\Interface\MntResponseBuilderInterface;
 use Manticoresearch\Buddy\Interface\MntResponseInterface;
-use \RuntimeException;
+use RuntimeException;
 
 class MntHTTPClient implements MntHTTPClientInterface {
 

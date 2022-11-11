@@ -13,7 +13,7 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Manticoresearch\Buddy\Exception\MntResponseError;
 use Manticoresearch\Buddy\Interface\MntResponseInterface;
-use \Throwable;
+use Throwable;
 
 class MntResponse implements MntResponseInterface {
 

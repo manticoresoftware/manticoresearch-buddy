@@ -11,8 +11,8 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-use \RuntimeException;
-use \Throwable;
+use RuntimeException;
+use Throwable;
 
 final class SocketError extends RuntimeException {
 

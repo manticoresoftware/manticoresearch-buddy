@@ -14,8 +14,8 @@ namespace Manticoresearch\BuddyTest\Trait;
 use Manticoresearch\Buddy\Enum\MntEndpoint;
 use Manticoresearch\Buddy\Exception\SocketError;
 use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
-use \ReflectionClass;
-use \RuntimeException;
+use ReflectionClass;
+use RuntimeException;
 
 trait TestHTTPServerTrait {
 
