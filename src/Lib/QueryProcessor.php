@@ -24,9 +24,6 @@ class QueryProcessor {
 	/** @var array<string> CUSTOM_COMMAND_TYPES */
 	public const CUSTOM_COMMANDS = ['BACKUP'];
 
-	/** @var array<mixed> $mtest */
-	public static array $mtest;
-
 	/**
 	 * This is the main entry point to start parsing and processing query
 	 *
