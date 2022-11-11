@@ -64,13 +64,8 @@ final class Response {
 			'message' => $message,
 			'error' => $error?->getMessage(),
 		];
-		$body = json_encode($payload, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_IGNORE);
-		$body_len = strlen($body);
 		return new static(
-			"HTTP/1.1 200\r\n"
-			. "Server: buddy\r\n"
-			. "Content-Type: application/json; charset=UTF-8\r\n"
-			. "Content-Length: {$body_len}\r\n\r\n{$body}"
+			json_encode($payload, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_IGNORE)
 		);
 	}
 

@@ -31,7 +31,7 @@ $defaultOpts = ['sockAddr' => '127.0.0.1', 'sockPort' => 5000];
 ] = getopt('', $longopts) + $defaultOpts;
 
 Server::create($sockAddr, (int)$sockPort)
-	->addHandler('data', EventHandler::data(...))
+	->addHandler('request', EventHandler::request(...))
 	->addHandler('error', EventHandler::error(...))
 	->addTicker(
 		function () {

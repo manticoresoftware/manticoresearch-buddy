@@ -19,11 +19,7 @@ class BuddyNetworkResponseTest extends TestCase {
 		echo "\nTesting the building of Buddy response\n";
 		$msg = 'test message';
 		$err = 'test error';
-		$resp = "\"type\":\"http response\",\"message\":$msg,\"error\":$err";
-		$resp = "HTTP/1.1 200\r\n"
-			. "Server: buddy\r\n"
-			. "Content-Type: application/json; charset=UTF-8\r\n"
-			. "Content-Length: 70\r\n\r\n{\"type\":\"http response\",\"message\":\"$msg\",\"error\":\"$err\"}";
+		$resp = "{\"type\":\"http response\",\"message\":\"$msg\",\"error\":\"$err\"}";
 		$this->assertEquals($resp, (string)Response::fromStringAndError($msg, new Exception($err)));
 	}
 
