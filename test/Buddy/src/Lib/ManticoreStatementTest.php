@@ -9,18 +9,18 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Lib\MntStatement;
+use Manticoresearch\Buddy\Lib\ManticoreStatement;
 use PHPUnit\Framework\TestCase;
 
-class MntStatementTest extends TestCase {
+class ManticoreStatementTest extends TestCase {
 
-	public function testMntStatementCreate():void {
+	public function testManticoreStatementCreate():void {
 		$stmtBody = 'CREATE TABLE IF NOT EXISTS test (col text)';
-		$stmt = MntStatement::create($stmtBody);
-		$this->assertInstanceOf(MntStatement::class, $stmt);
+		$stmt = ManticoreStatement::create($stmtBody);
+		$this->assertInstanceOf(ManticoreStatement::class, $stmt);
 		$postprocessor = function () {
 		};
-		$stmt = MntStatement::create($stmtBody, $postprocessor);
+		$stmt = ManticoreStatement::create($stmtBody, $postprocessor);
 		$this->assertEquals($postprocessor, $stmt->getPostprocessor());
 	}
 

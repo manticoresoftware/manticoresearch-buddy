@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\BuddyTest\Trait;
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\SocketError;
 use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
 use ReflectionClass;
@@ -57,7 +57,7 @@ trait TestHTTPServerTrait {
 	 * @return string
 	 */
 	protected static function makeStartupScript(): string {
-		$requiredClasses = [MntEndpoint::class, SocketError::class, MockManticoreServer::class];
+		$requiredClasses = [ManticoreEndpoint::class, SocketError::class, MockManticoreServer::class];
 		$requireCode = implode(
 			PHP_EOL,
 			array_map(
@@ -80,8 +80,8 @@ trait TestHTTPServerTrait {
 	/**
 	 * @return void
 	 */
-	protected static function createMockMntServer(): void {
-		self::finishMockMntServer();
+	protected static function createMockManticoreServer(): void {
+		self::finishMockManticoreServer();
 
 		$addr = '127.0.0.1';
 		$port = self::checkServerPortAvailable($addr);
@@ -102,7 +102,7 @@ trait TestHTTPServerTrait {
 	/**
 	 * @return void
 	 */
-	public static function finishMockMntServer(): void {
+	public static function finishMockManticoreServer(): void {
 		if (self::$mockServerProc === false || !is_resource(self::$mockServerProc)) {
 			return;
 		}
@@ -116,12 +116,12 @@ trait TestHTTPServerTrait {
 	 * @param bool $isMockServerInErrorMode
 	 * @return string
 	 */
-	public static function setUpMockMntServer(
+	public static function setUpMockManticoreServer(
 		bool $isMockServerInErrorMode = false
 		//string $testFailMsg = 'Mock Manticore server cannot be created'
 	): string {
 		self::$isMockServerInErrorMode = $isMockServerInErrorMode;
-		self::createMockMntServer();
+		self::createMockManticoreServer();
 // 		if ($mockServerUrl === '') {
 // 			return $this->fail($testFailMsg);
 // 		}

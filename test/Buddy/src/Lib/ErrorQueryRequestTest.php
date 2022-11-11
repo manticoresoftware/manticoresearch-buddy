@@ -10,7 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Enum\Action;
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 // @codingStandardsIgnoreStart
 use Manticoresearch\Buddy\Interface\ErrorQueryRequestInterface;
@@ -40,7 +40,7 @@ class ErrorQueryRequestTest extends TestCase {
 				'origMsg' => '',
 				'query' => 'INSERT INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,
-				'endpoint' => MntEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
 		$this->request = ErrorQueryRequest::fromNetworkRequest($request);

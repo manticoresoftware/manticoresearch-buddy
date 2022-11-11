@@ -12,14 +12,14 @@
 namespace Manticoresearch\Buddy\Lib;
 
 use Exception;
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Interface\BuddyLocatorClientInterface;
 use Manticoresearch\Buddy\Interface\BuddyLocatorInterface;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Interface\ErrorQueryRequestInterface;
-use Manticoresearch\Buddy\Interface\MntHTTPClientInterface;
+use Manticoresearch\Buddy\Interface\ManticoreHTTPClientInterface;
 // @codingStandardsIgnoreStart
-use Manticoresearch\Buddy\Interface\MntResponseBuilderInterface;
+use Manticoresearch\Buddy\Interface\ManticoreResponseBuilderInterface;
 use Manticoresearch\Buddy\Interface\StatementInterface;
 // @codingStandardsIgnoreEnd
 use Manticoresearch\Buddy\Network\Response;
@@ -30,14 +30,14 @@ use RuntimeException;
  */
 class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClientInterface {
 	const CANCEL_EXECUTION_MSG = 'The query cannot be corrected by Buddy';
-	const DEFAULT_ENDPOINT = MntEndpoint::Cli;
+	const DEFAULT_ENDPOINT = ManticoreEndpoint::Cli;
 	const DEFAULT_SERVER_URL = '127.0.0.1:9308';
 
 	/** @var BuddyLocatorInterface $locator */
 	protected BuddyLocatorInterface $locator;
 
-	/** @var MntHTTPClientInterface $mntClient */
-	protected ?MntHTTPClientInterface $mntClient = null;
+	/** @var ManticoreHTTPClientInterface $manticoreClient */
+	protected ?ManticoreHTTPClientInterface $manticoreClient = null;
 
 	/**
 	 *  Initialize the executor
@@ -57,10 +57,10 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 	}
 
 	/**
-	 * @return MntHTTPClientInterface
+	 * @return ManticoreHTTPClientInterface
 	 */
-	public function getMntClient(): MntHTTPClientInterface {
-		return $this->mntClient ?? $this->setMntClient();
+	public function getManticoreClient(): ManticoreHTTPClientInterface {
+		return $this->manticoreClient ?? $this->setManticoreClient();
 	}
 
 	/**
@@ -75,35 +75,36 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$Task = Task::create(
-			$taskId, function (ErrorQueryExecutor $that, array $statements, MntEndpoint $finalEndpoint): Response {
-				if (empty($statements)) {
-					return Response::fromError(new Exception($that::CANCEL_EXECUTION_MSG));
+		$taskFn = function (ErrorQueryExecutor $that, array $statements, ManticoreEndpoint $finalEndpoint): Response {
+			if (empty($statements)) {
+				return Response::fromError(new Exception($that::CANCEL_EXECUTION_MSG));
+			}
+			$manticoreClient = $that->getManticoreClient();
+			while (!empty($statements)) {
+				$stmt = array_shift($statements);
+				// When processing the final statement we need to make sure the response to client
+				// has the same format as the initial request, otherwise we just use 'cli' endpoint
+				if (sizeof($statements) === 1) {
+					$manticoreClient->setEndpoint($finalEndpoint);
 				}
-				$mntClient = $that->getMntClient();
-				while (!empty($statements)) {
-					$stmt = array_shift($statements);
-					// When processing the final statement we need to make sure the response to client
-					// has the same format as the initial request, otherwise we just use 'cli' endpoint
-					if (sizeof($statements) === 1) {
-						$mntClient->setEndpoint($finalEndpoint);
-					}
-					$resp = $mntClient->sendRequest($stmt->getBody());
-					if ($resp->hasError()) {
-						return Response::fromStringAndError(
-							$that->getRequest()->getOrigMsg(), new Exception((string)$resp->getError())
-						);
-					}
+				$resp = $manticoreClient->sendRequest($stmt->getBody());
+				if ($resp->hasError()) {
+					return Response::fromStringAndError(
+						$that->getRequest()->getOrigMsg(), new Exception((string)$resp->getError())
+					);
 				}
-				if ($stmt->hasPostprocessor()) {
-					$processor = $stmt->getPostprocessor();
-					if (isset($processor)) {
-						$resp->postprocess($processor);
-					}
+			}
+			if ($stmt->hasPostprocessor()) {
+				$processor = $stmt->getPostprocessor();
+				if (isset($processor)) {
+					$resp->postprocess($processor);
 				}
+			}
 
-				return Response::fromString($resp->getBody());
-			}, [$this, $statements, $endpoint]
+			return Response::fromString($resp->getBody());
+		};
+		$Task = Task::create(
+			$taskId, $taskFn, [$this, $statements, $endpoint]
 		);
 
 		return $Task->run();
@@ -121,27 +122,27 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 	 * Instantiating the http client to execute requests to Manticore server
 	 *
 	 * @param ?string $url
-	 * @return MntHTTPClientInterface
+	 * @return ManticoreHTTPClientInterface
 	 * @throws RuntimeException
 	 */
-	public function setMntClient(string $url = null): MntHTTPClientInterface {
-		$mntClient = $this->locator->getByInterface(MntHTTPClientInterface::class);
-		if (!$mntClient instanceof MntHTTPClientInterface) {
+	public function setManticoreClient(string $url = null): ManticoreHTTPClientInterface {
+		$manticoreClient = $this->locator->getByInterface(ManticoreHTTPClientInterface::class);
+		if (!$manticoreClient instanceof ManticoreHTTPClientInterface) {
 			throw new RuntimeException('Http client is missing');
 		}
-		$this->mntClient = $mntClient;
+		$this->manticoreClient = $manticoreClient;
 		$this->locator->getByInterface(
-			MntResponseBuilderInterface::class, [], $this->mntClient, 'setResponseBuilder'
+			ManticoreResponseBuilderInterface::class, [], $this->manticoreClient, 'setResponseBuilder'
 		);
-		$this->mntClient->setServerUrl($url ?? self::DEFAULT_SERVER_URL);
-		$this->mntClient->setEndpoint(self::DEFAULT_ENDPOINT);
-		return $this->mntClient;
+		$this->manticoreClient->setServerUrl($url ?? self::DEFAULT_SERVER_URL);
+		$this->manticoreClient->setEndpoint(self::DEFAULT_ENDPOINT);
+		return $this->manticoreClient;
 	}
 
 	/**
 	 * Preprocessing the request to get all data required for the task to start
 	 *
-	 * @return array{0:array<StatementInterface>,1:MntEndpoint}
+	 * @return array{0:array<StatementInterface>,1:ManticoreEndpoint}
 	 */
 	protected function prepareRequest(): array {
 		$this->request->setLocator($this->locator);

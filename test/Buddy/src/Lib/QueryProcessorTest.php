@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandMissing;
@@ -142,7 +142,7 @@ class QueryProcessorTest extends TestCase {
 				'origMsg' => '',
 				'query' => 'BACKUP',
 				'format' => RequestFormat::SQL,
-				'endpoint' => MntEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
 		$executor = QueryProcessor::process($request);
@@ -156,7 +156,7 @@ class QueryProcessorTest extends TestCase {
 				'origMsg' => '',
 				'query' => 'ERROR QUERY',
 				'format' => RequestFormat::SQL,
-				'endpoint' => MntEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
 		$executor = QueryProcessor::process($request);
@@ -175,7 +175,7 @@ class QueryProcessorTest extends TestCase {
 				'origMsg' => '',
 				'query' => 'BACKUP',
 				'format' => RequestFormat::SQL,
-				'endpoint' => MntEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
 		QueryProcessor::process($request);

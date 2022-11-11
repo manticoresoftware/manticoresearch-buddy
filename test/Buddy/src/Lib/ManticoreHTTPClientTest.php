@@ -9,45 +9,45 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
-use Manticoresearch\Buddy\Exception\MntHTTPClientError;
-use Manticoresearch\Buddy\Lib\MntHTTPClient;
-use Manticoresearch\Buddy\Lib\MntResponseBuilder;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
+use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
+use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
+use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
-class MntHTTPClientTest extends TestCase {
+class ManticoreHTTPClientTest extends TestCase {
 
 	use TestProtectedTrait;
 
 	/**
-	 * @var MntHTTPClient $client
+	 * @var ManticoreHTTPClient $client
 	 */
 	private $client;
 
 	/**
-	 * @var ReflectionClass<MntHTTPClient> $refCls
+	 * @var ReflectionClass<ManticoreHTTPClient> $refCls
 	 */
 	private $refCls;
 
 	protected function setUp(): void {
-		$this->client = new MntHTTPClient();
-		$this->refCls = new \ReflectionClass(MntHTTPClient::class);
+		$this->client = new ManticoreHTTPClient();
+		$this->refCls = new \ReflectionClass(ManticoreHTTPClient::class);
 	}
 
-	public function testMntHTTPClientCreate(): void {
-		$this->assertInstanceOf(MntHTTPClient::class, $this->client);
+	public function testManticoreHTTPClientCreate(): void {
+		$this->assertInstanceOf(ManticoreHTTPClient::class, $this->client);
 		$this->assertNull($this->refCls->getProperty('url')->getValue($this->client));
-		$this->assertEquals(MntEndpoint::Cli, $this->refCls->getProperty('endpoint')->getValue($this->client));
+		$this->assertEquals(ManticoreEndpoint::Cli, $this->refCls->getProperty('endpoint')->getValue($this->client));
 
-		$client = new MntHTTPClient(new MntResponseBuilder(), 'localhost:1000', MntEndpoint::Insert);
-		$this->assertInstanceOf(MntHTTPClient::class, $client);
+		$client = new ManticoreHTTPClient(new ManticoreResponseBuilder(), 'localhost:1000', ManticoreEndpoint::Insert);
+		$this->assertInstanceOf(ManticoreHTTPClient::class, $client);
 	}
 
 // 	public function testResponseBuilderSet(): void {
-// 		$this->client->setResponseBuilder(new MntResponseBuilder());
+// 		$this->client->setResponseBuilder(new ManticoreResponseBuilder());
 // 		$respBuilder = $this->refCls->getProperty('responseBuilder')->getValue($this->client);
-// 		$this->assertInstanceOf(MntResponseBuilder::class, $respBuilder);
+// 		$this->assertInstanceOf(ManticoreResponseBuilder::class, $respBuilder);
 // 	}
 
 	public function testResponseUrlSetOk(): void {
@@ -58,14 +58,14 @@ class MntHTTPClientTest extends TestCase {
 
 	public function testResponseUrlSetFail(): void {
 		$url = 'some_unvalid_url';
-		$this->expectException(MntHTTPClientError::class);
+		$this->expectException(ManticoreHTTPClientError::class);
 		$this->expectExceptionMessage("Manticore request error: Malformed request url '$url' passed");
 		$this->client->setServerUrl($url);
 	}
 
 // 	public function testEndpointSet(): void {
-// 		$this->client->setEndpoint(MntEndpoint::Insert);
-// 		$this->assertEquals(MntEndpoint::Insert, $this->refCls->getProperty('endpoint')->getValue($this->client));
+// 		$this->client->setEndpoint(ManticoreEndpoint::Insert);
+// 		$this->assertEquals(ManticoreEndpoint::Insert, $this->refCls->getProperty('endpoint')->getValue($this->client));
 // 	}
 
 }

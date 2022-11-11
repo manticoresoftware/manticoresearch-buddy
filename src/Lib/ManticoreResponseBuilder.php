@@ -9,11 +9,15 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Enum;
+namespace Manticoresearch\Buddy\Lib;
 
-enum MntEndpoint: string {
-	case Cli = 'cli';
-	case Insert = 'insert';
-	case Sql = 'sql';
-	case Bulk = 'bulk';
+use Manticoresearch\Buddy\Interface\ManticoreResponseBuilderInterface;
+use Manticoresearch\Buddy\Interface\ManticoreResponseInterface;
+
+class ManticoreResponseBuilder implements ManticoreResponseBuilderInterface {
+
+	public static function buildFromBody(string $body): ManticoreResponseInterface {
+		return new ManticoreResponse($body);
+	}
+
 }

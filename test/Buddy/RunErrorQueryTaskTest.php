@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\ErrorQueryExecutor;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
@@ -22,7 +22,7 @@ class RunErrorQueryTaskTest extends TestCase {
 	use TestHTTPServerTrait;
 
 	protected function tearDown(): void {
-		self::finishMockMntServer();
+		self::finishMockManticoreServer();
 	}
 
 	/**
@@ -33,7 +33,7 @@ class RunErrorQueryTaskTest extends TestCase {
 	protected function runTask(Request $request, $mockServerUrl, $resp): void {
 		$request = ErrorQueryRequest::fromNetworkRequest($request);
 		$executor = new ErrorQueryExecutor($request);
-		$executor->setMntClient($mockServerUrl);
+		$executor->setManticoreClient($mockServerUrl);
 		$task = $executor->run();
 		// TODO: fix infinite loop here
 		while ($task->isRunning()) {
@@ -47,13 +47,13 @@ class RunErrorQueryTaskTest extends TestCase {
 		$resp = "HTTP/1.1 200\r\nServer: buddy\r\nContent-Type: application/json; charset=UTF-8\r\n"
 			. "Content-Length: 95\r\n\r\n"
 			. '{"type":"http response","message":"[{\"total\":1,\"error\":\"\",\"warning\":\"\"}]","error":""}';
-		$mockServerUrl = self::setUpMockMntServer(false);
+		$mockServerUrl = self::setUpMockManticoreServer(false);
 		$request = Request::fromArray(
 			[
 				'origMsg' => "index 'test' absent, or does not support INSERT",
 				'query' => 'INSERT INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,
-				'endpoint' => MntEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
 		$this->runTask($request, $mockServerUrl, $resp);
@@ -67,13 +67,13 @@ class RunErrorQueryTaskTest extends TestCase {
 			. '{\"host\":{\"type\":\"string\"}},{\"ID\":{\"type\":\"long long\"}},{\"query\":{\"type\":\"string\"}}],'
 			. '\n\"data\":[{\"proto\":\"http\",\"host\":\"127.0.0.1:584\",\"ID\":19,\"query\":\"select\"}'
 			. '\n],\n\"total\":1,\n\"error\":\"\",\n\"warning\":\"\"\n}]","error":""}';
-		$mockServerUrl = self::setUpMockMntServer(false);
+		$mockServerUrl = self::setUpMockManticoreServer(false);
 		$request = Request::fromArray(
 			[
 				'origMsg' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
 				'query' => 'SHOW QUERIES',
 				'format' => RequestFormat::SQL,
-				'endpoint' => MntEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
 		$this->runTask($request, $mockServerUrl, $resp);

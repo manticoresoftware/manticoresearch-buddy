@@ -11,11 +11,11 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
-use Manticoresearch\Buddy\Exception\MntResponseError;
-use Manticoresearch\Buddy\Interface\MntResponseInterface;
+use Manticoresearch\Buddy\Exception\ManticoreResponseError ;
+use Manticoresearch\Buddy\Interface\ManticoreResponseInterface;
 use Throwable;
 
-class MntResponse implements MntResponseInterface {
+class ManticoreResponse implements ManticoreResponseInterface {
 
 	/**
 	 * @var array<string,mixed> $data
@@ -67,25 +67,25 @@ class MntResponse implements MntResponseInterface {
 	 * @param callable $processor
 	 * @param array<mixed> $args
 	 * @return void
-	 * @throws MntResponseError
+	 * @throws ManticoreResponseError
 	 */
 	public function postprocess(callable $processor, array $args = []): void {
 		try {
 			$this->body = $processor($this->body, $this->data, $this->columns, ...$args);
 		} catch (Throwable $e) {
-			throw new MntResponseError("Postprocessing function failed to run: {$e->getMessage()}");
+			throw new ManticoreResponseError("Postprocessing function failed to run: {$e->getMessage()}");
 		}
 		$this->parse();
 	}
 
 	/**
 	 * @return void
-	 * @throws MntResponseError
+	 * @throws ManticoreResponseError
 	 */
 	protected function parse(): void {
 		$bodyJSON = json_decode($this->body, true);
 		if (!is_array($bodyJSON)) {
-			throw new MntResponseError('Unvalid JSON found');
+			throw new ManticoreResponseError('Unvalid JSON found');
 		}
 		if (empty($bodyJSON)) {
 			return;

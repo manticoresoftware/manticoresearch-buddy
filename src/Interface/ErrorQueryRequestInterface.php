@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
-use Manticoresearch\Buddy\Enum\MntEndpoint;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 
 interface ErrorQueryRequestInterface extends CommandRequestInterface {
 
@@ -31,8 +31,8 @@ interface ErrorQueryRequestInterface extends CommandRequestInterface {
 	public function getOrigMsg(): string;
 
 	/**
-	 * @return MntEndpoint
+	 * @return ManticoreEndpoint
 	 */
-	public function getEndpoint(): MntEndpoint;
+	public function getEndpoint(): ManticoreEndpoint;
 
 }

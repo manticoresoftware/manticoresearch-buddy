@@ -9,15 +9,10 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Exception;
 
-use Manticoresearch\Buddy\Interface\MntResponseBuilderInterface;
-use Manticoresearch\Buddy\Interface\MntResponseInterface;
+final class ManticoreHTTPClientError extends DetailedError {
 
-class MntResponseBuilder implements MntResponseBuilderInterface {
-
-	public static function buildFromBody(string $body): MntResponseInterface {
-		return new MntResponse($body);
-	}
+	const ERROR_MSG = 'Manticore request error';
 
 }
