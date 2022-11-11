@@ -17,18 +17,12 @@ use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use ValueError;
 
 final class Request {
-	public RequestFormat $requestType;
+	const PAYLOAD_FIELDS = ['type', 'message', 'request_type', 'endpoint', 'listen'];
+
 	public ManticoreEndpoint $endpoint;
 	public RequestFormat $format;
 	public string $origMsg;
 	public string $query;
-
-	/** @var array<string,string> */
-	const FIELD_MAP = [
-		'type' => 'origMsg',
-		'message' => 'query',
-		'request_type' => 'format',
-	];
 
 	/**
 	 * @return void
@@ -64,10 +58,21 @@ final class Request {
 	}
 
 	/**
+	 * This method is same as fromArray but applied to payload
+	 *
+	 * @param array{type:string,message:string,request_type:string,endpoint:string,listen:string} $payload
+	 * @return static
+	 */
+	public static function fromPayload(array $payload): static {
+		$self = new static;
+		return $self->parseOrFail($payload);
+	}
+
+	/**
 	 * Validate input data before we will parse it into a request
 	 *
 	 * @param string $data
-	 * @return array<string,string>
+	 * @return array{type:string,message:string,request_type:string,endpoint:string,listen:string}
 	 * @throws InvalidRequestError
 	 */
 	public static function validateOrFail(string $data): array {
@@ -79,6 +84,7 @@ final class Request {
 			throw new InvalidRequestError("Request body is missing in query '{$data}'");
 		}
 		$query = substr($data, $reqBodyPos);
+		/** @var array{type:string,message:string,request_type:string,endpoint:string,listen:string} */
 		$result = json_decode($query, true);
 		if (!is_array($result)) {
 			throw new InvalidRequestError("Invalid request body '{$query}' is passed");
@@ -88,12 +94,12 @@ final class Request {
 	}
 
 	/**
-	 * @param array<string,string> $payload
+	 * @param array{type:string,message:string,request_type:string,endpoint:string,listen:string} $payload
 	 * @return static
 	 * @throws InvalidRequestError
 	 */
 	protected function parseOrFail(array $payload): static {
-		foreach (array_keys(self::FIELD_MAP) as $k) {
+		foreach (static::PAYLOAD_FIELDS as $k) {
 			if (!array_key_exists($k, $payload)) {
 				throw new InvalidRequestError("Mandatory field '$k' is missing");
 			}
@@ -109,18 +115,17 @@ final class Request {
 			throw new InvalidRequestError("Unknown request endpoint '{$payload['endpoint']}'");
 		}
 		try {
-			$requestType = RequestFormat::from($payload['request_type']);
+			$format = RequestFormat::from($payload['request_type']);
 			unset($payload['request_type']);
 		} catch (\Throwable) {
 			throw new InvalidRequestError("Unknown request type '{$payload['request_type']}'");
 		}
 
-		$this->requestType = $requestType;
+		$this->format = $format;
 		$this->endpoint = $endpoint;
-		// Change original request field names to more informative ones
-		foreach (self::FIELD_MAP as $k => $v) {
-			$this->$v = $payload[$k]; // @phpstan-ignore-line
-		}
+		// Omg? O_O ok
+		$this->origMsg = $payload['type'];
+		$this->query = $payload['message'];
 
 		return $this;
 	}
