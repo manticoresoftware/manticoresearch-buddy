@@ -25,7 +25,11 @@
 	<rule ref="SlevomatCodingStandard.Functions.UnusedParameter"/>
 	<rule ref="SlevomatCodingStandard.Variables.UnusedVariable"/>
 	<rule ref="SlevomatCodingStandard.Variables.UselessVariable"/>
-	<rule ref="SlevomatCodingStandard.Namespaces.UnusedUses"/>
+	<rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
+		<properties>
+			<property name="searchAnnotations" value="true"/>
+		</properties>
+	</rule>
 	<rule ref="SlevomatCodingStandard.Exceptions.DeadCatch"/>
 	<rule ref="SlevomatCodingStandard.Functions.UselessParameterDefaultValue"/>
 	<rule ref="SlevomatCodingStandard.Classes.ModernClassNameReference"/>

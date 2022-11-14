@@ -12,9 +12,7 @@
 namespace Manticoresearch\Buddy\Trait;
 
 use Manticoresearch\Buddy\Enum\Datatype;
-// @codingStandardsIgnoreStart
 use RuntimeException;
-// @codingStandardsIgnoreEnd
 
 trait CheckInsertDataTrait {
 

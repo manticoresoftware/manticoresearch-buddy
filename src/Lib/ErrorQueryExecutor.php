@@ -18,10 +18,8 @@ use Manticoresearch\Buddy\Interface\BuddyLocatorInterface;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Interface\ErrorQueryRequestInterface;
 use Manticoresearch\Buddy\Interface\ManticoreHTTPClientInterface;
-// @codingStandardsIgnoreStart
 use Manticoresearch\Buddy\Interface\ManticoreResponseBuilderInterface;
 use Manticoresearch\Buddy\Interface\StatementInterface;
-// @codingStandardsIgnoreEnd
 use Manticoresearch\Buddy\Network\Response;
 use RuntimeException;
 
@@ -75,9 +73,9 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (ErrorQueryExecutor $that, array $statements, ManticoreEndpoint $finalEndpoint): string {
+		$taskFn = function (ErrorQueryExecutor $that, array $statements, ManticoreEndpoint $finalEndpoint): Response {
 			if (empty($statements)) {
-				return (string)Response::fromError(new Exception($that::CANCEL_EXECUTION_MSG));
+				return Response::fromError(new Exception($that::CANCEL_EXECUTION_MSG));
 			}
 			$manticoreClient = $that->getManticoreClient();
 			while (!empty($statements)) {
@@ -89,7 +87,7 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 				}
 				$resp = $manticoreClient->sendRequest($stmt->getBody());
 				if ($resp->hasError()) {
-					return (string)Response::fromStringAndError(
+					return Response::fromStringAndError(
 						$that->getRequest()->getOrigMsg(), new Exception((string)$resp->getError())
 					);
 				}
@@ -101,7 +99,7 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 				}
 			}
 
-			return (string)Response::fromString($resp->getBody());
+			return Response::fromString($resp->getBody());
 		};
 		return Task::create(
 			$taskId, $taskFn, [$this, $statements, $endpoint]

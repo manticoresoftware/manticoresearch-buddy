@@ -11,9 +11,7 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
-// @codingStandardsIgnoreStart
 use Manticoresearch\Buddy\Exception\BuddyLocatorError;
-// @codingStandardsIgnoreEnd
 
 interface BuddyLocatorInterface {
 	/**

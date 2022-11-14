@@ -83,26 +83,27 @@ class ManticoreResponse implements ManticoreResponseInterface {
 	 * @throws ManticoreResponseError
 	 */
 	protected function parse(): void {
-		$bodyJSON = json_decode($this->body, true);
-		if (!is_array($bodyJSON)) {
+		$data = json_decode($this->body, true);
+		if (!is_array($data)) {
 			throw new ManticoreResponseError('Invalid JSON found');
 		}
-		if (empty($bodyJSON)) {
+		if (empty($data)) {
 			return;
 		}
-		if (array_is_list($bodyJSON)) {
-			$bodyJSON = $bodyJSON[0];
+		if (array_is_list($data)) {
+			/** @var array<string,string> */
+			$data = $data[0];
 		}
-		if (array_key_exists('error', $bodyJSON) && is_string($bodyJSON['error']) && $bodyJSON['error'] !== '') {
-			$this->error = $bodyJSON['error'];
+		if (array_key_exists('error', $data) && is_string($data['error']) && $data['error'] !== '') {
+			$this->error = $data['error'];
 		} else {
 			$this->error = null;
 		}
 		foreach (['columns', 'data'] as $prop) {
-			if (!array_key_exists($prop, $bodyJSON) || !is_array($bodyJSON[$prop])) {
+			if (!array_key_exists($prop, $data) || !is_array($data[$prop])) {
 				continue;
 			}
-			$this->$prop = $bodyJSON[$prop];
+			$this->$prop = $data[$prop];
 		}
 	}
 

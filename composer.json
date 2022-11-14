@@ -26,9 +26,10 @@
 		}
 	},
 	"require" : {
-		"manticoresoftware/manticoresearch-backup" : "^0.2.25",
 		"react/http": "^1.8",
-		"react/socket": "^1.12"
+		"react/socket": "^1.12",
+		"manticoresoftware/manticoresearch-backup": "^0.2.25",
+		"manticoresoftware/telemetry": "^0.1.1"
 	},
 	"require-dev" : {
 		"phpstan/phpstan" : "^1.8",
@@ -36,7 +37,9 @@
 		"squizlabs/php_codesniffer" : "^3.7",
 		"phpunit/phpunit" : "^9.5"
 	},
-	"bin" : [
-		"manticore-buddy"
-	]
+	"repositories": [{
+		"url": "https://github.com/manticoresoftware/telemetry-lib.git",
+		"type": "git"
+	}],
+	"bin": ["manticore-buddy"]
 }

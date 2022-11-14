@@ -16,13 +16,14 @@ use Manticoresearch\Buddy\Lib\TaskStatus;
 use RuntimeException;
 use Throwable;
 use parallel\Future;
-use function parallel\run;
+use parallel\Runtime;
 
 final class Task {
 	protected TaskStatus $status;
 	protected Future $future;
+	protected Runtime $runtime;
 	protected Throwable $error;
-	protected bool|string $result;
+	protected mixed $result;
 
 	/**
 	 * @param string $id
@@ -34,15 +35,32 @@ final class Task {
 	}
 
 	/**
+	 * This method creates new runtime and initialize the task to run in i
+	 *
 	 * @param string $task
 	 * @param Closure $fn
-	 * 	The closure should return bool or string as value due to
-	 *  some limitations that we have when using the parallel extension
+	 * @param mixed[] $argv
+	 * @return static
+	 * @see static::createInRuntime()
+	 */
+	public static function create(string $task, Closure $fn, array $argv = []): static {
+		$autoload_file = __DIR__ . '/../../vendor/autoload.php';
+		return static::createInRuntime(new Runtime($autoload_file), $task, $fn, $argv);
+	}
+
+	/**
+	 * This is main function to create runtime and initialize the task
+	 *
+	 * @param Runtime $runtime
+	 * @param string $task
+	 * @param Closure $fn
 	 * @param mixed[] $argv
 	 * @return static
 	 */
-	public static function create(string $task, Closure $fn, array $argv = []): static {
-		return new static($task, [$fn, serialize($argv)]);
+	public static function createInRuntime(Runtime $runtime, string $task, Closure $fn, array $argv = []): static {
+		$task = new static($task, [$fn, $argv]);
+		$task->runtime = $runtime;
+		return $task;
 	}
 
 	/**
@@ -51,27 +69,21 @@ final class Task {
 	 * @return static
 	 */
 	public function run(): static {
-		$future = run(
-			function (Closure $fn, string $argv): bool|string {
+		$future = $this->runtime->run(
+			function (Closure $fn, array $argv): mixed {
 				if (!defined('STDOUT')) {
 					define('STDOUT', fopen('/dev/stdout', 'wb+'));
+				}
+
+				if (!defined('STDERR')) {
 					define('STDERR', fopen('/dev/stderr', 'wb+'));
 				}
-				include_once __DIR__ . '/../../vendor/autoload.php';
+
 				try {
-					/** @var mixed[] $args */
-					$args = unserialize($argv);
-					$res = $fn(...$args);
+					return $fn(...$argv);
 				} catch (Throwable $e) {
 					return $e->getMessage();
 				}
-				if (!isset($res)) {
-					return true;
-				}
-				if (is_bool($res) || is_string($res)) {
-					return $res;
-				}
-				throw new RuntimeException('Task failed to return value of required bool|string type');
 			}, $this->argv
 		);
 
@@ -120,11 +132,7 @@ final class Task {
 			$this->status = TaskStatus::Finished;
 
 			try {
-				$value = $this->future->value();
-				if (!is_bool($value) && !is_string($value)) {
-					throw new RuntimeException('Incorrect future value returned');
-				}
-				$this->result = $value;
+				$this->result = $this->future->value();
 			} catch (Throwable $error) {
 				$this->error = $error;
 			}
@@ -179,10 +187,10 @@ final class Task {
 	/**
 	 * Just getter for result of future
 	 *
-	 * @return bool|string
+	 * @return mixed
 	 * @throws RuntimeException
 	 */
-	public function getResult(): bool|string {
+	public function getResult(): mixed {
 		if (!isset($this->result)) {
 			throw new RuntimeException('There result was not set, you should be sure that isSucceed returned true.');
 		}
