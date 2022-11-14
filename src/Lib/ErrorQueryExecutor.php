@@ -75,9 +75,9 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (ErrorQueryExecutor $that, array $statements, ManticoreEndpoint $finalEndpoint): Response {
+		$taskFn = function (ErrorQueryExecutor $that, array $statements, ManticoreEndpoint $finalEndpoint): string {
 			if (empty($statements)) {
-				return Response::fromError(new Exception($that::CANCEL_EXECUTION_MSG));
+				return (string)Response::fromError(new Exception($that::CANCEL_EXECUTION_MSG));
 			}
 			$manticoreClient = $that->getManticoreClient();
 			while (!empty($statements)) {
@@ -89,7 +89,7 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 				}
 				$resp = $manticoreClient->sendRequest($stmt->getBody());
 				if ($resp->hasError()) {
-					return Response::fromStringAndError(
+					return (string)Response::fromStringAndError(
 						$that->getRequest()->getOrigMsg(), new Exception((string)$resp->getError())
 					);
 				}
@@ -101,13 +101,11 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 				}
 			}
 
-			return Response::fromString($resp->getBody());
+			return (string)Response::fromString($resp->getBody());
 		};
-		$Task = Task::create(
+		return Task::create(
 			$taskId, $taskFn, [$this, $statements, $endpoint]
-		);
-
-		return $Task->run();
+		)->run();
 	}
 
 	/**
