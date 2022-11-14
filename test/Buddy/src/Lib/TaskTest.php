@@ -14,6 +14,7 @@ namespace Manticoresearch\BuddyUnitTest\Lib;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Lib\TaskStatus;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 
 class TaskTest extends TestCase {
 	public function testTaskParallelRunSucceed(): void {
@@ -29,6 +30,31 @@ class TaskTest extends TestCase {
 		$this->assertEquals(TaskStatus::Running, $Task->getStatus());
 		usleep(2500000);
 		$this->assertEquals(TaskStatus::Finished, $Task->getStatus());
+		$this->assertEquals(true, $Task->isSucceed());
 		$this->assertEquals(true, $Task->getResult());
+	}
+
+	public function testTaskParallelRunWithArgumentsSucceed(): void {
+		$taskId = uniqid();
+
+		$arg = new stdClass();
+		$arg->name = 'test';
+		$arg->value = 123;
+
+		$Task = Task::create(
+			$taskId, function (stdClass $arg): stdClass {
+				usleep(2000000);
+				return $arg;
+			},
+			[$arg]
+		);
+
+		$this->assertEquals(TaskStatus::Pending, $Task->getStatus());
+		$Task->run();
+		$this->assertEquals(TaskStatus::Running, $Task->getStatus());
+		usleep(2500000);
+		$this->assertEquals(TaskStatus::Finished, $Task->getStatus());
+		$this->assertEquals(true, $Task->isSucceed());
+		$this->assertEquals($arg, $Task->getResult());
 	}
 }

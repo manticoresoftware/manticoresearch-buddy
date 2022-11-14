@@ -43,7 +43,7 @@ class BackupExecutor implements CommandExecutorInterface {
 	// We just waiting for a thread to be done
 		$Task = Task::create(
 			$taskId, function (BackupRequest $request) {
-			// TODO: the config path should be in global variables/passed/or whatever
+				// TODO: the config path should be in global variables/passed/or whatever
 				$config = new ManticoreConfig('/etc/manticoresearch/manticore.conf');
 				$client = new ManticoreClient($config);
 				$storage = new FileStorage(

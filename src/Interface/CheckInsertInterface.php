@@ -11,10 +11,8 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
-// @codingStandardsIgnoreStart
 use Manticoresearch\Buddy\Enum\Datatype;
 use RuntimeException;
-// @codingStandardsIgnoreEnd
 
 interface CheckInsertInterface {
 	/**

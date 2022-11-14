@@ -14,6 +14,7 @@ use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\ErrorQueryExecutor;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
 use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\Network\Response;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -38,7 +39,9 @@ class RunErrorQueryTaskTest extends TestCase {
 		$task->wait();
 
 		$this->assertEquals(true, $task->isSucceed());
-		$this->assertEquals($resp, $task->getResult());
+		/** @var Response */
+		$result = $task->getResult();
+		$this->assertEquals($resp, (string)$result);
 	}
 
 	public function testTaskRunWithInsertQuery(): void {
@@ -58,10 +61,14 @@ class RunErrorQueryTaskTest extends TestCase {
 
 	public function testTaskRunWithShowQuery():void {
 		echo "\nTesting the execution of a task with SHOW query request\n";
-		$resp = '{"type":"http response","message":"[{\n\"columns\":[{\"proto\":{\"type\":\"string\"}},'
-			. '{\"host\":{\"type\":\"string\"}},{\"ID\":{\"type\":\"long long\"}},{\"query\":{\"type\":\"string\"}}],'
-			. '\n\"data\":[{\"proto\":\"http\",\"host\":\"127.0.0.1:584\",\"ID\":19,\"query\":\"select\"}'
-			. '\n],\n\"total\":1,\n\"error\":\"\",\n\"warning\":\"\"\n}]","error":""}';
+		$resp = '{"type":"http response","message":"[{\n\"columns\":'
+				. '[{\"id\":{\"type\":\"long long\"}},{\"proto\":{\"type\":\"string\"}},'
+				. '{\"state\":{\"type\":\"string\"}},{\"host\":{\"type\":\"string\"}},'
+				. '{\"connid\":{\"type\":\"long long\"}},{\"killed\":{\"type\":\"string\"}}'
+				. ',{\"last cmd\":{\"type\":\"string\"}}],\n\"data\":[{\"id\":1,\"proto\":\"http\",\"state\":\"query\",'
+				. '\"host\":\"127.0.0.1:584\",\"connid\":19,\"killed\":\"0\",\"last cmd\":\"select\"}\n]'
+				. ',\n\"total\":1,\n\"error\":\"\",\n\"warning\":\"\"\n}]","error":""}'
+			;
 		$mockServerUrl = self::setUpMockManticoreServer(false);
 		$request = Request::fromArray(
 			[

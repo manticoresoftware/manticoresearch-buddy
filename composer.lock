@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7fcce10640e2133047727d47d34c97a3",
+    "content-hash": "0be8d52416f904cfff1e4db0d6c59da2",
     "packages": [
         {
             "name": "evenement/evenement",
@@ -111,16 +111,16 @@
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
-            "version": "v0.2.25",
+            "version": "v0.2.27",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/manticoresearch-backup.git",
-                "reference": "1b3dbad4fdb98bb10a321ec1248802302c9e927f"
+                "reference": "9846ba8a53faa9b461def1f892fab343df5845d4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/1b3dbad4fdb98bb10a321ec1248802302c9e927f",
-                "reference": "1b3dbad4fdb98bb10a321ec1248802302c9e927f",
+                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/9846ba8a53faa9b461def1f892fab343df5845d4",
+                "reference": "9846ba8a53faa9b461def1f892fab343df5845d4",
                 "shasum": ""
             },
             "require": {
@@ -159,9 +159,107 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/manticoresearch-backup/issues",
-                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/v0.2.25"
+                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/v0.2.27"
             },
-            "time": "2022-10-19T12:28:42+00:00"
+            "time": "2022-11-01T05:02:00+00:00"
+        },
+        {
+            "name": "manticoresoftware/openmetrics",
+            "version": "v0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/manticoresoftware/exposition-text.git",
+                "reference": "4054ad5b63da8874974801df5977189bafa0374b"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/manticoresoftware/exposition-text/zipball/4054ad5b63da8874974801df5977189bafa0374b",
+                "reference": "4054ad5b63da8874974801df5977189bafa0374b",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "ext-xdebug": "*",
+                "hollodotme/phpunit-testdox-markdown": "~1.0.0",
+                "tm/tooly-composer-script": "~1.4"
+            },
+            "type": "library",
+            "extra": {
+                "tools": {
+                    "phpunit8": {
+                        "url": "https://phar.phpunit.de/phpunit-8.phar",
+                        "only-dev": true,
+                        "replace": true
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "OpenMetrics\\Exposition\\Text\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Holger Woltersdorf",
+                    "email": "hw@hollo.me"
+                },
+                {
+                    "name": "Manticore Software",
+                    "email": "contact@manticoresearch.com"
+                }
+            ],
+            "description": "Implementation of the text exposition format of OpenMetrics",
+            "support": {
+                "source": "https://github.com/manticoresoftware/exposition-text/tree/v0.1.0"
+            },
+            "time": "2022-10-27T05:48:35+00:00"
+        },
+        {
+            "name": "manticoresoftware/telemetry",
+            "version": "0.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/manticoresoftware/telemetry-lib.git",
+                "reference": "cbf9a4fc2615b4678c080fa827fbd4c53485b60b"
+            },
+            "require": {
+                "manticoresoftware/openmetrics": "^v0.1.0",
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^1.8",
+                "phpunit/phpunit": "^9.5",
+                "slevomat/coding-standard": "^8.5",
+                "squizlabs/php_codesniffer": "^3.7"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Manticoresoftware\\Telemetry\\": "src/"
+                }
+            },
+            "license": [
+                "GPLv2-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Manticore Software Co. Ltd",
+                    "email": "contact@manticoresearch.com"
+                }
+            ],
+            "description": "Metric collection tool for PHP projects of Manticore Software",
+            "keywords": [
+                "analytics",
+                "metric",
+                "telemetry"
+            ],
+            "time": "2022-10-31T09:14:52+00:00"
         },
         {
             "name": "psr/http-message",
@@ -1223,16 +1321,16 @@
         },
         {
             "name": "nikic/php-parser",
-            "version": "v4.15.1",
+            "version": "v4.15.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nikic/PHP-Parser.git",
-                "reference": "0ef6c55a3f47f89d7a374e6f835197a0b5fcf900"
+                "reference": "f59bbe44bf7d96f24f3e2b4ddc21cd52c1d2adbc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nikic/PHP-Parser/zipball/0ef6c55a3f47f89d7a374e6f835197a0b5fcf900",
-                "reference": "0ef6c55a3f47f89d7a374e6f835197a0b5fcf900",
+                "url": "https://api.github.com/repos/nikic/PHP-Parser/zipball/f59bbe44bf7d96f24f3e2b4ddc21cd52c1d2adbc",
+                "reference": "f59bbe44bf7d96f24f3e2b4ddc21cd52c1d2adbc",
                 "shasum": ""
             },
             "require": {
@@ -1273,9 +1371,9 @@
             ],
             "support": {
                 "issues": "https://github.com/nikic/PHP-Parser/issues",
-                "source": "https://github.com/nikic/PHP-Parser/tree/v4.15.1"
+                "source": "https://github.com/nikic/PHP-Parser/tree/v4.15.2"
             },
-            "time": "2022-09-04T07:30:47+00:00"
+            "time": "2022-11-12T15:38:23+00:00"
         },
         {
             "name": "phar-io/manifest",
@@ -1390,16 +1488,16 @@
         },
         {
             "name": "phpstan/phpdoc-parser",
-            "version": "1.11.0",
+            "version": "1.13.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpdoc-parser.git",
-                "reference": "7d1e81213b0c7eb8d5a9f524456cbc2778ed5c65"
+                "reference": "33aefcdab42900e36366d0feab6206e2dd68f947"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/7d1e81213b0c7eb8d5a9f524456cbc2778ed5c65",
-                "reference": "7d1e81213b0c7eb8d5a9f524456cbc2778ed5c65",
+                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/33aefcdab42900e36366d0feab6206e2dd68f947",
+                "reference": "33aefcdab42900e36366d0feab6206e2dd68f947",
                 "shasum": ""
             },
             "require": {
@@ -1429,22 +1527,22 @@
             "description": "PHPDoc parser with support for nullable, intersection and generic types",
             "support": {
                 "issues": "https://github.com/phpstan/phpdoc-parser/issues",
-                "source": "https://github.com/phpstan/phpdoc-parser/tree/1.11.0"
+                "source": "https://github.com/phpstan/phpdoc-parser/tree/1.13.0"
             },
-            "time": "2022-10-14T13:32:28+00:00"
+            "time": "2022-10-21T09:57:39+00:00"
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.8.10",
+            "version": "1.9.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "0c4459dc42c568b818b3f25186589f3acddc1823"
+                "reference": "d6fdf01c53978b6429f1393ba4afeca39cc68afa"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/0c4459dc42c568b818b3f25186589f3acddc1823",
-                "reference": "0c4459dc42c568b818b3f25186589f3acddc1823",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/d6fdf01c53978b6429f1393ba4afeca39cc68afa",
+                "reference": "d6fdf01c53978b6429f1393ba4afeca39cc68afa",
                 "shasum": ""
             },
             "require": {
@@ -1474,7 +1572,7 @@
             ],
             "support": {
                 "issues": "https://github.com/phpstan/phpstan/issues",
-                "source": "https://github.com/phpstan/phpstan/tree/1.8.10"
+                "source": "https://github.com/phpstan/phpstan/tree/1.9.2"
             },
             "funding": [
                 {
@@ -1490,20 +1588,20 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2022-10-17T14:23:35+00:00"
+            "time": "2022-11-10T09:56:11+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
-            "version": "9.2.17",
+            "version": "9.2.18",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/php-code-coverage.git",
-                "reference": "aa94dc41e8661fe90c7316849907cba3007b10d8"
+                "reference": "12fddc491826940cf9b7e88ad9664cf51f0f6d0a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/php-code-coverage/zipball/aa94dc41e8661fe90c7316849907cba3007b10d8",
-                "reference": "aa94dc41e8661fe90c7316849907cba3007b10d8",
+                "url": "https://api.github.com/repos/sebastianbergmann/php-code-coverage/zipball/12fddc491826940cf9b7e88ad9664cf51f0f6d0a",
+                "reference": "12fddc491826940cf9b7e88ad9664cf51f0f6d0a",
                 "shasum": ""
             },
             "require": {
@@ -1559,7 +1657,7 @@
             ],
             "support": {
                 "issues": "https://github.com/sebastianbergmann/php-code-coverage/issues",
-                "source": "https://github.com/sebastianbergmann/php-code-coverage/tree/9.2.17"
+                "source": "https://github.com/sebastianbergmann/php-code-coverage/tree/9.2.18"
             },
             "funding": [
                 {
@@ -1567,7 +1665,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2022-08-30T12:24:04+00:00"
+            "time": "2022-10-27T13:35:33+00:00"
         },
         {
             "name": "phpunit/php-file-iterator",
@@ -1812,16 +1910,16 @@
         },
         {
             "name": "phpunit/phpunit",
-            "version": "9.5.25",
+            "version": "9.5.26",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "3e6f90ca7e3d02025b1d147bd8d4a89fd4ca8a1d"
+                "reference": "851867efcbb6a1b992ec515c71cdcf20d895e9d2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/3e6f90ca7e3d02025b1d147bd8d4a89fd4ca8a1d",
-                "reference": "3e6f90ca7e3d02025b1d147bd8d4a89fd4ca8a1d",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/851867efcbb6a1b992ec515c71cdcf20d895e9d2",
+                "reference": "851867efcbb6a1b992ec515c71cdcf20d895e9d2",
                 "shasum": ""
             },
             "require": {
@@ -1894,7 +1992,7 @@
             ],
             "support": {
                 "issues": "https://github.com/sebastianbergmann/phpunit/issues",
-                "source": "https://github.com/sebastianbergmann/phpunit/tree/9.5.25"
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/9.5.26"
             },
             "funding": [
                 {
@@ -1910,7 +2008,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2022-09-25T03:44:45+00:00"
+            "time": "2022-10-28T06:00:21+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -2878,32 +2976,32 @@
         },
         {
             "name": "slevomat/coding-standard",
-            "version": "8.6.0",
+            "version": "8.6.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/slevomat/coding-standard.git",
-                "reference": "d4175d8bf1246f4bf8be04ab688fbdc6fed18ece"
+                "reference": "94fd4f9263e65a5006444890b1615c025ff58f1a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/slevomat/coding-standard/zipball/d4175d8bf1246f4bf8be04ab688fbdc6fed18ece",
-                "reference": "d4175d8bf1246f4bf8be04ab688fbdc6fed18ece",
+                "url": "https://api.github.com/repos/slevomat/coding-standard/zipball/94fd4f9263e65a5006444890b1615c025ff58f1a",
+                "reference": "94fd4f9263e65a5006444890b1615c025ff58f1a",
                 "shasum": ""
             },
             "require": {
                 "dealerdirect/phpcodesniffer-composer-installer": "^0.6.2 || ^0.7",
                 "php": "^7.2 || ^8.0",
-                "phpstan/phpdoc-parser": ">=1.11.0 <1.12.0",
+                "phpstan/phpdoc-parser": ">=1.11.0 <1.14.0",
                 "squizlabs/php_codesniffer": "^3.7.1"
             },
             "require-dev": {
                 "phing/phing": "2.17.4",
                 "php-parallel-lint/php-parallel-lint": "1.3.2",
-                "phpstan/phpstan": "1.4.10|1.8.9",
+                "phpstan/phpstan": "1.4.10|1.9.0",
                 "phpstan/phpstan-deprecation-rules": "1.0.0",
-                "phpstan/phpstan-phpunit": "1.0.0|1.1.1",
+                "phpstan/phpstan-phpunit": "1.0.0|1.2.2",
                 "phpstan/phpstan-strict-rules": "1.4.4",
-                "phpunit/phpunit": "7.5.20|8.5.21|9.5.25"
+                "phpunit/phpunit": "7.5.20|8.5.21|9.5.26"
             },
             "type": "phpcodesniffer-standard",
             "extra": {
@@ -2927,7 +3025,7 @@
             ],
             "support": {
                 "issues": "https://github.com/slevomat/coding-standard/issues",
-                "source": "https://github.com/slevomat/coding-standard/tree/8.6.0"
+                "source": "https://github.com/slevomat/coding-standard/tree/8.6.3"
             },
             "funding": [
                 {
@@ -2939,7 +3037,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2022-10-16T10:31:02+00:00"
+            "time": "2022-11-10T15:24:40+00:00"
         },
         {
             "name": "squizlabs/php_codesniffer",

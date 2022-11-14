@@ -13,9 +13,7 @@ namespace Manticoresearch\Buddy\Network;
 
 use Exception;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
-// @codingStandardsIgnoreStart
 use Manticoresearch\Buddy\Lib\Task;
-// @codingStandardsIgnoreEnd
 use Manticoresearch\Buddy\Lib\TaskStatus;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Message\Response as HttpResponse;
@@ -99,6 +97,7 @@ final class EventHandler {
 					$result[] = Response::fromError(new Exception('Buddy task failed to start'));
 				} else {
 					if ($task->isSucceed()) {
+						// @phpstan-ignore-next-line
 						$result[] = Response::fromString((string)$task->getResult());
 					} else {
 						$error = $task->getError()->getMessage();
