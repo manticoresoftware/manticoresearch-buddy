@@ -62,7 +62,7 @@ final class Response {
 		$payload = [
 			'type' => 'http response',
 			'message' => $message,
-			'error' => $error?->getMessage(),
+			'error' => $error?->getMessage() ?? '',
 		];
 		return new static(
 			json_encode($payload, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_IGNORE)

@@ -53,8 +53,10 @@ final class Task {
 	public function run(): static {
 		$future = run(
 			function (Closure $fn, string $argv): bool|string {
-				define('STDOUT', fopen('/dev/stdout', 'wb+'));
-				define('STDERR', fopen('/dev/stderr', 'wb+'));
+				if (!defined('STDOUT')) {
+					define('STDOUT', fopen('/dev/stdout', 'wb+'));
+					define('STDERR', fopen('/dev/stderr', 'wb+'));
+				}
 				include_once __DIR__ . '/../../vendor/autoload.php';
 				try {
 					/** @var mixed[] $args */
@@ -69,7 +71,7 @@ final class Task {
 				if (is_bool($res) || is_string($res)) {
 					return $res;
 				}
-				throw new RuntimeException("Task {$this->id} failed to return value of required bool|string type");
+				throw new RuntimeException('Task failed to return value of required bool|string type');
 			}, $this->argv
 		);
 
@@ -151,7 +153,7 @@ final class Task {
 	 * @return bool
 	 */
 	public function isRunning(): bool {
-		return $this->status === TaskStatus::Running;
+		return $this->getStatus() === TaskStatus::Running;
 	}
 
 	/**

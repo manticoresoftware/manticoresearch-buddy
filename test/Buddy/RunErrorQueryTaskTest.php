@@ -35,10 +35,9 @@ class RunErrorQueryTaskTest extends TestCase {
 		$executor = new ErrorQueryExecutor($request);
 		$executor->setManticoreClient($mockServerUrl);
 		$task = $executor->run();
-		// TODO: fix infinite loop here
-		while ($task->isRunning()) {
-			sleep(1);
-		};
+		$task->wait();
+
+		$this->assertEquals(true, $task->isSucceed());
 		$this->assertEquals($resp, $task->getResult());
 	}
 

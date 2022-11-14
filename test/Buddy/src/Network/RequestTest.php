@@ -50,13 +50,13 @@ class RequestTest extends TestCase {
 			try {
 				Request::fromPayload($payload);
 			} finally {
-				$payload['request_type'] = '';
+				unset($payload['request_type']);
 				$this->expectException(InvalidRequestError::class);
 				$this->expectExceptionMessage(
 					"Manticore request parse error: Mandatory field 'request_type' is missing"
 				);
 				try {
-					Request::fromPayload($payload);
+					Request::fromPayload($payload); // @phpstan-ignore-line
 				} finally {
 					$this->assertTrue(true);
 				}
