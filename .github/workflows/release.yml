@@ -7,7 +7,6 @@ on:
 
 env:
   APP_NAME: 'manticore-buddy'
-  PHP_VERSION: '8.1.11'
   MAINTAINER: 'Manticore'
   DESC: 'Manticore Buddy'
 
