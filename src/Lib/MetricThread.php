@@ -41,7 +41,7 @@ final class MetricThread {
 	 * @return self
 	 */
 	public static function start(): self {
-		$runtime = new Runtime();
+		$runtime = new Runtime(__DIR__ . '/../../vendor/autoload.php');
 		$channel = new Channel();
 		$task = Task::createInRuntime(
 			$runtime, static::class, function (Channel $ch) {
