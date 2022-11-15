@@ -19,18 +19,22 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
   . 'autoload.php'
 ;
 
-$longopts  = ['pid:', 'pid_path:', 'listen:', 'sockAddr::', 'sockPort::'];
-$defaultOpts = ['sockAddr' => '127.0.0.1', 'sockPort' => 5000];
+$longopts  = ['pid:', 'pid-file:', 'host::', 'port::', 'disable-telemetry', 'help'];
+$defaultOpts = ['host' => '127.0.0.1', 'port' => 5000];
 
-[
-	'pid' => $clPid, /** @var string $clPid */
-	'pid_path' => $clPidPath, /** @var string $clPidPath */
-	//'listen' => $clUrl, /** @var string $clUrl */
-	'sockAddr' => $sockAddr, /** @var string $sockAddr */
-	'sockPort' => $sockPort, /** @var string $sockPort */
-] = getopt('', $longopts) + $defaultOpts;
+/** @var array{host:string,port:string,pid:?string,pid-file:?string,port:?int,disable-telemetry?:bool,help?:bool} */
+$opts = array_replace(getopt('', $longopts), $defaultOpts);
 
-Server::create($sockAddr, (int)$sockPort)
+if (isset($opts['disable-telemetry'])) {
+	putenv('TELEMETRY=1');
+}
+
+if (isset($opts['help'])) {
+	echo "This is going to be help\n";
+	exit(0);
+}
+
+Server::create($opts['host'], (int)$opts['port'])
 	->addHandler('request', EventHandler::request(...))
 	->addHandler('error', EventHandler::error(...))
 	->addTicker(
@@ -40,5 +44,5 @@ Server::create($sockAddr, (int)$sockPort)
 			echo "Current memory usage: {$formatted}\n";
 		}, 10
 	)
-	->addTicker(EventHandler::clientCheckTickerFn((int)$clPid, (string)$clPidPath), 5, 'client')
+	->addTicker(EventHandler::clientCheckTickerFn((int)$opts['pid'], (string)$opts['pid-file']), 5, 'client')
 	->start();
