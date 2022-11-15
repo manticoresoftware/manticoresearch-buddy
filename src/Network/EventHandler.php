@@ -13,10 +13,13 @@ namespace Manticoresearch\Buddy\Network;
 
 use Exception;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
-use Manticoresearch\Buddy\Lib\Task;
-use Manticoresearch\Buddy\Lib\TaskStatus;
 use Psr\Http\Message\ServerRequestInterface;
+use React\EventLoop\Loop;
+use React\EventLoop\Timer\Timer;
 use React\Http\Message\Response as HttpResponse;
+use React\Promise\Deferred;
+use React\Promise\Promise;
+use React\Promise\PromiseInterface;
 use Throwable;
 
 /**
@@ -24,46 +27,69 @@ use Throwable;
  * for work with connection initiated by React framework
  */
 final class EventHandler {
-	/** @var array<int,Task> */
-	protected static array $tasks = [];
-
 	/**
 	 * Process 'data' event on connecction
 	 *
 	 * @param string $data
-	 * @return Response
+	 * @return PromiseInterface
 	 */
-	protected static function data(string $data): Response {
+	protected static function data(string $data): PromiseInterface {
+		$deferred = new Deferred;
 		try {
 			$request = Request::fromString($data);
 			$executor = QueryProcessor::process($request);
-			static::$tasks[] = $executor->run();
-		} catch (Throwable $e) {
-			return Response::fromError($e);
-		}
+			$task = $executor->run();
 
-		return Response::none();
+			Loop::addPeriodicTimer(
+				1, function (Timer $timer) use ($task, $deferred) {
+					if ($task->isRunning()) {
+						return;
+					}
+
+					Loop::cancelTimer($timer);
+					if ($task->isSucceed()) {
+						return $deferred->resolve(Response::none());
+					}
+
+					return $deferred->resolve(Response::fromError($task->getError()));
+				}
+			);
+		} catch (Throwable $e) {
+			$deferred->resolve(Response::fromError($e));
+		}
+		return $deferred->promise();
 	}
 
 	/**
 	 * Main handler for HTTP request that returns HttpResponse
 	 *
 	 * @param ServerRequestInterface $request
-	 * @return HttpResponse
+	 * @return Promise
 	 */
-	public static function request(ServerRequestInterface $request): HttpResponse {
-		static $headers = ['Content-Type' => 'application/json'];
+	public static function request(ServerRequestInterface $request): Promise {
+		return new Promise(
+			function (callable $resolve, callable $reject) use ($request) {
+				static $headers = ['Content-Type' => 'application/json'];
 
-		// Allow only post and otherwise send bad request
-		if ($request->getMethod() !== 'POST') {
-			return new HttpResponse(
-				400, $headers, (string)Response::none()
-			);
-		}
-		$data = (string)$request->getBody();
-		$response = static::data($data);
+				$data = (string)$request->getBody();
+				$promise = static::data($data);
 
-		return new HttpResponse(200, $headers, (string)$response);
+			// Allow only post and otherwise send bad request
+				if ($request->getMethod() !== 'POST') {
+					return $reject(
+						new HttpResponse(
+							400, $headers, (string)Response::none()
+						)
+					);
+				}
+
+				$promise->then(
+					function (Response $response) use ($headers, $resolve) {
+						return $resolve(new HttpResponse(200, $headers, (string)$response));
+					}
+				);
+			}
+		);
 	}
 
 	/**
@@ -75,40 +101,6 @@ final class EventHandler {
 	public static function error(Exception $e): Response {
 		var_dump($e);
 		return Response::none();
-	}
-
-	/**
-	 * Process ticker handler and check jobs
-	 * It's related to the client side and should be added to client ns of ticker
-	 * TODO: we should store tasks somewhere else and think about concurrent access to it
-	 *
-	 * @return array<Response>
-	 */
-	public static function taskStatusTicker(): array {
-		$result = [];
-		static::$tasks = array_filter(
-			static::$tasks,
-			function ($task) use (&$result) {
-				$taskStatus = $task->getStatus();
-				if (in_array($taskStatus, [TaskStatus::Pending, TaskStatus::Running])) {
-					return true;
-				}
-				if ($taskStatus === TaskStatus::Failed) {
-					$result[] = Response::fromError(new Exception('Buddy task failed to start'));
-				} else {
-					if ($task->isSucceed()) {
-						// @phpstan-ignore-next-line
-						$result[] = Response::fromString((string)$task->getResult());
-					} else {
-						$error = $task->getError()->getMessage();
-						$result[] = Response::fromError(new Exception($error));
-					}
-				}
-				return false;
-			}
-		);
-
-		return $result;
 	}
 
 	/**
