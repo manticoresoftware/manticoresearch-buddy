@@ -40,6 +40,5 @@ Server::create($sockAddr, (int)$sockPort)
 			echo "Current memory usage: {$formatted}\n";
 		}, 10
 	)
-	->addTicker(EventHandler::taskStatusTicker(...), 10, 'client')
 	->addTicker(EventHandler::clientCheckTickerFn((int)$clPid, (string)$clPidPath), 5, 'client')
 	->start();
