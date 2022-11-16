@@ -71,13 +71,13 @@ final class Task {
 	public function run(): static {
 		$future = $this->runtime->run(
 			function (Closure $fn, array $argv): mixed {
-				if (!defined('STDOUT')) {
-					define('STDOUT', fopen('/dev/stdout', 'wb+'));
-				}
+				// if (!defined('STDOUT')) {
+				// 	define('STDOUT', fopen('/dev/stdout', 'wb+'));
+				// }
 
-				if (!defined('STDERR')) {
-					define('STDERR', fopen('/dev/stderr', 'wb+'));
-				}
+				// if (!defined('STDERR')) {
+				// 	define('STDERR', fopen('/dev/stderr', 'wb+'));
+				// }
 
 				try {
 					return $fn(...$argv);

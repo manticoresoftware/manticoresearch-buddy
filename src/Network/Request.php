@@ -17,7 +17,7 @@ use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use ValueError;
 
 final class Request {
-	const PAYLOAD_FIELDS = ['type', 'message', 'request_type', 'endpoint', 'listen'];
+	const PAYLOAD_FIELDS = ['type', 'message', 'request_type', 'endpoint'];
 
 	public ManticoreEndpoint $endpoint;
 	public RequestFormat $format;
@@ -60,7 +60,7 @@ final class Request {
 	/**
 	 * This method is same as fromArray but applied to payload
 	 *
-	 * @param array{type:string,message:string,request_type:string,endpoint:string,listen:string} $payload
+	 * @param array{type:string,message:string,request_type:string,endpoint:string} $payload
 	 * @return static
 	 */
 	public static function fromPayload(array $payload): static {
@@ -72,7 +72,7 @@ final class Request {
 	 * Validate input data before we will parse it into a request
 	 *
 	 * @param string $data
-	 * @return array{type:string,message:string,request_type:string,endpoint:string,listen:string}
+	 * @return array{type:string,message:string,request_type:string,endpoint:string}
 	 * @throws InvalidRequestError
 	 */
 	public static function validateOrFail(string $data): array {
@@ -84,7 +84,7 @@ final class Request {
 			throw new InvalidRequestError("Request body is missing in query '{$data}'");
 		}
 		$query = substr($data, $reqBodyPos);
-		/** @var array{type:string,message:string,request_type:string,endpoint:string,listen:string} */
+		/** @var array{type:string,message:string,request_type:string,endpoint:string} */
 		$result = json_decode($query, true);
 		if (!is_array($result)) {
 			throw new InvalidRequestError("Invalid request body '{$query}' is passed");
@@ -94,7 +94,7 @@ final class Request {
 	}
 
 	/**
-	 * @param array{type:string,message:string,request_type:string,endpoint:string,listen:string} $payload
+	 * @param array{type:string,message:string,request_type:string,endpoint:string} $payload
 	 * @return static
 	 * @throws InvalidRequestError
 	 */

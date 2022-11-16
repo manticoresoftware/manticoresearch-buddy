@@ -22,7 +22,6 @@ class RequestTest extends TestCase {
 			'message' => 'some query',
 			'request_type' => 'sphinqxl',
 			'endpoint' => 'cli',
-			'listen' => '127.0.0.1:9308',
 		];
 		$request = Request::fromPayload($payload);
 		$this->assertInstanceOf(Request::class, $request);
@@ -37,7 +36,6 @@ class RequestTest extends TestCase {
 			'message' => 'some query',
 			'request_type' => 'test',
 			'endpoint' => 'cli',
-			'listen' => '127.0.0.1:9308',
 		];
 		$this->expectException(InvalidRequestError::class);
 		$this->expectExceptionMessage("Manticore request parse error: Unknown request type 'test'");

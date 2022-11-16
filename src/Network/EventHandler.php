@@ -48,7 +48,7 @@ final class EventHandler {
 
 					Loop::cancelTimer($timer);
 					if ($task->isSucceed()) {
-						return $deferred->resolve(Response::none());
+						return $deferred->resolve($task->getResult());
 					}
 
 					return $deferred->resolve(Response::fromError($task->getError()));
@@ -73,8 +73,7 @@ final class EventHandler {
 
 				$data = (string)$request->getBody();
 				$promise = static::data($data);
-
-			// Allow only post and otherwise send bad request
+				// Allow only post and otherwise send bad request
 				if ($request->getMethod() !== 'POST') {
 					return $reject(
 						new HttpResponse(
