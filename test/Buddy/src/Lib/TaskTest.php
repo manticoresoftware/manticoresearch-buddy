@@ -18,9 +18,8 @@ use stdClass;
 
 class TaskTest extends TestCase {
 	public function testTaskParallelRunSucceed(): void {
-		$taskId = uniqid();
 		$Task = Task::create(
-			$taskId, function (): bool {
+			function (): bool {
 				usleep(2000000);
 				return true;
 			}
@@ -35,14 +34,12 @@ class TaskTest extends TestCase {
 	}
 
 	public function testTaskParallelRunWithArgumentsSucceed(): void {
-		$taskId = uniqid();
-
 		$arg = new stdClass();
 		$arg->name = 'test';
 		$arg->value = 123;
 
 		$Task = Task::create(
-			$taskId, function (stdClass $arg): stdClass {
+			function (stdClass $arg): stdClass {
 				usleep(2000000);
 				return $arg;
 			},

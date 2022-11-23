@@ -19,10 +19,10 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
   . 'autoload.php'
 ;
 
-$longopts  = ['pid:', 'pid-file:', 'host::', 'port::', 'disable-telemetry', 'help'];
+$longopts  = ['pid:', 'pid-file:', 'host::', 'port::', 'disable-telemetry', 'help', 'config:'];
 $defaultOpts = ['host' => '127.0.0.1', 'port' => 5000];
 
-/** @var array{host:string,port:string,pid:?string,pid-file:?string,port:?int,disable-telemetry?:bool,help?:bool} */
+/** @var array{config:string,host:string,port:string,pid:?string,pid-file:?string,port:?int,disable-telemetry?:bool,help?:bool} */
 $opts = array_replace(getopt('', $longopts), $defaultOpts);
 
 if (isset($opts['disable-telemetry'])) {
@@ -33,6 +33,11 @@ if (isset($opts['help'])) {
 	echo "This is going to be help\n";
 	exit(0);
 }
+
+// Not the best way, but it's ok for now
+// phpcs:disable
+define('SEARCHD_CONFIG', $opts['config']);
+// phpcs:enable
 
 Server::create($opts['host'], (int)$opts['port'])
 	->addHandler('request', EventHandler::request(...))

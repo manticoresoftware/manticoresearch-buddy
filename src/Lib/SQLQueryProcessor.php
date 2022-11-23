@@ -11,9 +11,12 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
+use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandMissing;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
+use Manticoresearch\Buddy\Network\Request;
 
 /**
  * This is the main processor that handle query and find what to do next
@@ -62,9 +65,17 @@ class SQLQueryProcessor {
 			throw new SQLQueryCommandNotSupported();
 		}
 
+		$request = Request::fromArray(
+			[
+				'origMsg' => '',
+				'query' => $query,
+				'format' => RequestFormat::SQL,
+				'endpoint' => ManticoreEndpoint::Cli,
+			]
+		);
 	  /** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
 		return new $executorClassName(
-			$requestClassName::fromQuery($query)
+			$requestClassName::fromNetworkRequest($request)
 		);
 	}
 }

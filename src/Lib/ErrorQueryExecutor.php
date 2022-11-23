@@ -68,8 +68,6 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 	 */
 	public function run(): Task {
 		[$statements, $endpoint] = $this->prepareRequest();
-		// For simplicity we use class name as id for now
-		$taskId = static::class;
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
@@ -102,7 +100,7 @@ class ErrorQueryExecutor implements CommandExecutorInterface, BuddyLocatorClient
 			return Response::fromString($resp->getBody());
 		};
 		return Task::create(
-			$taskId, $taskFn, [$this, $statements, $endpoint]
+			$taskFn, [$this, $statements, $endpoint]
 		)->run();
 	}
 

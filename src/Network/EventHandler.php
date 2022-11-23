@@ -40,20 +40,27 @@ final class EventHandler {
 			$executor = QueryProcessor::process($request);
 			$task = $executor->run();
 
-			Loop::addPeriodicTimer(
-				1, function (Timer $timer) use ($task, $deferred) {
-					if ($task->isRunning()) {
-						return;
-					}
+			// In case we work with deferred task we
+			// should return response to the client without waiting
+			// for results of it
+			if ($task->isDeferred()) {
+				$deferred->resolve(Response::fromString($task->getId()));
+			} else { // in case we should block loop we do it as promise and timer
+				Loop::addPeriodicTimer(
+					1, function (Timer $timer) use ($task, $deferred) {
+						if ($task->isRunning()) {
+							return;
+						}
 
-					Loop::cancelTimer($timer);
-					if ($task->isSucceed()) {
-						return $deferred->resolve($task->getResult());
-					}
+						Loop::cancelTimer($timer);
+						if ($task->isSucceed()) {
+							return $deferred->resolve($task->getResult());
+						}
 
-					return $deferred->resolve(Response::fromError($task->getError()));
-				}
-			);
+						return $deferred->resolve(Response::fromError($task->getError()));
+					}
+				);
+			}
 		} catch (Throwable $e) {
 			$deferred->resolve(Response::fromError($e));
 		}
