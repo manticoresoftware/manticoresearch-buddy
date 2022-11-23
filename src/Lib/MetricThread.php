@@ -44,7 +44,7 @@ final class MetricThread {
 		$runtime = new Runtime(__DIR__ . '/../../vendor/autoload.php');
 		$channel = new Channel();
 		$task = Task::createInRuntime(
-			$runtime, static::class, function (Channel $ch) {
+			$runtime, function (Channel $ch) {
 				$metric = Metric::instance();
 				while ($msg = $ch->recv()) {
 					if (!is_array($msg)) {

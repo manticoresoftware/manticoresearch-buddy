@@ -33,7 +33,8 @@ class BackupRequest implements CommandRequestInterface {
 	public function __construct(
 		public string $path,
 		public array $tables,
-		public array $options
+		public array $options,
+		public string $configPath = SEARCHD_CONFIG
 	) {
 	}
 
@@ -48,8 +49,8 @@ class BackupRequest implements CommandRequestInterface {
    */
 	public static function fromNetworkRequest(Request $request): BackupRequest {
 		$query = $request->query;
-		$whatPattern = '(?P<all>ALL)|(?:TABLES?\s*(?P<table>(,?\s*[\w]+\s*)+))';
-		$toPattern = 'TO\s*local\(\s*(?P<path>[\\_\-a-z/0-9]+)\s*\)';
+		$whatPattern = 'BACKUP\s*(?P<all>ALL)|(?:TABLES?\s*(?P<table>(,?\s*[\w]+\s*)+))';
+		$toPattern = 'TO\s*local\(\s*(?P<path>[/\\_\-a-z/0-9]+)\s*\)';
 		$optionsKeys = implode('|', array_keys(static::OPTIONS));
 		$optionsPattern = 'OPTIONS?\s*(?P<options>'
 			. '(,?\s*(?:' . $optionsKeys . ')\s*\=\s*(?:0|1|true|false|yes|no|on|off)'
@@ -67,7 +68,7 @@ class BackupRequest implements CommandRequestInterface {
 			? array_map(trim(...), explode(',', $params['table']))
 			: []
 		;
-		/* @var array{async?:bool,compress?:bool} $options */
+		/** @var array{async?:bool,compress?:bool} $options */
 		$options = isset($params['options'])
 		? array_reduce(
 			array_map(trim(...), explode(',', $params['options'])),
@@ -77,8 +78,7 @@ class BackupRequest implements CommandRequestInterface {
 				return $map;
 			},
 			[]
-		) : []
-		;
+		) : [];
 
 		return new BackupRequest(
 			path: $path,

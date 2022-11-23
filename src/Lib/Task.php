@@ -19,6 +19,19 @@ use parallel\Future;
 use parallel\Runtime;
 
 final class Task {
+	protected string $id;
+	/**
+	 * This flag shows that this task is deffered and
+	 * we can return response to client asap
+	 *
+	 * @var bool $isDeferred
+	 */
+	protected bool $isDeferred = false;
+	/**
+	 * Current task status
+	 *
+	 * @var TaskStatus $status
+	 */
 	protected TaskStatus $status;
 	protected Future $future;
 	protected Runtime $runtime;
@@ -26,39 +39,69 @@ final class Task {
 	protected mixed $result;
 
 	/**
-	 * @param string $id
 	 * @param mixed[] $argv
 	 * @return void
 	 */
-	public function __construct(protected string $id, protected array $argv = []) {
+	public function __construct(protected array $argv = []) {
+		$this->id = uniqid();
 		$this->status = TaskStatus::Pending;
+	}
+
+	/**
+	 * Check if this task is deferred
+	 * @return bool
+	 */
+	public function isDeferred(): bool {
+		return $this->isDeferred;
+	}
+
+	/**
+	 * Get current task ID
+	 *
+	 * @return string
+	 */
+	public function getId(): string {
+		return $this->id;
 	}
 
 	/**
 	 * This method creates new runtime and initialize the task to run in i
 	 *
-	 * @param string $task
 	 * @param Closure $fn
 	 * @param mixed[] $argv
 	 * @return static
 	 * @see static::createInRuntime()
 	 */
-	public static function create(string $task, Closure $fn, array $argv = []): static {
+	public static function create(Closure $fn, array $argv = []): static {
 		$autoload_file = __DIR__ . '/../../vendor/autoload.php';
-		return static::createInRuntime(new Runtime($autoload_file), $task, $fn, $argv);
+		return static::createInRuntime(new Runtime($autoload_file), $fn, $argv);
+	}
+
+	/**
+	 * This method creates new runtime and initialize task to run in deffered mode
+	 * It accepts same parameters as create method
+	 * @param Closure $fn
+	 * @param mixed[] $argv
+	 * @return static
+	 * @see static::create()
+	 */
+	public static function createDeferred(Closure $fn, array $argv = []): static {
+		$autoload_file = __DIR__. '/../../vendor/autoload.php';
+		$Self = static::createInRuntime(new Runtime($autoload_file), $fn, $argv);
+		$Self->isDeferred = true;
+		return $Self;
 	}
 
 	/**
 	 * This is main function to create runtime and initialize the task
 	 *
 	 * @param Runtime $runtime
-	 * @param string $task
 	 * @param Closure $fn
 	 * @param mixed[] $argv
 	 * @return static
 	 */
-	public static function createInRuntime(Runtime $runtime, string $task, Closure $fn, array $argv = []): static {
-		$task = new static($task, [$fn, $argv]);
+	public static function createInRuntime(Runtime $runtime, Closure $fn, array $argv = []): static {
+		$task = new static([$fn, $argv]);
 		$task->runtime = $runtime;
 		return $task;
 	}
@@ -71,13 +114,13 @@ final class Task {
 	public function run(): static {
 		$future = $this->runtime->run(
 			function (Closure $fn, array $argv): mixed {
-				// if (!defined('STDOUT')) {
-				// 	define('STDOUT', fopen('/dev/stdout', 'wb+'));
-				// }
+				if (!defined('STDOUT')) {
+					define('STDOUT', fopen('php://stdout', 'wb+'));
+				}
 
-				// if (!defined('STDERR')) {
-				// 	define('STDERR', fopen('/dev/stderr', 'wb+'));
-				// }
+				if (!defined('STDERR')) {
+					define('STDERR', fopen('php://stderr', 'wb+'));
+				}
 
 				try {
 					return $fn(...$argv);

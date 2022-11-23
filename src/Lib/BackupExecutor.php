@@ -15,7 +15,9 @@ use Manticoresearch\Backup\Lib\FileStorage;
 use Manticoresearch\Backup\Lib\ManticoreBackup;
 use Manticoresearch\Backup\Lib\ManticoreClient;
 use Manticoresearch\Backup\Lib\ManticoreConfig;
+use Manticoresearch\Backup\Lib\Searchd;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
+use Manticoresearch\Buddy\Network\Response;
 
 /**
  * This is the class to handle BACKUP ... SQL command
@@ -36,21 +38,22 @@ class BackupExecutor implements CommandExecutorInterface {
    * @return Task
    */
 	public function run(): Task {
-	// For simplicity we use class name as id for now
-		$taskId = static::class;
+		// We run in a thread anyway but in case if we need blocking
+		// We just waiting for a thread to be done
+		$isAsync = $this->request->options['async'] ?? false;
+		$method = $isAsync ? 'defer' : 'create';
+		$Task = Task::$method(
+			function (BackupRequest $request): Response {
+				Searchd::init();
 
-	// We run in a thread anyway but in case if we need blocking
-	// We just waiting for a thread to be done
-		$Task = Task::create(
-			$taskId, function (BackupRequest $request) {
-				// TODO: the config path should be in global variables/passed/or whatever
-				$config = new ManticoreConfig('/etc/manticoresearch/manticore.conf');
+				$config = new ManticoreConfig($request->configPath);
 				$client = new ManticoreClient($config);
 				$storage = new FileStorage(
 					$request->path,
 					$request->options['compress'] ?? false
 				);
 				ManticoreBackup::store($client, $storage, $request->tables);
+				return Response::none();
 			}, [$this->request]
 		);
 
