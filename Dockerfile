@@ -12,9 +12,15 @@ RUN apt -y update && apt -y upgrade && \
     ./configure && make && make install && \
     echo extension=parallel > /usr/local/etc/php/conf.d/docker-php-ext-parallel.ini && \
   \
+  docker-php-ext-install sockets && \
   wget https://repo.manticoresearch.com/manticore-dev-repo.noarch.deb && \
   dpkg -i manticore-dev-repo.noarch.deb && \
-  apt -y update && apt -y install manticore=${MANTICORE_VERSION} && \
+  apt -y update && apt -y install manticore=${MANTICORE_VERSION} \
+    manticore-server=${MANTICORE_VERSION} \
+    manticore-tools=${MANTICORE_VERSION} \
+    manticore-dev=${MANTICORE_VERSION} \
+    manticore-common=${MANTICORE_VERSION} \
+    manticore-server-core=${MANTICORE_VERSION} && \
   apt-get -y autoremove && apt-get -y clean && \
   \
   wget https://github.com/manticoresoftware/executor/releases/download/v${EXECUTOR_VERSION}/${DEB_PKG} && \
