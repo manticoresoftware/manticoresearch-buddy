@@ -146,7 +146,7 @@ class BackupRequestTest extends TestCase {
 
 			$checks = array_replace($args, $checks);
 			foreach ($checks as $key => $val) {
-				  $this->assertEquals($val, $request->{$key});
+				$this->assertEquals($val, $request->{$key});
 			}
 		}
 	}
@@ -160,7 +160,7 @@ class BackupRequestTest extends TestCase {
    * @return array{origMsg:string,query:string,format:RequestFormat,endpoint:ManticoreEndpoint}
    */
 	protected static function buildSQLQuery(array $args): array {
-		$query = '';
+		$query = 'BACKUP ';
 
 		if (isset($args['tables'])) {
 			$tables = implode(', ', $args['tables']);
