@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Run tests inside docker container
-        uses: manticoresoftware/addnab-docker-run-action@main
+        uses: manticoresoftware/addnab-docker-run-action@v3
         with:
           image: manticoresearch/manticoresearch-buddy-test-kit:5.0.3
           options: -v ${{ github.workspace }}:/src --cap-add SYS_ADMIN --security-opt apparmor=unconfined
@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Run PHPCS to check following the standard
-        uses: manticoresoftware/addnab-docker-run-action@main
+        uses: manticoresoftware/addnab-docker-run-action@v3
         with:
           image: manticoresearch/manticoresearch-buddy-test-kit:5.0.3
           options: -v ${{ github.workspace }}:/src
@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Run PHPStan to analyze the codebase
-        uses: manticoresoftware/addnab-docker-run-action@main
+        uses: manticoresoftware/addnab-docker-run-action@v3
         with:
           image: manticoresearch/manticoresearch-buddy-test-kit:5.0.3
           options: -v ${{ github.workspace }}:/src
