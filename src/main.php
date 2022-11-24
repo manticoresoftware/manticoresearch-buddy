@@ -9,6 +9,8 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+use Manticoresearch\Buddy\Lib\ContainerBuilder;
+use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Network\EventHandler;
 use Manticoresearch\Buddy\Network\Server;
 
@@ -38,6 +40,8 @@ if (isset($opts['help'])) {
 // phpcs:disable
 define('SEARCHD_CONFIG', $opts['config']);
 // phpcs:enable
+
+QueryProcessor::setContainer(ContainerBuilder::create());
 
 Server::create($opts['host'], (int)$opts['port'])
 	->addHandler('request', EventHandler::request(...))

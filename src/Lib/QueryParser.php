@@ -11,7 +11,9 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
+//@codingStandardsIgnoreStart
 use Manticoresearch\Buddy\Enum\Datatype;
+//@codingStandardsIgnoreEnd
 use Manticoresearch\Buddy\Interface\QueryParserInterface;
 
 abstract class QueryParser implements QueryParserInterface {

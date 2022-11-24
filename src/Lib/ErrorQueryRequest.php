@@ -16,15 +16,13 @@ use Manticoresearch\Buddy\Enum\Action;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Enum\Statement;
-use Manticoresearch\Buddy\Interface\BuddyLocatorClientInterface;
-use Manticoresearch\Buddy\Interface\BuddyLocatorInterface;
 use Manticoresearch\Buddy\Interface\ErrorQueryRequestInterface;
 use Manticoresearch\Buddy\Interface\QueryParserLoaderInterface;
 use Manticoresearch\Buddy\Interface\StatementInterface;
 use Manticoresearch\Buddy\Network\Request;
 use RuntimeException;
 
-class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClientInterface {
+class ErrorQueryRequest implements ErrorQueryRequestInterface {
 
 	const ACTION_MAP = [
 		'NO_INDEX' => [
@@ -57,25 +55,32 @@ class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClien
 	protected array $correctionStmts;
 
 	/**
-	 * @param Request $request
-	 * @param ?BuddyLocatorInterface $locator
+	 * @param ?Request $request
 	 * @param ?QueryParserLoaderInterface $queryParserLoader
 	 * @param ?StatementInterface $statementBuilder
 	 * @return void
 	 */
-	protected function __construct(
-		Request $request,
-		protected ?BuddyLocatorInterface $locator = null,
+	public function __construct(
+		public ?Request $request = null,
 		protected ?QueryParserLoaderInterface $queryParserLoader = null,
 		protected ?StatementInterface $statementBuilder = null
 	) {
-		foreach (get_object_vars($request) as $k => $v) {
+		$this->parseRequest();
+	}
+
+	/**
+	 * @return void
+	 */
+	public function parseRequest(): void {
+		if (!isset($this->request)) {
+			return;
+		}
+		foreach (get_object_vars($this->request) as $k => $v) {
 			$this->$k = $v;
 		}
 		// Resolve the possible ambiguity with Manticore query format as it may not correspond to request format
 		$this->queryFormat = in_array($this->endpoint, [ManticoreEndpoint::Cli, ManticoreEndpoint::Sql])
-		? RequestFormat::SQL : RequestFormat::JSON;
-		$this->locateHelpers();
+			? RequestFormat::SQL : RequestFormat::JSON;
 	}
 
 	/**
@@ -97,6 +102,7 @@ class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClien
 	 * @return void
 	 */
 	public function generateCorrectionStatements(): void {
+		$this->parseRequest();
 		if (!isset($this->statementBuilder)) {
 			throw new RuntimeException('Statement builder is not instantiated');
 		}
@@ -129,38 +135,6 @@ class ErrorQueryRequest implements ErrorQueryRequestInterface, BuddyLocatorClien
 	 */
 	public function getEndpoint(): ManticoreEndpoint {
 		return $this->endpoint;
-	}
-
-	/**
-	 * @param BuddyLocatorInterface $locator
-	 * @return void
-	 */
-	public function setLocator(BuddyLocatorInterface $locator): void {
-		$this->locator = $locator;
-		$this->locateHelpers();
-	}
-
-	/**
-	 * @return void
-	 */
-	protected function locateHelpers(): void {
-		if (!isset($this->locator)) {
-			return;
-		}
-		if (!isset($this->statementBuilder)) {
-			$builder = $this->locator->getByInterface(StatementInterface::class);
-			if ($builder instanceof StatementInterface) {
-				$this->statementBuilder = $builder;
-			}
-		}
-		if (isset($this->queryParserLoader)) {
-			return;
-		}
-		$loader = $this->locator->getByInterface(QueryParserLoaderInterface::class);
-		if (!($loader instanceof QueryParserLoaderInterface)) {
-			return;
-		}
-		$this->queryParserLoader = $loader;
 	}
 
 	/**

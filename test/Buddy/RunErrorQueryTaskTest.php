@@ -11,10 +11,13 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Lib\ContainerBuilder;
 use Manticoresearch\Buddy\Lib\ErrorQueryExecutor;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
 use Manticoresearch\Buddy\Network\Request;
+//@codingStandardsIgnoreStart
 use Manticoresearch\Buddy\Network\Response;
+//@codingStandardsIgnoreEnd
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -32,16 +35,32 @@ class RunErrorQueryTaskTest extends TestCase {
 	 * @param string $resp
 	 */
 	protected function runTask(Request $request, $mockServerUrl, $resp): void {
-		$request = ErrorQueryRequest::fromNetworkRequest($request);
-		$executor = new ErrorQueryExecutor($request);
-		$executor->setManticoreClient($mockServerUrl);
+		$container = ContainerBuilder::create();
+		$commandRequest = $container->get('ErrorQueryRequest');
+		if (!isset($commandRequest) || !($commandRequest instanceof ErrorQueryRequest)) {
+			$this->fail('Error query request is not instantiated');
+		}
+		$executor = $container->get('ErrorQueryExecutor');
+		if (!isset($executor) || !($executor instanceof ErrorQueryExecutor)) {
+			$this->fail('Error query executor is not instantiated');
+		}
+
+		$commandRequest->request = $request;
+		$executor->request = $commandRequest;
+
+		$cl = $executor->getManticoreClient();
+		if (!isset($cl)) {
+			$this->fail('Manticore client is not instantiated');
+		}
+		$cl->setServerUrl($mockServerUrl);
+
 		$task = $executor->run();
 		$task->wait();
 
 		$this->assertEquals(true, $task->isSucceed());
 		/** @var Response */
 		$result = $task->getResult();
-		$this->assertEquals($resp, (string)$result);
+		$this->assertEquals(Response::fromString($resp), $result);
 	}
 
 	public function testTaskRunWithInsertQuery(): void {

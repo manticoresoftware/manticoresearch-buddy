@@ -11,12 +11,11 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\BuddyLocator;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
-// use Manticoresearch\Buddy\Lib\ManticoreResponse;
 use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-// use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
 use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
+use Manticoresearch\Buddy\Lib\ManticoreStatement;
+use Manticoresearch\Buddy\Lib\QueryParserLoader;
 use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
@@ -50,7 +49,9 @@ class PostprocessManticoreResponseTest extends TestCase {
 		$serverUrl = self::setUpMockManticoreServer(false);
 		$manticoreClient = new ManticoreHTTPClient(new ManticoreResponseBuilder(), $serverUrl);
 		$request = ErrorQueryRequest::fromNetworkRequest($request);
-		$request->setLocator(new BuddyLocator());
+		$refCls = new ReflectionClass($request);
+		$refCls->getProperty('queryParserLoader')->setValue($request, new QueryParserLoader());
+		$refCls->getProperty('statementBuilder')->setValue($request, new ManticoreStatement());
 		$request->generateCorrectionStatements();
 		$statements = $request->getCorrectionStatements();
 		$stmt = $statements[0];
