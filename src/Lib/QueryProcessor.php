@@ -14,7 +14,9 @@ namespace Manticoresearch\Buddy\Lib;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandMissing;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
+use Manticoresearch\Buddy\Interface\CommandRequestInterface;
 use Manticoresearch\Buddy\Network\Request;
+use Psr\Container\ContainerInterface;
 
 class QueryProcessor {
 
@@ -23,6 +25,24 @@ class QueryProcessor {
 
 	/** @var array<string> CUSTOM_COMMAND_TYPES */
 	public const CUSTOM_COMMANDS = ['BACKUP'];
+
+	/** @var string NAMESPACE_PREFIX */
+	protected const NAMESPACE_PREFIX = __NAMESPACE__ . '\\';
+
+	/** @var ?ContainerInterface $container */
+	protected static ?ContainerInterface $container = null;
+
+	/**
+	 * Setter for container property
+	 *
+	 * @param ContainerInterface $container
+	 *  The container object to resolve the executor's dependencies in case such exist
+	 * @return void
+	 *  The CommandExecutorInterface to execute to process the final query
+	 */
+	public static function setContainer(ContainerInterface $container): void {
+		self::$container = $container;
+	}
 
 	/**
 	 * This is the main entry point to start parsing and processing query
@@ -44,6 +64,41 @@ class QueryProcessor {
 		}
 
 		// And now parse depending on command and return executor
+		$executor = self::getExecutorByCommand($command, $request);
+		if (!isset($executor)) {
+			throw new SQLQueryCommandNotSupported("Command '$command' is not supported");
+		}
+
+		return $executor;
+	}
+
+	/**
+	 * @param string $objType
+	 * @param ?array<string,mixed> $initProps
+	 * @return mixed
+	 */
+	protected static function getObjFromContainer(string $objType, ?array $initProps): mixed {
+		if (!isset(self::$container) || !self::$container->has($objType)) {
+			return null;
+		}
+
+		$containerObj = self::$container->get($objType);
+		if (!isset($initProps)) {
+			return $containerObj;
+		}
+
+		foreach ($initProps as $k => $v) {
+			$containerObj->$k = $v;
+		}
+		return $containerObj;
+	}
+
+	/**
+	 * @param string $command
+	 * @param Request $request
+	 * @return ?CommandExecutorInterface
+	 */
+	protected static function getExecutorByCommand(string $command, Request $request): ?CommandExecutorInterface {
 		// Handle possible multi-words command
 		$prefix = array_reduce(
 			explode(' ', $command),
@@ -51,15 +106,28 @@ class QueryProcessor {
 			''
 		);
 
-		$executorClassName = "\\Manticoresearch\\Buddy\\Lib\\{$prefix}Executor";
-		$requestClassName = "\\Manticoresearch\\Buddy\\Lib\\{$prefix}Request";
-		if (!class_exists($executorClassName) || !class_exists($requestClassName)) {
-			throw new SQLQueryCommandNotSupported("Command '$command' is not supported");
+		$requestType = "{$prefix}Request";
+		$commandRequest = self::getObjFromContainer($requestType, ['request' => $request]);
+		if (!isset($commandRequest) || !($commandRequest instanceof CommandRequestInterface)) {
+			$requestClassName = static::NAMESPACE_PREFIX . $requestType;
+			if (!class_exists($requestClassName)) {
+				return null;
+			}
+			$commandRequest = $requestClassName::fromNetworkRequest($request);
 		}
 
+		$executorType = "{$prefix}Executor";
+		$commandExecutor = self::getObjFromContainer($executorType, ['request' => $commandRequest]);
+		if (isset($commandExecutor) && $commandExecutor instanceof CommandExecutorInterface) {
+			return $commandExecutor;
+		}
+
+		$executorClassName = static::NAMESPACE_PREFIX . $executorType;
+		if (!class_exists($executorClassName)) {
+			return null;
+		}
 		/** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
-		return new $executorClassName(
-			$requestClassName::fromNetworkRequest($request)
-		);
+		return new $executorClassName($commandRequest);
 	}
+
 }

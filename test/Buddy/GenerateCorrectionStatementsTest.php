@@ -13,10 +13,10 @@ use Manticoresearch\Buddy\Enum\Action;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Enum\Statement;
-use Manticoresearch\Buddy\Interface\QueryParserLoaderInterface;
 use Manticoresearch\Buddy\Interface\StatementInterface;
-use Manticoresearch\Buddy\Lib\BuddyLocator;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
+use Manticoresearch\Buddy\Lib\ManticoreStatement;
+use Manticoresearch\Buddy\Lib\QueryParserLoader;
 use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
@@ -81,10 +81,15 @@ class GenerateCorrectionStatementsTest extends TestCase {
 	public function testGenerateCorrectionStatementsForInsertJSONQuery(): void {
 		echo "\nTesting the correction statement generation for erroneous INSERT JSON query\n";
 		$jsonQuery = '{"index":"test","id":1,"doc":{"col1" : 1}}';
-		self::$refCls->getProperty('format')->setValue(self::$request, RequestFormat::JSON);
-		self::$refCls->getProperty('queryFormat')->setValue(self::$request, RequestFormat::JSON);
-		self::$refCls->getProperty('endpoint')->setValue(self::$request, ManticoreEndpoint::Insert);
-		self::$refCls->getProperty('query')->setValue(self::$request, $jsonQuery);
+		$request = Request::fromArray(
+			[
+				'origMsg' => "index 'test' absent, or does not support INSERT",
+				'query' => $jsonQuery,
+				'format' => RequestFormat::JSON,
+				'endpoint' => ManticoreEndpoint::Insert,
+			]
+		);
+		self::$refCls->getProperty('request')->setValue(self::$request, $request);
 		$stmts = [
 			'CREATE TABLE IF NOT EXISTS test (col1 int)',
 			$jsonQuery,
@@ -97,13 +102,15 @@ class GenerateCorrectionStatementsTest extends TestCase {
 	 */
 	public function testGenerateCorrectionStatementsForShowQuery(): void {
 		echo "\nTesting the correction statement generation for erroneous SHOW statement\n";
-		self::$refCls->getProperty('origMsg')->setValue(
-			self::$request, "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'"
+		$request = Request::fromArray(
+			[
+				'origMsg' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
+				'query' => 'SHOW QUERIES',
+				'format' => RequestFormat::SQL,
+				'endpoint' => ManticoreEndpoint::Cli,
+			]
 		);
-		self::$refCls->getProperty('format')->setValue(self::$request, RequestFormat::SQL);
-		self::$refCls->getProperty('queryFormat')->setValue(self::$request, RequestFormat::SQL);
-		self::$refCls->getProperty('endpoint')->setValue(self::$request, ManticoreEndpoint::Cli);
-		self::$refCls->getProperty('query')->setValue(self::$request, 'SHOW QUERIES');
+		self::$refCls->getProperty('request')->setValue(self::$request, $request);
 		$stmts = ['SELECT * FROM @@system.sessions'];
 		$this->generate($stmts);
 	}
@@ -136,40 +143,14 @@ class GenerateCorrectionStatementsTest extends TestCase {
 		);
 	}
 
-	/**
-	 * @depends testHelpersLocation
-	 */
 	public function testBuildStatementWithParser(): void {
 		echo "\nTesting the correction statement build\n";
+		self::$refCls->getProperty('queryParserLoader')->setValue(self::$request, new QueryParserLoader());
+		self::$refCls->getProperty('statementBuilder')->setValue(self::$request, new ManticoreStatement());
 		$stmt = 'CREATE TABLE IF NOT EXISTS test (col1 int)';
 		$this->assertEquals(
 			$stmt,
 			self::invokeMethod(self::$request, 'buildStmtWithParser', [Statement::INSERT, Statement::CREATE])
-		);
-	}
-
-	/**
-	 * @depends testSetLocator
-	 */
-	public function testHelpersLocation(): void {
-		echo "\nTesting the location of helper objects for 'errorRequest' instance\n";
-		self::invokeMethod(self::$request, 'locateHelpers');
-		$this->assertInstanceOf(
-			QueryParserLoaderInterface::class,
-			self::$refCls->getProperty('queryParserLoader')->getValue(self::$request)
-		);
-		$this->assertInstanceOf(
-			StatementInterface::class,
-			self::$refCls->getProperty('statementBuilder')->getValue(self::$request)
-		);
-	}
-
-	public function testSetLocator(): void {
-		echo "\nTesting the instantiating of Buddy locator\n";
-		self::$request->setLocator(new BuddyLocator());
-		$this->assertInstanceOf(
-			BuddyLocator::class,
-			self::$refCls->getProperty('locator')->getValue(self::$request)
 		);
 	}
 

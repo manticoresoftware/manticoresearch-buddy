@@ -26,13 +26,13 @@ class JSONInsertParserTest extends TestCase {
 		$query = '{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 1 } } }'
 			. "\n"
 			. '{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : 2 } } }';
-			$res = [
-				'{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 1 } } }',
-				'{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : 2 } } }',
-			];
-			foreach (JSONInsertParser::parseNdJSON($query) as $i => $row) {
-				$this->assertEquals($res[$i], $row);
-			}
+		$res = [
+			'{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 1 } } }',
+			'{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : 2 } } }',
+		];
+		foreach (JSONInsertParser::parseNdJSON($query) as $i => $row) {
+			$this->assertEquals($res[$i], $row);
+		}
 	}
 
 	public function testInsertValTypeDetection(): void {
@@ -113,6 +113,7 @@ class JSONInsertParserTest extends TestCase {
 	}
 
 	public function testParseFail(): void {
+
 		echo "\nTesting the parsing of an incorrect JSON insert request\n";
 		$query = '{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }'
 			. "\n"

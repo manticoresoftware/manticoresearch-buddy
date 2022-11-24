@@ -9,6 +9,8 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+use Manticoresearch\Buddy\Lib\ContainerBuilder;
+use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Network\EventHandler;
 use Manticoresearch\Buddy\Network\Server;
 
@@ -33,6 +35,8 @@ if (isset($opts['help'])) {
 	echo "This is going to be help\n";
 	exit(0);
 }
+
+QueryProcessor::setContainer(ContainerBuilder::create());
 
 Server::create($opts['host'], (int)$opts['port'])
 	->addHandler('request', EventHandler::request(...))
