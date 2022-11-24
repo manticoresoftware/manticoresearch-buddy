@@ -5,22 +5,16 @@ ENV EXECUTOR_VERSION=0.2.15
 ENV EXECUTOR_SUFFIX=221012-29f9461
 ENV DEB_PKG=manticore-executor_${EXECUTOR_VERSION}-${EXECUTOR_SUFFIX}_${TARGET_ARCH}.deb
 ENV MANTICORE_VERSION=5.0.3-221020-cd2335eec
-RUN apt -y update && apt -y upgrade && \
-  apt -y install figlet git zip unzip wget curl gpg && \
+RUN apt-get -y update && apt-get -y upgrade && \
+  apt-get -y install figlet git zip unzip wget curl gpg && \
   git clone https://github.com/krakjoe/parallel.git && \
     cd parallel && git checkout 25ba1ee594c350b0e3e239c6b995d772d0e4fc9c && phpize && \
     ./configure && make && make install && \
     echo extension=parallel > /usr/local/etc/php/conf.d/docker-php-ext-parallel.ini && \
   \
   docker-php-ext-install sockets && \
-  wget https://repo.manticoresearch.com/manticore-dev-repo.noarch.deb && \
-  dpkg -i manticore-dev-repo.noarch.deb && \
-  apt -y update && apt -y install manticore=${MANTICORE_VERSION} \
-    manticore-server=${MANTICORE_VERSION} \
-    manticore-tools=${MANTICORE_VERSION} \
-    manticore-dev=${MANTICORE_VERSION} \
-    manticore-common=${MANTICORE_VERSION} \
-    manticore-server-core=${MANTICORE_VERSION} && \
+  curl -sSL https://repo.manticoresearch.com/repository/manticoresearch_buster_dev/dists/manticore_${MANTICORE_VERSION}_${TARGET_ARCH}.tgz | tar -xzf - && \
+  dpkg -i manticore*.deb && \
   apt-get -y autoremove && apt-get -y clean && \
   \
   wget https://github.com/manticoresoftware/executor/releases/download/v${EXECUTOR_VERSION}/${DEB_PKG} && \
