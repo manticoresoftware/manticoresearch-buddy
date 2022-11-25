@@ -60,7 +60,7 @@ class RunErrorQueryTaskTest extends TestCase {
 		$this->assertEquals(true, $task->isSucceed());
 		/** @var Response */
 		$result = $task->getResult();
-		$this->assertEquals(Response::fromString($resp), $result);
+		$this->assertEquals($resp, $result);
 	}
 
 	public function testTaskRunWithInsertQuery(): void {
