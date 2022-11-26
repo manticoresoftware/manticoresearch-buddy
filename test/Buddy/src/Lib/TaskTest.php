@@ -18,6 +18,7 @@ use stdClass;
 
 class TaskTest extends TestCase {
 	public function testTaskParallelRunSucceed(): void {
+		echo "\nTesting the task parallel run succeed\n";
 		$Task = Task::create(
 			function (): bool {
 				usleep(2000000);
@@ -34,6 +35,7 @@ class TaskTest extends TestCase {
 	}
 
 	public function testTaskParallelRunWithArgumentsSucceed(): void {
+		echo "\nTesting the task parallel run with arguments succeed\n";
 		$arg = new stdClass();
 		$arg->name = 'test';
 		$arg->value = 123;

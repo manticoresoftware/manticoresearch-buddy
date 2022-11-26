@@ -43,7 +43,7 @@ class BackupExecutor implements CommandExecutorInterface {
 		$isAsync = $this->request->options['async'] ?? false;
 		$method = $isAsync ? 'defer' : 'create';
 		$Task = Task::$method(
-			function (BackupRequest $request): Response {
+			static function (BackupRequest $request): Response {
 				Searchd::init();
 
 				$config = new ManticoreConfig($request->configPath);
