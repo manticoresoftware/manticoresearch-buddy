@@ -53,7 +53,8 @@ class RunErrorQueryTaskTest extends TestCase {
 			$this->fail('Manticore client is not instantiated');
 		}
 		$cl->setServerUrl($mockServerUrl);
-
+		var_dump($executor::class);
+		ob_flush();
 		$task = $executor->run();
 		$task->wait();
 
