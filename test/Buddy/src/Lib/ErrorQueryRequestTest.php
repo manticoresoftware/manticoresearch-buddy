@@ -12,9 +12,9 @@
 use Manticoresearch\Buddy\Enum\Action;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-//@codingStandardsIgnoreStart
+
 use Manticoresearch\Buddy\Interface\ErrorQueryRequestInterface;
-//@codingStandardsIgnoreEnd
+
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
 use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
