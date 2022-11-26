@@ -14,9 +14,8 @@ namespace Manticoresearch\BuddyTest\Lib;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\SocketError;
 use RuntimeException;
-//@codingStandardsIgnoreStart
+
 use Socket;
-//@codingStandardsIgnoreEnd
 
 final class MockManticoreServer {
 

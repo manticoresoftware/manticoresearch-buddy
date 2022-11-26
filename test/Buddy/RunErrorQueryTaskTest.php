@@ -15,9 +15,9 @@ use Manticoresearch\Buddy\Lib\ContainerBuilder;
 use Manticoresearch\Buddy\Lib\ErrorQueryExecutor;
 use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
 use Manticoresearch\Buddy\Network\Request;
-//@codingStandardsIgnoreStart
+
 use Manticoresearch\Buddy\Network\Response;
-//@codingStandardsIgnoreEnd
+
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 

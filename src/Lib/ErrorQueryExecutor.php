@@ -16,9 +16,9 @@ use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Interface\ErrorQueryRequestInterface;
 use Manticoresearch\Buddy\Interface\ManticoreHTTPClientInterface;
-//@codingStandardsIgnoreStart
+
 use Manticoresearch\Buddy\Interface\StatementInterface;
-//@codingStandardsIgnoreEnd
+
 use Manticoresearch\Buddy\Network\Response;
 use RuntimeException;
 
