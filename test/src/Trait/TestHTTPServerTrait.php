@@ -88,7 +88,7 @@ trait TestHTTPServerTrait {
 		if ($port === 0) {
 			self::$mockServerUrl = '';
 		} else {
-			self::$mockServerUrl = "$addr:$port";
+			self::$mockServerUrl = "http://$addr:$port";
 			$scriptCode = self::makeStartupScript();
 			$descrs = $pipes = [];
 			self::$mockServerProc = proc_open("php -r '$scriptCode'", $descrs, $pipes);
