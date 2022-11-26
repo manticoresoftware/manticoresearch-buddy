@@ -67,7 +67,9 @@ class ErrorQueryExecutor implements CommandExecutorInterface {
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (ErrorQueryExecutor $that, array $statements, ManticoreEndpoint $finalEndpoint): Response {
+		$taskFn = static function ($that, array $statements, $finalEndpoint) {
+			/** @var ErrorQueryExecutor $that */
+			/** @var ManticoreEndpoint $finalEndpoint */
 
 			if (empty($statements)) {
 				return Response::fromError(new Exception($that::CANCEL_EXECUTION_MSG));
@@ -101,7 +103,6 @@ class ErrorQueryExecutor implements CommandExecutorInterface {
 					$resp->postprocess($processor);
 				}
 			}
-
 			return Response::fromString($resp->getBody());
 		};
 		return Task::create(

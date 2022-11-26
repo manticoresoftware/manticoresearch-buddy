@@ -108,7 +108,7 @@ final class MockManticoreServer {
 					exit("<Mock Manticore server terminated: Request parse failure: empty request passed>\n");
 				}
 				preg_match('/(\n|\r)/', $req, $matches, PREG_OFFSET_CAPTURE);
-				$reqUrlData = substr($req, 0, $matches[0][1]);
+				$reqUrlData = substr($req, 0, (int)$matches[0][1]);
 				preg_match('/\s\/(.*?)\s/', $reqUrlData, $matches);
 				$this->reqEndpoint = $matches[1];
 				preg_match('/(\n\n|\r\n\r\n|\r\r)/', $req, $matches, PREG_OFFSET_CAPTURE);
