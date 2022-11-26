@@ -1,35 +1,20 @@
-FROM php:8.1.11-zts-buster
+FROM manticoresearch/manticore-executor:0.3.5-dev
 
 ARG TARGET_ARCH=amd64
-ENV EXECUTOR_VERSION=0.3.5
-ENV EXECUTOR_SUFFIX=221012-29f9461
-ENV DEB_PKG=manticore-executor_${EXECUTOR_VERSION}-${EXECUTOR_SUFFIX}_${TARGET_ARCH}.deb
 ENV MANTICORE_VERSION=5.0.3-221020-cd2335eec
 RUN apt-get -y update && apt-get -y upgrade && \
-  apt-get -y install figlet git zip unzip wget curl gpg && \
-  git clone https://github.com/krakjoe/parallel.git && \
-    cd parallel && git checkout 25ba1ee594c350b0e3e239c6b995d772d0e4fc9c && phpize && \
-    ./configure && make && make install && \
-    echo extension=parallel > /usr/local/etc/php/conf.d/docker-php-ext-parallel.ini && \
-  \
-  docker-php-ext-install sockets && \
+  curl -sSL  http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb > libssl.deb && \
+  dpkg -i libssl.deb && rm -f libssl.deb && \
   curl -sSL https://repo.manticoresearch.com/repository/manticoresearch_buster_dev/dists/manticore_${MANTICORE_VERSION}_${TARGET_ARCH}.tgz | tar -xzf - && \
   dpkg -i manticore*.deb && \
-  apt-get -y autoremove && apt-get -y clean && \
-  \
-  wget https://github.com/manticoresoftware/executor/releases/download/v${EXECUTOR_VERSION}/${DEB_PKG} && \
-  dpkg -i ${DEB_PKG} && \
-  rm -f ${DEB_PKG}
+  apt-get -y autoremove && apt-get -y clean
 
 # alter bash prompt
 ENV PS1A="\u@manticore-backup.test:\w> "
 RUN echo 'PS1=$PS1A' >> ~/.bashrc && \
   echo 'figlet -w 120 manticore-backup script testing' >> ~/.bashrc
 
-# install composer - see https://medium.com/@c.harrison/speedy-composer-installs-in-docker-builds-41eea6d0172b
-RUN curl -sS https://getcomposer.org/installer | php && mv composer.phar /usr/local/bin/composer
-
-RUN mkdir /var/run/manticore/ && \
+RUN mkdir -p /var/run/manticore/ && \
   mkdir -p /usr/share/manticore/morph/ && \
   echo -e 'a\nb\nc\nd\n' > /usr/share/manticore/morph/test
 
