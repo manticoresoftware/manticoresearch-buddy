@@ -15,11 +15,6 @@ use Manticoresearch\Buddy\Lib\BackupRequest;
 use Manticoresearch\Buddy\Network\Request;
 use PHPUnit\Framework\TestCase;
 
-// Not the best way, but it's ok for now
-// phpcs:disable
-define('SEARCHD_CONFIG', '/etc/manticore/manticore.conf');
-// phpcs:enable
-
 class BackupRequestTest extends TestCase {
 	const PARSING_SETS = [
 		[ #1

@@ -25,6 +25,9 @@ class BackupRequest implements CommandRequestInterface {
 		'compress' => 'bool',
 	];
 
+	/** @var string */
+	public string $configPath;
+
   /**
    * @param string $path
    * @param string[] $tables
@@ -34,8 +37,12 @@ class BackupRequest implements CommandRequestInterface {
 		public string $path,
 		public array $tables,
 		public array $options,
-		public string $configPath = SEARCHD_CONFIG
 	) {
+		$configFile = getenv('SEARCHD_CONFIG');
+		if (!$configFile || !file_exists($configFile)) {
+			throw new RuntimeException("Cannot find manticore config file: $configFile");
+		}
+		$this->configPath = $configFile;
 	}
 
 
