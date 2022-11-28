@@ -80,7 +80,7 @@ final class CliArgsProcessor {
 			. "$script --pid=100 --pid-file=/var/run/manticore/searchd.pid\n"
 			. "$script --pid=100 --pid-file=/var/run/manticore/searchd.pid --host=127.0.0.2 --port=1000\n"
 			. "$script --pid=100 --pid-file=/var/run/manticore/searchd.pid --disable-telemetry\n\n"
-			. "Detailed info on Manticore executor can be found "
+			. 'Detailed info on Manticore executor can be found '
 			. "\e]8;;https://github.com/manticoresoftware/executor/\e\\here\e]8;;\e\\ "
 			. "(https://github.com/manticoresoftware/executor)\n\n";
 	}
