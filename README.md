@@ -41,3 +41,26 @@ To debug the flow you can use `bin/query` script. To run it just pass the query 
   Result: Backup directory is not writable
   done
 ```
+
+### Running from CLI
+
+To run a Buddy instance from CLI, use the following command:
+
+```bash
+  $ php main.php [ARGUMENTS]
+
+  Arguments are:
+  --help		   			display this help message
+  --pid     				PID of a running Manticore instance
+  --pid-file				path to the Manticore workfile containing its current PID
+  --host   					hostname to connect with Manticore searchd
+							(default is 127.0.0.1)
+  --port    				port to connect with Manticore searchd
+							(default is 5000)
+  --disable-telemetry		disables telemetry for Buddy
+
+  Examples:
+  php main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid
+  php main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid --host=127.0.0.2 --port=1000
+  php main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid --disable-telemetry
+```

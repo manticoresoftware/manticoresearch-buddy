@@ -16,7 +16,7 @@ $executor -n <<CODE
 <?php declare(strict_types=1);
 define('STDOUT', fopen('/dev/stdout', 'wb+'));
 define('STDERR', fopen('/dev/stderr', 'wb+'));
-define('SEARCHD_CONFIG', '/etc/manticore/manticore.conf');
+putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 include_once __DIR__ . '/vendor/autoload.php';
 
 use Manticoresearch\Buddy\Lib\SQLQueryProcessor;
