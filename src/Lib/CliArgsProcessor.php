@@ -70,7 +70,7 @@ final class CliArgsProcessor {
 			. "--help   			display this help message\n"
 			. "--pid     			PID of a running Manticore instance\n"
 			. "--pid-file			path to the Manticore workfile containing its current PID\n"
-			. "--config       path to the manticore searchd config file for handling some commands\n"
+			. "--config       			path to the manticore searchd config file for handling some commands\n"
 			. "--host   			hostname to connect with Manticore searchd\n"
 			. "				(default is 127.0.0.1)\n"
 			. "--port    			port to connect with Manticore searchd\n"
@@ -79,7 +79,10 @@ final class CliArgsProcessor {
 			. "Examples:\n"
 			. "$script --pid=100 --pid-file=/var/run/manticore/searchd.pid\n"
 			. "$script --pid=100 --pid-file=/var/run/manticore/searchd.pid --host=127.0.0.2 --port=1000\n"
-			. "$script --pid=100 --pid-file=/var/run/manticore/searchd.pid --disable-telemetry\n\n";
+			. "$script --pid=100 --pid-file=/var/run/manticore/searchd.pid --disable-telemetry\n\n"
+			. "Detailed info on Manticore executor can be found "
+			. "\e]8;;https://github.com/manticoresoftware/executor/\e\\here\e]8;;\e\\ "
+			. "(https://github.com/manticoresoftware/executor)\n\n";
 	}
 
 	/**
@@ -99,7 +102,7 @@ final class CliArgsProcessor {
 		$errMsg = self::validate($opts);
 		if ($errMsg !== '') {
 			echo $errMsg;
-			exit(0);
+			exit(1);
 		}
 
 		if (isset($opts['disable-telemetry'])) {

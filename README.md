@@ -47,7 +47,7 @@ To debug the flow you can use `bin/query` script. To run it just pass the query 
 To run a Buddy instance from CLI, use the following command:
 
 ```bash
-  $ php main.php [ARGUMENTS]
+  $ manticore-executor src/main.php [ARGUMENTS]
 
   Arguments are:
   --help		   			display this help message
@@ -60,7 +60,8 @@ To run a Buddy instance from CLI, use the following command:
   --disable-telemetry		disables telemetry for Buddy
 
   Examples:
-  php main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid
-  php main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid --host=127.0.0.2 --port=1000
-  php main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid --disable-telemetry
+  manticore-executor src/main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid
+  manticore-executor src/main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid --host=127.0.0.2 --port=1000
+  manticore-executor src/main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid --disable-telemetry
 ```
+Detailed info on  Manticore executor can be found [here](https://github.com/manticoresoftware/executor)
