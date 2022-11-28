@@ -11,11 +11,12 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Lib\BackupExecutor;
 use Manticoresearch\Buddy\Lib\BackupRequest;
-use Manticoresearch\Buddy\Lib\ErrorQueryExecutor;
-use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Lib\ShowQueriesExecutor;
+use Manticoresearch\Buddy\Lib\ShowQueriesRequest;
 use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
@@ -42,22 +43,22 @@ class QueryProcessorTest extends TestCase {
 		$request = Request::fromArray(
 			[
 				'origMsg' => '',
-				'query' => 'ERROR QUERY',
+				'query' => 'SHOW QUERIES',
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
 		$executor = QueryProcessor::process($request);
-		$this->assertInstanceOf(ErrorQueryExecutor::class, $executor);
+		$this->assertInstanceOf(ShowQueriesExecutor::class, $executor);
 		$refCls = new ReflectionClass($executor);
 		$request = $refCls->getProperty('request')->getValue($executor);
-		$this->assertInstanceOf(ErrorQueryRequest::class, $request);
+		$this->assertInstanceOf(ShowQueriesRequest::class, $request);
 	}
 
 	public function testCommandProcessFail(): void {
 		echo "\nTesting the processing of incorrect execution command\n";
-		// $this->expectException(SQLQueryCommandNotSupported::class);
-		// $this->expectExceptionMessage("Command 'TEST' is not supported");
+		$this->expectException(SQLQueryCommandNotSupported::class);
+		$this->expectExceptionMessage('Failed to handle query: TEST');
 		$request = Request::fromArray(
 			[
 				'origMsg' => '',
@@ -66,8 +67,7 @@ class QueryProcessorTest extends TestCase {
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
-		$executor = QueryProcessor::process($request);
-		$this->assertInstanceOf(ErrorQueryExecutor::class, $executor);
+		QueryProcessor::process($request);
 	}
 
 }

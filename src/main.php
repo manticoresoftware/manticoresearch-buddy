@@ -10,21 +10,13 @@
 */
 
 use Manticoresearch\Buddy\Lib\CliArgsProcessor;
-use Manticoresearch\Buddy\Lib\ContainerBuilder;
-use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Network\EventHandler;
 use Manticoresearch\Buddy\Network\Server;
 
 // Init autoload first
-include_once __DIR__ . DIRECTORY_SEPARATOR
-  . '..' . DIRECTORY_SEPARATOR
-  . 'vendor' . DIRECTORY_SEPARATOR
-  . 'autoload.php'
-;
+include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
 
 [$pid, $pidFile, $host, $port] = CliArgsProcessor::run();
-
-QueryProcessor::setContainer(ContainerBuilder::create());
 
 Server::create($host, $port)
 	->addHandler('request', EventHandler::request(...))

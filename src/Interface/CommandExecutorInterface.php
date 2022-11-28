@@ -14,5 +14,9 @@ namespace Manticoresearch\Buddy\Interface;
 use Manticoresearch\Buddy\Lib\Task;
 
 interface CommandExecutorInterface {
+	/** @return Task */
 	public function run(): Task;
+
+	/** @return array<string> */
+	public function getProps(): array;
 }
