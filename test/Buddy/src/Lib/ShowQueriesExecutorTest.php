@@ -11,21 +11,21 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\ErrorQueryRequest;
 use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
 use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
-use Manticoresearch\Buddy\Lib\ManticoreStatement;
-use Manticoresearch\Buddy\Lib\QueryParserLoader;
+use Manticoresearch\Buddy\Lib\ShowQueriesExecutor;
+use Manticoresearch\Buddy\Lib\ShowQueriesRequest;
 use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\Network\Response;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
-class PostprocessManticoreResponseTest extends TestCase {
+class ShowQueriesExecutorTest extends TestCase {
 
 	use TestHTTPServerTrait;
 
-	public function testManticoreResponsePostprocess(): void {
-		echo "\nTesting the postprocessing of Manticore response received\n";
+	public function testShowQueriesExecutesProperly(): void {
+		echo "\nTesting the 'show queries' executes properly and we got the correct Manticore response received\n";
 		$respBody = "[{\n"
 			. '"columns":[{"proto":{"type":"string"}},{"host":{"type":"string"}},'
 			. '{"ID":{"type":"long long"}},{"query":{"type":"string"}}],'
@@ -48,19 +48,19 @@ class PostprocessManticoreResponseTest extends TestCase {
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);
 		$manticoreClient = new ManticoreHTTPClient(new ManticoreResponseBuilder(), $serverUrl);
-		$request = ErrorQueryRequest::fromNetworkRequest($request);
-		$refCls = new ReflectionClass($request);
-		$refCls->getProperty('queryParserLoader')->setValue($request, new QueryParserLoader());
-		$refCls->getProperty('statementBuilder')->setValue($request, new ManticoreStatement());
-		$request->generateCorrectionStatements();
-		$statements = $request->getCorrectionStatements();
-		$stmt = $statements[0];
-		$resp = $manticoreClient->sendRequest($stmt->getBody());
-		$processor = $stmt->getPostprocessor();
-		if (isset($processor)) {
-			$resp->postprocess($processor);
-		}
-		$this->assertEquals($respBody, $resp->getBody());
+		$request = ShowQueriesRequest::fromNetworkRequest($request);
+
+		$executor = new ShowQueriesExecutor($request);
+		$refCls = new ReflectionClass($executor);
+		$refCls->getProperty('manticoreClient')->setValue($executor, $manticoreClient);
+		$task = $executor->run();
+		$task->wait();
+		$this->assertEquals(true, $task->isSucceed());
+		$result = $task->getResult();
+		$this->assertInstanceOf(Response::class, $result);
+		$result = (array)json_decode((string)$result, true);
+		$this->assertArrayHasKey('message', $result);
+		$this->assertEquals($respBody, $result['message']);
 		self::finishMockManticoreServer();
 	}
 

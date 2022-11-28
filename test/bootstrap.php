@@ -10,7 +10,10 @@
 */
 
 // TODO: do something to bootstrap tests
-include_once __DIR__ . '/../vendor/autoload.php';
+include_once __DIR__ . DIRECTORY_SEPARATOR
+	. '..' . DIRECTORY_SEPARATOR
+	. 'src' . DIRECTORY_SEPARATOR
+	. 'init.php';
 
 // Not the best way, but it's ok for now
 // phpcs:disable

@@ -59,4 +59,11 @@ class BackupExecutor implements CommandExecutorInterface {
 
 		return $Task->run();
 	}
+
+	/**
+	 * @return array<string>
+	 */
+	public function getProps(): array {
+		return [];
+	}
 }
