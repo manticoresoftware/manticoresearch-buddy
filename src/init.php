@@ -17,7 +17,11 @@ use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
 use Symfony\Component\DependencyInjection\Reference;
 
 // Init autoload first
-include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
+include_once __DIR__ . DIRECTORY_SEPARATOR
+. '..' . DIRECTORY_SEPARATOR
+. 'vendor' . DIRECTORY_SEPARATOR
+. 'autoload.php'
+;
 
 // Build container dependencies
 $container = new Container();

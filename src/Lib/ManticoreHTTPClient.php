@@ -81,21 +81,37 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 			$endpoint = $this->endpoint;
 		}
 		$fullReqUrl = "{$this->url}/{$endpoint->value}";
-		$opts = [
-			'http' => [
-				'method'  => 'POST',
-				'header'  => 'Content-Type: application/x-www-form-urlencoded',
-				'content' => $request,
-			],
-		];
 
-		$context  = stream_context_create($opts);
-		$result = file_get_contents($fullReqUrl, false, $context);
-
-		if ($result === false) {
+		$conn = curl_init($fullReqUrl);
+		if ($conn === false) {
 			throw new ManticoreHTTPClientError("Cannot connect to server at $fullReqUrl");
 		} else {
-			$this->response = (string)$result;
+//			// !TODO  Check why requests to Manticore hang when using stream approach  
+// 			$opts = [
+// 				'http' => [
+// 					'method'  => 'POST',
+// 					'header'  => 'Content-Type: application/x-www-form-urlencoded',
+// 					'content' => $request,
+// 				],
+// 			];
+			
+// 			$context  = stream_context_create($opts);
+// 			$result = file_get_contents($fullReqUrl, false, $context);
+			
+			curl_setopt_array(
+				$conn,
+				[
+					CURLOPT_RETURNTRANSFER => true,
+					CURLOPT_POST => 1,
+					CURLOPT_POSTFIELDS => $request,
+					CURLOPT_HTTPHEADER => [
+						'Content-Type: text/plain',
+						'X-Manticore-Error-Redirect: disable',
+					],
+				]
+			);
+			$this->response = (string)curl_exec($conn);
+			curl_close($conn);
 			if ($this->response === '') {
 				throw new ManticoreHTTPClientError('No response passed from server');
 			}
