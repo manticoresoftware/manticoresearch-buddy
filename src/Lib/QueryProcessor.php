@@ -59,7 +59,7 @@ class QueryProcessor {
 			$executor->{'set' . ucfirst($prop)}(static::getObjFromContainer($prop));
 		}
 		/** @var CommandExecutorInterface */
-		return new $executorClassName($commandRequest);
+		return $executor;
 	}
 
 	/**
@@ -87,6 +87,7 @@ class QueryProcessor {
 	public static function extractPrefixFromQuery(string $query): string {
 		$queryLowercase = strtolower($query);
 		return match (true) {
+			str_starts_with($queryLowercase, 'insert into') => 'InsertQuery',
 			str_starts_with($queryLowercase, 'show queries') => 'ShowQueries',
 			str_starts_with($queryLowercase, 'backup') => 'Backup',
 			default => throw new SQLQueryCommandNotSupported("Failed to handle query: $query"),

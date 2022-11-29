@@ -46,6 +46,12 @@ class InsertQueryExecutor implements CommandExecutorInterface {
 		$taskFn = function (InsertQueryRequest $request, ManticoreHTTPClientInterface $manticoreClient): Response {
 			for ($i = 0, $max_i = sizeof($request->queries) - 1; $i <= $max_i; $i++) {
 				$query = $request->queries[$i];
+				// When processing the final query we need to make sure the response to client
+				// has the same format as the initial request, otherwise we just use 'cli' default endpoint
+				if ($i === $max_i) {
+					$manticoreClient->setEndpoint($request->endpoint);
+				}
+
 				$resp = $manticoreClient->sendRequest($query);
 				if ($resp->hasError()) {
 					return Response::fromError(new Exception((string)$resp->getError()));

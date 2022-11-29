@@ -20,6 +20,9 @@ class InsertQueryRequest  {
 	/** @var array<string> */
 	public array $queries = [];
 
+	/** @var ManticoreEndpoint */
+	public ManticoreEndpoint $endpoint = ManticoreEndpoint::Cli;
+
 	/**
 	 * @return void
 	 */
@@ -38,6 +41,7 @@ class InsertQueryRequest  {
 		$parser = QueryParserLoader::getInsertQueryParser($queryFormat);
 		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->query));
 		$self->queries[] = $request->query;
+		$self->endpoint = $request->endpoint;
 		return $self;
 	}
 
