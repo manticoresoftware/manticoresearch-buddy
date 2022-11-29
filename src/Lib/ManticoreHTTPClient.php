@@ -86,7 +86,7 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 		if ($conn === false) {
 			throw new ManticoreHTTPClientError("Cannot connect to server at $fullReqUrl");
 		} else {
-//			// !TODO  Check why requests to Manticore hang when using stream approach  
+//			// !TODO  Check why requests to Manticore hang when using stream approach 
 // 			$opts = [
 // 				'http' => [
 // 					'method'  => 'POST',
@@ -94,10 +94,9 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 // 					'content' => $request,
 // 				],
 // 			];
-			
+//
 // 			$context  = stream_context_create($opts);
 // 			$result = file_get_contents($fullReqUrl, false, $context);
-			
 			curl_setopt_array(
 				$conn,
 				[
