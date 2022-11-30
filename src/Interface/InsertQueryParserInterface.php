@@ -33,7 +33,7 @@ interface InsertQueryParserInterface extends QueryParserInterface {
 	/**
 	 * @param callable $checker
 	 * @param array<mixed> $rowVals
-	 * @param array<Datatype> $types
+	 * @param array<Datatype> &$types
 	 * @param array<string> $cols
 	 * @param class-string<RuntimeException> $errorHandler
 	 * @return void

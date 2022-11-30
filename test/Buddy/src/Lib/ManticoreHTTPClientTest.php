@@ -44,12 +44,6 @@ class ManticoreHTTPClientTest extends TestCase {
 		$this->assertInstanceOf(ManticoreHTTPClient::class, $client);
 	}
 
-// 	public function testResponseBuilderSet(): void {
-// 		$this->client->setResponseBuilder(new ManticoreResponse());
-// 		$respBuilder = $this->refCls->getProperty('responseBuilder')->getValue($this->client);
-// 		$this->assertInstanceOf(ManticoreResponse::class, $respBuilder);
-// 	}
-
 	public function testResponseUrlSetOk(): void {
 		$url = 'http://localhost:1000';
 		$this->client->setServerUrl($url);
@@ -62,10 +56,5 @@ class ManticoreHTTPClientTest extends TestCase {
 		$this->expectExceptionMessage("Manticore request error: Malformed request url '$url' passed");
 		$this->client->setServerUrl($url);
 	}
-
-// 	public function testEndpointSet(): void {
-// 		$this->client->setEndpoint(ManticoreEndpoint::Insert);
-// 		$this->assertEquals(ManticoreEndpoint::Insert, $this->refCls->getProperty('endpoint')->getValue($this->client));
-// 	}
 
 }

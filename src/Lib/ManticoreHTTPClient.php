@@ -98,7 +98,7 @@ class ManticoreHTTPClient {
 			}
 		}
 
-		return $this->responseBuilder->buildFromBody($this->response);
+		return $this->responseBuilder->fromBody($this->response);
 	}
 
 	/**

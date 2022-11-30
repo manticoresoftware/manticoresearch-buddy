@@ -113,7 +113,7 @@ class ManticoreResponse {
 	 * @param string $body
 	 * @return self
 	 */
-	public static function buildFromBody(string $body): self {
+	public static function fromBody(string $body): self {
 		return new self($body);
 	}
 }
