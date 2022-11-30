@@ -12,7 +12,6 @@
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
 use Manticoresearch\Buddy\Lib\ManticoreResponse;
-use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
 use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
@@ -33,7 +32,7 @@ class GetManticoreResponseTest extends TestCase {
 	 */
 	protected function setUpServer(bool $isInErrorMode): void {
 		$serverUrl = self::setUpMockManticoreServer($isInErrorMode);
-		$this->httpClient = new ManticoreHTTPClient(new ManticoreResponseBuilder(), $serverUrl);
+		$this->httpClient = new ManticoreHTTPClient(new ManticoreResponse(), $serverUrl);
 	}
 
 	protected function tearDown(): void {

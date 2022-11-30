@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Exception;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
-use Manticoresearch\Buddy\Interface\ManticoreHTTPClientInterface;
 
 use Manticoresearch\Buddy\Network\Response;
 use RuntimeException;
@@ -22,8 +21,8 @@ use RuntimeException;
  * This is the parent class to handle erroneous Manticore queries
  */
 class InsertQueryExecutor implements CommandExecutorInterface {
-	/** @var ManticoreHTTPClientInterface */
-	protected ManticoreHTTPClientInterface $manticoreClient;
+	/** @var ManticoreHTTPClient */
+	protected ManticoreHTTPClient $manticoreClient;
 
 	/**
 	 *  Initialize the executor
@@ -43,7 +42,7 @@ class InsertQueryExecutor implements CommandExecutorInterface {
 	public function run(): Task {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (InsertQueryRequest $request, ManticoreHTTPClientInterface $manticoreClient): Response {
+		$taskFn = function (InsertQueryRequest $request, ManticoreHTTPClient $manticoreClient): Response {
 			for ($i = 0, $max_i = sizeof($request->queries) - 1; $i <= $max_i; $i++) {
 				$query = $request->queries[$i];
 				// When processing the final query we need to make sure the response to client
@@ -79,10 +78,10 @@ class InsertQueryExecutor implements CommandExecutorInterface {
 	/**
 	 * Instantiating the http client to execute requests to Manticore server
 	 *
-	 * @param ManticoreHTTPClientInterface $client
-	 * $return ManticoreHTTPClientInterface
+	 * @param ManticoreHTTPClient $client
+	 * $return ManticoreHTTPClient
 	 */
-	public function setManticoreClient(ManticoreHTTPClientInterface $client): ManticoreHTTPClientInterface {
+	public function setManticoreClient(ManticoreHTTPClient $client): ManticoreHTTPClient {
 		$this->manticoreClient = $client;
 		return $this->manticoreClient;
 	}

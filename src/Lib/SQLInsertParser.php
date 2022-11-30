@@ -14,11 +14,10 @@ namespace Manticoresearch\Buddy\Lib;
 use Manticoresearch\Buddy\Enum\Datalim;
 use Manticoresearch\Buddy\Enum\Datatype;
 use Manticoresearch\Buddy\Exception\QueryParserError;
-use Manticoresearch\Buddy\Interface\CheckInsertInterface;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 use Manticoresearch\Buddy\Lib\QueryParser;
 
-class SQLInsertParser extends QueryParser implements InsertQueryParserInterface, CheckInsertInterface {
+class SQLInsertParser extends QueryParser implements InsertQueryParserInterface {
 
 	use \Manticoresearch\Buddy\Trait\CheckInsertDataTrait;
 

@@ -12,10 +12,9 @@
 namespace Manticoresearch\Buddy\Lib;
 
 use Manticoresearch\Buddy\Exception\ManticoreResponseError ;
-use Manticoresearch\Buddy\Interface\ManticoreResponseInterface;
 use Throwable;
 
-class ManticoreResponse implements ManticoreResponseInterface {
+class ManticoreResponse {
 
 	/**
 	 * @var array<string,mixed> $data
@@ -33,11 +32,11 @@ class ManticoreResponse implements ManticoreResponseInterface {
 	protected ?string $error;
 
 	/**
-	 * @param string $body
+	 * @param ?string $body
 	 * @return void
 	 */
 	public function __construct(
-		protected string $body
+		protected ?string $body = null
 	) {
 		$this->parse();
 	}
@@ -53,7 +52,7 @@ class ManticoreResponse implements ManticoreResponseInterface {
 	 * @return string
 	 */
 	public function getBody(): string {
-		return $this->body;
+		return (string)$this->body;
 	}
 
 	/**
@@ -83,6 +82,9 @@ class ManticoreResponse implements ManticoreResponseInterface {
 	 * @throws ManticoreResponseError
 	 */
 	protected function parse(): void {
+		if (!isset($this->body)) {
+			return;
+		}
 		$data = json_decode($this->body, true);
 		if (!is_array($data)) {
 			throw new ManticoreResponseError('Invalid JSON found');
@@ -107,4 +109,11 @@ class ManticoreResponse implements ManticoreResponseInterface {
 		}
 	}
 
+	/**
+	 * @param string $body
+	 * @return self
+	 */
+	public static function buildFromBody(string $body): self {
+		return new self($body);
+	}
 }

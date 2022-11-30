@@ -10,7 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
+use Manticoresearch\Buddy\Lib\ManticoreResponse;
 use Manticoresearch\Buddy\Lib\QueryParserLoader;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
@@ -24,7 +24,7 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 ;
 // Build container dependencies
 $container = new Container();
-$container->register('ManticoreResponseBuilder', ManticoreResponseBuilder::class);
+$container->register('ManticoreResponseBuilder', ManticoreResponse::class);
 $container->register('QueryParserLoader', QueryParserLoader::class);
 $container
 	->register('manticoreClient', ManticoreHTTPClient::class)

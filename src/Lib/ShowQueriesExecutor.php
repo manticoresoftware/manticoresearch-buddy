@@ -13,8 +13,6 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Exception;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
-use Manticoresearch\Buddy\Interface\ManticoreHTTPClientInterface;
-
 use Manticoresearch\Buddy\Lib\ShowQueriesRequest;
 use Manticoresearch\Buddy\Network\Response;
 use RuntimeException;
@@ -23,8 +21,8 @@ use RuntimeException;
  * This is the parent class to handle erroneous Manticore queries
  */
 class ShowQueriesExecutor implements CommandExecutorInterface {
-	/** @var ManticoreHTTPClientInterface $manticoreClient */
-	protected ManticoreHTTPClientInterface $manticoreClient;
+	/** @var ManticoreHTTPClient $manticoreClient */
+	protected ManticoreHTTPClient $manticoreClient;
 
 	/**
 	 *  Initialize the executor
@@ -46,7 +44,7 @@ class ShowQueriesExecutor implements CommandExecutorInterface {
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (ShowQueriesRequest $request, ManticoreHTTPClientInterface $manticoreClient): Response {
+		$taskFn = function (ShowQueriesRequest $request, ManticoreHTTPClient $manticoreClient): Response {
 			$resp = $manticoreClient->sendRequest($request->query);
 			if ($resp->hasError()) {
 				return Response::fromError(new Exception((string)$resp->getError()));
@@ -126,10 +124,10 @@ class ShowQueriesExecutor implements CommandExecutorInterface {
 	/**
 	 * Instantiating the http client to execute requests to Manticore server
 	 *
-	 * @param ManticoreHTTPClientInterface $client
-	 * $return ManticoreHTTPClientInterface
+	 * @param ManticoreHTTPClient $client
+	 * $return ManticoreHTTPClient
 	 */
-	public function setManticoreClient(ManticoreHTTPClientInterface $client): ManticoreHTTPClientInterface {
+	public function setManticoreClient(ManticoreHTTPClient $client): ManticoreHTTPClient {
 		$this->manticoreClient = $client;
 		return $this->manticoreClient;
 	}

@@ -14,7 +14,7 @@ use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\InsertQueryExecutor;
 use Manticoresearch\Buddy\Lib\InsertQueryRequest;
 use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
+use Manticoresearch\Buddy\Lib\ManticoreResponse;
 use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\Buddy\Network\Response;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
@@ -36,7 +36,7 @@ class InsertQueryExecutorTest extends TestCase {
 	protected function runTask(Request $networkRequest, string $serverUrl, string $resp): void {
 		$request = InsertQueryRequest::fromNetworkRequest($networkRequest);
 
-		$manticoreClient = new ManticoreHTTPClient(new ManticoreResponseBuilder(), $serverUrl);
+		$manticoreClient = new ManticoreHTTPClient(new ManticoreResponse(), $serverUrl);
 		$executor = new InsertQueryExecutor($request);
 		$executor->setManticoreClient($manticoreClient);
 		ob_flush();

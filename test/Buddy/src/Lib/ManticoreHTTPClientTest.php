@@ -12,7 +12,7 @@
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
 use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
+use Manticoresearch\Buddy\Lib\ManticoreResponse;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -40,14 +40,14 @@ class ManticoreHTTPClientTest extends TestCase {
 		$this->assertNull($this->refCls->getProperty('url')->getValue($this->client));
 		$this->assertEquals(ManticoreEndpoint::Cli, $this->refCls->getProperty('endpoint')->getValue($this->client));
 
-		$client = new ManticoreHTTPClient(new ManticoreResponseBuilder(), 'localhost:1000', ManticoreEndpoint::Insert);
+		$client = new ManticoreHTTPClient(new ManticoreResponse(), 'localhost:1000', ManticoreEndpoint::Insert);
 		$this->assertInstanceOf(ManticoreHTTPClient::class, $client);
 	}
 
 // 	public function testResponseBuilderSet(): void {
-// 		$this->client->setResponseBuilder(new ManticoreResponseBuilder());
+// 		$this->client->setResponseBuilder(new ManticoreResponse());
 // 		$respBuilder = $this->refCls->getProperty('responseBuilder')->getValue($this->client);
-// 		$this->assertInstanceOf(ManticoreResponseBuilder::class, $respBuilder);
+// 		$this->assertInstanceOf(ManticoreResponse::class, $respBuilder);
 // 	}
 
 	public function testResponseUrlSetOk(): void {
