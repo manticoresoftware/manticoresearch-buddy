@@ -27,4 +27,21 @@ trait TestProtectedTrait {
 		return $method->invokeArgs($ref, $args);
 	}
 
+	/**
+	 * @param class-string|object $classInstance
+	 * @param string $methodName
+	 * @param array<mixed> $args
+	 * @return array{0:string,1:string}
+	 */
+	public static function getExceptionInfo(mixed $classInstance, string $methodName, array $args = []): array {
+		$exCls = $exMsg = '';
+		try {
+			self::invokeMethod($classInstance, $methodName, $args);
+		} catch (\RuntimeException $e) {
+			$exCls = $e::class;
+			$exMsg = $e->getMessage();
+		}
+
+		return [$exCls, $exMsg];
+	}
 }
