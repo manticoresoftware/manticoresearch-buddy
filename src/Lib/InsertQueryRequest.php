@@ -39,8 +39,8 @@ class InsertQueryRequest  {
 		$queryFormat = in_array($request->endpoint, [ManticoreEndpoint::Cli, ManticoreEndpoint::Sql])
 			? RequestFormat::SQL : RequestFormat::JSON;
 		$parser = QueryParserLoader::getInsertQueryParser($queryFormat);
-		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->query));
-		$self->queries[] = $request->query;
+		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->payload));
+		$self->queries[] = $request->payload;
 		$self->endpoint = $request->endpoint;
 		return $self;
 	}

@@ -11,10 +11,9 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
-use Exception;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
+use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
 use Manticoresearch\Buddy\Lib\ShowQueriesRequest;
-use Manticoresearch\Buddy\Network\Response;
 use RuntimeException;
 
 /**
@@ -44,14 +43,9 @@ class ShowQueriesExecutor implements CommandExecutorInterface {
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (ShowQueriesRequest $request, ManticoreHTTPClient $manticoreClient): Response {
+		$taskFn = function (ShowQueriesRequest $request, ManticoreHTTPClient $manticoreClient): array {
 			$resp = $manticoreClient->sendRequest($request->query);
-			if ($resp->hasError()) {
-				return Response::fromError(new Exception((string)$resp->getError()));
-			}
-
-			$result = static::formatResponse($resp->getBody());
-			return Response::fromString($result);
+			return static::formatResponse($resp->getBody());
 		};
 		return Task::create(
 			$taskFn, [$this->request, $this->manticoreClient]
@@ -62,9 +56,9 @@ class ShowQueriesExecutor implements CommandExecutorInterface {
 	 * Process the results
 	 *
 	 * @param string $origResp
-	 * @return string
+	 * @return array<mixed>
 	 */
-	public static function formatResponse(string $origResp): string {
+	public static function formatResponse(string $origResp): array {
 		$allowedFields = ['ID', 'query', 'host', 'proto'];
 		$colNameMap = ['connid' => 'ID', 'last cmd' => 'query'];
 		$resp = (array)json_decode($origResp, true);
@@ -94,24 +88,24 @@ class ShowQueriesExecutor implements CommandExecutorInterface {
 			}
 		}
 		$resp[0]['columns'] = $updatedCols;
-		// Replacing updated fields 'columns' and 'data' in the original response
-		$replFrom = [
-			'/(\[\{\n"columns":)(.*?)(,\n"data":\[)/s',
-			'/(,\n"data":\[)(.*?)(\n\],\n)/s',
-		];
-		$replTo = [
-			json_encode($resp[0]['columns']),
-			json_encode($resp[0]['data'][0]),
-		];
-		$res = preg_replace_callback(
-			$replFrom,
-			function ($matches) use (&$replTo) {
-				return $matches[1] . array_shift($replTo) . $matches[3];
-			},
-			$origResp
-		);
+		// // Replacing updated fields 'columns' and 'data' in the original response
+		// $replFrom = [
+		// 	'/(\[\{\n"columns":)(.*?)(,\n"data":\[)/s',
+		// 	'/(,\n"data":\[)(.*?)(\n\],\n)/s',
+		// ];
+		// $replTo = [
+		// 	json_encode($resp[0]['columns']),
+		// 	json_encode($resp[0]['data'][0]),
+		// ];
+		// $res = preg_replace_callback(
+		// 	$replFrom,
+		// 	function ($matches) use (&$replTo) {
+		// 		return $matches[1] . array_shift($replTo) . $matches[3];
+		// 	},
+		// 	$origResp
+		// );
 
-		return $res ?? '';
+		return $resp;
 	}
 
 	/**

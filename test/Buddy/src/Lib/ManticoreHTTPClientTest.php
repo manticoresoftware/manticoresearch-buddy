@@ -37,7 +37,10 @@ class ManticoreHTTPClientTest extends TestCase {
 
 	public function testManticoreHTTPClientCreate(): void {
 		$this->assertInstanceOf(ManticoreHTTPClient::class, $this->client);
-		$this->assertNull($this->refCls->getProperty('url')->getValue($this->client));
+		$this->assertEquals(
+			ManticoreHTTPClient::DEFAULT_URL,
+			$this->refCls->getProperty('url')->getValue($this->client)
+		);
 		$this->assertEquals(ManticoreEndpoint::Cli, $this->refCls->getProperty('endpoint')->getValue($this->client));
 
 		$client = new ManticoreHTTPClient(new ManticoreResponse(), 'localhost:1000', ManticoreEndpoint::Insert);

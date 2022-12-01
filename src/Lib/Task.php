@@ -97,6 +97,8 @@ final class Task {
 	 *
 	 * @param Runtime $runtime
 	 * @param Closure $fn
+	 *  The closure should be catch all exception and work properly withou failure
+	 *  Otherwise the all loop will be stopped
 	 * @param mixed[] $argv
 	 * @return static
 	 */
@@ -113,7 +115,7 @@ final class Task {
 	 */
 	public function run(): static {
 		$future = $this->runtime->run(
-			function (Closure $fn, array $argv): mixed {
+			function (Closure $fn, array $argv): array {
 				if (!defined('STDOUT')) {
 					define('STDOUT', fopen('php://stdout', 'wb+'));
 				}
@@ -123,9 +125,9 @@ final class Task {
 				}
 
 				try {
-					return $fn(...$argv);
-				} catch (Throwable $e) {
-					return $e->getMessage();
+					return [null, $fn(...$argv)];
+				} catch (\Throwable $t) {
+					return [[$t::class, $t->getMessage()], null];
 				}
 			}, $this->argv
 		);
@@ -175,7 +177,16 @@ final class Task {
 			$this->status = TaskStatus::Finished;
 
 			try {
-				$this->result = $this->future->value();
+				/** @var array<mixed> */
+				$value = $this->future->value();
+				[$error, $result] = $value;
+				if ($error) {
+					/** @var array{0:string,1:string} $error */
+					[$errorClass, $errorMessage] = $error;
+					throw new $errorClass($errorMessage); // @phpstan-ignore-line
+				}
+
+				$this->result = $result;
 			} catch (Throwable $error) {
 				$this->error = $error;
 			}

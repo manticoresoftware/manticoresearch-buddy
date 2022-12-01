@@ -25,6 +25,9 @@ class QueryProcessor {
 	// We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
 
+	/** @var bool */
+	protected static bool $inited = false;
+
 	/**
 	 * Setter for container property
 	 *
@@ -46,11 +49,15 @@ class QueryProcessor {
 	 *  The CommandExecutorInterface to execute to process the final query
 	 */
 	public static function process(Request $request): CommandExecutorInterface {
-		$prefix = static::extractPrefixFromQuery($request->query);
+		if (!static::$inited) {
+			static::init();
+		}
+		$prefix = static::extractPrefixFromQuery($request->payload);
+		debug('Executor: ' . $prefix);
 		$requestType = "{$prefix}Request";
 		$requestClassName = static::NAMESPACE_PREFIX . $requestType;
 		$commandRequest = $requestClassName::fromNetworkRequest($request);
-
+		debug('Command request: ' . $requestType . json_encode($commandRequest));
 		$executorType = "{$prefix}Executor";
 		$executorClassName = static::NAMESPACE_PREFIX . $executorType;
 		/** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
@@ -60,6 +67,29 @@ class QueryProcessor {
 		}
 		/** @var CommandExecutorInterface */
 		return $executor;
+	}
+
+	/**
+	 * Load show settings response and setup things on first request
+	 *
+	 * @return void
+	 */
+	protected static function init(): void {
+		/** @var ManticoreHTTPClient */
+		$manticoreClient = static::getObjFromContainer('manticoreClient');
+		$resp = $manticoreClient->sendRequest('SHOW SETTINGS');
+		/** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
+		$data = (array)json_decode($resp->getBody(), true);
+		foreach ($data[0]['data'] as ['Setting_name' => $key, 'Value' => $value]) {
+			if ($key !== 'configuration_file') {
+				continue;
+			}
+
+			debug("using config file = '$value'");
+			putenv("SEARCHD_CONFIG={$value}");
+		}
+
+		static::$inited = true;
 	}
 
 	/**

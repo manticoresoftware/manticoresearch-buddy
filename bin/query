@@ -16,16 +16,25 @@ $executor -n <<CODE
 <?php declare(strict_types=1);
 define('STDOUT', fopen('/dev/stdout', 'wb+'));
 define('STDERR', fopen('/dev/stderr', 'wb+'));
-putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
-include_once __DIR__ . '/vendor/autoload.php';
+include_once __DIR__ . '/src/init.php';
 
-use Manticoresearch\Buddy\Lib\SQLQueryProcessor;
+use Manticoresearch\Buddy\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Network\Request;
 echo 'Running query: $query' . PHP_EOL. PHP_EOL;
 try {
-  \$task = SQLQueryProcessor::process('$query')->run();
+  \$request = Request::fromPayload([
+    'version' => 1,
+    'type' => 'unknown json request',
+    'error' => '',
+    'message' => [
+      'path_query' => '/cli',
+      'body' => '$query',
+    ]
+  ]);
+  \$task = QueryProcessor::process(\$request)->run();
   \$status = \$task->wait(true);
   printf('Status code: %s' . PHP_EOL, \$status->name);
-  printf('Result: %s' . PHP_EOL, \$task->getResult());
+  printf('Result: %s' . PHP_EOL, str_replace('    ', '  ', json_encode(\$task->getResult(), JSON_PRETTY_PRINT)));
 } catch (Throwable \$e) {
   echo 'Error:' . PHP_EOL;
   echo ' ' . \$e::class . ': ' . \$e->getMessage() . PHP_EOL;

@@ -15,24 +15,29 @@ use PHPUnit\Framework\TestCase;
 
 class BuddyNetworkResponseTest extends TestCase {
 
-	public function testBuddyResponseBuildOk():void {
+	public function testBuddyResponseBuildOk(): void {
 		echo "\nTesting the building of Buddy response\n";
-		$msg = 'test message';
-		$err = 'test error';
-		$resp = "{\"type\":\"http response\",\"message\":\"$msg\",\"error\":\"$err\"}";
-		$this->assertEquals($resp, (string)Response::fromStringAndError($msg, new Exception($err)));
-	}
-
-	public function testBuddyResponseBuildFail():void {
-		echo "\nTesting the fail on the building of Buddy response\n";
-
-		$msg = chr(193);
-		$err = 'test error';
-		$resp = (string)Response::fromStringAndError($msg, new BuddyRequestError($err));
-		$this->assertStringContainsString(
-			'{"type":"http response","message":"","error":"Build request error: test error"}',
-			$resp
+		$result = [
+			'version' => 1,
+			'type' => 'json response',
+			'message' => ['test message'],
+			'error' => 'test error',
+		];
+		$this->assertEquals(
+			json_encode($result),
+			(string)Response::fromMessageAndError($result['message'], new Exception($result['error']))
 		);
 	}
 
+	public function testBuddyResponseBuildFail(): void {
+		echo "\nTesting the fail on the building of Buddy response\n";
+
+		$msg = [chr(193)];
+		$err = 'test error';
+		$resp = (string)Response::fromMessageAndError($msg, new BuddyRequestError($err));
+		$this->assertStringContainsString(
+			'"error":"Build request error: test error"',
+			$resp
+		);
+	}
 }

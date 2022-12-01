@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Network;
 
+use Manticoresearch\Buddy\Enum\RequestFormat;
 use Throwable;
 
 final class Response {
@@ -30,20 +31,22 @@ final class Response {
 
 	/**
 	 * @see static::fromStringAndError()
-	 * @param string $message
+	 * @param array<mixed> $message
+	 * @param RequestFormat $format
 	 * @return static
 	 */
-	public static function fromString(string $message): static {
-		return static::fromStringAndError($message);
+	public static function fromMessage(array $message, RequestFormat $format = RequestFormat::JSON): static {
+		return static::fromMessageAndError($message, null, $format);
 	}
 
 	/**
 	 * @see static::fromStringAndError()
 	 * @param Throwable $error
+	 * @param RequestFormat $format
 	 * @return static
 	 */
-	public static function fromError(Throwable $error): static {
-		return static::fromStringAndError('', $error);
+	public static function fromError(Throwable $error, RequestFormat $format = RequestFormat::JSON): static {
+		return static::fromMessageAndError([], $error, $format);
 	}
 
 	/**
@@ -54,13 +57,19 @@ final class Response {
 	}
 
 	/**
-	 * @param string $message
+	 * @param array<mixed> $message
 	 * @param ?Throwable $error
+	 * @param RequestFormat $format
 	 * @return static
 	 */
-	public static function fromStringAndError(string $message = '', ?Throwable $error = null): static {
+	public static function fromMessageAndError(
+		array $message = [],
+		?Throwable $error = null,
+		RequestFormat $format = RequestFormat::JSON
+	): static {
 		$payload = [
-			'type' => 'http response',
+			'version' => 1,
+			'type' => "{$format->value} response",
 			'message' => $message,
 			'error' => $error?->getMessage() ?? '',
 		];

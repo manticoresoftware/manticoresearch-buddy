@@ -9,6 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use Manticoresearch\Buddy\Network\Request;
 use PHPUnit\Framework\TestCase;
@@ -18,40 +19,46 @@ class RequestTest extends TestCase {
 	public function testManticoreRequestValidationOk(): void {
 		echo "\nTesting the validation of a correct Manticore request\n";
 		$payload = [
-			'type' => 'some error',
-			'message' => 'some query',
-			'request_type' => 'sphinqxl',
-			'endpoint' => 'cli',
+			'error' => 'some error',
+			'type' => 'unknown json request',
+			'message' => [
+				'path_query' => '/cli',
+				'body' => 'some query',
+			],
+			'version' => 1,
 		];
 		$request = Request::fromPayload($payload);
 		$this->assertInstanceOf(Request::class, $request);
-		$this->assertEquals($payload['message'], $request->query);
-		$this->assertEquals($payload['type'], $request->origMsg);
+		$this->assertEquals($payload['message']['body'], $request->payload);
+		$this->assertEquals(RequestFormat::JSON, $request->format);
 	}
 
 	public function testManticoreRequestValidationFail(): void {
 		echo "\nTesting the validation of an incorrect Manticore request\n";
 		$payload = [
-			'type' => 'some error',
-			'message' => 'some query',
-			'request_type' => 'test',
-			'endpoint' => 'cli',
+			'error' => 'some error',
+			'type' => 'error request',
+			'message' => [
+				'path_query' => '/cli',
+				'body' => 'some query',
+			],
+			'version' => 1,
 		];
 		$this->expectException(InvalidRequestError::class);
-		$this->expectExceptionMessage("Manticore request parse error: Unknown request type 'test'");
+		$this->expectExceptionMessage("Do not know how to handle 'error request' type");
 		try {
 			Request::fromPayload($payload);
 		} finally {
 			$payload['request_type'] = 'trololo';
 			$this->expectException(InvalidRequestError::class);
-			$this->expectExceptionMessage("Manticore request parse error: Field 'request_type' must be a string");
+			$this->expectExceptionMessage("Do not know how to handle 'error request' type");
 			try {
 				Request::fromPayload($payload);
 			} finally {
-				unset($payload['request_type']);
+				unset($payload['error']);
 				$this->expectException(InvalidRequestError::class);
 				$this->expectExceptionMessage(
-					"Manticore request parse error: Mandatory field 'request_type' is missing"
+					"Manticore request parse error: Mandatory field 'error' is missing"
 				);
 				try {
 					Request::fromPayload($payload); // @phpstan-ignore-line
@@ -63,10 +70,8 @@ class RequestTest extends TestCase {
 	}
 
 	public function testManticoreQueryValidationOk(): void {
-		$query = "Some valid\nManticore query\n\n"
-			. '{"type":"some error","message":"some query","request_type":"sphinqxl",'
-			. '"endpoint":"cli","listen":"127.0.0.1:9308"}'
-		;
+		$query = '{"error":"some error","type":"unknown json request",'
+			. '"message":{"path_query":"/cli","body":"some query"},"version":1}';
 		$request = Request::fromString($query);
 		$this->assertInstanceOf(Request::class, $request);
 	}
@@ -90,7 +95,7 @@ class RequestTest extends TestCase {
 				$query = 'Query\nwith unvalid\n\n{"request_body"}';
 				$this->expectException(InvalidRequestError::class);
 				$this->expectExceptionMessage(
-					"Manticore request parse error: Invalid request body '{\"request_body\"}' is passed"
+					'Manticore request parse error: Invalid request payload is passed'
 				);
 				Request::fromString($query);
 			}
