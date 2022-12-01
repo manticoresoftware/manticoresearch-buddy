@@ -12,9 +12,12 @@
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
 class RequestTest extends TestCase {
+
+	use TestProtectedTrait;
 
 	public function testManticoreRequestValidationOk(): void {
 		echo "\nTesting the validation of a correct Manticore request\n";
@@ -44,29 +47,19 @@ class RequestTest extends TestCase {
 			],
 			'version' => 1,
 		];
-		$this->expectException(InvalidRequestError::class);
-		$this->expectExceptionMessage("Do not know how to handle 'error request' type");
-		try {
-			Request::fromPayload($payload);
-		} finally {
-			$payload['request_type'] = 'trololo';
-			$this->expectException(InvalidRequestError::class);
-			$this->expectExceptionMessage("Do not know how to handle 'error request' type");
-			try {
-				Request::fromPayload($payload);
-			} finally {
-				unset($payload['error']);
-				$this->expectException(InvalidRequestError::class);
-				$this->expectExceptionMessage(
-					"Manticore request parse error: Mandatory field 'error' is missing"
-				);
-				try {
-					Request::fromPayload($payload); // @phpstan-ignore-line
-				} finally {
-					$this->assertTrue(true);
-				}
-			}
-		}
+		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
+		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals("Manticore request parse error: Do not know how to handle 'error request' type", $exMsg);
+
+		$payload['request_type'] = 'trololo';
+		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
+		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals("Manticore request parse error: Do not know how to handle 'error request' type", $exMsg);
+
+		unset($payload['error']);
+		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
+		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals("Manticore request parse error: Mandatory field 'error' is missing", $exMsg);
 	}
 
 	public function testManticoreQueryValidationOk(): void {
@@ -79,26 +72,18 @@ class RequestTest extends TestCase {
 	public function testManticoreQueryValidationFail(): void {
 		echo "\nTesting the validation of an incorrect request query from Manticore\n";
 		$query = '';
-		$this->expectException(InvalidRequestError::class);
-		$this->expectExceptionMessage('Manticore request parse error: Query is missing');
-		try {
-			Request::fromString($query);
-		} finally {
-			$query = "Invalid query\nis passed\nagain";
-			$this->expectException(InvalidRequestError::class);
-			$this->expectExceptionMessage(
-				"Manticore request parse error: Request body is missing in query '{$query}'"
-			);
-			try {
-				Request::fromString($query);
-			} finally {
-				$query = 'Query\nwith unvalid\n\n{"request_body"}';
-				$this->expectException(InvalidRequestError::class);
-				$this->expectExceptionMessage(
-					'Manticore request parse error: Invalid request payload is passed'
-				);
-				Request::fromString($query);
-			}
-		}
+		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromString', [$query]);
+		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals('Manticore request parse error: The payload is missing', $exMsg);
+
+		$query = "Invalid query\nis passed\nagain";
+		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromString', [$query]);
+		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals('Manticore request parse error: Invalid request payload is passed', $exMsg);
+
+		$query = 'Query\nwith unvalid\n\n{"request_body"}';
+		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromString', [$query]);
+		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals('Manticore request parse error: Invalid request payload is passed', $exMsg);
 	}
 }
