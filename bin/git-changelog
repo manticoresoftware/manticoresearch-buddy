@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+echo '## Changes'
+echo
+
+readarray -t pair < <(git tag --sort=-version:refname | head -n 2)
+readarray -t lines < <(git --no-pager log --format="%cI %H [%cN] %s" "${pair[1]}..${pair[0]}")
+
+for line in "${lines[@]}"; do
+  date=$(echo "$line" | cut -d' ' -f1)
+  commit=$(echo "$line" | cut -d' ' -f2)
+  # author=$(echo "$line" | cut -d' ' -f3)
+  message=$(echo "$line" | cut -d' ' -f4)
+
+  repl="**${date}**"
+  line=${line//$date/$repl}
+
+  repl="[${commit:0:7}](https://github.com/manticoresoftware/manticoresearch-backup/commit/${commit})"
+  line=${line//$commit/$repl}
+
+  repl="*${message}*"
+  line=${line//$message/$repl}
+
+  echo "$line"
+done
