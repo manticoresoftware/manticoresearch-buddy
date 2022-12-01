@@ -13,12 +13,9 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
-use Manticoresearch\Buddy\Interface\ManticoreHTTPClientInterface;
-use Manticoresearch\Buddy\Interface\ManticoreResponseBuilderInterface;
-use Manticoresearch\Buddy\Interface\ManticoreResponseInterface;
 use RuntimeException;
 
-class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
+class ManticoreHTTPClient {
 
 	const CONTENT_TYPE_HEADER = 'Content-Type: text/plain';
 	const CUSTOM_REDIRECT_DISABLE_HEADER = 'X-Manticore-Error-Redirect: disable';
@@ -30,23 +27,23 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 	protected string $response;
 
 	/**
-	 * @param ?ManticoreResponseBuilderInterface $responseBuilder
+	 * @param ?ManticoreResponse $responseBuilder
 	 * @param ?string $url
 	 * @param ManticoreEndpoint $endpoint
 	 * @return void
 	 */
 	public function __construct(
-		protected ?ManticoreResponseBuilderInterface $responseBuilder = null,
+		protected ?ManticoreResponse $responseBuilder = null,
 		protected ?string $url = null,
 		protected ManticoreEndpoint $endpoint = ManticoreEndpoint::Cli
 	) {
 	}
 
 	/**
-	 * @param ManticoreResponseBuilderInterface $responseBuilder
+	 * @param ManticoreResponse $responseBuilder
 	 * @return void
 	 */
-	public function setResponseBuilder(ManticoreResponseBuilderInterface $responseBuilder): void {
+	public function setResponseBuilder(ManticoreResponse $responseBuilder): void {
 		$this->responseBuilder = $responseBuilder;
 	}
 
@@ -68,9 +65,9 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 	/**
 	 * @param string $request
 	 * @param ?ManticoreEndpoint $endpoint
-	 * @return ManticoreResponseInterface
+	 * @return ManticoreResponse
 	 */
-	public function sendRequest(string $request, ManticoreEndpoint $endpoint = null): ManticoreResponseInterface {
+	public function sendRequest(string $request, ManticoreEndpoint $endpoint = null): ManticoreResponse {
 		if (!isset($this->responseBuilder)) {
 			throw new RuntimeException("'responseBuilder' property of ManticoreHTTPClient class is not instantiated");
 		}
@@ -101,7 +98,7 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 			}
 		}
 
-		return $this->responseBuilder->buildFromBody($this->response);
+		return $this->responseBuilder->fromBody($this->response);
 	}
 
 	/**

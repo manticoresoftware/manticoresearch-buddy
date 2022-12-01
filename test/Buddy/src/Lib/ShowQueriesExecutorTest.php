@@ -12,7 +12,7 @@
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
+use Manticoresearch\Buddy\Lib\ManticoreResponse;
 use Manticoresearch\Buddy\Lib\ShowQueriesExecutor;
 use Manticoresearch\Buddy\Lib\ShowQueriesRequest;
 use Manticoresearch\Buddy\Network\Request;
@@ -47,7 +47,7 @@ class ShowQueriesExecutorTest extends TestCase {
 			]
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);
-		$manticoreClient = new ManticoreHTTPClient(new ManticoreResponseBuilder(), $serverUrl);
+		$manticoreClient = new ManticoreHTTPClient(new ManticoreResponse(), $serverUrl);
 		$request = ShowQueriesRequest::fromNetworkRequest($request);
 
 		$executor = new ShowQueriesExecutor($request);

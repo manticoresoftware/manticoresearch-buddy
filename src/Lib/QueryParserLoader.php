@@ -14,9 +14,8 @@ namespace Manticoresearch\Buddy\Lib;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\ParserLoadError;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
-use Manticoresearch\Buddy\Interface\QueryParserLoaderInterface;
 
-class QueryParserLoader implements QueryParserLoaderInterface {
+class QueryParserLoader {
 
 	/**
 	 * @param RequestFormat $reqFormat
