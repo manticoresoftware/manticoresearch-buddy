@@ -118,25 +118,22 @@ class JSONInsertParserTest extends TestCase {
 		$query = '{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }'
 			. "\n"
 			. '{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : "c", "col2": "b" } } }';
-		$this->expectException(QueryParserError::class);
-		$this->expectExceptionMessage('Parse request error: Incompatible types col1: text int');
-		try {
-			self::$parser->parse($query);
-		} finally {
-			$query = '{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }'
-				. "\n"
-				. '{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : 20, "col2": "b", "col3": "c" } } }';
-			$this->expectException(QueryParserError::class);
-			$this->expectExceptionMessage('Parse request error: Column count mismatch in INSERT statement');
-			try {
-				self::$parser->parse($query);
-			} finally {
-				$query = '{ "update" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }';
-				$this->expectException(QueryParserError::class);
-				$this->expectExceptionMessage("Operation name 'insert' is missing");
-				self::$parser->parse($query);
-			}
-		}
+
+		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
+		$this->assertEquals(QueryParserError::class, $exCls);
+		$this->assertEquals("Parse request error: Incompatible types in 'col1': 'text int',", $exMsg);
+
+		$query = '{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }'
+			. "\n"
+			. '{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : 20, "col2": "b", "col3": "c" } } }';
+		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
+		$this->assertEquals(QueryParserError::class, $exCls);
+		$this->assertEquals('Parse request error: Column count mismatch in INSERT statement', $exMsg);
+
+		$query = '{ "update" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }';
+		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
+		$this->assertEquals(QueryParserError::class, $exCls);
+		$this->assertEquals("Parse request error: Operation name 'insert' is missing", $exMsg);
 	}
 
 }

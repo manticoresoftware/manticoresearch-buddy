@@ -92,20 +92,21 @@ trait CheckInsertDataTrait {
 			foreach ($TYPE_BUNDLES as $tb) {
 				$i1 = array_search($t, $tb);
 				$i2 = array_search($types[$i], $tb);
-				if (($i1 === false && $i2 !== false) || ($i2 === false && $i1 !== false)) {
-					if ($error === '') {
-						$error = "Incompatible types in '{$cols[$i]}': ";
-					} elseif ($i !== $i0) {
-						$error .= "; '{$cols[$i]}': ";
-					}
-					$error .= "'{$t->value} {$types[$i]->value}',";
-					break;
-				}
 				// updating possible Datatype by priority set in TYPE_BUNDLES
-				if ($i1 >= $i2) {
+				if ($i1 !== false && $i2 !== false && $i1 < $i2) {
+					$types[$i] = $tb[$i1];
+				}
+				if (($i1 !== false && $i2 !== false) || ($i1 === false && $i2 === false)) {
 					continue;
 				}
-				$types[$i] = $tb[$i1];
+				// Incompatible types are found
+				if ($error === '') {
+					$error = "Incompatible types in '{$cols[$i]}': ";
+				} elseif ($i !== $i0) {
+					$error .= "; '{$cols[$i]}': ";
+				}
+				$error .= "'{$t->value} {$types[$i]->value}',";
+				break;
 			}
 		}
 
