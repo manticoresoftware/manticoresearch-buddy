@@ -35,6 +35,8 @@ class QueryProcessorTest extends TestCase {
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
+		$refCls = new ReflectionClass(QueryProcessor::class);
+		$refCls->setStaticPropertyValue('inited', true);
 		$executor = QueryProcessor::process($request);
 		$this->assertInstanceOf(BackupExecutor::class, $executor);
 		$refCls = new ReflectionClass($executor);
@@ -70,6 +72,8 @@ class QueryProcessorTest extends TestCase {
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
+		$refCls = new ReflectionClass(QueryProcessor::class);
+		$refCls->setStaticPropertyValue('inited', true);
 		QueryProcessor::process($request);
 	}
 
