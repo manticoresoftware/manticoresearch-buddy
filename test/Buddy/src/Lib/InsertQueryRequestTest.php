@@ -20,8 +20,9 @@ class InsertQueryRequestTest extends TestCase {
 		echo "\nTesting the creation of InsertQueryRequest from manticore request data struct\n";
 		$request = Request::fromArray(
 			[
-				'origMsg' => '',
-				'query' => 'INSERT INTO test(int_col, string_col, float_col) VALUES(1, \'string\', 2.22)',
+				'version' => 1,
+				'error' => '',
+				'payload' => 'INSERT INTO test(int_col, string_col, float_col) VALUES(1, \'string\', 2.22)',
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]

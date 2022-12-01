@@ -36,7 +36,7 @@ final class Server {
 	/** @var array<string,callable> */
 	protected array $handlers = [];
 
-	/** @var array{server:array<callable,int>,client:array<callable,int>} */
+	/** @var array{server:array<array{0:callable,1:int}>,client:array<array{0:callable,1:int}>} */
 	protected array $ticks = [
 		'server' => [],
 		'client' => [],
@@ -46,23 +46,13 @@ final class Server {
 	protected string $ip;
 
 	/**
-	 * @param string $host
-	 * @param int $port
 	 * @param array<string,mixed> $config
 	 */
 	public function __construct(
-		protected string $host,
-		protected int $port,
 		array $config = [],
 	) {
-		// Find the ip of host provided (in case if we pass localhost or whatever)
-		$this->ip = match (false) {
-			ip2long($host) => gethostbyname($host),
-			default => $host,
-		};
-
 		$this->socket = new SocketServer(
-			"$this->host:$this->port",
+			'127.0.0.1:0',
 			array_replace(static::SOCKET_CONFIG, $config)
 		);
 	}
@@ -71,13 +61,11 @@ final class Server {
 	 * Initialize the server and start to process requests
 	 *
 	 * @static
-	 * @param string $address
-	 * @param int $port
 	 * @param array<string,mixed> $config
 	 * @return static
 	 */
-	public static function create(string $address, int $port, array $config = []): static {
-		return new static($address, $port, $config);
+	public static function create(array $config = []): static {
+		return new static($config);
 	}
 
 	/**
@@ -105,7 +93,7 @@ final class Server {
 		// We should enum, but for now string is ok
 		assert($type === 'server' || $type === 'client');
 
-		$this->ticks[] = [$fn, $period];
+		$this->ticks[$type][] = [$fn, $period];
 		return $this;
 	}
 
@@ -115,7 +103,7 @@ final class Server {
 	 * @return static
 	 */
 	public function start(): static {
-		echo "Starting server on {$this->ip}:{$this->port}" . PHP_EOL;
+		echo 'started ' . str_replace('tcp://', '', (string)$this->socket->getAddress()) . PHP_EOL;
 
 		// First add all ticks to run periodically
 		foreach ($this->ticks['server'] as [$fn, $period]) {

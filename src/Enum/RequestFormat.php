@@ -12,6 +12,6 @@
 namespace Manticoresearch\Buddy\Enum;
 
 enum RequestFormat: string {
-	case SQL = 'sphinqxl';
-	case JSON = 'http';
+	case SQL = 'sql';
+	case JSON = 'json';
 }

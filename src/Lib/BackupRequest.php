@@ -55,7 +55,7 @@ class BackupRequest implements CommandRequestInterface {
    * @throws SQLQueryParsingError
    */
 	public static function fromNetworkRequest(Request $request): BackupRequest {
-		$query = $request->query;
+		$query = $request->payload;
 		$whatPattern = 'BACKUP\s*((?P<all>ALL)|(?:TABLES?\s*(?P<table>(,?\s*[\w]+\s*)+)))';
 		$toPattern = 'TO\s*local\(\s*(?P<path>[/\\_\-a-z/0-9]+)\s*\)';
 		$optionsKeys = implode('|', array_keys(static::OPTIONS));

@@ -23,11 +23,16 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 	const CONTENT_TYPE_HEADER = 'Content-Type: text/plain';
 	const CUSTOM_REDIRECT_DISABLE_HEADER = 'X-Manticore-Error-Redirect: disable';
 	const URL_PREFIX = 'http://';
+	const HTTP_REQUEST_TIMEOUT = 1;
+	const DEFAULT_URL = 'http://127.0.0.1:9308';
 
 	/**
 	 * @var string $response
 	 */
 	protected string $response;
+
+	/** @var string $url */
+	protected string $url;
 
 	/**
 	 * @param ?ManticoreResponseBuilderInterface $responseBuilder
@@ -37,9 +42,15 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 	 */
 	public function __construct(
 		protected ?ManticoreResponseBuilderInterface $responseBuilder = null,
-		protected ?string $url = null,
+		?string $url = null,
 		protected ManticoreEndpoint $endpoint = ManticoreEndpoint::Cli
 	) {
+		// If no url passed, set default one
+		if (!$url) {
+			$url = static::DEFAULT_URL;
+		}
+
+		$this->setServerUrl($url);
 	}
 
 	/**
@@ -51,7 +62,7 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 	}
 
 	/**
-	 * @param string $url
+	 * @param string $url it supports http:// prefixed and not
 	 * @return void
 	 */
 	public function setServerUrl($url): void {
@@ -77,19 +88,20 @@ class ManticoreHTTPClient implements ManticoreHTTPClientInterface {
 		if ($request === '') {
 			throw new ManticoreHTTPClientError('Empty request passed');
 		}
-		if (!isset($endpoint)) {
-			$endpoint = $this->endpoint;
-		}
+		$endpoint ??= $this->endpoint;
+		// Hmm, This is strange, but $endpoint === ManticoreEndpoint::Sql is not working
+		$prefix = ($endpoint->name === 'Sql' ? 'query=' : '');
 		$fullReqUrl = "{$this->url}/{$endpoint->value}";
 		$opts = [
 			'http' => [
 				'method'  => 'POST',
 				'header'  => 'Content-Type: application/x-www-form-urlencoded',
-				'content' => $request,
+				'content' => $prefix . $request,
+				'timeout' => static::HTTP_REQUEST_TIMEOUT,
 			],
 		];
 
-		$context  = stream_context_create($opts);
+		$context = stream_context_create($opts);
 		$result = file_get_contents($fullReqUrl, false, $context);
 
 		if ($result === false) {

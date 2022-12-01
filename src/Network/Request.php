@@ -14,15 +14,21 @@ namespace Manticoresearch\Buddy\Network;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\InvalidRequestError;
-use ValueError;
 
 final class Request {
-	const PAYLOAD_FIELDS = ['type', 'message', 'request_type', 'endpoint'];
+	const PAYLOAD_FIELDS = [
+		'type' => 'string',
+		'error' => 'string',
+		'message' => 'array',
+		'version' => 'integer',
+	];
+	const MESSAGE_FIELDS = ['path_query' => 'string', 'body' => 'string'];
 
 	public ManticoreEndpoint $endpoint;
 	public RequestFormat $format;
-	public string $origMsg;
-	public string $query;
+	public string $error;
+	public string $payload;
+	public int $version;
 
 	/**
 	 * @return void
@@ -46,7 +52,7 @@ final class Request {
 	 * Helper to create request from prepare array data
 	 * It can be useful for tests
 	 *
-	 * @param array{origMsg:string,query:string,format:RequestFormat,endpoint:ManticoreEndpoint} $data
+	 * @param array{error:string,payload:string,version:int,format:RequestFormat,endpoint:ManticoreEndpoint} $data
 	 * @return static
 	 */
 	public static function fromArray(array $data): static {
@@ -60,7 +66,7 @@ final class Request {
 	/**
 	 * This method is same as fromArray but applied to payload
 	 *
-	 * @param array{type:string,message:string,request_type:string,endpoint:string} $payload
+	 * @param array{type:string,error:string,message:array{path_query:string,body:string},version:int} $payload
 	 * @return static
 	 */
 	public static function fromPayload(array $payload): static {
@@ -72,61 +78,85 @@ final class Request {
 	 * Validate input data before we will parse it into a request
 	 *
 	 * @param string $data
-	 * @return array{type:string,message:string,request_type:string,endpoint:string}
+	 * @return array{type:string,error:string,message:array{path_query:string,body:string},version:int}
 	 * @throws InvalidRequestError
 	 */
 	public static function validateOrFail(string $data): array {
 		if ($data === '') {
-			throw new InvalidRequestError('Query is missing');
+			throw new InvalidRequestError('The payload is missing');
 		}
-		$reqBodyPos = strpos($data, '{');
-		if ($reqBodyPos === false) {
-			throw new InvalidRequestError("Request body is missing in query '{$data}'");
-		}
-		$query = substr($data, $reqBodyPos);
-		/** @var array{type:string,message:string,request_type:string,endpoint:string} */
-		$result = json_decode($query, true);
+		/** @var array{type:string,error:string,message:array{path_query:string,body:string},version:int} */
+		$result = json_decode($data, true);
 		if (!is_array($result)) {
-			throw new InvalidRequestError("Invalid request body '{$query}' is passed");
+			throw new InvalidRequestError('Invalid request payload is passed');
 		}
 
 		return $result;
 	}
 
 	/**
-	 * @param array{type:string,message:string,request_type:string,endpoint:string} $payload
+	 * @param array{type:string,error:string,message:array{path_query:string,body:string},version:int} $payload
 	 * @return static
 	 * @throws InvalidRequestError
 	 */
 	protected function parseOrFail(array $payload): static {
-		foreach (static::PAYLOAD_FIELDS as $k) {
-			if (!array_key_exists($k, $payload)) {
-				throw new InvalidRequestError("Mandatory field '$k' is missing");
-			}
-			if (!is_string($payload[$k])) {
-				throw new InvalidRequestError("Field '$k' must be a string");
-			}
-		}
+		static::validateInputFields($payload, static::PAYLOAD_FIELDS);
+
 		// Checking if request format and endpoint are supported
-		try {
-			$endpoint = ManticoreEndpoint::from($payload['endpoint']);
-			unset($payload['endpoint']);
-		} catch (ValueError) {
-			throw new InvalidRequestError("Unknown request endpoint '{$payload['endpoint']}'");
-		}
-		try {
-			$format = RequestFormat::from($payload['request_type']);
-			unset($payload['request_type']);
-		} catch (\Throwable) {
-			throw new InvalidRequestError("Unknown request type '{$payload['request_type']}'");
-		}
+		$endpoint = match (ltrim($payload['message']['path_query'], '/')) {
+			'cli' => ManticoreEndpoint::Cli,
+			'sql?mode=raw' => ManticoreEndpoint::Sql,
+			'sql' => ManticoreEndpoint::Sql,
+			'' => ManticoreEndpoint::Sql,
+			default => throw new InvalidRequestError(
+				"Do not know how to handle '{$payload['message']['path_query']}' path_query"
+			),
+		};
+
+		$format = match ($payload['type']) {
+			'unknown json request' => RequestFormat::JSON,
+			'unknown sql request' => RequestFormat::SQL,
+			default => throw new InvalidRequestError("Do not know how to handle '{$payload['type']}' type"),
+		};
 
 		$this->format = $format;
 		$this->endpoint = $endpoint;
-		// Omg? O_O ok
-		$this->origMsg = $payload['type'];
-		$this->query = $payload['message'];
-
+		$this->payload = $payload['message']['body'];
+		$this->error = $payload['error'];
+		$this->version = $payload['version'];
 		return $this;
+	}
+
+	/**
+	 * Helper function to do recursive validation of input fields
+	 *
+	 * @param array{
+	 * 		path_query: string,
+	 * 		body: string
+	 * 	}|array{
+	 * 		type:string,
+	 * 		error:string,
+	 * 		message:array{path_query:string,body:string},
+	 * 		version:int
+	 * 	} $payload
+	 * @param array<string> $fields
+	 * @return void
+	 */
+	protected function validateInputFields(array $payload, array $fields): void {
+		foreach ($fields as $k => $type) {
+			if (!array_key_exists($k, $payload)) {
+				throw new InvalidRequestError("Mandatory field '$k' is missing");
+			}
+
+			if (gettype($payload[$k]) !== $type) {
+				throw new InvalidRequestError("Field '$k' must be a $type");
+			}
+
+			if ($k !== 'message') {
+				continue;
+			}
+
+			static::validateInputFields($payload[$k], static::MESSAGE_FIELDS);
+		}
 	}
 }

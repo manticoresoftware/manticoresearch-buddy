@@ -28,8 +28,9 @@ class QueryProcessorTest extends TestCase {
 		echo "\nTesting the processing of execution command\n";
 		$request = Request::fromArray(
 			[
-				'origMsg' => '',
-				'query' => 'BACKUP',
+				'version' => 1,
+				'error' => '',
+				'payload' => 'BACKUP',
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
@@ -42,8 +43,9 @@ class QueryProcessorTest extends TestCase {
 
 		$request = Request::fromArray(
 			[
-				'origMsg' => '',
-				'query' => 'SHOW QUERIES',
+				'version' => 1,
+				'error' => '',
+				'payload' => 'SHOW QUERIES',
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
@@ -61,8 +63,9 @@ class QueryProcessorTest extends TestCase {
 		$this->expectExceptionMessage('Failed to handle query: TEST');
 		$request = Request::fromArray(
 			[
-				'origMsg' => '',
-				'query' => 'TEST',
+				'version' => 1,
+				'error' => '',
+				'payload' => 'TEST',
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]

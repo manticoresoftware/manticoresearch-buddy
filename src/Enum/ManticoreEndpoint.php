@@ -14,6 +14,6 @@ namespace Manticoresearch\Buddy\Enum;
 enum ManticoreEndpoint: string {
 	case Cli = 'cli';
 	case Insert = 'insert';
-	case Sql = 'sql';
+	case Sql = 'sql?mode=raw';
 	case Bulk = 'bulk';
 }

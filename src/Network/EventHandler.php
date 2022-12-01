@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Network;
 
 use Exception;
+use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Psr\Http\Message\ServerRequestInterface;
 use React\EventLoop\Loop;
@@ -36,34 +37,42 @@ final class EventHandler {
 	protected static function data(string $data): PromiseInterface {
 		$deferred = new Deferred;
 		try {
+			debug("Request data: $data");
 			$request = Request::fromString($data);
 			$executor = QueryProcessor::process($request);
 			$task = $executor->run();
-
-			// In case we work with deferred task we
-			// should return response to the client without waiting
-			// for results of it
-			if ($task->isDeferred()) {
-				$deferred->resolve(Response::fromString($task->getId()));
-			} else { // in case we should block loop we do it as promise and timer
-				Loop::addPeriodicTimer(
-					1, function (Timer $timer) use ($task, $deferred) {
-						if ($task->isRunning()) {
-							return;
-						}
-
-						Loop::cancelTimer($timer);
-						if ($task->isSucceed()) {
-							return $deferred->resolve($task->getResult());
-						}
-
-						return $deferred->resolve(Response::fromError($task->getError()));
-					}
-				);
-			}
 		} catch (Throwable $e) {
-			$deferred->resolve(Response::fromError($e));
+			debug("Data parse error: {$e->getMessage()}");
+			return $deferred->resolve(Response::fromError($e, $request->format ?? RequestFormat::JSON));
 		}
+
+		// In case we work with deferred task we
+		// should return response to the client without waiting
+		// for results of it
+		if ($task->isDeferred()) {
+			return $deferred->resolve(Response::fromMessage([$task->getId()], $request->format));
+		} else { // in case we should block loop we do it as promise and timer
+			Loop::addPeriodicTimer(
+				1, function (Timer $timer) use ($request, $task, $deferred) {
+					$taskId = $task->getId();
+					$taskStatus = $task->getStatus()->name;
+					debug("Task $taskId is $taskStatus");
+					if ($task->isRunning()) {
+						return;
+					}
+
+					Loop::cancelTimer($timer);
+					if ($task->isSucceed()) {
+						/** @var array<mixed> */
+						$result = $task->getResult();
+						return $deferred->resolve(Response::fromMessage($result, $request->format));
+					}
+
+					return $deferred->resolve(Response::fromError($task->getError(), $request->format));
+				}
+			);
+		}
+
 		return $deferred->promise();
 	}
 
@@ -91,7 +100,9 @@ final class EventHandler {
 
 				$promise->then(
 					function (Response $response) use ($headers, $resolve) {
-						return $resolve(new HttpResponse(200, $headers, (string)$response));
+						$result = (string)$response;
+						debug("Response data: $result");
+						return $resolve(new HttpResponse(200, $headers, $result));
 					}
 				);
 			}
@@ -105,28 +116,18 @@ final class EventHandler {
 	 * @return Response
 	 */
 	public static function error(Exception $e): Response {
-		var_dump($e);
+		debug('Error: ' . $e->getMessage());
 		return Response::none();
 	}
 
 	/**
 	 * Ticker to validate that client is alive or not
 	 *
-	 * @param int $pid
-	 * @param string $pidPath
 	 * @return callable
 	 */
-	public static function clientCheckTickerFn(int $pid, string $pidPath): callable {
-		return function () use ($pid, $pidPath) {
-			$pidFromFile = -1;
-			if (file_exists($pidPath)) {
-				$content = file_get_contents($pidPath);
-				if ($content === false) {
-					return false;
-				}
-				$pidFromFile = substr($content, 0, -1);
-			}
-			return $pid === $pidFromFile;
+	public static function clientCheckTickerFn(): callable {
+		return function () {
+			return process_exists(get_parent_pid());
 		};
 	}
 }

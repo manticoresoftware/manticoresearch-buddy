@@ -46,17 +46,18 @@ class InsertQueryExecutorTest extends TestCase {
 		$this->assertEquals(true, $task->isSucceed());
 		/** @var Response */
 		$result = $task->getResult();
-		$this->assertEquals($resp, $result);
+		$this->assertEquals($resp, json_encode($result));
 	}
 
 	public function testInsertQueryExecutesProperly(): void {
 		echo "\nTesting the execution of a task with INSERT query request\n";
-		$resp = '{"type":"http response","message":"[{\"total\":1,\"error\":\"\",\"warning\":\"\"}]","error":""}';
+		$resp = '[{"total":1,"error":"","warning":""}]';
 		$mockServerUrl = self::setUpMockManticoreServer(false);
 		$request = Request::fromArray(
 			[
-				'origMsg' => "index 'test' absent, or does not support INSERT",
-				'query' => 'INSERT INTO test(col1) VALUES(1)',
+				'version' => 1,
+				'error' => "index 'test' absent, or does not support INSERT",
+				'payload' => 'INSERT INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]

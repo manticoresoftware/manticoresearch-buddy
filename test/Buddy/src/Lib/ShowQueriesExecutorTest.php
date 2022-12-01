@@ -16,7 +16,6 @@ use Manticoresearch\Buddy\Lib\ManticoreResponseBuilder;
 use Manticoresearch\Buddy\Lib\ShowQueriesExecutor;
 use Manticoresearch\Buddy\Lib\ShowQueriesRequest;
 use Manticoresearch\Buddy\Network\Request;
-use Manticoresearch\Buddy\Network\Response;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -26,7 +25,8 @@ class ShowQueriesExecutorTest extends TestCase {
 
 	public function testShowQueriesExecutesProperly(): void {
 		echo "\nTesting the 'show queries' executes properly and we got the correct Manticore response received\n";
-		$respBody = "[{\n"
+		$respBody = json_decode(
+			"[{\n"
 			. '"columns":[{"proto":{"type":"string"}},{"host":{"type":"string"}},'
 			. '{"ID":{"type":"long long"}},{"query":{"type":"string"}}],'
 			. "\n"
@@ -37,11 +37,14 @@ class ShowQueriesExecutorTest extends TestCase {
 			. '"error":"",'
 			. "\n"
 			. '"warning":""'
-			. "\n}]";
+			. "\n}]", true
+		);
+
 		$request = Request::fromArray(
 			[
-				'origMsg' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
-				'query' => 'SHOW QUERIES',
+				'error' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
+				'payload' => 'SHOW QUERIES',
+				'version' => 1,
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
@@ -57,11 +60,8 @@ class ShowQueriesExecutorTest extends TestCase {
 		$task->wait();
 		$this->assertEquals(true, $task->isSucceed());
 		$result = $task->getResult();
-		$this->assertInstanceOf(Response::class, $result);
-		$result = (array)json_decode((string)$result, true);
-		$this->assertArrayHasKey('message', $result);
-		$this->assertEquals($respBody, $result['message']);
+		$this->assertIsArray($result);
+		$this->assertEquals($respBody, $result);
 		self::finishMockManticoreServer();
 	}
-
 }

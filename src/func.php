@@ -21,10 +21,64 @@ use Manticoresearch\Buddy\Lib\MetricThread;
  * @param int|float $value
  * @return void
  */
-function metric(string $name, int|float $value) {
+function buddy_metric(string $name, int|float $value) {
 	static $thread;
 	if (!isset($thread)) {
 		$thread = MetricThread::start();
 	}
 	$thread->execute('add', [$name, $value]);
+}
+
+
+/**
+ * This is helper to display debug info in debug mode
+ *
+ * @param string $message
+ * @param string $eol
+ * @return void
+ */
+function debug(string $message, string $eol = PHP_EOL): void {
+	if (!getenv('DEBUG')) {
+		return;
+	}
+
+	echo $message . $eol;
+}
+
+/**
+ * Cross-platform function to get parent pid of manticore process
+ *
+ * @return int
+ */
+function get_parent_pid(): int {
+	if (strncasecmp(PHP_OS, 'win', 3) === 0) {
+		$pid = getmypid();  // child process ID
+		$parentPid = (string)shell_exec("wmic process where (processid=$pid) get parentprocessid");
+		$parentPid = explode("\n", $parentPid);
+		$parentPid = (int)$parentPid[1];
+
+		return $parentPid;
+	}
+
+	return posix_getppid();
+}
+
+/**
+ * Check wether process is running or not
+ *
+ * @param int $pid
+ * @return bool
+ */
+function process_exists(int $pid): bool {
+	$isRunning = false;
+	if (strncasecmp(PHP_OS, 'win', 3) === 0) {
+		$out = [];
+		exec("TASKLIST /FO LIST /FI \"PID eq $pid\"", $out);
+		if (sizeof($out) > 1) {
+			$isRunning = true;
+		}
+	} elseif (posix_kill($pid, 0)) {
+		$isRunning = true;
+	}
+	return $isRunning;
 }

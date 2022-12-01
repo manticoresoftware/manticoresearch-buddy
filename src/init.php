@@ -30,4 +30,7 @@ $container
 	->register('manticoreClient', ManticoreHTTPClient::class)
 	->addArgument(new Reference('ManticoreResponseBuilder'))
 	->addArgument('127.0.0.1:9308');
+
 QueryProcessor::setContainer($container);
+
+return $container;

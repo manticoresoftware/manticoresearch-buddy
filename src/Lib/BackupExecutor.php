@@ -15,9 +15,7 @@ use Manticoresearch\Backup\Lib\FileStorage;
 use Manticoresearch\Backup\Lib\ManticoreBackup;
 use Manticoresearch\Backup\Lib\ManticoreClient;
 use Manticoresearch\Backup\Lib\ManticoreConfig;
-use Manticoresearch\Backup\Lib\Searchd;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
-use Manticoresearch\Buddy\Network\Response;
 
 /**
  * This is the class to handle BACKUP ... SQL command
@@ -43,9 +41,7 @@ class BackupExecutor implements CommandExecutorInterface {
 		$isAsync = $this->request->options['async'] ?? false;
 		$method = $isAsync ? 'defer' : 'create';
 		$Task = Task::$method(
-			static function (BackupRequest $request): Response {
-				Searchd::init();
-
+			static function (BackupRequest $request): array {
 				$config = new ManticoreConfig($request->configPath);
 				$client = new ManticoreClient($config);
 				$storage = new FileStorage(
@@ -53,7 +49,7 @@ class BackupExecutor implements CommandExecutorInterface {
 					$request->options['compress'] ?? false
 				);
 				ManticoreBackup::store($client, $storage, $request->tables);
-				return Response::none();
+				return [];
 			}, [$this->request]
 		);
 

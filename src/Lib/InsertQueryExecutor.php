@@ -15,7 +15,6 @@ use Exception;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Interface\ManticoreHTTPClientInterface;
 
-use Manticoresearch\Buddy\Network\Response;
 use RuntimeException;
 
 /**
@@ -43,7 +42,7 @@ class InsertQueryExecutor implements CommandExecutorInterface {
 	public function run(): Task {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (InsertQueryRequest $request, ManticoreHTTPClientInterface $manticoreClient): Response {
+		$taskFn = function (InsertQueryRequest $request, ManticoreHTTPClientInterface $manticoreClient): array {
 			for ($i = 0, $max_i = sizeof($request->queries) - 1; $i <= $max_i; $i++) {
 				$query = $request->queries[$i];
 				// When processing the final query we need to make sure the response to client
@@ -53,16 +52,13 @@ class InsertQueryExecutor implements CommandExecutorInterface {
 				}
 
 				$resp = $manticoreClient->sendRequest($query);
-				if ($resp->hasError()) {
-					return Response::fromError(new Exception((string)$resp->getError()));
-				}
 			}
 
 			if (!isset($resp)) {
-				return Response::fromError(new Exception('Empty queries to process'));
+				throw new Exception('Empty queries to process');
 			}
 
-			return Response::fromString($resp->getBody());
+			return (array)json_decode($resp->getBody(), true);
 		};
 		return Task::create(
 			$taskFn, [$this->request, $this->manticoreClient]

@@ -67,8 +67,9 @@ class SQLQueryProcessor {
 
 		$request = Request::fromArray(
 			[
-				'origMsg' => '',
-				'query' => $query,
+				'version' => 1,
+				'error' => '',
+				'payload' => $query,
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]

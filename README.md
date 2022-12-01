@@ -48,20 +48,17 @@ To run a Buddy instance from CLI, use the following command:
 
 ```bash
   $ manticore-executor src/main.php [ARGUMENTS]
+  Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)
+
+  Usage: manticore-executor src/main.php [ARGUMENTS]
 
   Arguments are:
-  --help		   			display this help message
-  --pid     				PID of a running Manticore instance
-  --pid-file				path to the Manticore workfile containing its current PID
-  --host   					hostname to connect with Manticore searchd
-							(default is 127.0.0.1)
-  --port    				port to connect with Manticore searchd
-							(default is 5000)
-  --disable-telemetry		disables telemetry for Buddy
-
+  --help               display this help message
+  --disable-telemetry  disables telemetry for Buddy
+  --debug              enable debug mode for testing
   Examples:
-  manticore-executor src/main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid
-  manticore-executor src/main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid --host=127.0.0.2 --port=1000
-  manticore-executor src/main.php --pid=100 --pid-file=/var/run/manticore/searchd.pid --disable-telemetry
+  manticore-executor src/main.php --debug
+  manticore-executor src/main.php --disable-telemetry
+
 ```
 Detailed info on  Manticore executor can be found [here](https://github.com/manticoresoftware/executor)

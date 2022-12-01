@@ -10,23 +10,28 @@
 */
 
 use Manticoresearch\Buddy\Lib\CliArgsProcessor;
+use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
 use Manticoresearch\Buddy\Network\EventHandler;
 use Manticoresearch\Buddy\Network\Server;
+use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
 
 // Init autoload first
-include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
+/** @var Container */
+$container = include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
 
-[$pid, $pidFile, $host, $port] = CliArgsProcessor::run();
-
-Server::create($host, $port)
+$opts = CliArgsProcessor::run();
+/** @var ManticoreHTTPClient $manticoreClient */
+$manticoreClient = $container->get('manticoreClient');
+$manticoreClient->setServerUrl($opts['listen']);
+Server::create()
 	->addHandler('request', EventHandler::request(...))
 	->addHandler('error', EventHandler::error(...))
 	->addTicker(
 		function () {
 			$memory = memory_get_usage() / 1024;
 			$formatted = number_format($memory, 3).'K';
-			echo "Current memory usage: {$formatted}\n";
-		}, 10
+			debug("memory usage: {$formatted}");
+		}, 60
 	)
-	->addTicker(EventHandler::clientCheckTickerFn($pid, $pidFile), 5, 'client')
+	->addTicker(EventHandler::clientCheckTickerFn(), 5, 'server')
 	->start();
