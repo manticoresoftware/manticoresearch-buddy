@@ -9,13 +9,13 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\QueryParser;
 
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\ParserLoadError;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 
-class QueryParserLoader {
+class Loader {
 
 	/**
 	 * @param RequestFormat $reqFormat

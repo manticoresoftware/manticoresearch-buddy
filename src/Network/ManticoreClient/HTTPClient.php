@@ -9,14 +9,13 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Network\ManticoreClient;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
-use Manticoresearch\Buddy\Lib\ManticoreResponse;
 use RuntimeException;
 
-class ManticoreHTTPClient {
+class HTTPClient {
 
 	const CONTENT_TYPE_HEADER = 'Content-Type: text/plain';
 	const CUSTOM_REDIRECT_DISABLE_HEADER = 'X-Manticore-Error-Redirect: disable';
@@ -33,13 +32,13 @@ class ManticoreHTTPClient {
 	protected string $url;
 
 	/**
-	 * @param ?ManticoreResponse $responseBuilder
+	 * @param ?Response $responseBuilder
 	 * @param ?string $url
 	 * @param ManticoreEndpoint $endpoint
 	 * @return void
 	 */
 	public function __construct(
-		protected ?ManticoreResponse $responseBuilder = null,
+		protected ?Response $responseBuilder = null,
 		?string $url = null,
 		protected ManticoreEndpoint $endpoint = ManticoreEndpoint::Cli
 	) {
@@ -52,10 +51,10 @@ class ManticoreHTTPClient {
 	}
 
 	/**
-	 * @param ManticoreResponse $responseBuilder
+	 * @param Response $responseBuilder
 	 * @return void
 	 */
-	public function setResponseBuilder(ManticoreResponse $responseBuilder): void {
+	public function setResponseBuilder(Response $responseBuilder): void {
 		$this->responseBuilder = $responseBuilder;
 	}
 
@@ -77,11 +76,11 @@ class ManticoreHTTPClient {
 	/**
 	 * @param string $request
 	 * @param ?ManticoreEndpoint $endpoint
-	 * @return ManticoreResponse
+	 * @return Response
 	 */
-	public function sendRequest(string $request, ManticoreEndpoint $endpoint = null): ManticoreResponse {
+	public function sendRequest(string $request, ManticoreEndpoint $endpoint = null): Response {
 		if (!isset($this->responseBuilder)) {
-			throw new RuntimeException("'responseBuilder' property of ManticoreHTTPClient class is not instantiated");
+			throw new RuntimeException("'responseBuilder' property of HTTPClient class is not instantiated");
 		}
 		if ($request === '') {
 			throw new ManticoreHTTPClientError('Empty request passed');

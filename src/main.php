@@ -10,8 +10,8 @@
 */
 
 use Manticoresearch\Buddy\Lib\CliArgsProcessor;
-use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
 use Manticoresearch\Buddy\Network\EventHandler;
+use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\Server;
 use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
 
@@ -20,7 +20,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
 $container = include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
 
 $opts = CliArgsProcessor::run();
-/** @var ManticoreHTTPClient $manticoreClient */
+/** @var HTTPClient $manticoreClient */
 $manticoreClient = $container->get('manticoreClient');
 $manticoreClient->setServerUrl($opts['listen']);
 Server::create()

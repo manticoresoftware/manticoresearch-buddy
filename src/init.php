@@ -9,10 +9,10 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-use Manticoresearch\Buddy\Lib\ManticoreResponse;
-use Manticoresearch\Buddy\Lib\QueryParserLoader;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
+use Manticoresearch\Buddy\Network\ManticoreClient\Response;
+use Manticoresearch\Buddy\QueryParser\Loader;
 use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -24,10 +24,10 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 ;
 // Build container dependencies
 $container = new Container();
-$container->register('ManticoreResponseBuilder', ManticoreResponse::class);
-$container->register('QueryParserLoader', QueryParserLoader::class);
+$container->register('ManticoreResponseBuilder', Response::class);
+$container->register('QueryParserLoader', Loader::class);
 $container
-	->register('manticoreClient', ManticoreHTTPClient::class)
+	->register('manticoreClient', HTTPClient::class)
 	->addArgument(new Reference('ManticoreResponseBuilder'))
 	->addArgument('127.0.0.1:9308');
 

@@ -9,25 +9,26 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Backup;
 
 use Manticoresearch\Backup\Lib\FileStorage;
 use Manticoresearch\Backup\Lib\ManticoreBackup;
 use Manticoresearch\Backup\Lib\ManticoreClient;
 use Manticoresearch\Backup\Lib\ManticoreConfig;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
+use Manticoresearch\Buddy\Lib\Task;
 
 /**
  * This is the class to handle BACKUP ... SQL command
  */
-class BackupExecutor implements CommandExecutorInterface {
+class Executor implements CommandExecutorInterface {
   /**
    *  Initialize the executor
    *
-   * @param BackupRequest $request
+   * @param Request $request
    * @return void
    */
-	public function __construct(protected BackupRequest $request) {
+	public function __construct(protected Request $request) {
 	}
 
   /**
@@ -41,7 +42,7 @@ class BackupExecutor implements CommandExecutorInterface {
 		$isAsync = $this->request->options['async'] ?? false;
 		$method = $isAsync ? 'defer' : 'create';
 		$Task = Task::$method(
-			static function (BackupRequest $request): array {
+			static function (Request $request): array {
 				$config = new ManticoreConfig($request->configPath);
 				$client = new ManticoreClient($config);
 				$storage = new FileStorage(

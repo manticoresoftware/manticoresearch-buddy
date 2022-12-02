@@ -9,15 +9,14 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\QueryParser;
 
 use Manticoresearch\Buddy\Enum\Datalim;
 use Manticoresearch\Buddy\Enum\Datatype;
 use Manticoresearch\Buddy\Exception\QueryParserError;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
-use Manticoresearch\Buddy\Lib\QueryParser;
 
-class SQLInsertParser extends QueryParser implements InsertQueryParserInterface {
+class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 
 	use \Manticoresearch\Buddy\Trait\CheckInsertDataTrait;
 
@@ -45,12 +44,6 @@ class SQLInsertParser extends QueryParser implements InsertQueryParserInterface 
 
 		$rows = $this->parseInsertRows($valExpr);
 		foreach ($rows as $row) {
-// 			$rowVals = $this->parseInsertValues($row);
-// 			$curColTypes = array_map([$this, 'detectValType'], $rowVals);
-// 			$this->error = self::checkColTypesError($curColTypes, $this->colTypes, $this->cols);
-// 			if ($this->error !== '') {
-// 				throw new QueryParserError($this->error);
-// 			}
 			self::checkUnescapedChars($row, QueryParserError::class);
 			self::checkColTypesError(
 				[$this, 'detectValType'],

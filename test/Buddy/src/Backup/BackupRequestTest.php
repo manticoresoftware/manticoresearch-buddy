@@ -9,9 +9,9 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+use Manticoresearch\Buddy\Backup\Request as BackupRequest;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\BackupRequest;
 use Manticoresearch\Buddy\Network\Request;
 use PHPUnit\Framework\TestCase;
 

@@ -9,14 +9,14 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\InsertQuery;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\QueryParserLoader;
-use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\Network\Request as NetRequest;
+use Manticoresearch\Buddy\QueryParser\Loader;
 
-class InsertQueryRequest  {
+class Request  {
 	/** @var array<string> */
 	public array $queries = [];
 
@@ -30,15 +30,15 @@ class InsertQueryRequest  {
 	}
 
 	/**
-	 * @param Request $request
-	 * @return InsertQueryRequest
+	 * @param NetRequest $request
+	 * @return self
 	 */
-	public static function fromNetworkRequest(Request $request): InsertQueryRequest {
+	public static function fromNetworkRequest(NetRequest $request): self {
 		$self = new self();
 		// Resolve the possible ambiguity with Manticore query format as it may not correspond to request format
 		$queryFormat = in_array($request->endpoint, [ManticoreEndpoint::Cli, ManticoreEndpoint::Sql])
 			? RequestFormat::SQL : RequestFormat::JSON;
-		$parser = QueryParserLoader::getInsertQueryParser($queryFormat);
+		$parser = Loader::getInsertQueryParser($queryFormat);
 		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->payload));
 		$self->queries[] = $request->payload;
 		$self->endpoint = $request->endpoint;

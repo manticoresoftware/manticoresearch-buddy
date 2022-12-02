@@ -11,40 +11,40 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
-use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-use Manticoresearch\Buddy\Lib\ManticoreResponse;
+use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
+use Manticoresearch\Buddy\Network\ManticoreClient\Response;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
-class ManticoreHTTPClientTest extends TestCase {
+class HTTPClientTest extends TestCase {
 
 	use TestProtectedTrait;
 
 	/**
-	 * @var ManticoreHTTPClient $client
+	 * @var HTTPClient $client
 	 */
 	private $client;
 
 	/**
-	 * @var ReflectionClass<ManticoreHTTPClient> $refCls
+	 * @var ReflectionClass<HTTPClient> $refCls
 	 */
 	private $refCls;
 
 	protected function setUp(): void {
-		$this->client = new ManticoreHTTPClient();
-		$this->refCls = new \ReflectionClass(ManticoreHTTPClient::class);
+		$this->client = new HTTPClient();
+		$this->refCls = new \ReflectionClass(HTTPClient::class);
 	}
 
-	public function testManticoreHTTPClientCreate(): void {
-		$this->assertInstanceOf(ManticoreHTTPClient::class, $this->client);
+	public function testHTTPClientCreate(): void {
+		$this->assertInstanceOf(HTTPClient::class, $this->client);
 		$this->assertEquals(
-			ManticoreHTTPClient::DEFAULT_URL,
+			HTTPClient::DEFAULT_URL,
 			$this->refCls->getProperty('url')->getValue($this->client)
 		);
 		$this->assertEquals(ManticoreEndpoint::Cli, $this->refCls->getProperty('endpoint')->getValue($this->client));
 
-		$client = new ManticoreHTTPClient(new ManticoreResponse(), 'localhost:1000', ManticoreEndpoint::Insert);
-		$this->assertInstanceOf(ManticoreHTTPClient::class, $client);
+		$client = new HTTPClient(new Response(), 'localhost:1000', ManticoreEndpoint::Insert);
+		$this->assertInstanceOf(HTTPClient::class, $client);
 	}
 
 	public function testResponseUrlSetOk(): void {
