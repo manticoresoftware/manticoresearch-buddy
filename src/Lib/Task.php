@@ -41,7 +41,6 @@ final class Task {
 
 	// Extended properties for make things simpler
 	protected string $host = '';
-	protected int $connectionId = 0;
 	protected string $body = '';
 
 	/**
@@ -272,23 +271,6 @@ final class Task {
 	 */
 	public function getHost(): string {
 		return $this->host;
-	}
-
-	// Now setter and getter for connectionId property
-	/**
-   * @param int $connectionId
-   * return static
-   */
-	public function setConnectionId(int $connectionId): static {
-		$this->connectionId = $connectionId;
-		return $this;
-	}
-
-	/**
-   * @return int
-   */
-	public function getConnectionId(): int {
-		return $this->connectionId;
 	}
 
 	// Now setter and getter for body property

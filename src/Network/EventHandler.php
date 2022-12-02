@@ -17,7 +17,7 @@ use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Lib\TaskPool;
 use Psr\Http\Message\ServerRequestInterface;
 use React\EventLoop\Loop;
-use React\EventLoop\Timer\Timer;
+use React\EventLoop\TimerInterface;
 use React\Http\Message\Response as HttpResponse;
 use React\Promise\Deferred;
 use React\Promise\Promise;
@@ -52,41 +52,55 @@ final class EventHandler {
 		// and set it for the task first
 		/** @var string $host */
 		$host = $serverRequest->getHeader('Host')[0] ?? '';
-		$connectionId = mt_rand(0, 10000000);
 		$task
 			->setHost($host)
-			->setConnectionId($connectionId)
 			->setBody($request->payload);
 		// Add task to running pool first
 		TaskPool::add($task);
 
 		// We always add periodic timer, just because we keep tracking deferred tasks
 		// to show it in case of show queries
-		Loop::addPeriodicTimer(
-			1, function (Timer $timer) use ($request, $task, $deferred) {
-				$taskId = $task->getId();
-				$taskStatus = $task->getStatus()->name;
-				debug("Task $taskId is $taskStatus");
-				if ($task->isRunning()) {
-					return;
-				}
-				// task is finished, we can remove it from the pool
-				TaskPool::remove($task);
+		$tickFn = static function (TimerInterface $timer) use ($request, $task, $deferred) {
+			$taskId = $task->getId();
+			$taskStatus = $task->getStatus()->name;
+			debug("Task $taskId is $taskStatus");
+			if ($task->isRunning()) {
+				return;
+			}
+			// task is finished, we can remove it from the pool
+			TaskPool::remove($task);
 
-				Loop::cancelTimer($timer);
-				if ($task->isSucceed()) {
-					/** @var array<mixed> */
-					$result = $task->getResult();
-					if (!$task->isDeferred()) {
-						return $deferred->resolve(Response::fromMessage($result, $request->format));
-					}
-				}
-
+			Loop::cancelTimer($timer);
+			if ($task->isSucceed()) {
+				/** @var array<mixed> */
+				$result = $task->getResult();
 				if (!$task->isDeferred()) {
-					return $deferred->resolve(Response::fromError($task->getError(), $request->format));
+					return $deferred->resolve(Response::fromMessage($result, $request->format));
 				}
 			}
-		);
+
+			if (!$task->isDeferred()) {
+				return $deferred->resolve(Response::fromError($task->getError(), $request->format));
+			}
+		};
+
+		// If this is not deferred task, we check status for short period of time and return
+		// Otherwise we will wait when timer will be executed
+		if (!$task->isDeferred()) {
+			$blocking = 0; // in millisec
+			while ($blocking < 100) {
+				if (!$task->isRunning()) {
+					break;
+				}
+				usleep(20000);
+				$blocking += 20;
+			}
+		}
+
+		// Run tick function and add timer only when task is still running or deferred
+		if ($task->isDeferred() || !$task->isRunning()) {
+			$tickFn(Loop::addPeriodicTimer(1, $tickFn));
+		}
 
 		// In case we work with deferred task we
 		// should return response to the client without waiting
