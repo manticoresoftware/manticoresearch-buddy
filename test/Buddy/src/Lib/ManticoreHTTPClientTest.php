@@ -10,7 +10,6 @@
  */
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
 use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
 use Manticoresearch\Buddy\Lib\ManticoreResponse;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
@@ -53,11 +52,11 @@ class ManticoreHTTPClientTest extends TestCase {
 		$this->assertEquals($url, $this->refCls->getProperty('url')->getValue($this->client));
 	}
 
-	public function testResponseUrlSetFail(): void {
-		$url = 'some_unvalid_url';
-		$this->expectException(ManticoreHTTPClientError::class);
-		$this->expectExceptionMessage("Manticore request error: Malformed request url '$url' passed");
-		$this->client->setServerUrl($url);
-	}
+	// public function testResponseUrlSetFail(): void {
+	// 	$url = 'some_unvalid_url';
+	// 	$this->expectException(ManticoreHTTPClientError::class);
+	// 	$this->expectExceptionMessage("Manticore request error: Malformed request url '$url' passed");
+	// 	$this->client->setServerUrl($url);
+	// }
 
 }
