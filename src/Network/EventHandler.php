@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Network;
 use Exception;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Lib\TaskPool;
 use Psr\Http\Message\ServerRequestInterface;
 use React\EventLoop\Loop;
 use React\EventLoop\Timer\Timer;
@@ -31,10 +32,11 @@ final class EventHandler {
 	/**
 	 * Process 'data' event on connecction
 	 *
+	 * @param ServerRequestInterface $serverRequest
 	 * @param string $data
 	 * @return PromiseInterface
 	 */
-	protected static function data(string $data): PromiseInterface {
+	protected static function data(ServerRequestInterface $serverRequest, string $data): PromiseInterface {
 		$deferred = new Deferred;
 		try {
 			debug("Request data: $data");
@@ -46,31 +48,65 @@ final class EventHandler {
 			return $deferred->resolve(Response::fromError($e, $request->format ?? RequestFormat::JSON));
 		}
 
+		// Get extra properties to identified connectio and host
+		// and set it for the task first
+		/** @var string $host */
+		$host = $serverRequest->getHeader('Host')[0] ?? '';
+		$connectionId = mt_rand(0, 10000000);
+		$task
+			->setHost($host)
+			->setConnectionId($connectionId)
+			->setBody($request->payload);
+		// Add task to running pool first
+		TaskPool::add($task);
+
+		// We always add periodic timer, just because we keep tracking deferred tasks
+		// to show it in case of show queries
+		Loop::addPeriodicTimer(
+			1, function (Timer $timer) use ($request, $task, $deferred) {
+				$taskId = $task->getId();
+				$taskStatus = $task->getStatus()->name;
+				debug("Task $taskId is $taskStatus");
+				if ($task->isRunning()) {
+					return;
+				}
+				// task is finished, we can remove it from the pool
+				TaskPool::remove($task);
+
+				Loop::cancelTimer($timer);
+				if ($task->isSucceed()) {
+					/** @var array<mixed> */
+					$result = $task->getResult();
+					if (!$task->isDeferred()) {
+						return $deferred->resolve(Response::fromMessage($result, $request->format));
+					}
+				}
+
+				if (!$task->isDeferred()) {
+					return $deferred->resolve(Response::fromError($task->getError(), $request->format));
+				}
+			}
+		);
+
 		// In case we work with deferred task we
 		// should return response to the client without waiting
 		// for results of it
 		if ($task->isDeferred()) {
-			return $deferred->resolve(Response::fromMessage([$task->getId()], $request->format));
-		} else { // in case we should block loop we do it as promise and timer
-			Loop::addPeriodicTimer(
-				1, function (Timer $timer) use ($request, $task, $deferred) {
-					$taskId = $task->getId();
-					$taskStatus = $task->getStatus()->name;
-					debug("Task $taskId is $taskStatus");
-					if ($task->isRunning()) {
-						return;
-					}
-
-					Loop::cancelTimer($timer);
-					if ($task->isSucceed()) {
-						/** @var array<mixed> */
-						$result = $task->getResult();
-						return $deferred->resolve(Response::fromMessage($result, $request->format));
-					}
-
-					return $deferred->resolve(Response::fromError($task->getError(), $request->format));
-				}
-			);
+			// TODO: extract it somewhere for better code
+			$response = [[
+				'columns' => [
+					'id' => [
+						'type' => 'long long',
+					],
+				],
+				'data' => [
+					[
+						'id' => $task->getId(),
+					],
+				],
+			],
+			];
+			$deferred->resolve(Response::fromMessage($response, $request->format));
 		}
 
 		return $deferred->promise();
@@ -88,7 +124,7 @@ final class EventHandler {
 				static $headers = ['Content-Type' => 'application/json'];
 
 				$data = (string)$request->getBody();
-				$promise = static::data($data);
+				$promise = static::data($request, $data);
 				// Allow only post and otherwise send bad request
 				if ($request->getMethod() !== 'POST') {
 					return $reject(
