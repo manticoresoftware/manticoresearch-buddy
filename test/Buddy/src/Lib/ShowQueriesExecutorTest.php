@@ -27,10 +27,10 @@ class ShowQueriesExecutorTest extends TestCase {
 		echo "\nTesting the 'show queries' executes properly and we got the correct Manticore response received\n";
 		$respBody = json_decode(
 			"[{\n"
-			. '"columns":[{"proto":{"type":"string"}},{"host":{"type":"string"}},'
-			. '{"ID":{"type":"long long"}},{"query":{"type":"string"}}],'
+			. '"columns":[{"id":{"type":"long long"}},{"query":{"type":"string"}},'
+			. '{"proto":{"type":"string"}},{"host":{"type":"string"}}],'
 			. "\n"
-			. '"data":[{"proto":"http","host":"127.0.0.1:584","ID":19,"query":"select"}'
+			. '"data":[{"proto":"http","host":"127.0.0.1:584","id":19,"query":"select"}'
 			. "\n],\n"
 			. '"total":1,'
 			. "\n"
