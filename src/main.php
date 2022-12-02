@@ -11,6 +11,7 @@
 
 use Manticoresearch\Buddy\Lib\CliArgsProcessor;
 use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
+use Manticoresearch\Buddy\Lib\TaskPool;
 use Manticoresearch\Buddy\Network\EventHandler;
 use Manticoresearch\Buddy\Network\Server;
 use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
@@ -31,6 +32,12 @@ Server::create()
 			$memory = memory_get_usage() / 1024;
 			$formatted = number_format($memory, 3).'K';
 			debug("memory usage: {$formatted}");
+		}, 60
+	)
+	->addTicker(
+		function () {
+			$taskCount = TaskPool::getCount();
+			debug("running {$taskCount} tasks");
 		}, 60
 	)
 	->addTicker(EventHandler::clientCheckTickerFn(), 5, 'server')

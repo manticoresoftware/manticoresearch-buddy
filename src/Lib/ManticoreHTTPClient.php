@@ -64,13 +64,14 @@ class ManticoreHTTPClient {
 	 * @return void
 	 */
 	public function setServerUrl($url): void {
-		$origUrl = $url;
+		// $origUrl = $url;
 		if (!str_starts_with($url, self::URL_PREFIX)) {
 			$url = self::URL_PREFIX . $url;
 		}
-		if (!filter_var($url, FILTER_VALIDATE_URL)) {
-			throw new ManticoreHTTPClientError("Malformed request url '$origUrl' passed");
-		}
+		// ! we do not have filter extension in production version
+		// if (!filter_var($url, FILTER_VALIDATE_URL)) {
+			// throw new ManticoreHTTPClientError("Malformed request url '$origUrl' passed");
+		// }
 		$this->url = $url;
 	}
 

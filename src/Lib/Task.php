@@ -19,7 +19,8 @@ use parallel\Future;
 use parallel\Runtime;
 
 final class Task {
-	protected string $id;
+	protected int $id;
+
 	/**
 	 * This flag shows that this task is deffered and
 	 * we can return response to client asap
@@ -38,12 +39,17 @@ final class Task {
 	protected Throwable $error;
 	protected mixed $result;
 
+	// Extended properties for make things simpler
+	protected string $host = '';
+	protected int $connectionId = 0;
+	protected string $body = '';
+
 	/**
 	 * @param mixed[] $argv
 	 * @return void
 	 */
 	public function __construct(protected array $argv = []) {
-		$this->id = uniqid();
+		$this->id = (int)(microtime(true) * 10000);
 		$this->status = TaskStatus::Pending;
 	}
 
@@ -58,9 +64,9 @@ final class Task {
 	/**
 	 * Get current task ID
 	 *
-	 * @return string
+	 * @return int
 	 */
-	public function getId(): string {
+	public function getId(): int {
 		return $this->id;
 	}
 
@@ -85,7 +91,7 @@ final class Task {
 	 * @return static
 	 * @see static::create()
 	 */
-	public static function createDeferred(Closure $fn, array $argv = []): static {
+	public static function defer(Closure $fn, array $argv = []): static {
 		$autoload_file = __DIR__. '/../../vendor/autoload.php';
 		$Self = static::createInRuntime(new Runtime($autoload_file), $fn, $argv);
 		$Self->isDeferred = true;
@@ -250,5 +256,55 @@ final class Task {
 		}
 
 		return $this->result;
+	}
+
+	/**
+	 * @param string $host
+	 * return static
+	 */
+	public function setHost(string $host): static {
+		$this->host = $host;
+		return $this;
+	}
+
+	/**
+	 * @return string
+	 */
+	public function getHost(): string {
+		return $this->host;
+	}
+
+	// Now setter and getter for connectionId property
+	/**
+   * @param int $connectionId
+   * return static
+   */
+	public function setConnectionId(int $connectionId): static {
+		$this->connectionId = $connectionId;
+		return $this;
+	}
+
+	/**
+   * @return int
+   */
+	public function getConnectionId(): int {
+		return $this->connectionId;
+	}
+
+	// Now setter and getter for body property
+	/**
+   * @param string $body
+   * return static
+   */
+	public function setBody(string $body): static {
+		$this->body = $body;
+		return $this;
+	}
+
+	/**
+   * @return string
+   */
+	public function getBody(): string {
+		return $this->body;
 	}
 }
