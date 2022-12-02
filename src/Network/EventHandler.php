@@ -98,7 +98,7 @@ final class EventHandler {
 		}
 
 		// Run tick function and add timer only when task is still running or deferred
-		if ($task->isDeferred() || !$task->isRunning()) {
+		if ($task->isDeferred() || $task->isRunning()) {
 			$tickFn(Loop::addPeriodicTimer(1, $tickFn));
 		}
 
