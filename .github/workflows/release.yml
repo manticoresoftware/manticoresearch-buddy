@@ -30,12 +30,14 @@ jobs:
           name="${{ env.APP_NAME }}_${{ steps.vars.outputs.app_version }}-$( date +%y%m%d )-${GITHUB_SHA:0:7}"
           echo "$name"
           tar czf "$name.tar.gz" build/manticore-buddy
+          zip "$name.zip" build/manticore-buddy.phar
         shell: bash
       - uses: actions/upload-artifact@v3
         with:
           name: artifact
           path: |
             ./*.tar.gz
+            ./*.zip
 
   build-linux-packages:
     runs-on: ubuntu-22.04
@@ -312,7 +314,7 @@ jobs:
             script: bin/upload_repo_rpm
             distro: 9
           - artifact: artifact
-            ext: tar.gz
+            ext: {tar.gz,zip}
             script: bin/upload_repo_arc
             distro: ""
     steps:
