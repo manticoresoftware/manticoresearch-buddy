@@ -49,7 +49,25 @@ class BackupExecutor implements CommandExecutorInterface {
 					$request->options['compress'] ?? false
 				);
 				ManticoreBackup::store($client, $storage, $request->tables);
-				return [];
+				// TODO: make standard response interface
+				return [[
+					'total' => 1,
+					'error' => '',
+					'warning' => '',
+					'columns' => [
+						[
+							'Path' => [
+								'type' => 'string',
+							],
+						],
+					],
+					'data' => [
+						[
+							'Path' => $storage->getBackupDir(),
+						],
+					],
+				],
+				];
 			}, [$this->request]
 		);
 

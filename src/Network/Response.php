@@ -46,7 +46,14 @@ final class Response {
 	 * @return static
 	 */
 	public static function fromError(Throwable $error, RequestFormat $format = RequestFormat::JSON): static {
-		return static::fromMessageAndError([], $error, $format);
+		return static::fromMessageAndError(
+			[[
+				'total' => 0,
+				'warning' => '',
+				'error' => $error->getMessage(),
+			],
+			], $error, $format
+		);
 	}
 
 	/**
