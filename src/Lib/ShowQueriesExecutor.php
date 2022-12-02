@@ -76,17 +76,21 @@ class ShowQueriesExecutor implements CommandExecutorInterface {
 	public static function formatResponse(string $origResp): array {
 		$struct = [
 			'columns' => [
-				'id' => [
+				['id' => [
 					'type' => 'long long',
 				],
-				'query' => [
+				],
+				['query' => [
 					'type' => 'string',
 				],
-				'proto' => [
+				],
+				['proto' => [
 					'type' => 'string',
 				],
-				'host' => [
+				],
+				['host' => [
 					'type' => 'string',
+				],
 				],
 			],
 			'data' => [],
