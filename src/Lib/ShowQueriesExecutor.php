@@ -22,6 +22,13 @@ use RuntimeException;
  * This is the parent class to handle erroneous Manticore queries
  */
 class ShowQueriesExecutor implements CommandExecutorInterface {
+	const COL_MAP = [
+		'connid' => 'id',
+		'last cmd' => 'query',
+		'proto' => 'proto',
+		'host' => 'host',
+	];
+
 	/** @var ManticoreHTTPClient $manticoreClient */
 	protected ManticoreHTTPClient $manticoreClient;
 
@@ -67,36 +74,45 @@ class ShowQueriesExecutor implements CommandExecutorInterface {
 	 * @return array<mixed>
 	 */
 	public static function formatResponse(string $origResp): array {
-		$allowedFields = ['id', 'query', 'host', 'proto'];
-		$colNameMap = ['connid' => 'id', 'last cmd' => 'query'];
+		$struct = [
+			'columns' => [
+				'id' => [
+					'type' => 'long long',
+				],
+				'query' => [
+					'type' => 'string',
+				],
+				'proto' => [
+					'type' => 'string',
+				],
+				'host' => [
+					'type' => 'string',
+				],
+			],
+			'data' => [],
+			'total' => 0,
+			'error' => '',
+			'warning' => '',
+		];
 		$resp = (array)json_decode($origResp, true);
-		// Updating column names in 'data' field
-		foreach ($colNameMap as $k => $v) {
-			$resp[0] = (array)$resp[0];
-			$resp[0]['data'] = (array)$resp[0]['data'];
-			$resp[0]['data'][0] = (array)$resp[0]['data'][0];
-			$resp[0]['data'][0][$v] = $resp[0]['data'][0][$k];
-		}
-		$resp[0]['data'][0] = array_filter(
-			$resp[0]['data'][0],
-			function ($k) use ($allowedFields) {
-				return in_array($k, $allowedFields);
-			},
-			ARRAY_FILTER_USE_KEY
-		);
-		// Updating column names in 'columns' field
-		$updatedCols = [];
-		foreach ((array)$resp[0]['columns'] as $col) {
-			$colKeys = array_keys((array)$col);
-			$k = $colKeys[0];
-			if (array_key_exists($k, $colNameMap)) {
-				$updatedCols[] = [$colNameMap[$k] => $col[$k]];
-			} elseif (in_array($k, $allowedFields)) {
-				$updatedCols[] = $col;
+		/** @var array{0:array{error?:string,warning?:string,data?:array<array<string,mixed>>}} $resp */
+		if (isset($resp[0]['data'])) {
+			$struct['error'] = $resp[0]['error'] ?? '';
+			$struct['warning'] = $resp[0]['warning'] ?? '';
+			foreach ($resp[0]['data'] as $row) {
+				++$struct['total'];
+				$newRow = [];
+				foreach (static::COL_MAP as $oldKey => $newKey) {
+					if (!isset($row[$oldKey])) {
+						continue;
+					}
+
+					$newRow[$newKey] = $row[$oldKey];
+				}
+				$struct['data'][] = $newRow;
 			}
 		}
-		$resp[0]['columns'] = $updatedCols;
-		return $resp;
+		return [$struct];
 	}
 
 	/**
