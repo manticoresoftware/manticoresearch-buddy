@@ -61,9 +61,18 @@ final class EventHandler {
 		// We always add periodic timer, just because we keep tracking deferred tasks
 		// to show it in case of show queries
 		$tickFn = static function (TimerInterface $timer) use ($request, $task, $deferred) {
-			$taskId = $task->getId();
-			$taskStatus = $task->getStatus()->name;
-			debug("Task $taskId is $taskStatus");
+			static $ts;
+			if (!isset($ts)) {
+				$ts = time();
+			}
+			$now = time();
+			// Dump debug message once a 5 sec
+			if (($now - $ts) >= 5) {
+				$ts = $now;
+				$taskId = $task->getId();
+				$taskStatus = $task->getStatus()->name;
+				debug("Task $taskId is $taskStatus");
+			}
 			if ($task->isRunning()) {
 				return;
 			}
@@ -84,23 +93,8 @@ final class EventHandler {
 			}
 		};
 
-		// If this is not deferred task, we check status for short period of time and return
-		// Otherwise we will wait when timer will be executed
-		if (!$task->isDeferred()) {
-			$blocking = 0; // in millisec
-			while ($blocking < 100) {
-				if (!$task->isRunning()) {
-					break;
-				}
-				usleep(20000);
-				$blocking += 20;
-			}
-		}
-
 		// Run tick function and add timer only when task is still running or deferred
-		if ($task->isDeferred() || $task->isRunning()) {
-			$tickFn(Loop::addPeriodicTimer(1, $tickFn));
-		}
+		$tickFn(Loop::addPeriodicTimer(0.005, $tickFn));
 
 		// In case we work with deferred task we
 		// should return response to the client without waiting
