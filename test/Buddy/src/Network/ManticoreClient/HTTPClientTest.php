@@ -10,7 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
+//use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
@@ -35,7 +35,7 @@ class HTTPClientTest extends TestCase {
 		$this->refCls = new \ReflectionClass(HTTPClient::class);
 	}
 
-	public function testHTTPClientCreate(): void {
+	public function testManticoreHTTPClientCreate(): void {
 		$this->assertInstanceOf(HTTPClient::class, $this->client);
 		$this->assertEquals(
 			HTTPClient::DEFAULT_URL,
@@ -53,11 +53,11 @@ class HTTPClientTest extends TestCase {
 		$this->assertEquals($url, $this->refCls->getProperty('url')->getValue($this->client));
 	}
 
-	public function testResponseUrlSetFail(): void {
-		$url = 'some_unvalid_url';
-		$this->expectException(ManticoreHTTPClientError::class);
-		$this->expectExceptionMessage("Manticore request error: Malformed request url '$url' passed");
-		$this->client->setServerUrl($url);
-	}
+	// public function testResponseUrlSetFail(): void {
+	// 	$url = 'some_unvalid_url';
+	// 	$this->expectException(ManticoreHTTPClientError::class);
+	// 	$this->expectExceptionMessage("Manticore request error: Malformed request url '$url' passed");
+	// 	$this->client->setServerUrl($url);
+	// }
 
 }

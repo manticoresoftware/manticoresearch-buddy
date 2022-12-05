@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\ShowQueries;
 
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Lib\TaskPool;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
 
@@ -20,6 +21,13 @@ use RuntimeException;
  * This is the parent class to handle erroneous Manticore queries
  */
 class Executor implements CommandExecutorInterface {
+	const COL_MAP = [
+		'connid' => 'id',
+		'last cmd' => 'query',
+		'proto' => 'proto',
+		'host' => 'host',
+	];
+
 	/** @var HTTPClient $manticoreClient */
 	protected HTTPClient $manticoreClient;
 
@@ -43,12 +51,18 @@ class Executor implements CommandExecutorInterface {
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (Request $request, HTTPClient $manticoreClient): array {
+		$taskFn = function (Request $request, HTTPClient $manticoreClient, array $tasks): array {
+			// First, get response from the manticore
 			$resp = $manticoreClient->sendRequest($request->query);
-			return static::formatResponse($resp->getBody());
+			$result = static::formatResponse($resp->getBody());
+			// Second, get our own queries and append to the final result
+			/** @var array{0:array{data:array<mixed>,total:int}} $result */
+			$result[0]['data'] = array_merge($result[0]['data'], $tasks);
+			$result[0]['total'] += sizeof($tasks);
+			return $result;
 		};
 		return Task::create(
-			$taskFn, [$this->request, $this->manticoreClient]
+			$taskFn, [$this->request, $this->manticoreClient, static::getTasksToAppend()]
 		)->run();
 	}
 
@@ -59,53 +73,69 @@ class Executor implements CommandExecutorInterface {
 	 * @return array<mixed>
 	 */
 	public static function formatResponse(string $origResp): array {
-		$allowedFields = ['ID', 'query', 'host', 'proto'];
-		$colNameMap = ['connid' => 'ID', 'last cmd' => 'query'];
+		$struct = [
+			'columns' => [
+				['id' => [
+					'type' => 'long long',
+				],
+				],
+				['query' => [
+					'type' => 'string',
+				],
+				],
+				['proto' => [
+					'type' => 'string',
+				],
+				],
+				['host' => [
+					'type' => 'string',
+				],
+				],
+			],
+			'data' => [],
+			'total' => 0,
+			'error' => '',
+			'warning' => '',
+		];
 		$resp = (array)json_decode($origResp, true);
-		// Updating column names in 'data' field
-		foreach ($colNameMap as $k => $v) {
-			$resp[0] = (array)$resp[0];
-			$resp[0]['data'] = (array)$resp[0]['data'];
-			$resp[0]['data'][0] = (array)$resp[0]['data'][0];
-			$resp[0]['data'][0][$v] = $resp[0]['data'][0][$k];
-		}
-		$resp[0]['data'][0] = array_filter(
-			$resp[0]['data'][0],
-			function ($k) use ($allowedFields) {
-				return in_array($k, $allowedFields);
-			},
-			ARRAY_FILTER_USE_KEY
-		);
-		// Updating column names in 'columns' field
-		$updatedCols = [];
-		foreach ((array)$resp[0]['columns'] as $col) {
-			$colKeys = array_keys((array)$col);
-			$k = $colKeys[0];
-			if (array_key_exists($k, $colNameMap)) {
-				$updatedCols[] = [$colNameMap[$k] => $col[$k]];
-			} elseif (in_array($k, $allowedFields)) {
-				$updatedCols[] = $col;
+		/** @var array{0:array{error?:string,warning?:string,data?:array<array<string,mixed>>}} $resp */
+		if (isset($resp[0]['data'])) {
+			$struct['error'] = $resp[0]['error'] ?? '';
+			$struct['warning'] = $resp[0]['warning'] ?? '';
+			foreach ($resp[0]['data'] as $row) {
+				++$struct['total'];
+				$newRow = [];
+				foreach (static::COL_MAP as $oldKey => $newKey) {
+					if (!isset($row[$oldKey])) {
+						continue;
+					}
+
+					$newRow[$newKey] = $row[$oldKey];
+				}
+				$struct['data'][] = $newRow;
 			}
 		}
-		$resp[0]['columns'] = $updatedCols;
-		// // Replacing updated fields 'columns' and 'data' in the original response
-		// $replFrom = [
-		// 	'/(\[\{\n"columns":)(.*?)(,\n"data":\[)/s',
-		// 	'/(,\n"data":\[)(.*?)(\n\],\n)/s',
-		// ];
-		// $replTo = [
-		// 	json_encode($resp[0]['columns']),
-		// 	json_encode($resp[0]['data'][0]),
-		// ];
-		// $res = preg_replace_callback(
-		// 	$replFrom,
-		// 	function ($matches) use (&$replTo) {
-		// 		return $matches[1] . array_shift($replTo) . $matches[3];
-		// 	},
-		// 	$origResp
-		// );
+		return [$struct];
+	}
 
-		return $resp;
+	/**
+	 * This method appends our running queries from global state to result
+	 *
+	 * @return array<array{id:int,proto:string,host:string,query:string}>
+	 */
+	protected static function getTasksToAppend(): array {
+		$data = [];
+		$tasks = TaskPool::getList();
+		foreach ($tasks as $task) {
+			$data[] = [
+				'id' => $task->getId(),
+				'proto' => 'http',
+				'host' => $task->getHost(),
+				'query' => $task->getBody(),
+			];
+		}
+
+		return $data;
 	}
 
 	/**
