@@ -11,14 +11,14 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\InsertQueryRequest;
-use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\InsertQuery\Request;
+use Manticoresearch\Buddy\Network\Request as NetRequest;
 use PHPUnit\Framework\TestCase;
 
 class InsertQueryRequestTest extends TestCase {
 	public function testCreationFromNetworkRequest(): void {
-		echo "\nTesting the creation of InsertQueryRequest from manticore request data struct\n";
-		$request = Request::fromArray(
+		echo "\nTesting the creation of InsertQuery\Request from manticore request data struct\n";
+		$request = NetRequest::fromArray(
 			[
 				'version' => 1,
 				'error' => '',
@@ -27,8 +27,8 @@ class InsertQueryRequestTest extends TestCase {
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
-		$request = InsertQueryRequest::fromNetworkRequest($request);
-		$this->assertInstanceOf(InsertQueryRequest::class, $request);
+		$request = Request::fromNetworkRequest($request);
+		$this->assertInstanceOf(Request::class, $request);
 
 		echo "\nTesting the prepared quries after creating request are correct\n";
 

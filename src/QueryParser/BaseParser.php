@@ -9,13 +9,12 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\QueryParser;
 
 use Manticoresearch\Buddy\Enum\Datatype;
-
 use Manticoresearch\Buddy\Interface\QueryParserInterface;
 
-abstract class QueryParser implements QueryParserInterface {
+abstract class BaseParser implements QueryParserInterface {
 
 	/**
 	 * @var string $name

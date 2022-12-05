@@ -11,15 +11,15 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-use Manticoresearch\Buddy\Lib\ManticoreResponse;
-use Manticoresearch\Buddy\Lib\ShowQueriesExecutor;
-use Manticoresearch\Buddy\Lib\ShowQueriesRequest;
-use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
+use Manticoresearch\Buddy\Network\ManticoreClient\Response;
+use Manticoresearch\Buddy\Network\Request as NetRequest;
+use Manticoresearch\Buddy\ShowQueries\Executor;
+use Manticoresearch\Buddy\ShowQueries\Request;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
-class ShowQueriesExecutorTest extends TestCase {
+class ExecutorTest extends TestCase {
 
 	use TestHTTPServerTrait;
 
@@ -40,7 +40,7 @@ class ShowQueriesExecutorTest extends TestCase {
 			. "\n}]", true
 		);
 
-		$request = Request::fromArray(
+		$request = NetRequest::fromArray(
 			[
 				'error' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
 				'payload' => 'SHOW QUERIES',
@@ -50,10 +50,10 @@ class ShowQueriesExecutorTest extends TestCase {
 			]
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);
-		$manticoreClient = new ManticoreHTTPClient(new ManticoreResponse(), $serverUrl);
-		$request = ShowQueriesRequest::fromNetworkRequest($request);
+		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
+		$request = Request::fromNetworkRequest($request);
 
-		$executor = new ShowQueriesExecutor($request);
+		$executor = new Executor($request);
 		$refCls = new ReflectionClass($executor);
 		$refCls->getProperty('manticoreClient')->setValue($executor, $manticoreClient);
 		$task = $executor->run();

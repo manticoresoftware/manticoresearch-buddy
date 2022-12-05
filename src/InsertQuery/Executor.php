@@ -9,28 +9,28 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\InsertQuery;
 
 use Exception;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
-
-use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
+use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
 
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class InsertQueryExecutor implements CommandExecutorInterface {
-	/** @var ManticoreHTTPClient */
-	protected ManticoreHTTPClient $manticoreClient;
+class Executor implements CommandExecutorInterface {
+	/** @var HTTPClient */
+	protected HTTPClient $manticoreClient;
 
 	/**
 	 *  Initialize the executor
 	 *
-	 * @param InsertQueryRequest $request
+	 * @param Request $request
 	 * @return void
 	 */
-	public function __construct(public InsertQueryRequest $request) {
+	public function __construct(public Request $request) {
 	}
 
 	/**
@@ -42,7 +42,7 @@ class InsertQueryExecutor implements CommandExecutorInterface {
 	public function run(): Task {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (InsertQueryRequest $request, ManticoreHTTPClient $manticoreClient): array {
+		$taskFn = function (Request $request, HTTPClient $manticoreClient): array {
 			for ($i = 0, $max_i = sizeof($request->queries) - 1; $i <= $max_i; $i++) {
 				$query = $request->queries[$i];
 				// When processing the final query we need to make sure the response to client
@@ -75,10 +75,10 @@ class InsertQueryExecutor implements CommandExecutorInterface {
 	/**
 	 * Instantiating the http client to execute requests to Manticore server
 	 *
-	 * @param ManticoreHTTPClient $client
-	 * $return ManticoreHTTPClient
+	 * @param HTTPClient $client
+	 * $return HTTPClient
 	 */
-	public function setManticoreClient(ManticoreHTTPClient $client): ManticoreHTTPClient {
+	public function setManticoreClient(HTTPClient $client): HTTPClient {
 		$this->manticoreClient = $client;
 		return $this->manticoreClient;
 	}

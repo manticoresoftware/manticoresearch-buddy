@@ -9,17 +9,17 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Backup;
 
 use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
 use Manticoresearch\Buddy\Interface\CommandRequestInterface;
-use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\Network\Request as NetRequest;
 use RuntimeException;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
  */
-class BackupRequest implements CommandRequestInterface {
+class Request implements CommandRequestInterface {
 	const OPTIONS = [
 		'async' => 'bool',
 		'compress' => 'bool',
@@ -49,12 +49,12 @@ class BackupRequest implements CommandRequestInterface {
   /**
    * Create instance by parsing query into parameters
    *
-   * @param Request $request
+   * @param NetRequest $request
    *  The query itself without command prefix already
-   * @return BackupRequest
+   * @return Request
    * @throws SQLQueryParsingError
    */
-	public static function fromNetworkRequest(Request $request): BackupRequest {
+	public static function fromNetworkRequest(NetRequest $request): Request {
 		$query = $request->payload;
 		$whatPattern = 'BACKUP\s*((?P<all>ALL)|(?:TABLES?\s*(?P<table>(,?\s*[\w]+\s*)+)))';
 		$toPattern = 'TO\s*local\(\s*(?P<path>[/\\_\-a-z/0-9]+)\s*\)';
@@ -87,7 +87,7 @@ class BackupRequest implements CommandRequestInterface {
 			[]
 		) : [];
 
-		return new BackupRequest(
+		return new Request(
 			path: $path,
 			tables: $tables,
 			options: $options

@@ -9,12 +9,12 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Network\ManticoreClient;
 
 use Manticoresearch\Buddy\Exception\ManticoreResponseError ;
 use Throwable;
 
-class ManticoreResponse {
+class Response {
 
 	/**
 	 * @var array<string,mixed> $data

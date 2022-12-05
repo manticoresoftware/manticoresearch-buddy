@@ -14,12 +14,13 @@ namespace Manticoresearch\Buddy\Lib;
 use Exception;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
+use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\Request;
 use Psr\Container\ContainerInterface;
 
 class QueryProcessor {
 	/** @var string */
-	protected const NAMESPACE_PREFIX = __NAMESPACE__ . '\\';
+	protected const NAMESPACE_PREFIX = 'Manticoresearch\\Buddy\\';
 
 	/** @var ContainerInterface */
 	// We set this on initialization (init.php) so we are sure we have it in class
@@ -54,12 +55,10 @@ class QueryProcessor {
 		}
 		$prefix = static::extractPrefixFromQuery($request->payload);
 		debug('Executor: ' . $prefix);
-		$requestType = "{$prefix}Request";
-		$requestClassName = static::NAMESPACE_PREFIX . $requestType;
+		$requestClassName = static::NAMESPACE_PREFIX . "{$prefix}\\Request";
 		$commandRequest = $requestClassName::fromNetworkRequest($request);
-		debug('Command request: ' . $requestType . json_encode($commandRequest));
-		$executorType = "{$prefix}Executor";
-		$executorClassName = static::NAMESPACE_PREFIX . $executorType;
+		debug("Command request: {$prefix}\\Request " . json_encode($commandRequest));
+		$executorClassName = static::NAMESPACE_PREFIX . "{$prefix}\\Executor";
 		/** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
 		$executor = new $executorClassName($commandRequest);
 		foreach ($executor->getProps() as $prop) {
@@ -75,7 +74,7 @@ class QueryProcessor {
 	 * @return void
 	 */
 	protected static function init(): void {
-		/** @var ManticoreHTTPClient */
+		/** @var HTTPClient */
 		$manticoreClient = static::getObjFromContainer('manticoreClient');
 		$resp = $manticoreClient->sendRequest('SHOW SETTINGS');
 		/** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */

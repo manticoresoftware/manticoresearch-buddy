@@ -10,7 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Enum\Datatype;
-use Manticoresearch\Buddy\Lib\SQLInsertParser;
+use Manticoresearch\Buddy\QueryParser\SQLInsertParser;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 

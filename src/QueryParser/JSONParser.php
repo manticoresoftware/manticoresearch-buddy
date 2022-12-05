@@ -9,13 +9,12 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\QueryParser;
 
 use Manticoresearch\Buddy\Exception\QueryParserError;
 use Manticoresearch\Buddy\Interface\JSONParserInterface;
-use Manticoresearch\Buddy\Lib\QueryParser;
 
-abstract class JSONParser extends QueryParser implements JSONParserInterface {
+abstract class JSONParser extends BaseParser implements JSONParserInterface {
 
 	/**
 	 * @var bool $isNdJSON

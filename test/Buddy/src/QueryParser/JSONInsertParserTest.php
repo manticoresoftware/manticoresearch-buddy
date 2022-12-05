@@ -11,7 +11,7 @@
 
 use Manticoresearch\Buddy\Enum\Datatype;
 use Manticoresearch\Buddy\Exception\QueryParserError;
-use Manticoresearch\Buddy\Lib\JSONInsertParser;
+use Manticoresearch\Buddy\QueryParser\JSONInsertParser;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 

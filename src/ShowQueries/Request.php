@@ -9,16 +9,16 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\ShowQueries;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Interface\CommandRequestInterface;
-use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\Network\Request as NetRequest;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
  */
-class ShowQueriesRequest implements CommandRequestInterface {
+class Request implements CommandRequestInterface {
 	public string $query;
 	public ManticoreEndpoint $endpoint;
 
@@ -26,10 +26,10 @@ class ShowQueriesRequest implements CommandRequestInterface {
 	}
 
 	/**
-	 * @param Request $request
+	 * @param NetRequest $request
 	 * @return self
 	 */
-	public static function fromNetworkRequest(Request $request): ShowQueriesRequest {
+	public static function fromNetworkRequest(NetRequest $request): Request {
 		$self = new self();
 		$self->query = 'SELECT * FROM @@system.sessions';
 		$self->endpoint = $request->endpoint;
