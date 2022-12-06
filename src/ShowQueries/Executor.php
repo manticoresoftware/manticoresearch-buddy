@@ -24,7 +24,7 @@ class Executor implements CommandExecutorInterface {
 	const COL_MAP = [
 		'connid' => 'id',
 		'last cmd' => 'query',
-		'proto' => 'proto',
+		'proto' => 'protocol',
 		'host' => 'host',
 	];
 
@@ -84,7 +84,7 @@ class Executor implements CommandExecutorInterface {
 					'type' => 'string',
 				],
 				],
-				['proto' => [
+				['protocol' => [
 					'type' => 'string',
 				],
 				],
@@ -122,17 +122,18 @@ class Executor implements CommandExecutorInterface {
 	/**
 	 * This method appends our running queries from global state to result
 	 *
-	 * @return array<array{id:int,proto:string,host:string,query:string}>
+	 * @return array<array{id:int,protocol:string,host:string,query:string}>
 	 */
 	protected static function getTasksToAppend(): array {
 		$data = [];
 		$tasks = TaskPool::getList();
 		foreach ($tasks as $task) {
+			// ! same order as in COL_MAP
 			$data[] = [
 				'id' => $task->getId(),
-				'proto' => 'http',
-				'host' => $task->getHost(),
 				'query' => $task->getBody(),
+				'protocol' => 'http',
+				'host' => $task->getHost(),
 			];
 		}
 
