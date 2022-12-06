@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
+use Psr\Container\ContainerInterface;
 use parallel\Channel;
 use parallel\Runtime;
 
@@ -28,6 +29,14 @@ use parallel\Runtime;
  * </code>
  */
 final class MetricThread {
+	/** @var static */
+	protected static self $instance;
+
+	/** @var ContainerInterface */
+	// We set this on initialization (init.php) so we are sure we have it in class
+	protected static ContainerInterface $container;
+
+
 	/**
 	 * @param Runtime $runtime
 	 * @return void
@@ -36,15 +45,42 @@ final class MetricThread {
 	}
 
 	/**
+	 * Setter for container property
+	 *
+	 * @param ContainerInterface $container
+	 *  The container object to resolve the executor's dependencies in case such exist
+	 * @return void
+	 *  The CommandExecutorInterface to execute to process the final query
+	 */
+	public static function setContainer(ContainerInterface $container): void {
+		self::$container = $container;
+	}
+
+
+	/**
+	 * Get single instance of the thread for metrics
+	 *
+	 * @return static
+	 */
+	public static function instance(): static {
+		if (!isset(static::$instance)) {
+			static::$instance = static::start();
+		}
+
+		return static::$instance;
+	}
+
+	/**
 	 * Create runtime for running as a single thread and return instance
 	 *
 	 * @return self
 	 */
 	public static function start(): self {
-		$runtime = new Runtime(__DIR__ . '/../../vendor/autoload.php');
+		$runtime = Task::createRuntime();
 		$channel = new Channel();
 		$task = Task::createInRuntime(
-			$runtime, function (Channel $ch) {
+			$runtime, static function (Channel $ch, ContainerInterface $container) {
+				Metric::setContainer($container);
 				$metric = Metric::instance();
 				while ($msg = $ch->recv()) {
 					if (!is_array($msg)) {
@@ -54,7 +90,7 @@ final class MetricThread {
 					[$method, $args] = $msg;
 					$metric->$method(...$args);
 				}
-			}, [$channel]
+			}, [$channel, static::$container]
 		);
 		return (new self($runtime, $channel, $task))->run();
 	}

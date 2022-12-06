@@ -78,8 +78,7 @@ final class Task {
 	 * @see static::createInRuntime()
 	 */
 	public static function create(Closure $fn, array $argv = []): static {
-		$autoload_file = __DIR__ . '/../../vendor/autoload.php';
-		return static::createInRuntime(new Runtime($autoload_file), $fn, $argv);
+		return static::createInRuntime(static::createRuntime(), $fn, $argv);
 	}
 
 	/**
@@ -91,8 +90,7 @@ final class Task {
 	 * @see static::create()
 	 */
 	public static function defer(Closure $fn, array $argv = []): static {
-		$autoload_file = __DIR__. '/../../vendor/autoload.php';
-		$Self = static::createInRuntime(new Runtime($autoload_file), $fn, $argv);
+		$Self = static::createInRuntime(static::createRuntime(), $fn, $argv);
 		$Self->isDeferred = true;
 		return $Self;
 	}
@@ -111,6 +109,15 @@ final class Task {
 		$task = new static([$fn, $argv]);
 		$task->runtime = $runtime;
 		return $task;
+	}
+
+	/**
+	 * Create application runtime with init and autoload injected
+	 *
+	 * @return Runtime
+	 */
+	public static function createRuntime(): Runtime {
+		return new Runtime(__DIR__. '/../../vendor/autoload.php');
 	}
 
 	/**

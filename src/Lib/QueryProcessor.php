@@ -55,6 +55,7 @@ class QueryProcessor {
 		}
 		$prefix = static::extractPrefixFromQuery($request->payload);
 		debug('Executor: ' . $prefix);
+		buddy_metric(camelcase_to_underscore($prefix), 1);
 		$requestClassName = static::NAMESPACE_PREFIX . "{$prefix}\\Request";
 		$commandRequest = $requestClassName::fromNetworkRequest($request);
 		debug("Command request: {$prefix}\\Request " . json_encode($commandRequest));

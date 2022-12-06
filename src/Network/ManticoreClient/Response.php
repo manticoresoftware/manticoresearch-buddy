@@ -56,6 +56,13 @@ class Response {
 	}
 
 	/**
+	 * @return array<mixed>
+	 */
+	public function getResult(): array {
+		return (array)json_decode($this->getBody(), true);
+	}
+
+	/**
 	 * @return bool
 	 */
 	public function hasError(): bool {

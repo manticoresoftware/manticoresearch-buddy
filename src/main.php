@@ -10,6 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Lib\CliArgsProcessor;
+use Manticoresearch\Buddy\Lib\MetricThread;
 use Manticoresearch\Buddy\Lib\TaskPool;
 use Manticoresearch\Buddy\Network\EventHandler;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
@@ -39,6 +40,12 @@ Server::create()
 			$taskCount = TaskPool::getCount();
 			debug("running {$taskCount} tasks");
 		}, 60
+	)
+	->addTicker(
+		function () {
+			debug('running metric snapshot');
+			MetricThread::instance()->execute('snapshot');
+		}, 300, 'server'
 	)
 	->addTicker(EventHandler::clientCheckTickerFn(), 5, 'server')
 	->start();

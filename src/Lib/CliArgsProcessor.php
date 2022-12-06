@@ -58,6 +58,8 @@ final class CliArgsProcessor {
 
 		if (isset($opts['disable-telemetry'])) {
 			putenv('TELEMETRY=0');
+		} else {
+			putenv('TELEMETRY=1');
 		}
 
 		if (isset($opts['debug'])) {

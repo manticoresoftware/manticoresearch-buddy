@@ -9,11 +9,12 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+use Manticoresearch\Buddy\Lib\MetricThread;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response;
 use Manticoresearch\Buddy\QueryParser\Loader;
-use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
 
 // Init autoload first
@@ -23,7 +24,7 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 	. 'autoload.php'
 ;
 // Build container dependencies
-$container = new Container();
+$container = new ContainerBuilder();
 $container->register('ManticoreResponseBuilder', Response::class);
 $container->register('QueryParserLoader', Loader::class);
 $container
@@ -32,5 +33,6 @@ $container
 	->addArgument('127.0.0.1:9308');
 
 QueryProcessor::setContainer($container);
+MetricThread::setContainer($container);
 
 return $container;

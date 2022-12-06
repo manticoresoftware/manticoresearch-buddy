@@ -22,11 +22,7 @@ use Manticoresearch\Buddy\Lib\MetricThread;
  * @return void
  */
 function buddy_metric(string $name, int|float $value) {
-	static $thread;
-	if (!isset($thread)) {
-		$thread = MetricThread::start();
-	}
-	$thread->execute('add', [$name, $value]);
+	MetricThread::instance()->execute('add', [$name, $value]);
 }
 
 /**
@@ -36,6 +32,28 @@ function buddy_metric(string $name, int|float $value) {
  */
 function buddy_version(): string {
 	return trim((string)file_get_contents(__DIR__ . '/../APP_VERSION'));
+}
+
+/**
+ * Single iteration implementation of camelcase to underscore
+ *
+ * @param string $string
+ * @return string
+ */
+function camelcase_to_underscore(string $string): string {
+	$result = '';
+	$prevHigh = false;
+	for ($i = 0, $max = strlen($string); $i < $max; $i++) {
+		$curHigh = $string[$i] >= 'A' && $string[$i] <= 'Z';
+		if ($result && !$prevHigh && $curHigh) {
+			$result .= '_';
+		}
+
+		$result .= $curHigh ? strtolower($string[$i]) : $string[$i];
+		$prevHigh = $curHigh;
+	}
+
+	return $result;
 }
 
 /**

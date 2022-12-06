@@ -51,7 +51,7 @@ class Executor implements CommandExecutorInterface {
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (Request $request, HTTPClient $manticoreClient, array $tasks): array {
+		$taskFn = static function (Request $request, HTTPClient $manticoreClient, array $tasks): array {
 			// First, get response from the manticore
 			$resp = $manticoreClient->sendRequest($request->query);
 			$result = static::formatResponse($resp->getBody());
@@ -61,6 +61,7 @@ class Executor implements CommandExecutorInterface {
 			$result[0]['total'] += sizeof($tasks);
 			return $result;
 		};
+
 		return Task::create(
 			$taskFn, [$this->request, $this->manticoreClient, static::getTasksToAppend()]
 		)->run();
