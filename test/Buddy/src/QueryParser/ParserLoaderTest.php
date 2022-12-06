@@ -11,20 +11,20 @@
 
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
-use Manticoresearch\Buddy\Lib\JSONInsertParser;
-use Manticoresearch\Buddy\Lib\QueryParserLoader;
-use Manticoresearch\Buddy\Lib\SQLInsertParser;
+use Manticoresearch\Buddy\QueryParser\JSONInsertParser;
+use Manticoresearch\Buddy\QueryParser\Loader;
+use Manticoresearch\Buddy\QueryParser\SQLInsertParser;
 use PHPUnit\Framework\TestCase;
 
 class ParserLoaderTest extends TestCase {
 
 	public function testParserLoader(): void {
 		echo "\nGetting SQLInsertParser instance\n";
-		$parser = QueryParserLoader::getInsertQueryParser(RequestFormat::SQL);
+		$parser = Loader::getInsertQueryParser(RequestFormat::SQL);
 		$this->assertInstanceOf(SQLInsertParser::class, $parser);
 		$this->assertInstanceOf(InsertQueryParserInterface::class, $parser);
 		echo "\nGetting JSONInsertParser instance\n";
-		$parser = QueryParserLoader::getInsertQueryParser(RequestFormat::JSON);
+		$parser = Loader::getInsertQueryParser(RequestFormat::JSON);
 		$this->assertInstanceOf(JSONInsertParser::class, $parser);
 	}
 

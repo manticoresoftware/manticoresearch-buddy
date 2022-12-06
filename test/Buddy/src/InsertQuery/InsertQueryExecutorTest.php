@@ -11,11 +11,11 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\InsertQueryExecutor;
-use Manticoresearch\Buddy\Lib\InsertQueryRequest;
-use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-use Manticoresearch\Buddy\Lib\ManticoreResponse;
-use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\InsertQuery\Executor;
+use Manticoresearch\Buddy\InsertQuery\Request;
+use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
+use Manticoresearch\Buddy\Network\ManticoreClient\Response as ManticoreResponse;
+use Manticoresearch\Buddy\Network\Request as NetRequest;
 use Manticoresearch\Buddy\Network\Response;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
@@ -29,15 +29,15 @@ class InsertQueryExecutorTest extends TestCase {
 	}
 
 	/**
-	 * @param Request $networkRequest
+	 * @param NetRequest $networkRequest
 	 * @param string $serverUrl
 	 * @param string $resp
 	 */
-	protected function runTask(Request $networkRequest, string $serverUrl, string $resp): void {
-		$request = InsertQueryRequest::fromNetworkRequest($networkRequest);
+	protected function runTask(NetRequest $networkRequest, string $serverUrl, string $resp): void {
+		$request = Request::fromNetworkRequest($networkRequest);
 
-		$manticoreClient = new ManticoreHTTPClient(new ManticoreResponse(), $serverUrl);
-		$executor = new InsertQueryExecutor($request);
+		$manticoreClient = new HTTPClient(new ManticoreResponse(), $serverUrl);
+		$executor = new Executor($request);
 		$executor->setManticoreClient($manticoreClient);
 		ob_flush();
 		$task = $executor->run();
@@ -53,7 +53,7 @@ class InsertQueryExecutorTest extends TestCase {
 		echo "\nTesting the execution of a task with INSERT query request\n";
 		$resp = '[{"total":1,"error":"","warning":""}]';
 		$mockServerUrl = self::setUpMockManticoreServer(false);
-		$request = Request::fromArray(
+		$request = NetRequest::fromArray(
 			[
 				'version' => 1,
 				'error' => "index 'test' absent, or does not support INSERT",

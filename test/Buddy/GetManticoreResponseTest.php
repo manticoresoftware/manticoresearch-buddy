@@ -10,8 +10,8 @@
  */
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Lib\ManticoreHTTPClient;
-use Manticoresearch\Buddy\Lib\ManticoreResponse;
+use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
+use Manticoresearch\Buddy\Network\ManticoreClient\Response;
 use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
 class GetManticoreResponseTest extends TestCase {
 
 	/**
-	 * @var ManticoreHTTPClient $httpClient
+	 * @var HTTPClient $httpClient
 	 */
 	private $httpClient;
 
@@ -32,7 +32,7 @@ class GetManticoreResponseTest extends TestCase {
 	 */
 	protected function setUpServer(bool $isInErrorMode): void {
 		$serverUrl = self::setUpMockManticoreServer($isInErrorMode);
-		$this->httpClient = new ManticoreHTTPClient(new ManticoreResponse(), $serverUrl);
+		$this->httpClient = new HTTPClient(new Response(), $serverUrl);
 	}
 
 	protected function tearDown(): void {
@@ -44,15 +44,15 @@ class GetManticoreResponseTest extends TestCase {
 		$this->setUpServer(false);
 
 		$query = 'CREATE TABLE IF NOT EXISTS test(col1 text)';
-		$mntResp = new ManticoreResponse(MockManticoreServer::CREATE_RESPONSE_OK);
+		$mntResp = new Response(MockManticoreServer::CREATE_RESPONSE_OK);
 		$this->assertEquals($mntResp, $this->httpClient->sendRequest($query));
 
 		$query = 'INSERT INTO test(col1) VALUES("test")';
-		$mntResp = new ManticoreResponse(MockManticoreServer::SQL_INSERT_RESPONSE_OK);
+		$mntResp = new Response(MockManticoreServer::SQL_INSERT_RESPONSE_OK);
 		$this->assertEquals($mntResp, $this->httpClient->sendRequest($query));
 
 		$query = 'SELECT * FROM @@system.sessions';
-		$mntResp = new ManticoreResponse(MockManticoreServer::SHOW_QUERIES_RESPONSE_OK);
+		$mntResp = new Response(MockManticoreServer::SHOW_QUERIES_RESPONSE_OK);
 		$this->assertEquals($mntResp, $this->httpClient->sendRequest($query));
 	}
 
@@ -61,11 +61,11 @@ class GetManticoreResponseTest extends TestCase {
 		$this->setUpServer(true);
 
 		$query = 'CREATE TABLE IF NOT EXISTS testcol1 text';
-		$mntResp = new ManticoreResponse(MockManticoreServer::CREATE_RESPONSE_FAIL);
+		$mntResp = new Response(MockManticoreServer::CREATE_RESPONSE_FAIL);
 		$this->assertEquals($mntResp, $this->httpClient->sendRequest($query));
 
 		$query = 'INSERT INTO test(col1) VALUES("test")';
-		$mntResp = new ManticoreResponse(MockManticoreServer::SQL_INSERT_RESPONSE_FAIL);
+		$mntResp = new Response(MockManticoreServer::SQL_INSERT_RESPONSE_FAIL);
 		$this->assertEquals($mntResp, $this->httpClient->sendRequest($query));
 
 		$query = 'SELECT connid AS ID FROM @@system.sessions';
@@ -78,7 +78,7 @@ class GetManticoreResponseTest extends TestCase {
 		echo "\nTesting Manticore success response to JSON request\n";
 		$this->setUpServer(false);
 		$query = '{"index":"test","id":1,"doc":{"col1" : 1}}';
-		$mntResp = new ManticoreResponse(MockManticoreServer::JSON_INSERT_RESPONSE_OK);
+		$mntResp = new Response(MockManticoreServer::JSON_INSERT_RESPONSE_OK);
 		$this->assertEquals($mntResp, $this->httpClient->sendRequest($query, ManticoreEndpoint::Insert));
 	}
 
@@ -86,7 +86,7 @@ class GetManticoreResponseTest extends TestCase {
 		echo "\nTesting Manticore fail response to JSON request\n";
 		$this->setUpServer(true);
 		$query = '{"index":"test","id":1,"doc":{"col1" : 1}}';
-		$mntResp = new ManticoreResponse(MockManticoreServer::JSON_INSERT_RESPONSE_FAIL);
+		$mntResp = new Response(MockManticoreServer::JSON_INSERT_RESPONSE_FAIL);
 		$this->assertEquals($mntResp, $this->httpClient->sendRequest($query, ManticoreEndpoint::Insert));
 	}
 }

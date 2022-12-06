@@ -9,13 +9,12 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\QueryParser;
 
 use Manticoresearch\Buddy\Enum\Datalim;
 use Manticoresearch\Buddy\Enum\Datatype;
 use Manticoresearch\Buddy\Exception\QueryParserError;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
-use Manticoresearch\Buddy\Lib\JSONParser;
 
 class JSONInsertParser extends JSONParser implements InsertQueryParserInterface {
 

@@ -9,15 +9,15 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Backup\Executor as BackupExecutor;
+use Manticoresearch\Buddy\Backup\Request as BackupRequest;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\Lib\BackupExecutor;
-use Manticoresearch\Buddy\Lib\BackupRequest;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
-use Manticoresearch\Buddy\Lib\ShowQueriesExecutor;
-use Manticoresearch\Buddy\Lib\ShowQueriesRequest;
 use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\ShowQueries\Executor as ShowQueriesExecutor;
+use Manticoresearch\Buddy\ShowQueries\Request as ShowQueriesRequest;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 

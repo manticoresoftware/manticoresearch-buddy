@@ -10,7 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Exception\ManticoreResponseError ;
-use Manticoresearch\Buddy\Lib\ManticoreResponse;
+use Manticoresearch\Buddy\Network\ManticoreClient\Response;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -19,12 +19,12 @@ class ManticoreResponseTest extends TestCase {
 	use TestProtectedTrait;
 
 	/**
-	 * @var ManticoreResponse
+	 * @var Response
 	 */
 	protected $response;
 
 	/**
-	 * @var ReflectionClass<ManticoreResponse> $refCls
+	 * @var ReflectionClass<Response> $refCls
 	 */
 	protected $refCls;
 
@@ -46,8 +46,8 @@ class ManticoreResponseTest extends TestCase {
 			. "\n"
 			. '"a": 3'
 			. "\n}\n]\n}\n]";
-		$this->response = new ManticoreResponse($responseBody);
-		$this->refCls = new \ReflectionClass(ManticoreResponse::class);
+		$this->response = new Response($responseBody);
+		$this->refCls = new \ReflectionClass(Response::class);
 	}
 
 	public function testManticoreResponseCreateOk():void {
@@ -63,7 +63,7 @@ class ManticoreResponseTest extends TestCase {
 		$data = [
 			['id' => 1, 'a' => 3],
 		];
-		$this->assertInstanceOf(ManticoreResponse::class, $this->response);
+		$this->assertInstanceOf(Response::class, $this->response);
 		$this->assertNull($this->refCls->getProperty('error')->getValue($this->response));
 		$this->assertEquals($data, $this->refCls->getProperty('data')->getValue($this->response));
 		$this->assertEquals($columns, $this->refCls->getProperty('columns')->getValue($this->response));
@@ -73,7 +73,7 @@ class ManticoreResponseTest extends TestCase {
 		echo "\nTesting the fail on the creation of Manticore response\n";
 		$this->expectException(ManticoreResponseError ::class);
 		$this->expectExceptionMessage('Manticore response error: Invalid JSON found');
-		new ManticoreResponse('{"some unvalid json"}');
+		new Response('{"some unvalid json"}');
 	}
 
 	public function testHasError(): void {
