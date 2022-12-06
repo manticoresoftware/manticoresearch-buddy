@@ -90,10 +90,12 @@ class HTTPClient {
 		// Hmm, This is strange, but $endpoint === ManticoreEndpoint::Sql is not working
 		$prefix = ($endpoint->name === 'Sql' ? 'query=' : '');
 		$fullReqUrl = "{$this->url}/{$endpoint->value}";
+		$buddyVersion = buddy_version();
 		$opts = [
 			'http' => [
 				'method'  => 'POST',
-				'header'  => 'Content-Type: application/x-www-form-urlencoded',
+				'header'  => "Content-Type: application/x-www-form-urlencoded\n"
+					. "User-Agent: Manticore Buddy/{$buddyVersion}",
 				'content' => $prefix . $request,
 				'timeout' => static::HTTP_REQUEST_TIMEOUT,
 			],

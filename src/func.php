@@ -29,6 +29,14 @@ function buddy_metric(string $name, int|float $value) {
 	$thread->execute('add', [$name, $value]);
 }
 
+/**
+ * Little helper to get current version of buddy
+ *
+ * @return string
+ */
+function buddy_version(): string {
+	return trim((string)file_get_contents(__DIR__ . '/../APP_VERSION'));
+}
 
 /**
  * This is helper to display debug info in debug mode
