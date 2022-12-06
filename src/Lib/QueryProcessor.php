@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Lib;
 
 use Exception;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
@@ -53,7 +54,7 @@ class QueryProcessor {
 		if (!static::$inited) {
 			static::init();
 		}
-		$prefix = static::extractPrefixFromQuery($request->payload);
+		$prefix = static::extractPrefixFromEndpointAndQuery($request->endpoint, $request->payload);
 		debug('Executor: ' . $prefix);
 		buddy_metric(camelcase_to_underscore($prefix), 1);
 		$requestClassName = static::NAMESPACE_PREFIX . "{$prefix}\\Request";
@@ -111,12 +112,17 @@ class QueryProcessor {
 	 * This method extracts all supported prefixes from input query
 	 * that buddy able to handle
 	 *
+	 * @param ManticoreEndpoint $endpoint
 	 * @param string $query
 	 * @return string
 	 */
-	public static function extractPrefixFromQuery(string $query): string {
+	public static function extractPrefixFromEndpointAndQuery(ManticoreEndpoint $endpoint, string $query): string {
 		$queryLowercase = strtolower($query);
 		return match (true) {
+			($endpoint === ManticoreEndpoint::Insert) => 'InsertQuery',
+			($endpoint === ManticoreEndpoint::Bulk
+				&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')
+			) => 'InsertQuery',
 			str_starts_with($queryLowercase, 'insert into') => 'InsertQuery',
 			str_starts_with($queryLowercase, 'show queries') => 'ShowQueries',
 			str_starts_with($queryLowercase, 'backup') => 'Backup',

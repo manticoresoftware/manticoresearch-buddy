@@ -44,7 +44,7 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 
 		$rows = $this->parseInsertRows($valExpr);
 		foreach ($rows as $row) {
-			self::checkUnescapedChars($row, QueryParserError::class);
+			//self::checkUnescapedChars($row, QueryParserError::class);
 			self::checkColTypesError(
 				[$this, 'detectValType'],
 				$this->parseInsertValues($row),
