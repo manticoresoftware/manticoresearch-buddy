@@ -54,7 +54,7 @@ class QueryProcessor {
 		if (!static::$inited) {
 			static::init();
 		}
-		$prefix = static::extractPrefixFromEndpointAndQuery($request->endpoint, $request->payload);
+		$prefix = static::extractPrefixFromRequest($request);
 		debug('Executor: ' . $prefix);
 		buddy_metric(camelcase_to_underscore($prefix), 1);
 		$requestClassName = static::NAMESPACE_PREFIX . "{$prefix}\\Request";
@@ -112,21 +112,24 @@ class QueryProcessor {
 	 * This method extracts all supported prefixes from input query
 	 * that buddy able to handle
 	 *
-	 * @param ManticoreEndpoint $endpoint
-	 * @param string $query
+	 * @param Request $request
 	 * @return string
 	 */
-	public static function extractPrefixFromEndpointAndQuery(ManticoreEndpoint $endpoint, string $query): string {
-		$queryLowercase = strtolower($query);
-		return match (true) {
-			($endpoint === ManticoreEndpoint::Insert) => 'InsertQuery',
-			($endpoint === ManticoreEndpoint::Bulk
+	public static function extractPrefixFromRequest(Request $request): string {
+		$queryLowercase = strtolower($request->payload);
+		$isInsertSQLQuery = in_array($request->endpoint, [ManticoreEndpoint::Sql, ManticoreEndpoint::Cli])
+			&& str_starts_with($queryLowercase, 'insert into');
+		$isInsertHTTPQuery = ($request->endpoint === ManticoreEndpoint::Insert)
+			|| ($request->endpoint === ManticoreEndpoint::Bulk
 				&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')
-			) => 'InsertQuery',
-			str_starts_with($queryLowercase, 'insert into') => 'InsertQuery',
+		);
+		$isInsertError = preg_match('/index (.*?) absent/', $request->error);
+		file_put_contents('/tmp/test.txt', "test $isInsertSQLQuery, $isInsertError\n", FILE_APPEND);
+		return match (true) {
+			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => 'InsertQuery',
 			str_starts_with($queryLowercase, 'show queries') => 'ShowQueries',
 			str_starts_with($queryLowercase, 'backup') => 'Backup',
-			default => throw new SQLQueryCommandNotSupported("Failed to handle query: $query"),
+			default => throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload"),
 		};
 	}
 }
