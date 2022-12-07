@@ -88,6 +88,9 @@ final class MetricThread {
 					}
 
 					[$method, $args] = $msg;
+					if ($method === 'exit') {
+						break;
+					}
 					$metric->$method(...$args);
 				}
 			}, [$channel, static::$container]
