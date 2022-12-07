@@ -28,9 +28,9 @@ class ExecutorTest extends TestCase {
 		$respBody = json_decode(
 			"[{\n"
 			. '"columns":[{"id":{"type":"long long"}},{"query":{"type":"string"}},'
-			. '{"proto":{"type":"string"}},{"host":{"type":"string"}}],'
+			. '{"protocol":{"type":"string"}},{"host":{"type":"string"}}],'
 			. "\n"
-			. '"data":[{"proto":"http","host":"127.0.0.1:584","id":19,"query":"select"}'
+			. '"data":[{"protocol":"http","host":"127.0.0.1:584","id":19,"query":"select"}'
 			. "\n],\n"
 			. '"total":1,'
 			. "\n"

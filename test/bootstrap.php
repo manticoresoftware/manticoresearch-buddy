@@ -21,4 +21,6 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 mkdir('/etc/manticore', 0755, true);
 touch('/etc/manticore/manticore.conf');
 putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
+// Disable telemetry because we do not need it in tests
+putenv('TELEMETRY=0');
 // phpcs:enable
