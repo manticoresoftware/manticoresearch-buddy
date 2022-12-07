@@ -23,6 +23,7 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 	. 'vendor' . DIRECTORY_SEPARATOR
 	. 'autoload.php'
 ;
+
 // Build container dependencies
 $container = new ContainerBuilder();
 $container->register('ManticoreResponseBuilder', Response::class);
@@ -34,5 +35,7 @@ $container
 
 QueryProcessor::setContainer($container);
 MetricThread::setContainer($container);
+
+buddy_metric('invocation', 1);
 
 return $container;
