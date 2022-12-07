@@ -30,7 +30,9 @@ jobs:
           name="${{ env.APP_NAME }}_${{ steps.vars.outputs.app_version }}-$( date +%y%m%d )-${GITHUB_SHA:0:7}"
           echo "$name"
           tar czf "$name.tar.gz" build/manticore-buddy
-          zip "$name.zip" build/manticore-buddy.phar
+          mkdir -p share/modules
+          cp build/manticore-buddy.phar share/modules/
+          zip -r "$name.zip" share
         shell: bash
       - uses: actions/upload-artifact@v3
         with:
