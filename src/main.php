@@ -25,7 +25,7 @@ $opts = CliArgsProcessor::run();
 /** @var HTTPClient $manticoreClient */
 $manticoreClient = $container->get('manticoreClient');
 $manticoreClient->setServerUrl($opts['listen']);
-Server::create()
+$server = Server::create()
 	->addHandler('request', EventHandler::request(...))
 	->addHandler('error', EventHandler::error(...))
 	->addTicker(
@@ -41,11 +41,15 @@ Server::create()
 			debug("running {$taskCount} tasks");
 		}, 60
 	)
-	->addTicker(
+	->addTicker(EventHandler::clientCheckTickerFn(), 5, 'server');
+
+if (is_telemetry_enabled()) {
+	$server->addTicker(
 		function () {
 			debug('running metric snapshot');
 			MetricThread::instance()->execute('snapshot');
 		}, 300, 'server'
-	)
-	->addTicker(EventHandler::clientCheckTickerFn(), 5, 'server')
-	->start();
+	);
+}
+
+$server->start();

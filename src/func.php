@@ -22,7 +22,20 @@ use Manticoresearch\Buddy\Lib\MetricThread;
  * @return void
  */
 function buddy_metric(string $name, int|float $value) {
+	// Do nothing when no telemetry enabled
+	if (!is_telemetry_enabled()) {
+		return;
+	}
 	MetricThread::instance()->execute('add', [$name, $value]);
+}
+
+/**
+ * Little helper to check if  we have telemetry enabled
+ *
+ * @return bool
+ */
+function is_telemetry_enabled(): bool {
+	return getenv('TELEMETRY', true) === '1';
 }
 
 /**
