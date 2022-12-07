@@ -50,6 +50,15 @@ if (is_telemetry_enabled()) {
 			MetricThread::instance()->execute('snapshot');
 		}, 300, 'server'
 	);
+
+	// We need to add shutdown function to kill thread in case errors
+	register_shutdown_function(
+		function () {
+			MetricThread::instance()->execute('exit');
+		}
+	);
+
+	buddy_metric('invocation', 1);
 }
 
 $server->start();

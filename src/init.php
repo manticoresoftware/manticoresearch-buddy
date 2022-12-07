@@ -36,6 +36,4 @@ $container
 QueryProcessor::setContainer($container);
 MetricThread::setContainer($container);
 
-buddy_metric('invocation', 1);
-
 return $container;
