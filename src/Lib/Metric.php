@@ -57,11 +57,7 @@ final class Metric {
 			return static::$instance;
 		}
 
-		$enabled = true;
-		// No telemetry enabled?
-		if (getenv('TELEMETRY', true) !== '1') {
-			$enabled = false;
-		}
+		$enabled = is_telemetry_enabled();
 		debug(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
 
 		// 1. Get versions
