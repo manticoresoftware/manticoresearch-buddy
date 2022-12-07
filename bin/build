@@ -39,6 +39,7 @@ $default_stub = $phar->createDefaultStub($opts['index']);
 $phar->buildFromDirectory('.', '/src\/.+$/');
 $phar->setStub($default_stub);
 $phar->addFile(BUILD_DIR . '/../PHP_VERSION', 'PHP_VERSION');
+$phar->addFile(BUILD_DIR . '/../APP_VERSION', 'APP_VERSION');
 // $phar['PHP_VERSION']->setMetadata(['mime-type' => 'text/plain']);
 
 // Now add all deps required by composer
