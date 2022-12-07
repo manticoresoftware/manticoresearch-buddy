@@ -23,7 +23,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %install
 mkdir -p $RPM_BUILD_ROOT
-cp -p usr/bin/manticore-buddy $RPM_BUILD_ROOT/
+cp -p usr/share/manticore/modules/manticore-buddy $RPM_BUILD_ROOT/
 
 %clean
 rm -rf $RPM_BUILD_ROOT
