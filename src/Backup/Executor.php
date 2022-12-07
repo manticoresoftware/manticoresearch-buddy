@@ -49,7 +49,7 @@ class Executor implements CommandExecutorInterface {
 					$request->path,
 					$request->options['compress'] ?? false
 				);
-				ManticoreBackup::store($client, $storage, $request->tables);
+				ManticoreBackup::run('store', [$client, $storage, $request->tables]);
 				// TODO: make standard response interface
 				return [[
 					'total' => 1,
@@ -64,7 +64,7 @@ class Executor implements CommandExecutorInterface {
 					],
 					'data' => [
 						[
-							'Path' => $storage->getBackupDir(),
+							'Path' => $storage->getBackupPaths()['root'],
 						],
 					],
 				],
