@@ -38,13 +38,14 @@ final class EventHandler {
 	 */
 	protected static function data(ServerRequestInterface $serverRequest, string $data): PromiseInterface {
 		$deferred = new Deferred;
+		$id = static::getRequestId($serverRequest);
+		debug("[$id] Request data: $data");
 		try {
-			debug("Request data: $data");
-			$request = Request::fromString($data);
+			$request = Request::fromString($data, $id);
 			$executor = QueryProcessor::process($request);
 			$task = $executor->run();
 		} catch (Throwable $e) {
-			debug("Data parse error: {$e->getMessage()}");
+			debug("[$id] Data parse error: {$e->getMessage()}");
 			return $deferred->resolve(Response::fromError($e, $request->format ?? RequestFormat::JSON));
 		}
 
@@ -71,7 +72,7 @@ final class EventHandler {
 				$ts = $now;
 				$taskId = $task->getId();
 				$taskStatus = $task->getStatus()->name;
-				debug("Task $taskId is $taskStatus");
+				debug("[$request->id] Task $taskId is $taskStatus");
 			}
 			if ($task->isRunning()) {
 				return;
@@ -123,18 +124,18 @@ final class EventHandler {
 	/**
 	 * Main handler for HTTP request that returns HttpResponse
 	 *
-	 * @param ServerRequestInterface $request
+	 * @param ServerRequestInterface $serverRequest
 	 * @return Promise
 	 */
-	public static function request(ServerRequestInterface $request): Promise {
+	public static function request(ServerRequestInterface $serverRequest): Promise {
 		return new Promise(
-			function (callable $resolve, callable $reject) use ($request) {
+			function (callable $resolve, callable $reject) use ($serverRequest) {
 				static $headers = ['Content-Type' => 'application/json'];
 
-				$data = (string)$request->getBody();
-				$promise = static::data($request, $data);
+				$data = (string)$serverRequest->getBody();
+				$promise = static::data($serverRequest, $data);
 				// Allow only post and otherwise send bad request
-				if ($request->getMethod() !== 'POST') {
+				if ($serverRequest->getMethod() !== 'POST') {
 					return $reject(
 						new HttpResponse(
 							400, $headers, (string)Response::none()
@@ -143,9 +144,10 @@ final class EventHandler {
 				}
 
 				$promise->then(
-					function (Response $response) use ($headers, $resolve) {
+					function (Response $response) use ($headers, $resolve, $serverRequest) {
 						$result = (string)$response;
-						debug("Response data: $result");
+						$id = static::getRequestId($serverRequest);
+						debug("[$id] Response data: $result");
 						return $resolve(new HttpResponse(200, $headers, $result));
 					}
 				);
@@ -173,5 +175,15 @@ final class EventHandler {
 		return function () {
 			return process_exists(get_parent_pid());
 		};
+	}
+
+	/**
+	 * Get identifier for current request from headers
+	 *
+	 * @param ServerRequestInterface $serverRequest
+	 * @return int
+	 */
+	protected static function getRequestId(ServerRequestInterface $serverRequest): int {
+		return (int)($serverRequest->getHeader('Request-ID')[0] ?? 0);
 	}
 }

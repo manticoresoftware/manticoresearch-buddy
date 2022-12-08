@@ -55,11 +55,11 @@ class QueryProcessor {
 			static::init();
 		}
 		$prefix = static::extractPrefixFromRequest($request);
-		debug('Executor: ' . $prefix);
+		debug("[$request->id] Executor: $prefix");
 		buddy_metric(camelcase_to_underscore($prefix), 1);
 		$requestClassName = static::NAMESPACE_PREFIX . "{$prefix}\\Request";
 		$commandRequest = $requestClassName::fromNetworkRequest($request);
-		debug("Command request: {$prefix}\\Request " . json_encode($commandRequest));
+		debug("[$request->id] Command request: {$prefix}\\Request " . json_encode($commandRequest));
 		$executorClassName = static::NAMESPACE_PREFIX . "{$prefix}\\Executor";
 		/** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
 		$executor = new $executorClassName($commandRequest);
