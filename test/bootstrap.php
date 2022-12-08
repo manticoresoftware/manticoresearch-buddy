@@ -18,7 +18,9 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 // Not the best way, but it's ok for now
 // phpcs:disable
 // we mock config file just to make tests pass because we do not test backup here
-mkdir('/etc/manticore', 0755, true);
+if (is_dir('/etc/manticore')) {
+	mkdir('/etc/manticore', 0755, true);
+}
 touch('/etc/manticore/manticore.conf');
 putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 // Disable telemetry because we do not need it in tests

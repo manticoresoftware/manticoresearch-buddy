@@ -24,6 +24,9 @@ final class Request {
 	];
 	const MESSAGE_FIELDS = ['path_query' => 'string', 'body' => 'string'];
 
+	/** @var int $id Request id from header Request-ID */
+	public int $id;
+
 	public ManticoreEndpoint $endpoint;
 	public RequestFormat $format;
 	public string $error;
@@ -40,10 +43,12 @@ final class Request {
 	 * Create request from string and validate that it's ok for us
 	 *
 	 * @param string $data
+	 * @param int $id
 	 * @return static
 	 */
-	public static function fromString(string $data): static {
+	public static function fromString(string $data, int $id = 0): static {
 		$self = new static;
+		$self->id = $id;
 		$self->parseOrFail(static::validateOrFail($data));
 		return $self;
 	}
@@ -53,10 +58,12 @@ final class Request {
 	 * It can be useful for tests
 	 *
 	 * @param array{error:string,payload:string,version:int,format:RequestFormat,endpoint:ManticoreEndpoint} $data
+	 * @param int $id
 	 * @return static
 	 */
-	public static function fromArray(array $data): static {
+	public static function fromArray(array $data, int $id = 0): static {
 		$self = new static;
+		$self->id = $id;
 		foreach ($data as $k => $v) {
 			$self->$k = $v;
 		}
@@ -67,10 +74,12 @@ final class Request {
 	 * This method is same as fromArray but applied to payload
 	 *
 	 * @param array{type:string,error:string,message:array{path_query:string,body:string},version:int} $payload
+	 * @param int $id
 	 * @return static
 	 */
-	public static function fromPayload(array $payload): static {
+	public static function fromPayload(array $payload, int $id = 0): static {
 		$self = new static;
+		$self->id = $id;
 		return $self->parseOrFail($payload);
 	}
 

@@ -65,8 +65,10 @@ class RequestTest extends TestCase {
 	public function testManticoreQueryValidationOk(): void {
 		$query = '{"error":"some error","type":"unknown json request",'
 			. '"message":{"path_query":"/cli","body":"some query"},"version":1}';
-		$request = Request::fromString($query);
+		$id = mt_rand(0, 1000000);
+		$request = Request::fromString($query, $id);
 		$this->assertInstanceOf(Request::class, $request);
+		$this->assertEquals($id, $request->id);
 	}
 
 	public function testManticoreQueryValidationFail(): void {
