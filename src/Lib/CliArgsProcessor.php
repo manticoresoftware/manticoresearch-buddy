@@ -49,8 +49,7 @@ final class CliArgsProcessor {
 	 */
 	public static function run(): array {
 		/** @var array{disable-telemetry?:bool,debug?:bool,help?:bool,listen:string} */
-		$opts = array_replace(getopt('', self::LONG_OPTS), self::DEFAULT_OPTS);
-
+		$opts = array_replace(self::DEFAULT_OPTS, getopt('', self::LONG_OPTS));
 		if (isset($opts['help'])) {
 			echo self::help();
 			exit(0);
