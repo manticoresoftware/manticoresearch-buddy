@@ -200,15 +200,20 @@ final class Metric {
 		/** @var array{array{Index:string,Type:String}} */
 		$tablesResult = static::sendManticoreRequest('SHOW TABLES');
 		// TODO: change Index -> Table
-		foreach ($tablesResult as ['Index' => $table, 'Type' => $type]) {
-			$tableTypeKey = "table_{$type}_count";
+		foreach ($tablesResult as ['Index' => $table, 'Type' => $tableType]) {
+			$tableTypeKey = "table_{$tableType}_count";
 			$metrics[$tableTypeKey] ??= 0;
 			$metrics[$tableTypeKey] += 1;
 
+			if ($tableType !== 'rt' && $tableType !== 'percolate') {
+				continue;
+			}
+
+			$suffix = $tableType === 'percolate' ? ' TABLE' : '';
 			/** @var array{array{Type:string,Properties:string}} */
-			$descResult = static::sendManticoreRequest("DESC $table");
-			foreach ($descResult as ['Type' => $type, 'Properties' => $properties]) {
-				$fieldTypeKey = "field_{$type}_count";
+			$descResult = static::sendManticoreRequest("DESC {$table}{$suffix}");
+			foreach ($descResult as ['Type' => $fieldType, 'Properties' => $properties]) {
+				$fieldTypeKey = "{$tableType}_field_{$fieldType}_count";
 				$metrics[$fieldTypeKey] ??= 0;
 				$metrics[$fieldTypeKey] += 1;
 
