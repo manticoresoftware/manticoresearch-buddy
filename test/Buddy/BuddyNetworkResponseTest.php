@@ -9,6 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Exception\BuddyError;
 use Manticoresearch\Buddy\Exception\BuddyRequestError;
 use Manticoresearch\Buddy\Network\Response;
 use PHPUnit\Framework\TestCase;
@@ -21,11 +22,14 @@ class BuddyNetworkResponseTest extends TestCase {
 			'version' => 1,
 			'type' => 'json response',
 			'message' => ['test message'],
-			'error' => 'test error',
+			'error' => 'simple error #1',
 		];
+		$err = 'simple error #1';
+		$error = BuddyError::from(new Exception('this error goes to log'), $err);
+		$this->assertEquals($err, $error->getResponseError());
 		$this->assertEquals(
 			json_encode($result),
-			(string)Response::fromMessageAndError($result['message'], new Exception($result['error']))
+			(string)Response::fromMessageAndError($result['message'], $error)
 		);
 	}
 
@@ -33,10 +37,12 @@ class BuddyNetworkResponseTest extends TestCase {
 		echo "\nTesting the fail on the building of Buddy response\n";
 
 		$msg = [chr(193)];
-		$err = 'test error';
-		$resp = (string)Response::fromMessageAndError($msg, new BuddyRequestError($err));
+		$err = 'client error #2';
+		$error = BuddyError::from(new BuddyRequestError('this error goes to log'), $err);
+		$this->assertEquals($err, $error->getResponseError());
+		$resp = (string)Response::fromMessageAndError($msg, $error);
 		$this->assertStringContainsString(
-			'"error":"Build request error: test error"',
+			'"error":"' . $error->getResponseError() . '"',
 			$resp
 		);
 	}

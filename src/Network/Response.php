@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Network;
 
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Throwable;
+use Manticoresearch\Buddy\Exception\BuddyError;
 
 final class Response {
 	/**
@@ -41,16 +41,16 @@ final class Response {
 
 	/**
 	 * @see static::fromStringAndError()
-	 * @param Throwable $error
+	 * @param BuddyError $error
 	 * @param RequestFormat $format
 	 * @return static
 	 */
-	public static function fromError(Throwable $error, RequestFormat $format = RequestFormat::JSON): static {
+	public static function fromError(BuddyError $error, RequestFormat $format = RequestFormat::JSON): static {
 		return static::fromMessageAndError(
 			[[
 				'total' => 0,
 				'warning' => '',
-				'error' => $error->getMessage(),
+				'error' => $error->getResponseError(),
 			],
 			], $error, $format
 		);
@@ -65,20 +65,20 @@ final class Response {
 
 	/**
 	 * @param array<mixed> $message
-	 * @param ?Throwable $error
+	 * @param ?BuddyError $error
 	 * @param RequestFormat $format
 	 * @return static
 	 */
 	public static function fromMessageAndError(
 		array $message = [],
-		?Throwable $error = null,
+		?BuddyError $error = null,
 		RequestFormat $format = RequestFormat::JSON
 	): static {
 		$payload = [
 			'version' => 1,
 			'type' => "{$format->value} response",
 			'message' => $message,
-			'error' => $error?->getMessage() ?? '',
+			'error' => $error?->getResponseError() ?? '',
 		];
 		return new static(
 			json_encode($payload, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_IGNORE)

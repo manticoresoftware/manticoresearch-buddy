@@ -18,7 +18,7 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 // Not the best way, but it's ok for now
 // phpcs:disable
 // we mock config file just to make tests pass because we do not test backup here
-if (is_dir('/etc/manticore')) {
+if (!is_dir('/etc/manticore')) {
 	mkdir('/etc/manticore', 0755, true);
 }
 touch('/etc/manticore/manticore.conf');

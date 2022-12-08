@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Network;
 
 use Exception;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Exception\BuddyError;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Lib\TaskPool;
 use Psr\Http\Message\ServerRequestInterface;
@@ -45,8 +46,19 @@ final class EventHandler {
 			$executor = QueryProcessor::process($request);
 			$task = $executor->run();
 		} catch (Throwable $e) {
+			/** @var string $originalError */
+			$originalError = match (true) {
+				isset($request) => $request->error,
+				default => ((array)json_decode($data, true))['error'] ?? '',
+			};
+
 			debug("[$id] Data parse error: {$e->getMessage()}");
-			return $deferred->resolve(Response::fromError($e, $request->format ?? RequestFormat::JSON));
+			return $deferred->resolve(
+				Response::fromError(
+					BuddyError::from($e, $originalError),
+					$request->format ?? RequestFormat::JSON
+				)
+			);
 		}
 
 		// Get extra properties to identified connectio and host
@@ -90,7 +102,12 @@ final class EventHandler {
 			}
 
 			if (!$task->isDeferred()) {
-				return $deferred->resolve(Response::fromError($task->getError(), $request->format));
+				return $deferred->resolve(
+					Response::fromError(
+						BuddyError::from($task->getError(), $request->error),
+						$request->format
+					)
+				);
 			}
 		};
 
