@@ -204,7 +204,7 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 			return Datatype::Int;
 		}
 		// json type
-		if (substr($val, 0, 1) === '{' && substr($val, -1) === '}') {
+		if (substr($val, 1, 1) === '{' && substr($val, -2, 1) === '}') {
 			return Datatype::Json;
 		}
 		// mva types

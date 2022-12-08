@@ -30,7 +30,7 @@ class SQLInsertParserTest extends TestCase {
 		$this->assertEquals(Datatype::Bigint, self::invokeMethod($parser, 'detectValType', [11111111111]));
 		$this->assertEquals(Datatype::Bigint, self::invokeMethod($parser, 'detectValType', ['11111111111']));
 		$this->assertEquals(Datatype::Int, self::invokeMethod($parser, 'detectValType', [1]));
-		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', ['{"a":1}']));
+		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', ['\'{"a":1}\'']));
 		$this->assertEquals(
 			Datatype::Multi64, self::invokeMethod($parser, 'detectValType', ['(1, 1111111111111)'])
 		);
@@ -90,8 +90,8 @@ class SQLInsertParserTest extends TestCase {
 		echo "\nTesting the parsing of SQL insert request\n";
 
 		$query = 'INSERT INTO test(col1,col2,col3,col4,col5,col6,col7) VALUES'
-			. "('m1@google.com', 1, 111, {'b':2}, (1,2), (1,11111111111), 'c'),"
-			. "('m2@google.com', 2, 222222222222, {'a': '(2,3)'}, (2,3,4,5), (222222222222), 'qqq')";
+			. "('m1@google.com', 1, 111, '{\"b\":2}', (1,2), (1,11111111111), 'c'),"
+			. "('m2@google.com', 2, 222222222222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222222222222), 'qqq')";
 		$res = [
 			'name' => 'test',
 			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7'],
@@ -101,8 +101,8 @@ class SQLInsertParserTest extends TestCase {
 
 		$parser = new SQLInsertParser();
 		$query = 'INSERT INTO test(col1,col2,col3,col4,col5, col6, col7) VALUES'
-			. "('m1@google.com', 1, 111111111111, {'b':2}, (1,2), (1,111), 'c'),"
-			. "('m2@google.com', 2, 222, {'a': '(2,3)'}, (2,3,4,5), (222), 'qqq')";
+			. "('m1@google.com', 1, 111111111111, '{\"b\":2}', (1,2), (1,111), 'c'),"
+			. "('m2@google.com', 2, 222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222), 'qqq')";
 		$res = [
 			'name' => 'test',
 			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7'],
@@ -112,8 +112,8 @@ class SQLInsertParserTest extends TestCase {
 
 		$parser = new SQLInsertParser();
 		$query = 'INSERT INTO test(col1,col2,col3,col4,col5, col6, col7) VALUES'
-			. "('m1@google.com', 1, 111111111111, {'b':2}, (1,2), (1,111), 'c'),"
-			. "('some text', 2, 222, {'a': '(2,3)'}, (2,3,4,5), (222), 'qqq')";
+			. "('m1@google.com', 1, 111111111111, '{\"b\":2}', (1,2), (1,111), 'c'),"
+			. "('some text', 2, 222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222), 'qqq')";
 		$res = [
 			'name' => 'test',
 			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7'],
