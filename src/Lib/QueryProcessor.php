@@ -124,7 +124,6 @@ class QueryProcessor {
 				&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')
 		);
 		$isInsertError = preg_match('/index (.*?) absent/', $request->error);
-		file_put_contents('/tmp/test.txt', "test $isInsertSQLQuery, $isInsertError\n", FILE_APPEND);
 		return match (true) {
 			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => 'InsertQuery',
 			str_starts_with($queryLowercase, 'show queries') => 'ShowQueries',

@@ -54,6 +54,19 @@ final class EventHandler {
 	}
 
 	/**
+	 * @return void
+	 */
+	public static function destroy(): void {
+		try {
+			foreach (static::$runtimes as $runtime) {
+				$runtime->kill();
+			}
+			static::$runtimes = [];
+		} catch (Throwable) {
+		}
+	}
+
+	/**
 	 * Process 'data' event on connecction
 	 *
 	 * @param ServerRequestInterface $serverRequest
@@ -229,14 +242,21 @@ final class EventHandler {
 	/**
 	 * Ticker to validate that client is alive or not
 	 *
+	 * @param int $pid Initiale parent pid
 	 * @return callable
 	 */
-	public static function clientCheckTickerFn(): callable {
-		return function () {
-			if (!process_exists(get_parent_pid())) {
-				debug('Parrent proccess died, exiting…');
-				exit(1);
+	public static function clientCheckTickerFn(int $pid): callable {
+		return function () use ($pid) {
+			$curPid = get_parent_pid();
+			if ($curPid === $pid && process_exists($pid)) {
+				return;
 			}
+
+			debug('Parrent proccess died, exiting…');
+			if (function_exists('posix_kill')) {
+				posix_kill((int)getmypid(), 1);
+			}
+			exit(0);
 		};
 	}
 
