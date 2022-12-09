@@ -56,6 +56,13 @@ final class MetricThread {
 		self::$container = $container;
 	}
 
+	/**
+	 * @return void
+	 */
+	public static function destroy(): void {
+		static::instance()->channel->close();
+		static::instance()->runtime->kill();
+	}
 
 	/**
 	 * Get single instance of the thread for metrics
@@ -86,15 +93,12 @@ final class MetricThread {
 					if (!is_array($msg)) {
 						throw new \Exception('Incorrect data received');
 					}
-
 					[$method, $args] = $msg;
-					if ($method === 'exit') {
-						break;
-					}
 					$metric->$method(...$args);
 				}
 			}, [$channel, static::$container]
 		);
+
 		return (new self($runtime, $channel, $task))->run();
 	}
 

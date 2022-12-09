@@ -45,7 +45,7 @@ $server = Server::create()
 			debug("running {$taskCount} tasks");
 		}, 60
 	)
-	->addTicker(EventHandler::clientCheckTickerFn(), 5, 'server');
+	->addTicker(EventHandler::clientCheckTickerFn(get_parent_pid()), 5, 'server');
 
 if (is_telemetry_enabled()) {
 	$server->addTicker(
@@ -54,15 +54,10 @@ if (is_telemetry_enabled()) {
 			MetricThread::instance()->execute('snapshot');
 		}, 300, 'server'
 	);
-
-	// We need to add shutdown function to kill thread in case errors
-	register_shutdown_function(
-		function () {
-			MetricThread::instance()->execute('exit');
-		}
-	);
-
-	buddy_metric('invocation', 1);
+	register_shutdown_function(MetricThread::destroy(...));
 }
+
+// Shutdown functions MUST be registered here only
+register_shutdown_function(EventHandler::destroy(...));
 
 $server->start();
