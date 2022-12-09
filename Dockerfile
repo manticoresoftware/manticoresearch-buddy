@@ -3,6 +3,7 @@ FROM manticoresearch/manticore-executor:0.4.1-dev
 ARG TARGET_ARCH=amd64
 ENV MANTICORE_VERSION=5.0.3-221208-207f66c72
 RUN apt-get -y update && apt-get -y upgrade && \
+  apt-get -y install figlet && \
   curl -sSL  http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb > libssl.deb && \
   dpkg -i libssl.deb && rm -f libssl.deb && \
   curl -sSL https://repo.manticoresearch.com/repository/manticoresearch_buster_dev/dists/manticore_${MANTICORE_VERSION}_${TARGET_ARCH}.tgz | tar -xzf - && \
