@@ -12,10 +12,11 @@
 namespace Manticoresearch\Buddy\Interface;
 
 use Manticoresearch\Buddy\Lib\Task;
+use parallel\Runtime;
 
 interface CommandExecutorInterface {
 	/** @return Task */
-	public function run(): Task;
+	public function run(Runtime $runtime): Task;
 
 	/** @return array<string> */
 	public function getProps(): array;

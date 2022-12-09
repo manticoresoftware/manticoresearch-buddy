@@ -15,6 +15,7 @@ use Exception;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\BuddyError;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Lib\TaskPool;
 use Psr\Http\Message\ServerRequestInterface;
 use React\EventLoop\Loop;
@@ -24,12 +25,34 @@ use React\Promise\Deferred;
 use React\Promise\Promise;
 use React\Promise\PromiseInterface;
 use Throwable;
+use parallel\Runtime;
 
 /**
  * This is the main class that contains all handlers
  * for work with connection initiated by React framework
  */
 final class EventHandler {
+	/** @var array<Runtime> */
+	public static array $runtimes = [];
+
+	/** @var int */
+	public static int $maxRuntimeIndex;
+
+	/**
+	 * This fucntion must be called before using any request processing to initizalize runtimes for threading
+	 *
+	 * @return void
+	 */
+	public static function init(): void {
+		static::$runtimes = [
+			Task::createRuntime(),
+			Task::createRuntime(),
+			Task::createRuntime(),
+			Task::createRuntime(),
+		];
+		static::$maxRuntimeIndex = 3;
+	}
+
 	/**
 	 * Process 'data' event on connecction
 	 *
@@ -44,7 +67,7 @@ final class EventHandler {
 		try {
 			$request = Request::fromString($data, $id);
 			$executor = QueryProcessor::process($request);
-			$task = $executor->run();
+			$task = $executor->run(static::$runtimes[mt_rand(0, static::$maxRuntimeIndex)]);
 		} catch (Throwable $e) {
 			/** @var string $originalError */
 			$originalError = match (true) {
@@ -183,8 +206,8 @@ final class EventHandler {
 						$result = (string)$response;
 						$id = static::getRequestId($serverRequest);
 						debug("[$id] response data: $result");
-						$time = (int)((microtime(true) - $request->time) * 1000);
-						debug("[$id] process time: {$time}ms");
+						$time = (int)((microtime(true) - $request->time) * 1000000);
+						debug("[$id] process time: {$time}µs");
 						return $resolve(new HttpResponse(200, $headers, $result));
 					}
 				);

@@ -11,6 +11,7 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
@@ -56,7 +57,7 @@ class ExecutorTest extends TestCase {
 		$executor = new Executor($request);
 		$refCls = new ReflectionClass($executor);
 		$refCls->getProperty('manticoreClient')->setValue($executor, $manticoreClient);
-		$task = $executor->run();
+		$task = $executor->run(Task::createRuntime());
 		$task->wait();
 		$this->assertEquals(true, $task->isSucceed());
 		$result = $task->getResult();

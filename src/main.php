@@ -25,6 +25,10 @@ $opts = CliArgsProcessor::run();
 /** @var HTTPClient $manticoreClient */
 $manticoreClient = $container->get('manticoreClient');
 $manticoreClient->setServerUrl($opts['listen']);
+
+// Initialize runtimes that we will use for request handling
+EventHandler::init();
+
 $server = Server::create()
 	->addHandler('request', EventHandler::request(...))
 	->addHandler('error', EventHandler::error(...))
