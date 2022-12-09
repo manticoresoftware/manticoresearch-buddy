@@ -96,7 +96,8 @@ class HTTPClient {
 			'http' => [
 				'method'  => 'POST',
 				'header'  => "Content-Type: application/x-www-form-urlencoded\n"
-					. "User-Agent: Manticore Buddy/{$buddyVersion}",
+					. "User-Agent: Manticore Buddy/{$buddyVersion}\n"
+					. "Connection: close\n",
 				'content' => $prefix . $request,
 				'timeout' => static::HTTP_REQUEST_TIMEOUT,
 			],
