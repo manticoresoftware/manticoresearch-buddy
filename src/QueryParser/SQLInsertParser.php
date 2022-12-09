@@ -179,7 +179,7 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 			$isBlockRestored = false;
 			foreach (array_keys($this->blocksReplaced) as $replaced) {
 				foreach (array_keys($this->insertVals) as $valInd) {
-					$isBlockRestored = $this->restoreSingleCommaBlock($replaced, $valInd);
+					$isBlockRestored = $isBlockRestored || $this->restoreSingleCommaBlock($replaced, $valInd);
 				}
 			}
 		} while ($isBlockRestored);
