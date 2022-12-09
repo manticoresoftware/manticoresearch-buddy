@@ -53,12 +53,13 @@ final class EventHandler {
 			};
 
 			debug("[$id] Data parse error: {$e->getMessage()}");
-			return $deferred->resolve(
+			$deferred->resolve(
 				Response::fromError(
 					BuddyError::from($e, $originalError),
 					$request->format ?? RequestFormat::JSON
 				)
 			);
+			return $deferred->promise();
 		}
 
 		// Get extra properties to identified connectio and host
