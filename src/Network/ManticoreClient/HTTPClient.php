@@ -80,6 +80,7 @@ class HTTPClient {
 	 * @return Response
 	 */
 	public function sendRequest(string $request, ManticoreEndpoint $endpoint = null): Response {
+		$t = microtime(true);
 		if (!isset($this->responseBuilder)) {
 			throw new RuntimeException("'responseBuilder' property of ManticoreHTTPClient class is not instantiated");
 		}
@@ -113,7 +114,10 @@ class HTTPClient {
 			}
 		}
 
-		return $this->responseBuilder->fromBody($this->response);
+		$result = $this->responseBuilder->fromBody($this->response);
+		$time = (int)((microtime(true) - $t) * 1000000);
+		debug("[{$time}µs] manticore request: $request");
+		return $result;
 	}
 
 	/**
