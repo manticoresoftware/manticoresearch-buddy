@@ -120,7 +120,7 @@ final class Server {
 
 		$this->socket->on(
 			'connection', function (ConnectionInterface $connection) {
-				echo 'New connection from ' . $connection->getRemoteAddress() . PHP_EOL;
+				debug('New connection from ' . $connection->getRemoteAddress());
 
 				// First add all ticks to run periodically
 				foreach ($this->ticks['client'] as [$fn, $period]) {
