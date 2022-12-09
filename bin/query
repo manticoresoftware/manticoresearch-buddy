@@ -20,6 +20,7 @@ include_once __DIR__ . '/src/init.php';
 
 use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\Lib\Task;
 echo 'Running query: $query' . PHP_EOL. PHP_EOL;
 try {
   \$request = Request::fromPayload([
@@ -31,7 +32,7 @@ try {
       'body' => '$query',
     ]
   ]);
-  \$task = QueryProcessor::process(\$request)->run();
+  \$task = QueryProcessor::process(\$request)->run(Task::createRuntime());
   \$status = \$task->wait(true);
   printf('Status code: %s' . PHP_EOL, \$status->name);
   printf('Result: %s' . PHP_EOL, str_replace('    ', '  ', json_encode(\$task->getResult(), JSON_PRETTY_PRINT)));

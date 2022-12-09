@@ -17,6 +17,7 @@ use Manticoresearch\Backup\Lib\ManticoreClient;
 use Manticoresearch\Backup\Lib\ManticoreConfig;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Lib\Task;
+use parallel\Runtime;
 
 /**
  * This is the class to handle BACKUP ... SQL command
@@ -34,14 +35,17 @@ class Executor implements CommandExecutorInterface {
   /**
    * Process the request and return self for chaining
    *
+	 * @param Runtime $runtime
    * @return Task
    */
-	public function run(): Task {
+	public function run(Runtime $runtime): Task {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$isAsync = $this->request->options['async'] ?? false;
-		$method = $isAsync ? 'defer' : 'create';
+		$method = $isAsync ? 'deferInRuntime' : 'createInRuntime';
+
 		$Task = Task::$method(
+			$runtime,
 			static function (Request $request): array {
 				$config = new ManticoreConfig($request->configPath);
 				$client = new ManticoreClient($config);
@@ -69,7 +73,8 @@ class Executor implements CommandExecutorInterface {
 					],
 				],
 				];
-			}, [$this->request]
+			},
+			[$this->request]
 		);
 
 		return $Task->run();

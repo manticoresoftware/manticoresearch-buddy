@@ -13,6 +13,7 @@ use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\InsertQuery\Executor;
 use Manticoresearch\Buddy\InsertQuery\Request;
+use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response as ManticoreResponse;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
@@ -40,7 +41,8 @@ class InsertQueryExecutorTest extends TestCase {
 		$executor = new Executor($request);
 		$executor->setManticoreClient($manticoreClient);
 		ob_flush();
-		$task = $executor->run();
+		$runtime = Task::createRuntime();
+		$task = $executor->run($runtime);
 		$task->wait();
 
 		$this->assertEquals(true, $task->isSucceed());

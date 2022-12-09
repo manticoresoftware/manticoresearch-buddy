@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Lib\TaskPool;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
+use parallel\Runtime;
 
 /**
  * This is the parent class to handle erroneous Manticore queries
@@ -46,7 +47,7 @@ class Executor implements CommandExecutorInterface {
 	 * @return Task
 	 * @throws RuntimeException
 	 */
-	public function run(): Task {
+	public function run(Runtime $runtime): Task {
 		$this->manticoreClient->setEndpoint($this->request->endpoint);
 
 		// We run in a thread anyway but in case if we need blocking
@@ -62,8 +63,8 @@ class Executor implements CommandExecutorInterface {
 			return $result;
 		};
 
-		return Task::create(
-			$taskFn, [$this->request, $this->manticoreClient, static::getTasksToAppend()]
+		return Task::createInRuntime(
+			$runtime, $taskFn, [$this->request, $this->manticoreClient, static::getTasksToAppend()]
 		)->run();
 	}
 

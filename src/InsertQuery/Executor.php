@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
+use parallel\Runtime;
 
 /**
  * This is the parent class to handle erroneous Manticore queries
@@ -36,10 +37,11 @@ class Executor implements CommandExecutorInterface {
 	/**
 	 * Process the request and return self for chaining
 	 *
+	 * @param Runtime $runtime
 	 * @return Task
 	 * @throws RuntimeException
 	 */
-	public function run(): Task {
+	public function run(Runtime $runtime): Task {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = function (Request $request, HTTPClient $manticoreClient): array {
@@ -60,8 +62,8 @@ class Executor implements CommandExecutorInterface {
 
 			return (array)json_decode($resp->getBody(), true);
 		};
-		return Task::create(
-			$taskFn, [$this->request, $this->manticoreClient]
+		return Task::createInRuntime(
+			$runtime, $taskFn, [$this->request, $this->manticoreClient]
 		)->run();
 	}
 

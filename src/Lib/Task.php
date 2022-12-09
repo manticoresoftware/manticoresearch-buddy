@@ -112,6 +112,22 @@ final class Task {
 	}
 
 	/**
+	 * Defer in specified runtime
+	 *
+	 * @param Runtime $runtime
+	 * @param Closure $fn
+	 *  The closure should be catch all exception and work properly withou failure
+	 *  Otherwise the all loop will be stopped
+	 * @param mixed[] $argv
+	 * @return static
+	 */
+	public static function deferInRuntime(Runtime $runtime, Closure $fn, array $argv = []): static {
+		$task = static::createInRuntime($runtime, $fn, $argv);
+		$task->isDeferred = true;
+		return $task;
+	}
+
+	/**
 	 * Create application runtime with init and autoload injected
 	 *
 	 * @return Runtime
