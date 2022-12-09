@@ -40,7 +40,7 @@ final class EventHandler {
 	protected static function data(ServerRequestInterface $serverRequest, string $data): PromiseInterface {
 		$deferred = new Deferred;
 		$id = static::getRequestId($serverRequest);
-		debug("[$id] Request data: $data");
+		debug("[$id] request data: $data");
 		try {
 			$request = Request::fromString($data, $id);
 			$executor = QueryProcessor::process($request);
@@ -52,12 +52,15 @@ final class EventHandler {
 				default => ((array)json_decode($data, true))['error'] ?? '',
 			};
 
-			debug("[$id] Data parse error: {$e->getMessage()}");
+			debug("[$id] data parse error: {$e->getMessage()}");
 			$deferred->resolve(
-				Response::fromError(
-					BuddyError::from($e, $originalError),
-					$request->format ?? RequestFormat::JSON
-				)
+				[
+					$request ?? Request::default(),
+					Response::fromError(
+						BuddyError::from($e, $originalError),
+						$request->format ?? RequestFormat::JSON
+					),
+				]
 			);
 			return $deferred->promise();
 		}
@@ -98,16 +101,19 @@ final class EventHandler {
 				/** @var array<mixed> */
 				$result = $task->getResult();
 				if (!$task->isDeferred()) {
-					return $deferred->resolve(Response::fromMessage($result, $request->format));
+					return $deferred->resolve([$request, Response::fromMessage($result, $request->format)]);
 				}
 			}
 
 			if (!$task->isDeferred()) {
 				return $deferred->resolve(
-					Response::fromError(
-						BuddyError::from($task->getError(), $request->error),
-						$request->format
-					)
+					[
+						$request,
+						Response::fromError(
+							BuddyError::from($task->getError(), $request->error),
+							$request->format
+						),
+					]
 				);
 			}
 		};
@@ -133,7 +139,12 @@ final class EventHandler {
 				],
 			],
 			];
-			$deferred->resolve(Response::fromMessage($response, $request->format));
+			$deferred->resolve(
+				[
+					$request,
+					Response::fromMessage($response, $request->format),
+				]
+			);
 		}
 
 		return $deferred->promise();
@@ -162,10 +173,14 @@ final class EventHandler {
 				}
 
 				$promise->then(
-					function (Response $response) use ($headers, $resolve, $serverRequest) {
+					/** @param array{0:Request,1:Response} $payload */
+					function (array $payload) use ($headers, $resolve, $serverRequest) {
+						[$request, $response] = $payload;
 						$result = (string)$response;
 						$id = static::getRequestId($serverRequest);
-						debug("[$id] Response data: $result");
+						debug("[$id] response data: $result");
+						$time = (int)((microtime(true) - $request->time) * 1000);
+						debug("[$id] process time: {$time}ms");
 						return $resolve(new HttpResponse(200, $headers, $result));
 					}
 				);
@@ -191,7 +206,10 @@ final class EventHandler {
 	 */
 	public static function clientCheckTickerFn(): callable {
 		return function () {
-			return process_exists(get_parent_pid());
+			if (!process_exists(get_parent_pid())) {
+				debug('Parrent proccess died, exiting…');
+				exit(1);
+			}
 		};
 	}
 

@@ -26,6 +26,7 @@ final class Request {
 
 	/** @var int $id Request id from header Request-ID */
 	public int $id;
+	public float $time;
 
 	public ManticoreEndpoint $endpoint;
 	public RequestFormat $format;
@@ -40,6 +41,24 @@ final class Request {
 	}
 
 	/**
+	 * Create default filled request
+	 *
+	 * @param int $id
+	 * @return static
+	 */
+	public static function default(int $id = 0): static {
+		$self = new static;
+		$self->id = $id;
+		$self->time = microtime(true);
+		$self->endpoint = ManticoreEndpoint::Cli;
+		$self->format = RequestFormat::JSON;
+		$self->error = '';
+		$self->payload = '{}';
+		$self->version = 1;
+		return $self;
+	}
+
+	/**
 	 * Create request from string and validate that it's ok for us
 	 *
 	 * @param string $data
@@ -49,6 +68,7 @@ final class Request {
 	public static function fromString(string $data, int $id = 0): static {
 		$self = new static;
 		$self->id = $id;
+		$self->time = microtime(true);
 		$self->parseOrFail(static::validateOrFail($data));
 		return $self;
 	}
@@ -64,6 +84,7 @@ final class Request {
 	public static function fromArray(array $data, int $id = 0): static {
 		$self = new static;
 		$self->id = $id;
+		$self->time = microtime(true);
 		foreach ($data as $k => $v) {
 			$self->$k = $v;
 		}
@@ -80,6 +101,7 @@ final class Request {
 	public static function fromPayload(array $payload, int $id = 0): static {
 		$self = new static;
 		$self->id = $id;
+		$self->time = microtime(true);
 		return $self->parseOrFail($payload);
 	}
 
