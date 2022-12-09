@@ -65,6 +65,9 @@ final class CliArgsProcessor {
 			putenv('DEBUG=1');
 		}
 
+		if (str_starts_with($opts['listen'], 'http://0.0.0.0')) {
+			$opts['listen'] = 'http://127.0.0.1' . substr($opts['listen'], 14);
+		}
 		putenv("LISTEN={$opts['listen']}");
 		return $opts;
 	}
