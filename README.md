@@ -53,7 +53,9 @@ To run a Buddy instance from CLI, use the following command:
   Usage: manticore-executor src/main.php [ARGUMENTS]
 
   Arguments are:
+  --listen             HTTP endpoint to send requestes to manticore
   --help               display this help message
+  --version            display the current version of buddy
   --disable-telemetry  disables telemetry for Buddy
   --debug              enable debug mode for testing
   Examples:
