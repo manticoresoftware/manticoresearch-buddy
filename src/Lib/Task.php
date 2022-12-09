@@ -165,9 +165,10 @@ final class Task {
 	 * @throws Throwable
 	 */
 	public function wait(bool $exceptionOnError = false): TaskStatus {
+		$i = 0;
 		while ($this->status === TaskStatus::Running) {
 			$this->checkStatus();
-			usleep(500000);
+			usleep(5 + (int)log(++$i));
 		}
 
 		if ($exceptionOnError && !$this->isSucceed()) {

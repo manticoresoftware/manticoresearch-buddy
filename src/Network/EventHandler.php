@@ -77,7 +77,7 @@ final class EventHandler {
 
 		// We always add periodic timer, just because we keep tracking deferred tasks
 		// to show it in case of show queries
-		$tickFn = static function (TimerInterface $timer) use ($request, $task, $deferred) {
+		$tickFn = static function (?TimerInterface $timer = null) use ($request, $task, $deferred) {
 			static $ts;
 			if (!isset($ts)) {
 				$ts = time();
@@ -93,10 +93,13 @@ final class EventHandler {
 			if ($task->isRunning()) {
 				return;
 			}
+
 			// task is finished, we can remove it from the pool
 			TaskPool::remove($task);
 
-			Loop::cancelTimer($timer);
+			if ($timer) {
+				Loop::cancelTimer($timer);
+			}
 			if ($task->isSucceed()) {
 				/** @var array<mixed> */
 				$result = $task->getResult();
@@ -118,13 +121,11 @@ final class EventHandler {
 			}
 		};
 
-		// Run tick function and add timer only when task is still running or deferred
-		$tickFn(Loop::addPeriodicTimer(0.005, $tickFn));
-
 		// In case we work with deferred task we
 		// should return response to the client without waiting
 		// for results of it
 		if ($task->isDeferred()) {
+			$tickFn(Loop::addPeriodicTimer(0.001, $tickFn));
 			// TODO: extract it somewhere for better code
 			$response = [[
 				'columns' => [
@@ -145,6 +146,9 @@ final class EventHandler {
 					Response::fromMessage($response, $request->format),
 				]
 			);
+		} else {
+			$task->wait();
+			$tickFn();
 		}
 
 		return $deferred->promise();
