@@ -6,10 +6,11 @@ Group: Applications
 License: GPLv2
 Packager: {{ MAINTAINER }}
 Vendor: {{ MAINTAINER }}
+Requires: {{ LIBCURL_NAME }} >= {{ LIBCURL_VERSION }}
 
 Source: tmp.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
-BuildArch: {{ ARCH }}
+BuildArch: noarch
 
 %description
 {{ DESC }}

@@ -12,6 +12,8 @@ env:
   PHP_VERSION: '8.1.11'
   MAINTAINER: 'Manticore'
   DESC: 'Manticore Buddy'
+  LIBCURL_NAME: 'libcurl'
+  LIBCURL_VERSION: '7.29.0'
 
 jobs:
   build-artifact:
@@ -57,154 +59,99 @@ jobs:
           cp -p ./build/manticore-buddy .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}
           cp -p ./build/manticore-buddy .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}
       - uses: manticoresoftware/actions-build-deb-action@master
+        name: Build DEB packages
         with:
           package: ${{ env.APP_NAME }}
           package_root: .debpkg
           maintainer: ${{ env.MAINTAINER }}
           version: ${{ steps.vars.outputs.app_version }}
-          arch: 'amd64'
+          arch: 'all'
           desc: '${{ env.DESC }}'
+          depends: '${{ env.LIBCURL_NAME }}4 (>= ${{ env.LIBCURL_VERSION}})'
 
-      - uses: manticoresoftware/actions-build-rpm-action@master
-        with:
-          summary: '${{ env.DESC }}'
-          package: ${{ env.APP_NAME }}
-          package_root: .rpmpkg
-          maintainer: ${{ env.MAINTAINER }}
-          version: v${{ steps.vars.outputs.app_version }}
-          arch: 'x86_64'
-          desc: '${{ env.DESC }}'
+      - name: Build RPM packages
+        run: |
+          sudo apt-get update -y -q
+          sudo apt-get install -y rpm
+
+          RPMBUILD_DIR="$HOME/rpmbuild"
+          RPMBUILD_SOURCE_DIR="$RPMBUILD_DIR/SOURCES"
+          RPMBUILD_SPEC_DIR="$RPMBUILD_DIR/SPECS"
+          mkdir -p .rpmpkg/usr/bin
+
+          WORKDIR="/tmp/work"
+          mkdir "$WORKDIR"
+          spec_file=rpm.spec
+          cp "packages/$spec_file" "$WORKDIR"
+          cp -rp ".rpmpkg" "$WORKDIR/${{ env.APP_NAME }}"
+          cd "$WORKDIR"
+
+          # Prepare spec file for RPM
+          sed -i 's/{{ NAME }}/${{ env.APP_NAME }}/g' $spec_file
+          sed -i 's/{{ VERSION }}/v${{ steps.vars.outputs.app_version }}/g' $spec_file
+          sed -i 's/{{ MAINTAINER }}/${{ env.MAINTAINER }}/g' $spec_file
+          sed -i 's/{{ DESC }}/${{ env.DESC }}/g' $spec_file
+          sed -i 's/{{ LIBCURL_NAME }}/${{ env.LIBCURL_NAME }}/g' $spec_file
+          sed -i 's/{{ LIBCURL_VERSION }}/v${{ env.LIBCURL_VERSION }}/g' $spec_file
+
+          tar czf tmp.tar.gz "${{ env.APP_NAME }}/"
+          mkdir -p "$RPMBUILD_SOURCE_DIR"
+          mkdir -p "$RPMBUILD_SPEC_DIR"
+          mv tmp.tar.gz "$RPMBUILD_SOURCE_DIR"
+          cp -p $spec_file "$RPMBUILD_SPEC_DIR"
+          rpmbuild -bb "$RPMBUILD_SPEC_DIR/$spec_file"
+          ls -lah "$RPMBUILD_DIR/RPMS/noarch"/*.rpm
+          cp -p "$RPMBUILD_DIR/RPMS/noarch"/*.rpm $GITHUB_WORKSPACE
 
       - name: Rename packages to proper name
         run: |
           ls -la ./*.rpm
           version=${{ steps.vars.outputs.app_version }}
-          rpm_path="./${{ env.APP_NAME }}-${version}-1.el7.x86_64.rpm"
+          rpm_path="./${{ env.APP_NAME }}-v${version}-1.noarch.rpm"
           rpm_suffix=$( date +%y%m%d ).${GITHUB_SHA:0:7}
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el7.x86_64.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el8.x86_64.rpm"
-          mv $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el9.x86_64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el7.x86_64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el7.aarch64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el8.x86_64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el8.aarch64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el9.x86_64.rpm"
+          mv $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el9.aarch64.rpm"
 
           ls -la ./*.deb
-          deb_path="./${{ env.APP_NAME }}_${version}_amd64.deb"
-          mv "$deb_path" ./${{ env.APP_NAME }}_${version}-$( date +%y%m%d )-${GITHUB_SHA:0:7}_amd64.deb
+          deb_path="./${{ env.APP_NAME }}_${version}_all.deb"
+          cp "$deb_path" ./${{ env.APP_NAME }}_${version}-$( date +%y%m%d )-${GITHUB_SHA:0:7}_amd64.deb
+          mv "$deb_path" ./${{ env.APP_NAME }}_${version}-$( date +%y%m%d )-${GITHUB_SHA:0:7}_arm64.deb
 
       - uses: actions/upload-artifact@v3
         with:
           name: artifact-deb-amd64
           path: |
-            ./*.deb
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: artifact-rpm-amd64
-          path: |
-            ./*.rpm
-            !./*-debuginfo-*.rpm
-
-  build-linux-packages-arm64:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build binary
-        run: ./bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"
-
-      - id: vars
-        run: |
-          echo "::set-output name=app_version::$(<APP_VERSION)"
-
-      - name: Prepare package
-        run: |
-          mkdir -p .debpkg/usr/share/manticore/modules
-          mkdir -p .rpmpkg/usr/share/manticore/modules
-          cp -p ./build/manticore-buddy .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}
-          cp -p ./build/manticore-buddy .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}
-
-      - uses: manticoresoftware/actions-build-deb-action@master
-        with:
-          package: ${{ env.APP_NAME }}
-          package_root: .debpkg
-          maintainer: ${{ env.MAINTAINER }}
-          version: v${{ steps.vars.outputs.app_version }}
-          arch: 'arm64'
-          desc: '${{ env.DESC }}'
-
-      - name: Rename package to proper name
-        run: |
-          ls -la ./*.deb
-          version=${{ steps.vars.outputs.app_version }}
-          deb_path="./${{ env.APP_NAME }}_${version}_arm64.deb"
-          mv "$deb_path" ./${{ env.APP_NAME }}_${version}-$( date +%y%m%d )-${GITHUB_SHA:0:7}_arm64.deb
+            ./*amd64.deb
 
       - uses: actions/upload-artifact@v3
         with:
           name: artifact-deb-arm64
           path: |
-            ./*.deb
+            ./*arm64.deb
 
-      - uses: manticoresoftware/actions-run-on-arch-action@master
-        name: Preparing EL7 RPM package
+      - uses: actions/upload-artifact@v3
         with:
-          arch: aarch64
-          distro: centos7
-          githubToken: ${{ github.token }}
-          setup: |
-            mkdir -p "${PWD}/artifacts"
-          dockerRunArgs: |
-            --volume "${PWD}/artifacts:/artifacts"
-          install: |
-            yum install -y sudo git kernel-devel kernel-headers
-            yum groupinstall -y "Development Tools"
-          run: |
-            RPMBUILD_DIR="$HOME/rpmbuild"
-            RPMBUILD_SOURCE_DIR="$RPMBUILD_DIR/SOURCES"
-            RPMBUILD_SPEC_DIR="$RPMBUILD_DIR/SPECS"
-            mkdir -p .rpmpkg/usr/share/manticore/modules
-            cp -p build/manticore-buddy .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}
-            WORKDIR="/tmp/work"
-            mkdir "$WORKDIR"
-            cp packages/rpm.spec "$WORKDIR"
-            cp -rp ".rpmpkg" "$WORKDIR/${{ env.APP_NAME }}"
-            cd "$WORKDIR"
-
-            # Prepare spec file for RPM
-            sed -i 's/{{ NAME }}/${{ env.APP_NAME }}/g' rpm.spec
-            sed -i 's/{{ VERSION }}/${{ steps.vars.outputs.app_version }}/g' rpm.spec
-            sed -i 's/{{ MAINTAINER }}/${{ env.MAINTAINER }}/g' rpm.spec
-            sed -i 's/{{ DESC }}/${{ env.DESC }}/g' rpm.spec
-            sed -i 's/{{ ARCH }}/aarch64/g' rpm.spec
-
-            tar czf tmp.tar.gz "${{ env.APP_NAME }}/"
-            mkdir -p "$RPMBUILD_SOURCE_DIR"
-            mkdir -p "$RPMBUILD_SPEC_DIR"
-            mv tmp.tar.gz "$RPMBUILD_SOURCE_DIR"
-            cp -p rpm.spec "$RPMBUILD_SPEC_DIR"
-            rpmbuild -bb "$RPMBUILD_SPEC_DIR/rpm.spec"
-            cp -p "$RPMBUILD_DIR/RPMS/$(uname -m)"/*.rpm /artifacts/
-
-      - name: Rename package to proper name
-        run: |
-          ls -la ./artifacts/*.rpm
-          version=${{ steps.vars.outputs.app_version }}
-          rpm_path="./artifacts/${{ env.APP_NAME }}-${version}-1.el7.aarch64.rpm"
-          rpm_suffix=$( date +%y%m%d ).${GITHUB_SHA:0:7}
-          cp $rpm_path "./artifacts/${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el7.aarch64.rpm"
-          cp $rpm_path "./artifacts/${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el8.aarch64.rpm"
-          mv $rpm_path "./artifacts/${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el9.aarch64.rpm"
+          name: artifact-rpm-amd64
+          path: |
+            ./*x86_64.rpm
+            !./*-debuginfo-*.rpm
 
       - uses: actions/upload-artifact@v3
         with:
           name: artifact-rpm-arm64
           path: |
-            ./artifacts/*.rpm
-            !./artifacts/*-debuginfo-*.rpm
+            ./*aarch64.rpm
+            !./*-debuginfo-*.rpm
 
   create-release:
     runs-on: ubuntu-22.04
     needs:
       - build-artifact
       - build-linux-packages
-      - build-linux-packages-arm64
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v3
@@ -230,7 +177,6 @@ jobs:
     needs:
       - build-artifact
       - build-linux-packages
-      - build-linux-packages-arm64
     runs-on: self-hosted
     strategy:
       matrix:
