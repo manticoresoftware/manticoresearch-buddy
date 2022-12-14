@@ -56,7 +56,9 @@ jobs:
         run: |
           mkdir -p .debpkg/usr/share/manticore/modules
           mkdir -p .rpmpkg/usr/share/manticore/modules
+          cp -p ./LICENSE .debpkg/LICENSE
           cp -p ./build/manticore-buddy .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}
+          cp -p ./LICENSE .rpmpkg/LICENSE
           cp -p ./build/manticore-buddy .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}
       - uses: manticoresoftware/actions-build-deb-action@master
         name: Build DEB packages
