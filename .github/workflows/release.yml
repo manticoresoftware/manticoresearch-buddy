@@ -237,6 +237,14 @@ jobs:
             ext: deb
             script: bin/upload_repo_deb
             distro: bullseye
+          - artifact: artifact-deb-amd64
+            ext: deb
+            script: bin/upload_repo_deb
+            distro: bookworm
+          - artifact: artifact-deb-arm64
+            ext: deb
+            script: bin/upload_repo_deb
+            distro: bookworm
           - artifact: artifact-rpm-amd64
             ext: rpm
             script: bin/upload_repo_rpm
