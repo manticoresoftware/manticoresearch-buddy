@@ -109,12 +109,12 @@ jobs:
           version=${{ steps.vars.outputs.app_version }}
           rpm_path="./${{ env.APP_NAME }}-v${version}-1.noarch.rpm"
           rpm_suffix=$( date +%y%m%d ).${GITHUB_SHA:0:7}
-          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el7.x86_64.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el7.aarch64.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el8.x86_64.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el8.aarch64.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el9.x86_64.rpm"
-          mv $rpm_path "./${{ env.APP_NAME }}-v${version}_${rpm_suffix}-1.el9.aarch64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el7.x86_64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el7.aarch64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el8.x86_64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el8.aarch64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el9.x86_64.rpm"
+          mv $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el9.aarch64.rpm"
 
           ls -la ./*.deb
           deb_path="./${{ env.APP_NAME }}_${version}_all.deb"
