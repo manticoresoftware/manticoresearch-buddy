@@ -111,42 +111,25 @@ jobs:
           version=${{ steps.vars.outputs.app_version }}
           rpm_path="./${{ env.APP_NAME }}-v${version}-1.noarch.rpm"
           rpm_suffix=$( date +%y%m%d ).${GITHUB_SHA:0:7}
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el7.x86_64.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el7.aarch64.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el8.x86_64.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el8.aarch64.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el9.x86_64.rpm"
-          mv $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el9.aarch64.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el7.noarch.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el8.noarch.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el9.noarch.rpm"
 
           ls -la ./*.deb
           deb_path="./${{ env.APP_NAME }}_${version}_all.deb"
-          cp "$deb_path" ./${{ env.APP_NAME }}_${version}-$( date +%y%m%d )-${GITHUB_SHA:0:7}_amd64.deb
-          mv "$deb_path" ./${{ env.APP_NAME }}_${version}-$( date +%y%m%d )-${GITHUB_SHA:0:7}_arm64.deb
+          mv "$deb_path" ./${{ env.APP_NAME }}_${version}-$( date +%y%m%d )-${GITHUB_SHA:0:7}_all.deb
 
       - uses: actions/upload-artifact@v3
         with:
-          name: artifact-deb-amd64
+          name: artifact-deb
           path: |
-            ./*amd64.deb
+            ./*_all.deb
 
       - uses: actions/upload-artifact@v3
         with:
-          name: artifact-deb-arm64
+          name: artifact-rpm
           path: |
-            ./*arm64.deb
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: artifact-rpm-amd64
-          path: |
-            ./*x86_64.rpm
-            !./*-debuginfo-*.rpm
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: artifact-rpm-arm64
-          path: |
-            ./*aarch64.rpm
+            ./*.noarch.rpm
             !./*-debuginfo-*.rpm
 
   create-release:
@@ -183,91 +166,47 @@ jobs:
     strategy:
       matrix:
         include:
-          - artifact: artifact-deb-amd64
+          - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
             distro: stretch
-          - artifact: artifact-deb-arm64
-            ext: deb
-            script: bin/upload_repo_deb
-            distro: stretch
-          - artifact: artifact-deb-amd64
+          - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
             distro: buster
-          - artifact: artifact-deb-arm64
-            ext: deb
-            script: bin/upload_repo_deb
-            distro: buster
-          - artifact: artifact-deb-amd64
+          - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
             distro: xenial
-          - artifact: artifact-deb-arm64
-            ext: deb
-            script: bin/upload_repo_deb
-            distro: xenial
-          - artifact: artifact-deb-amd64
+          - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
             distro: bionic
-          - artifact: artifact-deb-arm64
-            ext: deb
-            script: bin/upload_repo_deb
-            distro: bionic
-          - artifact: artifact-deb-amd64
+          - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
             distro: focal
-          - artifact: artifact-deb-arm64
-            ext: deb
-            script: bin/upload_repo_deb
-            distro: focal
-          - artifact: artifact-deb-amd64
+          - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
             distro: jammy
-          - artifact: artifact-deb-arm64
-            ext: deb
-            script: bin/upload_repo_deb
-            distro: jammy
-          - artifact: artifact-deb-amd64
+          - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
             distro: bullseye
-          - artifact: artifact-deb-arm64
-            ext: deb
-            script: bin/upload_repo_deb
-            distro: bullseye
-          - artifact: artifact-deb-amd64
+          - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
             distro: bookworm
-          - artifact: artifact-deb-arm64
-            ext: deb
-            script: bin/upload_repo_deb
-            distro: bookworm
-          - artifact: artifact-rpm-amd64
+          - artifact: artifact-rpm
             ext: rpm
             script: bin/upload_repo_rpm
             distro: 7
-          - artifact: artifact-rpm-arm64
-            ext: rpm
-            script: bin/upload_repo_rpm
-            distro: 7
-          - artifact: artifact-rpm-amd64
+          - artifact: artifact-rpm
             ext: rpm
             script: bin/upload_repo_rpm
             distro: 8
-          - artifact: artifact-rpm-arm64
-            ext: rpm
-            script: bin/upload_repo_rpm
-            distro: 8
-          - artifact: artifact-rpm-amd64
-            ext: rpm
-            script: bin/upload_repo_rpm
-            distro: 9
-          - artifact: artifact-rpm-arm64
+          - artifact: artifact-rpm
             ext: rpm
             script: bin/upload_repo_rpm
             distro: 9

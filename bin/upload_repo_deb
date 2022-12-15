@@ -37,6 +37,11 @@ for f in build/*deb; do
       copy_to "$f" "$DISTRO/main/binary-arm64/"
       # bundlearm=1
     fi
+
+    if [[ $ARCH == "all" ]]; then
+      copy_to "$f" "$DISTRO/main/binary-amd64/"
+      copy_to "$f" "$DISTRO/main/binary-arm64/"
+    fi
   fi
 done
 
