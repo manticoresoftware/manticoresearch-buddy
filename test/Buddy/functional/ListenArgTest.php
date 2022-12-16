@@ -1,0 +1,37 @@
+<?php declare(strict_types=1);
+
+/*
+ Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License version 2 or any later
+ version. You should have received a copy of the GPL license along with this
+ program; if you did not, you can find it at http://www.gnu.org/
+ */
+
+use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
+use PHPUnit\Framework\TestCase;
+
+class ListenArgTest extends TestCase {
+
+	use TestFunctionalTrait;
+
+	public function testListenArgumentChange(): void {
+		echo "\nTesting if the `listen` argument is passed from daemon to Buddy correctly\n";
+		if (!self::hasCurl()) {
+			echo "Curl is not installed\n";
+			$this->markTestSkipped();
+		}
+		$defPort = $this->getListenDefaultPort();
+		$this->setListenDefaultPort(8888);
+		$httpPort = self::getListenHttpPort();
+		exec("curl localhost:$httpPort/cli -d 'drop table if exists test' 2>&1");
+		$query = 'INSERT into test(col1) VALUES(1) ';
+		exec("curl localhost:$httpPort/cli -d '$query' 2>&1", $out);
+		$result = '[{"total":1,"error":"","warning":""}]';
+		$this->assertEquals($result, $out[3]);
+		// Restoring listen default port
+		$this->setListenDefaultPort($defPort);
+	}
+
+}

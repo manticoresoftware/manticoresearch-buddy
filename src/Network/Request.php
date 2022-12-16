@@ -186,7 +186,7 @@ final class Request {
 				throw new InvalidRequestError("Field '$k' must be a $type");
 			}
 
-			if ($k !== 'message') {
+			if ($k !== 'message' || !is_array($payload[$k])) {
 				continue;
 			}
 
