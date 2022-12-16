@@ -16,25 +16,25 @@ BuildArch: noarch
 {{ DESC }}
 
 %prep
-rm -rf $RPM_BUILD_ROOT
+rm -rf %{buildroot}
 
 %setup -n %{name}
 
 %build
 
 %install
-mkdir -p $RPM_BUILD_ROOT
-cp -p usr/share/manticore/modules/manticore-buddy $RPM_BUILD_ROOT/
+mkdir -p %{buildroot}/usr/share/manticore/modules
+cp -p usr/share/manticore/modules/{{ NAME }} %{buildroot}/usr/share/manticore/modules/{{ NAME }}
 
 %clean
-rm -rf $RPM_BUILD_ROOT
+rm -rf %{buildroot}
 
 %post
 
 %postun
 
 %files
-%defattr(-, root, root)
-/manticore-buddy
+%defattr(1755, root, root)
+/usr/share/manticore/modules/{{ NAME }}
 
 %changelog
