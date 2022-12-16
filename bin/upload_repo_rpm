@@ -15,7 +15,7 @@ copy_to() {
 # bundleaarch=0
 # bundleintel=0
 
-for f in build/*."el$DISTRO".{x86_64,aarch64}.rpm; do
+for f in build/*."el$DISTRO".{x86_64,aarch64,noarch}.rpm; do
 
   echo "file $f"
   tail=$(echo "$f" | sed 's_build/__g;s/[a-z]*-//g;')
@@ -24,7 +24,10 @@ for f in build/*."el$DISTRO".{x86_64,aarch64}.rpm; do
     ARCH=x86_64
   elif [[ $tail == *".aarch64."* ]]; then
     ARCH=aarch64
-  fi;
+  elif [[ $tail == *".noarch."* ]]; then
+    ARCH=noarch
+  fi
+  echo "Arch: $ARCH"
   if [ -f "$f" ]; then
     if [ -z "${IS_RELEASE_DIGIT}" ]; then
       IS_RELEASE_DIGIT=$(echo "$f" | cut -d. -f3 | cut -d_ -f1)
