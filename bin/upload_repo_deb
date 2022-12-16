@@ -18,6 +18,7 @@ copy_to() {
 for f in build/*deb; do
   # VER="$(echo "$f" | cut -d_ -f2)"
   ARCH=$(echo "$f" | cut -d_ -f3 | cut -d. -f1)
+  echo "Arch: $ARCH"
   if [ -f "$f" ]; then
     if [ -z "${IS_RELEASE_DIGIT}" ]; then
       IS_RELEASE_DIGIT=$(echo "$f" | cut -d. -f3 | cut -d- -f1)
