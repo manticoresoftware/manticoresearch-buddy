@@ -26,10 +26,12 @@ jobs:
       - id: vars
         run: |
           echo "::set-output name=app_version::$(<APP_VERSION)"
+          echo "::set-output name=rpm_suffix::_$( date +%y%m%d%H ).${GITHUB_SHA:0:7}"
+          echo "::set-output name=deb_suffix::-$( date +%y%m%d%H )-${GITHUB_SHA:0:7}"
 
       - name: Create artifact
         run: |
-          name="${{ env.APP_NAME }}_${{ steps.vars.outputs.app_version }}-$( date +%y%m%d )-${GITHUB_SHA:0:7}"
+          name="${{ env.APP_NAME }}_${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.rpm_suffix }}"
           echo "$name"
           tar czf "$name.tar.gz" build/manticore-buddy
           mkdir -p share/modules
@@ -52,6 +54,8 @@ jobs:
       - id: vars
         run: |
           echo "::set-output name=app_version::$(<APP_VERSION)"
+          echo "::set-output name=rpm_suffix::_$( date +%y%m%d%H ).${GITHUB_SHA:0:7}"
+          echo "::set-output name=deb_suffix::-$( date +%y%m%d%H )-${GITHUB_SHA:0:7}"
       - name: Prepare packages structure
         run: |
           mkdir -p .debpkg/usr/share/manticore/modules
@@ -64,7 +68,7 @@ jobs:
           package: ${{ env.APP_NAME }}
           package_root: .debpkg
           maintainer: ${{ env.MAINTAINER }}
-          version: ${{ steps.vars.outputs.app_version }}
+          version: ${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.deb_suffix }}
           arch: 'all'
           desc: '${{ env.DESC }}'
           depends: '${{ env.LIBCURL_NAME }}4 (>= ${{ env.LIBCURL_VERSION}})'
@@ -87,7 +91,7 @@ jobs:
 
           # Prepare spec file for RPM
           sed -i 's/{{ NAME }}/${{ env.APP_NAME }}/g' $spec_file
-          sed -i 's/{{ VERSION }}/v${{ steps.vars.outputs.app_version }}/g' $spec_file
+          sed -i 's/{{ VERSION }}/${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.rpm_suffix }}/g' $spec_file
           sed -i 's/{{ MAINTAINER }}/${{ env.MAINTAINER }}/g' $spec_file
           sed -i 's/{{ DESC }}/${{ env.DESC }}/g' $spec_file
           sed -i 's/{{ LIBCURL_NAME }}/${{ env.LIBCURL_NAME }}/g' $spec_file
@@ -105,16 +109,14 @@ jobs:
       - name: Rename packages to proper name
         run: |
           ls -la ./*.rpm
-          version=${{ steps.vars.outputs.app_version }}
-          rpm_path="./${{ env.APP_NAME }}-v${version}-1.noarch.rpm"
-          rpm_suffix=$( date +%y%m%d ).${GITHUB_SHA:0:7}
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el7.noarch.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el8.noarch.rpm"
-          cp $rpm_path "./${{ env.APP_NAME }}-${version}_${rpm_suffix}-1.el9.noarch.rpm"
+          version=${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.rpm_suffix }}
+          rpm_path="./${{ env.APP_NAME }}-${version}-1.noarch.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el7.noarch.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el8.noarch.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el9.noarch.rpm"
 
           ls -la ./*.deb
-          deb_path="./${{ env.APP_NAME }}_${version}_all.deb"
-          mv "$deb_path" ./${{ env.APP_NAME }}_${version}-$( date +%y%m%d )-${GITHUB_SHA:0:7}_all.deb
+          version=${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.deb_version }}
 
       - uses: actions/upload-artifact@v3
         with:
