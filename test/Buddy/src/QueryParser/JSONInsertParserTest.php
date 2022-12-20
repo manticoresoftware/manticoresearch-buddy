@@ -69,7 +69,7 @@ class JSONInsertParserTest extends TestCase {
 		$this->assertEquals(['col1', 'col2'], $parserCls->getProperty('cols')->getValue(self::$parser));
 
 		$row = ['update' => ['index' => 'test', 'id' => 1, 'doc' => ['col1' => 10, 'col2' => 'a']]];
-		$this->expectException(\RuntimeException::class);
+		$this->expectException(QueryParserError::class);
 		//$this->expectExceptionMessage("Operation name 'insert' is missing");
 		$this->expectExceptionMessage("Mandatory request field 'index' is missing");
 		$this->assertEquals([], self::$parser->parseJSONRow($row));
@@ -121,19 +121,19 @@ class JSONInsertParserTest extends TestCase {
 
 		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
 		$this->assertEquals(QueryParserError::class, $exCls);
-		$this->assertEquals("Parse request error: Incompatible types in 'col1': 'text int',", $exMsg);
+		$this->assertEquals("Incompatible types in 'col1': 'text int',", $exMsg);
 
 		$query = '{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }'
 			. "\n"
 			. '{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : 20, "col2": "b", "col3": "c" } } }';
 		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
 		$this->assertEquals(QueryParserError::class, $exCls);
-		$this->assertEquals('Parse request error: Column count mismatch in INSERT statement', $exMsg);
+		$this->assertEquals('Column count mismatch in INSERT statement', $exMsg);
 
 		$query = '{ "update" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }';
 		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
 		$this->assertEquals(QueryParserError::class, $exCls);
-		$this->assertEquals("Parse request error: Operation name 'insert' is missing", $exMsg);
+		$this->assertEquals("Operation name 'insert' is missing", $exMsg);
 	}
 
 }

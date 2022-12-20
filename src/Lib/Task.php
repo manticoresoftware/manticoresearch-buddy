@@ -12,9 +12,9 @@
 namespace Manticoresearch\Buddy\Lib;
 
 use Closure;
+use Manticoresearch\Buddy\Exception\GenericError;
 use Manticoresearch\Buddy\Lib\TaskStatus;
 use RuntimeException;
-use Throwable;
 use parallel\Future;
 use parallel\Runtime;
 
@@ -36,7 +36,7 @@ final class Task {
 	protected TaskStatus $status;
 	protected Future $future;
 	protected Runtime $runtime;
-	protected Throwable $error;
+	protected GenericError $error;
 	protected mixed $result;
 
 	// Extended properties for make things simpler
@@ -178,7 +178,7 @@ final class Task {
 	 * 	and give possibility to caller handle it and check
 	 *
 	 * @return TaskStatus
-	 * @throws Throwable
+	 * @throws GenericError
 	 */
 	public function wait(bool $exceptionOnError = false): TaskStatus {
 		$i = 0;
@@ -212,11 +212,15 @@ final class Task {
 				if ($error) {
 					/** @var array{0:string,1:string} $error */
 					[$errorClass, $errorMessage] = $error;
-					throw new $errorClass($errorMessage); // @phpstan-ignore-line
+					$e = new GenericError("$errorClass: $errorMessage");
+					if ($errorMessage) {
+						$e->setResponseError($errorMessage);
+					}
+					throw $e;
 				}
 
 				$this->result = $result;
-			} catch (Throwable $error) {
+			} catch (GenericError $error) {
 				$this->error = $error;
 			}
 		}
@@ -257,10 +261,10 @@ final class Task {
 	/**
 	 * Just getter for current error
 	 *
-	 * @return Throwable
+	 * @return GenericError
 	 * @throws RuntimeException
 	 */
-	public function getError(): Throwable {
+	public function getError(): GenericError {
 		if (!isset($this->error)) {
 			throw new RuntimeException('There error was not set, you should call isScucceed first.');
 		}

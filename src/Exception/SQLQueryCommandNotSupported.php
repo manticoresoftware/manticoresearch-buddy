@@ -11,5 +11,5 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-class SQLQueryCommandNotSupported extends \Exception {
+class SQLQueryCommandNotSupported extends GenericError {
 }

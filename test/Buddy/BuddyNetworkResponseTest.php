@@ -9,8 +9,8 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Exception\BuddyError;
 use Manticoresearch\Buddy\Exception\BuddyRequestError;
+use Manticoresearch\Buddy\Exception\GenericError;
 use Manticoresearch\Buddy\Network\Response;
 use PHPUnit\Framework\TestCase;
 
@@ -25,7 +25,8 @@ class BuddyNetworkResponseTest extends TestCase {
 			'error' => 'simple error #1',
 		];
 		$err = 'simple error #1';
-		$error = BuddyError::from(new Exception('this error goes to log'), $err);
+		$error = new GenericError('this error goes to log');
+		$error->setResponseError($err);
 		$this->assertEquals($err, $error->getResponseError());
 		$this->assertEquals(
 			json_encode($result),
@@ -38,7 +39,8 @@ class BuddyNetworkResponseTest extends TestCase {
 
 		$msg = [chr(193)];
 		$err = 'client error #2';
-		$error = BuddyError::from(new BuddyRequestError('this error goes to log'), $err);
+		$error = new BuddyRequestError('this error goes to log');
+		$error->setResponseError($err);
 		$this->assertEquals($err, $error->getResponseError());
 		$resp = (string)Response::fromMessageAndError($msg, $error);
 		$this->assertStringContainsString(

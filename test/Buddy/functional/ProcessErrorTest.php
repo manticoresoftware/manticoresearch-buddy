@@ -1,0 +1,46 @@
+<?php declare(strict_types=1);
+
+/*
+ Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License version 2 or any later
+ version. You should have received a copy of the GPL license along with this
+ program; if you did not, you can find it at http://www.gnu.org/
+ */
+
+use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
+use PHPUnit\Framework\TestCase;
+
+final class ProcessErrorTest extends TestCase {
+
+	use TestFunctionalTrait;
+
+	public function testCorrectErrorOnFailedToParseRequest(): void {
+		$result = static::runSqlQuery('tratatata');
+		$this->assertEquals(
+			["ERROR 1064 (42000) at line 1: sphinxql: syntax error, unexpected identifier near 'tratatata'"],
+			$result
+		);
+
+		$result = static::runSqlQuery('hello how are you?');
+		$this->assertEquals(
+			["ERROR 1064 (42000) at line 1: sphinxql: syntax error, unexpected identifier near 'hello how are you?'"],
+			$result
+		);
+
+		$result = static::runSqlQuery('tratata; show tables;');
+		$this->assertEquals(
+			["ERROR 1064 (42000) at line 1: sphinxql: syntax error, unexpected identifier near 'tratata'"],
+			$result
+		);
+	}
+
+	public function testCorrectErrorOnBackupNoTables(): void {
+		$result = static::runSqlQuery('backup');
+		$this->assertEquals(
+			['ERROR 1064 (42000) at line 1: You have no tables to backup.'],
+			$result
+		);
+	}
+}

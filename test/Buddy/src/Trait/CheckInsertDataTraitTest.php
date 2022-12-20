@@ -10,6 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Enum\Datatype;
+use Manticoresearch\Buddy\Exception\GenericError;
 use Manticoresearch\Buddy\Trait\CheckInsertDataTrait;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
@@ -22,16 +23,16 @@ class CheckInsertDataTraitTest extends TestCase {
 	public function testCheckUnescapedCharsOk():void {
 		echo "\nTesting the detection of unescaped data characters\n";
 		$data = 'some correct data';
-		$this->checkUnescapedChars($data, RuntimeException::class);
+		$this->checkUnescapedChars($data, GenericError::class);
 		$this->assertTrue(true);
 	}
 
 	public function testCheckUnescapedCharsFail():void {
 		echo "\nTesting the detection of unescaped data characters\n";
 		$data = 'some "incorrect" data';
-		$this->expectException(RuntimeException::class);
+		$this->expectException(GenericError::class);
 		$this->expectExceptionMessage("Unescaped '\"' character found in INSERT statement");
-		$this->checkUnescapedChars($data, RuntimeException::class);
+		$this->checkUnescapedChars($data, GenericError::class);
 		$this->assertTrue(true);
 	}
 

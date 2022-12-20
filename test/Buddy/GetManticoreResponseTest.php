@@ -10,6 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
+use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response;
 use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
@@ -69,8 +70,8 @@ class GetManticoreResponseTest extends TestCase {
 		$this->assertEquals($mntResp, $this->httpClient->sendRequest($query));
 
 		$query = 'SELECT connid AS ID FROM @@system.sessions';
-		$this->expectException(\RuntimeException::class);
-		$this->expectExceptionMessage('Manticore request error: No response passed from server');
+		$this->expectException(ManticoreHTTPClientError::class);
+		$this->expectExceptionMessage('No response passed from server');
 		$this->httpClient->sendRequest($query);
 	}
 

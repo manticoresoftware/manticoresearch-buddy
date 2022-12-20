@@ -11,10 +11,10 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-use RuntimeException;
+use Exception;
 use Throwable;
 
-final class SocketError extends RuntimeException {
+final class SocketError extends Exception {
 
 	public function __construct(string $message = null, int $code = 0, ?Throwable $previous = null) {
 		if (isset($message)) {

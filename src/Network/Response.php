@@ -12,40 +12,40 @@
 namespace Manticoresearch\Buddy\Network;
 
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\BuddyError;
+use Manticoresearch\Buddy\Exception\GenericError;
 
 final class Response {
-	/**
-	 * @param string $data
-	 * @return void
-	 */
+  /**
+   * @param string $data
+   * @return void
+   */
 	public function __construct(protected string $data = '') {
 	}
 
-	/**
-	 * @return bool
-	 */
+  /**
+   * @return bool
+   */
 	public function isEmpty(): bool {
 		return $this->data === '';
 	}
 
-	/**
-	 * @see static::fromStringAndError()
-	 * @param array<mixed> $message
-	 * @param RequestFormat $format
-	 * @return static
-	 */
+  /**
+   * @see static::fromStringAndError()
+   * @param array<mixed> $message
+   * @param RequestFormat $format
+   * @return static
+   */
 	public static function fromMessage(array $message, RequestFormat $format = RequestFormat::JSON): static {
 		return static::fromMessageAndError($message, null, $format);
 	}
 
-	/**
-	 * @see static::fromStringAndError()
-	 * @param BuddyError $error
-	 * @param RequestFormat $format
-	 * @return static
-	 */
-	public static function fromError(BuddyError $error, RequestFormat $format = RequestFormat::JSON): static {
+  /**
+   * @see static::fromStringAndError()
+   * @param GenericError $error
+   * @param RequestFormat $format
+   * @return static
+   */
+	public static function fromError(GenericError $error, RequestFormat $format = RequestFormat::JSON): static {
 		return static::fromMessageAndError(
 			[[
 				'total' => 0,
@@ -56,22 +56,22 @@ final class Response {
 		);
 	}
 
-	/**
-	 * @return static
-	 */
+  /**
+   * @return static
+   */
 	public static function none(): static {
 		return new static;
 	}
 
-	/**
-	 * @param array<mixed> $message
-	 * @param ?BuddyError $error
-	 * @param RequestFormat $format
-	 * @return static
-	 */
+  /**
+   * @param array<mixed> $message
+   * @param ?GenericError $error
+   * @param RequestFormat $format
+   * @return static
+   */
 	public static function fromMessageAndError(
 		array $message = [],
-		?BuddyError $error = null,
+		?GenericError $error = null,
 		RequestFormat $format = RequestFormat::JSON
 	): static {
 		$payload = [
@@ -85,11 +85,11 @@ final class Response {
 		);
 	}
 
-	/**
-	 * This magic helps us to keep things simple :)
-	 *
-	 * @return string
-	 */
+  /**
+   * This magic helps us to keep things simple :)
+   *
+   * @return string
+   */
 	public function __toString(): string {
 		return $this->data;
 	}

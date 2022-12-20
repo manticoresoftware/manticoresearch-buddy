@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Interface;
 
 use Manticoresearch\Buddy\Enum\Datatype;
-use RuntimeException;
+use Manticoresearch\Buddy\Exception\GenericError;
 
 interface InsertQueryParserInterface extends QueryParserInterface {
 	/**
@@ -25,7 +25,7 @@ interface InsertQueryParserInterface extends QueryParserInterface {
 	 * Checking for unescaped characters. Just as a test feature so far
 	 *
 	 * @param string|array<mixed> $row
-	 * @param class-string<RuntimeException> $errorHandler
+	 * @param class-string<GenericError> $errorHandler
 	 * @return void
 	 */
 	public static function checkUnescapedChars(mixed $row, string $errorHandler): void;
@@ -35,7 +35,7 @@ interface InsertQueryParserInterface extends QueryParserInterface {
 	 * @param array<mixed> $rowVals
 	 * @param array<Datatype> &$types
 	 * @param array<string> $cols
-	 * @param class-string<RuntimeException> $errorHandler
+	 * @param class-string<GenericError> $errorHandler
 	 * @return void
 	 */
 	public static function checkColTypesError(

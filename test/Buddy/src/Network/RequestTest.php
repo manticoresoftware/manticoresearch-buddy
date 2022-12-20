@@ -47,24 +47,25 @@ class RequestTest extends TestCase {
 			],
 			'version' => 1,
 		];
+
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
 		$this->assertEquals(InvalidRequestError::class, $exCls);
-		$this->assertEquals("Manticore request parse error: Do not know how to handle 'error request' type", $exMsg);
+		$this->assertEquals("Do not know how to handle 'error request' type", $exMsg);
 
 		$payload['request_type'] = 'trololo';
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
 		$this->assertEquals(InvalidRequestError::class, $exCls);
-		$this->assertEquals("Manticore request parse error: Do not know how to handle 'error request' type", $exMsg);
+		$this->assertEquals("Do not know how to handle 'error request' type", $exMsg);
 
 		unset($payload['error']);
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
 		$this->assertEquals(InvalidRequestError::class, $exCls);
-		$this->assertEquals("Manticore request parse error: Mandatory field 'error' is missing", $exMsg);
+		$this->assertEquals("Mandatory field 'error' is missing", $exMsg);
 	}
 
 	public function testManticoreQueryValidationOk(): void {
 		$query = '{"error":"some error","type":"unknown json request",'
-			. '"message":{"path_query":"/cli","body":"some query"},"version":1}';
+		. '"message":{"path_query":"/cli","body":"some query"},"version":1}';
 		$id = mt_rand(0, 1000000);
 		$request = Request::fromString($query, $id);
 		$this->assertInstanceOf(Request::class, $request);
@@ -76,16 +77,16 @@ class RequestTest extends TestCase {
 		$query = '';
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromString', [$query]);
 		$this->assertEquals(InvalidRequestError::class, $exCls);
-		$this->assertEquals('Manticore request parse error: The payload is missing', $exMsg);
+		$this->assertEquals('The payload is missing', $exMsg);
 
 		$query = "Invalid query\nis passed\nagain";
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromString', [$query]);
 		$this->assertEquals(InvalidRequestError::class, $exCls);
-		$this->assertEquals('Manticore request parse error: Invalid request payload is passed', $exMsg);
+		$this->assertEquals('Invalid request payload is passed', $exMsg);
 
 		$query = 'Query\nwith unvalid\n\n{"request_body"}';
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromString', [$query]);
 		$this->assertEquals(InvalidRequestError::class, $exCls);
-		$this->assertEquals('Manticore request parse error: Invalid request payload is passed', $exMsg);
+		$this->assertEquals('Invalid request payload is passed', $exMsg);
 	}
 }

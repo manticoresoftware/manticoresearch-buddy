@@ -11,6 +11,8 @@
 
 namespace Manticoresearch\BuddyTest\Trait;
 
+use Manticoresearch\Buddy\Exception\GenericError;
+
 trait TestProtectedTrait {
 
 	/**
@@ -37,7 +39,7 @@ trait TestProtectedTrait {
 		$exCls = $exMsg = '';
 		try {
 			self::invokeMethod($classInstance, $methodName, $args);
-		} catch (\RuntimeException $e) {
+		} catch (GenericError $e) {
 			$exCls = $e::class;
 			$exMsg = $e->getMessage();
 		}

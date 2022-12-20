@@ -71,8 +71,8 @@ class ManticoreResponseTest extends TestCase {
 
 	public function testManticoreResponseFail(): void {
 		echo "\nTesting the fail on the creation of Manticore response\n";
-		$this->expectException(ManticoreResponseError ::class);
-		$this->expectExceptionMessage('Manticore response error: Invalid JSON found');
+		$this->expectException(ManticoreResponseError::class);
+		$this->expectExceptionMessage('Invalid JSON found');
 		new Response('{"some unvalid json"}');
 	}
 
@@ -115,8 +115,8 @@ class ManticoreResponseTest extends TestCase {
 		$processor = function ($body, $data, $columns) {
 			return isset($body, $data, $columns) ? 'some unvalid json' : null;
 		};
-		$this->expectException(ManticoreResponseError ::class);
-		$this->expectExceptionMessage('Manticore response error: Invalid JSON found');
+		$this->expectException(ManticoreResponseError::class);
+		$this->expectExceptionMessage('Invalid JSON found');
 		$this->response->postprocess($processor);
 	}
 
