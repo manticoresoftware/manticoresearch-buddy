@@ -149,6 +149,46 @@ trait TestFunctionalTrait {
 	}
 
 	/**
+	 * This is helper to validate error in response by running both sql and cli interfaces
+	 *
+	 * @param string $query
+	 * @param string $error
+	 * @return void
+	 * @throws Exception
+	 */
+	protected function assertQueryResultContainsError(string $query, string $error): void {
+		$result1 = static::runSqlQuery($query);
+		// TODO: dirty hack for backup but until we fix it
+		if (str_starts_with($query, 'backup')) {
+			usleep(1000000);
+		}
+		$result2 = static::runHttpQuery($query);
+
+		$this->assertStringContainsString($error, implode(PHP_EOL, $result1));
+		$this->assertEquals($error, $result2[0]['error']);
+	}
+
+	/**
+	 * Same as error checker but for asserts OK results
+	 *
+	 * @param string $query
+	 * @param string $string
+	 * @return void
+	 * @throws Exception
+	 */
+	protected function assertQueryResultContainsString(string $query, string $string): void {
+		$result1 = static::runSqlQuery($query, false);
+		$result2 = static::runHttpQuery($query);
+
+		$this->assertStringContainsString($string, implode(PHP_EOL, $result1));
+		foreach ($result2 as &$v) {
+			unset($v['error']);
+		}
+		$resultString = json_encode($result2) ?: '';
+		$this->assertStringContainsString($string, $resultString);
+	}
+
+	/**
 	 * Run sql query on test manticore instance
 	 *
 	 * @param string $query
@@ -169,15 +209,17 @@ trait TestFunctionalTrait {
 	 *
 	 * @param string $query
 	 * @param bool $redirectOutput
-	 * @return array<string>
+	 * @return array<int,array{error:string}>
 	 * @throws Exception
 	 */
 	protected static function runHttpQuery(string $query, bool $redirectOutput = true): array {
 		$port = static::getListenHttpPort();
 		$query = \addslashes($query);
 		$redirect = $redirectOutput ? '2>&1' : '';
-		exec("curl 127.0.0.1:$port/cli -d '$query' $redirect", $output);
-		return $output;
+		exec("curl -s 127.0.0.1:$port/cli -d '$query' $redirect", $output);
+		/** @var array<int,array{error:string}> $result */
+		$result = (array)json_decode($output[0] ?? '{}', true);
+		return $result;
 	}
 
 	/**

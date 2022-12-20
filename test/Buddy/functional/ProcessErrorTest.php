@@ -17,30 +17,24 @@ final class ProcessErrorTest extends TestCase {
 	use TestFunctionalTrait;
 
 	public function testCorrectErrorOnFailedToParseRequest(): void {
-		$result = static::runSqlQuery('tratatata');
-		$this->assertEquals(
-			["ERROR 1064 (42000) at line 1: sphinxql: syntax error, unexpected identifier near 'tratatata'"],
-			$result
+		$this->assertQueryResultContainsError(
+			'tratatata',
+			"sphinxql: syntax error, unexpected identifier near 'tratatata'"
 		);
-
-		$result = static::runSqlQuery('hello how are you?');
-		$this->assertEquals(
-			["ERROR 1064 (42000) at line 1: sphinxql: syntax error, unexpected identifier near 'hello how are you?'"],
-			$result
+		$this->assertQueryResultContainsError(
+			'hello how are you?',
+			"sphinxql: syntax error, unexpected identifier near 'hello how are you?'"
 		);
-
-		$result = static::runSqlQuery('tratata; show tables;');
-		$this->assertEquals(
-			["ERROR 1064 (42000) at line 1: sphinxql: syntax error, unexpected identifier near 'tratata'"],
-			$result
+		$this->assertQueryResultContainsError(
+			'showf tables',
+			"sphinxql: syntax error, unexpected identifier near 'showf tables'"
 		);
 	}
 
 	public function testCorrectErrorOnBackupNoTables(): void {
-		$result = static::runSqlQuery('backup');
-		$this->assertEquals(
-			['ERROR 1064 (42000) at line 1: You have no tables to backup.'],
-			$result
+		$this->assertQueryResultContainsError(
+			'backup',
+			'You have no tables to backup.'
 		);
 	}
 }
