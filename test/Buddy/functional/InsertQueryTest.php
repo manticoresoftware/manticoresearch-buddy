@@ -47,7 +47,7 @@ class InsertQueryTest extends TestCase {
 		}
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
 		$out = static::runHttpQuery($query);
-		$result = '[{"total":1,"error":"","warning":""}]';
-		$this->assertEquals($result, $out[3]);
+		$result = [['total' => 1,'error' => '','warning' => '']];
+		$this->assertEquals($result, $out);
 	}
 }
