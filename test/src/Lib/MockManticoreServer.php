@@ -27,8 +27,8 @@ final class MockManticoreServer {
 	const CREATE_RESPONSE_FAIL	= '{"error":"sphinxql: syntax error, unexpected IDENT, expecting '
 		. 'CLUSTER or FUNCTION or PLUGIN or TABLE near \'tablee test(col1 text)\'"}';
 	const CREATE_RESPONSE_OK = '[{"total":0,"error":"","warning":""}]';
-	const SQL_INSERT_RESPONSE_FAIL = '{"error":"index \'test\' absent, or does not support INSERT"}';
-	const JSON_INSERT_RESPONSE_FAIL = '{"error":{"type":"index \'test\' absent, or does not support INSERT"'
+	const SQL_INSERT_RESPONSE_FAIL = '{"error":"table \'test\' absent, or does not support INSERT"}';
+	const JSON_INSERT_RESPONSE_FAIL = '{"error":{"type":"table \'test\' absent, or does not support INSERT"'
 		. ',"index":"test"},"status":500}';
 	const SQL_INSERT_RESPONSE_OK = '[{"total":1,"error":"","warning":""}]';
 	const JSON_INSERT_RESPONSE_OK = '{"_index": "test","_id": 1,"created": true,"result": "created","status": 201}';

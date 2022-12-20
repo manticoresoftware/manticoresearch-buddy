@@ -123,7 +123,7 @@ class QueryProcessor {
 			|| ($request->endpoint === ManticoreEndpoint::Bulk
 				&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')
 		);
-		$isInsertError = preg_match('/index (.*?) absent/', $request->error);
+		$isInsertError = preg_match('/table (.*?) absent/', $request->error);
 		return match (true) {
 			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => 'InsertQuery',
 			str_starts_with($queryLowercase, 'show queries') => 'ShowQueries',

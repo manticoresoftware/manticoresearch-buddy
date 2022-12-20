@@ -58,7 +58,7 @@ class InsertQueryExecutorTest extends TestCase {
 		$request = NetRequest::fromArray(
 			[
 				'version' => 1,
-				'error' => "index 'test' absent, or does not support INSERT",
+				'error' => "table 'test' absent, or does not support INSERT",
 				'payload' => 'INSERT INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
