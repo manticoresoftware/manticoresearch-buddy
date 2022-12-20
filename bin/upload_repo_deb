@@ -19,6 +19,7 @@ for f in build/*deb; do
   # VER="$(echo "$f" | cut -d_ -f2)"
   ARCH=$(echo "$f" | cut -d_ -f3 | cut -d. -f1)
   echo "Arch: $ARCH"
+  declare -A archs
   if [ -f "$f" ]; then
     if [ -z "${IS_RELEASE_DIGIT}" ]; then
       IS_RELEASE_DIGIT=$(echo "$f" | cut -d. -f3 | cut -d- -f1)
@@ -30,11 +31,13 @@ for f in build/*deb; do
     ./bin/sign_deb "$GPG_SECRET" "$f"
 
     if [[ $ARCH == "amd64" ]]; then
+      archs[amd]=1
       copy_to "$f" "$DISTRO/main/binary-amd64/"
       # bundleamd=1
     fi
 
     if [[ $ARCH == "arm64" ]]; then
+      archs[arm]=1
       copy_to "$f" "$DISTRO/main/binary-arm64/"
       # bundlearm=1
     fi
@@ -42,18 +45,21 @@ for f in build/*deb; do
     if [[ $ARCH == "all" ]]; then
       copy_to "$f" "$DISTRO/main/binary-amd64/"
       copy_to "$f" "$DISTRO/main/binary-arm64/"
+      archs[amd]=1
+      archs[arm]=1
     fi
   fi
 done
 
 # no need to make bundle as we deploy one single package
 
+dev=
 if [ -n "$SUFFIX" ]; then
-  /usr/bin/docker exec repo-generator /generator.sh -distro "$DISTRO" -architecture amd -dev 1
-  # /usr/bin/docker exec repo-generator /generator.sh -distro "$DISTRO" -architecture arm -dev 1
-else
-  /usr/bin/docker exec repo-generator /generator.sh -distro "$DISTRO" -architecture amd
-  # /usr/bin/docker exec repo-generator /generator.sh -distro "$DISTRO" -architecture arm
+  dev="-dev 1"
 fi
+
+for arch in "${!archs[@]}"; do
+  /usr/bin/docker exec repo-generator /generator.sh -distro "$DISTRO" -architecture "$arch" $dev
+done
 
 rm -rf build/*deb
