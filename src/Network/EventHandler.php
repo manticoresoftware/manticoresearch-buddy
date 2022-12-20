@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Network;
 use Exception;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\GenericError;
+use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Lib\TaskPool;
@@ -91,12 +92,13 @@ final class EventHandler {
 				isset($request) => $request->error,
 				default => ((array)json_decode($data, true))['error'] ?? '',
 			};
-			if (!is_a($e, GenericError::class)) {
-				$e = GenericError::create($originalError);
-			}
-			/** @var GenericError $e */
-			if (!$e->hasResponseError()) {
+			// We proxy original error in case when we do not know how to handle query
+			// otherwise we send our custom error
+			if (is_a($e, SQLQueryCommandNotSupported::class)) {
+				/** @var GenericError $e */
 				$e->setResponseError($originalError);
+			} elseif (!is_a($e, GenericError::class)) {
+				$e = GenericError::create($originalError);
 			}
 
 			$deferred->resolve(
