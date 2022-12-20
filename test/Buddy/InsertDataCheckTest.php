@@ -72,7 +72,7 @@ class InsertDataCheckTest extends TestCase {
 		$types = [Datatype::Int, Datatype::Json];
 		$row = "1, 'a'";
 		$this->expectException(QueryParserError::class);
-		$this->expectExceptionMessage("Parse request error: Incompatible types in 'col2': 'text json',");
+		$this->expectExceptionMessage("Incompatible types in 'col2': 'text json',");
 		$parser->checkColTypesError(
 			[$parser, 'detectValType'],
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),
@@ -89,7 +89,7 @@ class InsertDataCheckTest extends TestCase {
 		$types = [Datatype::Int, Datatype::Json];
 		$row = ['col1' => 1, 'col2' => 'a'];
 		$this->expectException(QueryParserError::class);
-		$this->expectExceptionMessage("Parse request error: Incompatible types in 'col2': 'text json',");
+		$this->expectExceptionMessage("Incompatible types in 'col2': 'text json',");
 		$parser->checkColTypesError(
 			[$parser, 'detectValType'],
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),
@@ -106,7 +106,7 @@ class InsertDataCheckTest extends TestCase {
 		$row = '1';
 		$types = [Datatype::Int, Datatype::Text];
 		$this->expectException(QueryParserError::class);
-		$this->expectExceptionMessage('Parse request error: Column count mismatch in INSERT statement');
+		$this->expectExceptionMessage('Column count mismatch in INSERT statement');
 		$parser->checkColTypesError(
 			[$parser, 'detectValType'],
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),
@@ -123,7 +123,7 @@ class InsertDataCheckTest extends TestCase {
 		$row = ['col1' => 1];
 		$types = [Datatype::Int, Datatype::Text];
 		$this->expectException(QueryParserError::class);
-		$this->expectExceptionMessage('Parse request error: Column count mismatch in INSERT statement');
+		$this->expectExceptionMessage('Column count mismatch in INSERT statement');
 		$parser->checkColTypesError(
 			[$parser, 'detectValType'],
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),

@@ -11,5 +11,5 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-class SQLQueryParsingError extends \Exception {
+class SQLQueryParsingError extends GenericError {
 }

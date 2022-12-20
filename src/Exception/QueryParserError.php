@@ -11,8 +11,6 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-final class QueryParserError extends DetailedError {
-
-	const ERROR_MSG = 'Parse request error';
+final class QueryParserError extends GenericError {
 
 }

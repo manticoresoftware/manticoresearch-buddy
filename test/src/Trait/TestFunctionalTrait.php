@@ -59,6 +59,17 @@ trait TestFunctionalTrait {
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
 		sleep(2); // <- give 2 secs to protect from any kind of lags
 		self::loadBuddyPid();
+
+		// Clean up all tables and run fresh instance
+		$output = static::runSqlQuery('show tables');
+		if (sizeof($output) > 1) {
+			array_shift($output);
+			foreach ($output as $line) {
+				$table = trim(str_replace(['rt','plain', 'distributed', 'percolate'], '', $line));
+				static::runSqlQuery("DROP TABLE $table");
+			}
+		}
+		sleep(1);
 	}
 
 	/**
@@ -138,6 +149,38 @@ trait TestFunctionalTrait {
 	}
 
 	/**
+	 * Run sql query on test manticore instance
+	 *
+	 * @param string $query
+	 * @param bool $redirectOutput
+	 * @return array<string>
+	 * @throws Exception
+	 */
+	protected static function runSqlQuery(string $query, bool $redirectOutput = true): array {
+		$port = static::getListenSqlPort();
+		$query = \addslashes($query);
+		$redirect = $redirectOutput ? '2>&1' : '';
+		exec("mysql -P$port -h127.0.0.1 -e '$query' $redirect", $output);
+		return $output;
+	}
+
+	/**
+	 * Run sql query by using cli endpoint
+	 *
+	 * @param string $query
+	 * @param bool $redirectOutput
+	 * @return array<string>
+	 * @throws Exception
+	 */
+	protected static function runHttpQuery(string $query, bool $redirectOutput = true): array {
+		$port = static::getListenHttpPort();
+		$query = \addslashes($query);
+		$redirect = $redirectOutput ? '2>&1' : '';
+		exec("curl 127.0.0.1:$port/cli -d '$query' $redirect", $output);
+		return $output;
+	}
+
+	/**
 	 * Helper that checks if the pathes defined in the manticore config exist
 	 * and tries to create them if not
 	 *
@@ -173,7 +216,7 @@ trait TestFunctionalTrait {
 		$configFile = self::$manticoreConfigFile;
 		$conf = file_get_contents($configFile);
 		if ($conf === false) {
-			throw new Exception("Unvalid Manticore config found at $configFile");
+			throw new Exception("Invalid Manticore config found at $configFile");
 		}
 		$conf = str_replace('%BUDDY%', $buddyPath, $conf);
 		self::updateManticoreConf($conf);

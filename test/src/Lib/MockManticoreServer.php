@@ -12,9 +12,14 @@
 namespace Manticoresearch\BuddyTest\Lib;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
+use Manticoresearch\Buddy\Exception\InvalidRequestError;
+use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
+
+use Manticoresearch\Buddy\Exception\ManticoreResponseError;
+use Manticoresearch\Buddy\Exception\ParserLoadError;
+use Manticoresearch\Buddy\Exception\QueryParserError;
 use Manticoresearch\Buddy\Exception\SocketError;
 use RuntimeException;
-
 use Socket;
 
 final class MockManticoreServer {
@@ -211,6 +216,11 @@ final class MockManticoreServer {
 	/**
 	 * @param string $resp
 	 * @return void
+	 * @throws ManticoreHTTPClientError
+	 * @throws QueryParserError
+	 * @throws ParserLoadError
+	 * @throws ManticoreResponseError
+	 * @throws InvalidRequestError
 	 */
 	private function sendResponse(string $resp): void {
 		if ($this->conn === false) {

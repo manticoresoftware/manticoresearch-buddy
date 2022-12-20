@@ -11,6 +11,9 @@
 
 namespace Manticoresearch\BuddyUnitTest\Lib;
 
+use Exception;
+use Manticoresearch\Buddy\Exception\BuddyRequestError;
+use Manticoresearch\Buddy\Exception\GenericError;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Lib\TaskStatus;
 use PHPUnit\Framework\TestCase;
@@ -55,5 +58,45 @@ class TaskTest extends TestCase {
 		$this->assertEquals(TaskStatus::Finished, $Task->getStatus());
 		$this->assertEquals(true, $Task->isSucceed());
 		$this->assertEquals($arg, $Task->getResult());
+	}
+
+	public function testTaskReturnsGenericErrorOnException(): void {
+		echo "\nTesting the task's exception converts to generic error\n";
+		$errorMessage = 'Here we go';
+		$Task = Task::create(
+			function () use ($errorMessage): bool {
+				throw new Exception($errorMessage);
+			}
+		);
+		$this->assertEquals(TaskStatus::Pending, $Task->getStatus());
+		$Task->run();
+		$this->assertEquals(TaskStatus::Running, $Task->getStatus());
+		usleep(500000);
+		$this->assertEquals(TaskStatus::Finished, $Task->getStatus());
+		$this->assertEquals(false, $Task->isSucceed());
+		$error = $Task->getError();
+		$this->assertEquals(true, $error instanceof GenericError);
+		$this->assertEquals(Exception::class . ': ' . $errorMessage, $error->getMessage());
+		$this->assertEquals($errorMessage, $error->getResponseError());
+	}
+
+	public function testTaskReturnsGenericErrorOnCustomException(): void {
+		echo "\nTesting the task's custom exception converts to generic error\n";
+		$errorMessage = 'Custom error message';
+		$Task = Task::create(
+			function () use ($errorMessage): bool {
+				throw new BuddyRequestError($errorMessage);
+			}
+		);
+		$this->assertEquals(TaskStatus::Pending, $Task->getStatus());
+		$Task->run();
+		$this->assertEquals(TaskStatus::Running, $Task->getStatus());
+		usleep(500000);
+		$this->assertEquals(TaskStatus::Finished, $Task->getStatus());
+		$this->assertEquals(false, $Task->isSucceed());
+		$error = $Task->getError();
+		$this->assertEquals(true, $error instanceof GenericError);
+		$this->assertEquals(BuddyRequestError::class . ': ' . $errorMessage, $error->getMessage());
+		$this->assertEquals($errorMessage, $error->getResponseError());
 	}
 }

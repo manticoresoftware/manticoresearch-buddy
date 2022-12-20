@@ -16,8 +16,8 @@ class ParserLoadErrorTest extends TestCase {
 
 	public function testParserLoadError(): void {
 		echo "\nTesting ParserLoadError raise\n";
-		$this->expectException(RuntimeException::class);
-		$this->expectExceptionMessage('Parser load error: Test error message');
+		$this->expectException(ParserLoadError::class);
+		$this->expectExceptionMessage('Test error message');
 		throw new ParserLoadError('Test error message');
 	}
 

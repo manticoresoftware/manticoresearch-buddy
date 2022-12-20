@@ -23,8 +23,7 @@ class InsertQueryTest extends TestCase {
 
 	public function setUp(): void {
 		$this->testTable = 'test';
-		$sqlPort = self::getListenSqlPort();
-		exec("mysql -P$sqlPort -h127.0.0.1 -e 'drop table if exists {$this->testTable}' ");
+		static::runSqlQuery("drop table if exists {$this->testTable}", false);
 	}
 
 	public function testSqlInsertQueryOk(): void {
@@ -34,8 +33,7 @@ class InsertQueryTest extends TestCase {
 			$this->markTestSkipped();
 		}
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
-		$sqlPort = self::getListenSqlPort();
-		exec("mysql -P$sqlPort -h127.0.0.1 -e '$query' 2>&1", $out);
+		$out = static::runSqlQuery($query);
 		$result = [];
 		$this->assertEquals($result, $out);
 	}
@@ -48,8 +46,7 @@ class InsertQueryTest extends TestCase {
 			$this->markTestSkipped();
 		}
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
-		$httpPort = self::getListenHttpPort();
-		exec("curl localhost:$httpPort/cli -d '$query' 2>&1", $out);
+		$out = static::runHttpQuery($query);
 		$result = '[{"total":1,"error":"","warning":""}]';
 		$this->assertEquals($result, $out[3]);
 	}

@@ -13,7 +13,7 @@ namespace Manticoresearch\Buddy\Trait;
 
 use Manticoresearch\Buddy\Enum\Datatype;
 
-use RuntimeException;
+use Manticoresearch\Buddy\Exception\GenericError;
 
 trait CheckInsertDataTrait {
 
@@ -21,7 +21,7 @@ trait CheckInsertDataTrait {
 	 * Checking for unescaped characters. Just as a test feature so far
 	 *
 	 * @param string|array<mixed> $row
-	 * @param class-string<RuntimeException> $errorHandler
+	 * @param class-string<GenericError> $errorHandler
 	 * @return void
 	 */
 	public static function checkUnescapedChars(mixed $row, string $errorHandler): void {
@@ -43,7 +43,7 @@ trait CheckInsertDataTrait {
 	 * @param array<mixed> $rowVals
 	 * @param array<Datatype> $types
 	 * @param array<string> $cols
-	 * @param class-string<RuntimeException> $errorHandler
+	 * @param class-string<GenericError> $errorHandler
 	 * @return void
 	 */
 	public static function checkColTypesError(
@@ -71,7 +71,7 @@ trait CheckInsertDataTrait {
 	 * @param array<Datatype> $curTypes
 	 * @param array<Datatype> $types
 	 * @param array<string> $cols
-	 * @param class-string<RuntimeException> $errorHandler
+	 * @param class-string<GenericError> $errorHandler
 	 * @return void
 	 */
 	protected static function checkColTypesCompatibilityError(

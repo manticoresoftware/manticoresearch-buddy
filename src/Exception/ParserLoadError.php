@@ -11,8 +11,5 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-final class ParserLoadError extends DetailedError {
-
-	const ERROR_MSG = 'Parser load error';
-
+final class ParserLoadError extends GenericError {
 }

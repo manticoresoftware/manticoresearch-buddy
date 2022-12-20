@@ -13,7 +13,7 @@ namespace Manticoresearch\Buddy\Network;
 
 use Exception;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\BuddyError;
+use Manticoresearch\Buddy\Exception\GenericError;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Lib\TaskPool;
@@ -82,20 +82,27 @@ final class EventHandler {
 			$executor = QueryProcessor::process($request);
 			$task = $executor->run(static::$runtimes[mt_rand(0, static::$maxRuntimeIndex)]);
 		} catch (Throwable $e) {
+			debug("[$id] data parse error: {$e->getMessage()}");
+
+			// Create special generic error in case we have system exception
+			// And shadowing $e with it
 			/** @var string $originalError */
 			$originalError = match (true) {
 				isset($request) => $request->error,
 				default => ((array)json_decode($data, true))['error'] ?? '',
 			};
+			if (!is_a($e, GenericError::class)) {
+				$e = GenericError::create($originalError);
+			}
+			/** @var GenericError $e */
+			if (!$e->hasResponseError()) {
+				$e->setResponseError($originalError);
+			}
 
-			debug("[$id] data parse error: {$e->getMessage()}");
 			$deferred->resolve(
 				[
 					$request ?? Request::default(),
-					Response::fromError(
-						BuddyError::from($e, $originalError),
-						$request->format ?? RequestFormat::JSON
-					),
+					Response::fromError($e, $request->format ?? RequestFormat::JSON),
 				]
 			);
 			return $deferred->promise();
@@ -148,10 +155,7 @@ final class EventHandler {
 				return $deferred->resolve(
 					[
 						$request,
-						Response::fromError(
-							BuddyError::from($task->getError(), $request->error),
-							$request->format
-						),
+						Response::fromError($task->getError(), $request->format),
 					]
 				);
 			}

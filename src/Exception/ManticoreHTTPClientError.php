@@ -11,8 +11,5 @@
 
 namespace Manticoresearch\Buddy\Exception;
 
-final class ManticoreHTTPClientError extends DetailedError {
-
-	const ERROR_MSG = 'Manticore request error';
-
+final class ManticoreHTTPClientError extends GenericError {
 }
