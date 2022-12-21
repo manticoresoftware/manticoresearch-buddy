@@ -12,6 +12,7 @@
 use Manticoresearch\Buddy\Backup\Request as BackupRequest;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
 use Manticoresearch\Buddy\Network\Request;
 use PHPUnit\Framework\TestCase;
 
@@ -143,6 +144,88 @@ class BackupRequestTest extends TestCase {
 			foreach ($checks as $key => $val) {
 				$this->assertEquals($val, $request->{$key});
 			}
+		}
+	}
+
+
+	public function testSQLQueryParsingSucceedOnRightSyntax(): void {
+		$testingSet = [
+			'backup all',
+			'BacKup ALL',
+			'backup',
+			'backup all to local(/tmp)',
+			'backup all TO LOCAL(/tmp)',
+			'backup all options async=1',
+			'backup all options async =1, compress=0',
+			'backup all options ASYNC =1, COMPRESS=0',
+			'backup all options async = off, compress= yes',
+			'backup all options async = FALSE, compress= ON',
+			'backup table a, b to local(/tmp) option async = 1',
+			'backup tables b to local(  /tmp)',
+			'backup tables a, b',
+			'backup table b',
+			'backup all to local(  /path )',
+			'backup    all to   local(/tmp   ) option async     = on',
+		];
+
+		foreach ($testingSet as $query) {
+			try {
+				BackupRequest::fromNetworkRequest(
+					Request::fromArray(
+						[
+							'version' => 1,
+							'error' => '',
+							'payload' => $query,
+							'format' => RequestFormat::SQL,
+							'endpoint' => ManticoreEndpoint::Sql,
+						]
+					)
+				);
+			} catch (SQLQueryParsingError $e) {
+				$this->assertEquals(true, false, "Correct syntax parse failed: $query");
+			}
+			$this->assertEquals(true, true);
+		}
+	}
+
+	public function testSQLQueryParsingFailedOnWrongSyntax(): void {
+		$testingSet = [
+			'backup all to /tmp',
+			'backup all local(/tmp)',
+			'backup table %$ to local(/tmp)',
+			'backup table a to /tmp',
+			'backup tables a, b, c to /tmp',
+			'backup ttable a to local(/tmp)',
+			'backup table a to local(/tmp) options ha=1',
+			'backup table a to local(/tmp) options async=10',
+			'backup to local(/tmp) option async != 1',
+			'backup all to local(/tmp) option async = 1, compress=h',
+			'backup all option async = 1, compress=h to local(/tmp)',
+			'backup to local(/tmp)',
+		];
+
+		foreach ($testingSet as $query) {
+			try {
+				BackupRequest::fromNetworkRequest(
+					Request::fromArray(
+						[
+							'version' => 1,
+							'error' => '',
+							'payload' => $query,
+							'format' => RequestFormat::SQL,
+							'endpoint' => ManticoreEndpoint::Sql,
+						]
+					)
+				);
+			} catch (SQLQueryParsingError $e) {
+				$this->assertEquals(
+					'You have an error in your query. Please, double check it.',
+					$e->getResponseError()
+				);
+				continue;
+			}
+
+			$this->assertEquals(true, false, "Failure test succeeded: $query");
 		}
 	}
 

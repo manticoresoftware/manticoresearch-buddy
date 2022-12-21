@@ -20,6 +20,8 @@ use RuntimeException;
  * Request for Backup command that has parsed parameters from SQL
  */
 class Request implements CommandRequestInterface {
+	const DEFAULT_PATH = '/var/lib/manticore';
+
 	const OPTIONS = [
 		'async' => 'bool',
 		'compress' => 'bool',
@@ -70,7 +72,7 @@ class Request implements CommandRequestInterface {
 
 		$params = static::extractNamedMatches($matches);
 		// TODO: fix the default path
-		$path = $params['path'] ?? '/var/lib/manticore';
+		$path = $params['path'] ?? static::DEFAULT_PATH;
 		$tables = !isset($params['all']) && isset($params['table'])
 			? array_map(trim(...), explode(',', $params['table']))
 			: []
@@ -80,18 +82,26 @@ class Request implements CommandRequestInterface {
 		? array_reduce(
 			array_map(trim(...), explode(',', $params['options'])),
 			function (array $map, string $v): array {
-				[$key, $value] = array_map(trim(...), explode('=', $v));
+				[$key, $value] = array_map(fn ($v) => strtolower(trim($v)), explode('=', $v));
 				$map[$key] = static::castOption($key, $value);
 				return $map;
 			},
 			[]
 		) : [];
 
-		return new Request(
+		$self = new Request(
 			path: $path,
 			tables: $tables,
 			options: $options
 		);
+
+		$queryTokens = static::extractTokens($query);
+		$buildTokens = $self->tokenize();
+		if (array_diff($queryTokens, $buildTokens)) {
+			throw SQLQueryParsingError::create('You have an error in your query. Please, double check it.');
+		}
+
+		return $self;
 	}
 
   /**
@@ -126,5 +136,80 @@ class Request implements CommandRequestInterface {
 			'bool', 'boolean' => $value === 'true' || $value === '1' || $value === 'yes' || $value === 'on',
 			default => throw new RuntimeException("Unsupported type to cast the option '$key' to '$type"),
 		};
+	}
+
+	/**
+	 * Extract tokens from query to validate
+	 *
+	 * @param string $query
+	 * @return array<string>
+	 */
+	protected static function extractTokens(string $query): array {
+		$query = preg_replace(
+			[
+				'/\(\s*([^\)]+?)\s*\)/',
+				'/(' . implode('|', array_keys(static::OPTIONS)) . ')\s*=\s*/ius',
+				'/=\s*(on|1|yes|true)/ius',
+				'/=\s*(off|0|no|false)/ius',
+				'/options/ius',
+				'/tables/ius',
+				'/all/ius',
+			], [
+				'($1)',
+				'$1=',
+				'=1',
+				'=0',
+				'option',
+				'table',
+				'',
+			], $query
+		);
+		return static::prepareTokens((array)explode(' ', $query ?: ''));
+	}
+
+	/**
+	 * Do the same as extractTokens but with current request and opposite operation
+	 * We tokenize to single form of word and boolean to 0 or 1 by using replace query
+	 *
+	 * @return array<string>
+	 */
+	protected function tokenize(): array {
+		$tokens = ['backup'];
+
+		if ($this->path !== static::DEFAULT_PATH) {
+			$tokens[] = 'to';
+			$tokens[] = "local({$this->path})";
+		}
+
+		if ($this->tables) {
+			$tokens[] = 'table';
+			array_push($tokens, ...$this->tables);
+		}
+
+		if ($this->options) {
+			$tokens[] = 'option';
+			foreach ($this->options as $key => $value) {
+				$tokens[] = $key . '=' . ($value ? '1' : '0');
+			}
+		}
+
+		return static::prepareTokens($tokens);
+	}
+
+	/**
+	 * Helper to convert token list to single output
+	 *
+	 * @param array<string> $tokens
+	 * @return array<string>
+	 */
+	protected static function prepareTokens(array $tokens): array {
+		return array_unique(
+			array_filter(
+				array_map(
+					fn ($v) => strtolower(trim($v, ' ,')),
+					$tokens
+				)
+			)
+		);
 	}
 }
