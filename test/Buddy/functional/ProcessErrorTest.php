@@ -33,7 +33,7 @@ final class ProcessErrorTest extends TestCase {
 
 	public function testCorrectErrorOnBackupNoTables(): void {
 		$this->assertQueryResultContainsError(
-			'backup',
+			'backup to /tmp',
 			'You have no tables to backup.'
 		);
 	}

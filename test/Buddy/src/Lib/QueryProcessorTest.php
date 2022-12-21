@@ -30,7 +30,7 @@ class QueryProcessorTest extends TestCase {
 			[
 				'version' => 1,
 				'error' => '',
-				'payload' => 'BACKUP',
+				'payload' => 'BACKUP TO /tmp',
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
