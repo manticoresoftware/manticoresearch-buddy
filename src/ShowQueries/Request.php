@@ -29,7 +29,7 @@ class Request implements CommandRequestInterface {
 	/**
 	 * @param NetRequest $request
 	 * @return self
-	 * @throws CommandInvalid
+	 * @throws SQLQueryCommandNotSupported
 	 */
 	public static function fromNetworkRequest(NetRequest $request): Request {
 		if (trim(strtolower($request->payload)) !== 'show queries') {
