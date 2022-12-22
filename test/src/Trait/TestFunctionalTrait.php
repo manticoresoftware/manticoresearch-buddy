@@ -163,7 +163,6 @@ trait TestFunctionalTrait {
 			usleep(1000000);
 		}
 		$result2 = static::runHttpQuery($query);
-
 		$this->assertStringContainsString($error, implode(PHP_EOL, $result1));
 		$this->assertEquals($error, $result2[0]['error']);
 	}
@@ -196,11 +195,16 @@ trait TestFunctionalTrait {
 	 * @return array<string>
 	 * @throws Exception
 	 */
-	protected static function runSqlQuery(string $query, bool $redirectOutput = true): array {
+	protected static function runSqlQuery(
+		string $query,
+		bool $redirectOutput = true,
+		bool $continueOnError = true
+	): array {
 		$port = static::getListenSqlPort();
 		$query = \addslashes($query);
 		$redirect = $redirectOutput ? '2>&1' : '';
-		exec("mysql -P$port -h127.0.0.1 -e '$query' $redirect", $output);
+		$force = $continueOnError ? '-f' : '';
+		exec("mysql -P$port -h127.0.0.1 -e '$query' $redirect $force", $output);
 		return $output;
 	}
 
