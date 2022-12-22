@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\ShowQueries;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
+use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\CommandRequestInterface;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 
@@ -28,8 +29,12 @@ class Request implements CommandRequestInterface {
 	/**
 	 * @param NetRequest $request
 	 * @return self
+	 * @throws CommandInvalid
 	 */
 	public static function fromNetworkRequest(NetRequest $request): Request {
+		if (trim(strtolower($request->payload)) !== 'show queries') {
+			throw new SQLQueryCommandNotSupported("Invalid query passed: $request->payload");
+		}
 		$self = new self();
 		$self->query = 'SELECT * FROM @@system.sessions';
 		$self->endpoint = $request->endpoint;
