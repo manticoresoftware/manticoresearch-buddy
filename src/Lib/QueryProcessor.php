@@ -118,12 +118,12 @@ class QueryProcessor {
 	public static function extractPrefixFromRequest(Request $request): string {
 		$queryLowercase = strtolower($request->payload);
 		$isInsertSQLQuery = in_array($request->endpoint, [ManticoreEndpoint::Sql, ManticoreEndpoint::Cli])
-			&& str_starts_with($queryLowercase, 'insert into');
+			&& str_starts_with($queryLowercase, 'insert ');
 		$isInsertHTTPQuery = ($request->endpoint === ManticoreEndpoint::Insert)
 			|| ($request->endpoint === ManticoreEndpoint::Bulk
 				&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')
 		);
-		$isInsertError = preg_match('/table (.*?) absent/', $request->error);
+		$isInsertError = preg_match('/table (.*?) absent/s', $request->error);
 		return match (true) {
 			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => 'InsertQuery',
 			str_starts_with($queryLowercase, 'show queries') => 'ShowQueries',
