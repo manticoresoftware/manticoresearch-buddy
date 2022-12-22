@@ -209,7 +209,7 @@ trait TestFunctionalTrait {
 	 *
 	 * @param string $query
 	 * @param bool $redirectOutput
-	 * @return array<int,array{error:string}>
+	 * @return array<int,array{error:string,total?:string,columns?:string}>
 	 * @throws Exception
 	 */
 	protected static function runHttpQuery(string $query, bool $redirectOutput = true): array {
@@ -217,7 +217,7 @@ trait TestFunctionalTrait {
 		$query = \addslashes($query);
 		$redirect = $redirectOutput ? '2>&1' : '';
 		exec("curl -s 127.0.0.1:$port/cli -d '$query' $redirect", $output);
-		/** @var array<int,array{error:string}> $result */
+		/** @var array<int,array{error:string,total?:string,columns?:string}> $result */
 		$result = (array)json_decode($output[0] ?? '{}', true);
 		return $result;
 	}
