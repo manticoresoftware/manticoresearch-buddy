@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\QueryParser;
 use Manticoresearch\Buddy\Enum\Datalim;
 use Manticoresearch\Buddy\Enum\Datatype;
 use Manticoresearch\Buddy\Exception\QueryParserError;
+use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 
 class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
@@ -37,11 +38,16 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 		$this->cols = $this->colTypes = [];
 		$matches = [];
 		preg_match_all('/\s*INSERT\s+INTO\s+(.*?)\s*\((.*?)\)\s+VALUES\s*(.*?)\s*;?\s*$/i', $query, $matches);
+		if (empty($matches[2])) {
+			throw new SQLQueryCommandNotSupported("Cannot create table with column names missing in query: $query");
+		}
 		$name = $matches[1][0];
 		$colExpr = $matches[2][0];
 		$this->cols = array_map('trim', explode(',', $colExpr));
 		$valExpr = $matches[3][0];
-
+		if (!$name || !$valExpr) {
+			throw new SQLQueryCommandNotSupported("Invalid query passed: $query");
+		}
 		$rows = $this->parseInsertRows($valExpr);
 		foreach ($rows as $row) {
 			//self::checkUnescapedChars($row, QueryParserError::class);

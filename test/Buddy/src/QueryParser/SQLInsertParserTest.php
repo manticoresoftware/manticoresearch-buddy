@@ -10,6 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Enum\Datatype;
+use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\QueryParser\SQLInsertParser;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
@@ -86,7 +87,7 @@ class SQLInsertParserTest extends TestCase {
 		}
 	}
 
-	public function testParse(): void {
+	public function testParseOk(): void {
 		echo "\nTesting the parsing of SQL insert request\n";
 
 		$query = 'INSERT INTO test(col1,col2,col3,col4,col5,col6,col7) VALUES'
@@ -122,4 +123,21 @@ class SQLInsertParserTest extends TestCase {
 		$this->assertEquals($res, $parser->parse($query));
 	}
 
+	public function testParseFail(): void {
+		echo "\nTesting the fails on the parsing of SQL insert request\n";
+		$parser = new SQLInsertParser();
+		$query = "INSERT INTO test VALUES ('val1')";
+		[$exCls, $exMsg] = self::getExceptionInfo($parser, 'parse', [$query]);
+		$this->assertEquals(SQLQueryCommandNotSupported::class, $exCls);
+		$this->assertEquals(
+			"Cannot create table with column names missing in query: INSERT INTO test VALUES ('val1')",
+			$exMsg
+		);
+
+		$parser = new SQLInsertParser();
+		$query = 'INSERT INTO test(col1) VALUES';
+		[$exCls, $exMsg] = self::getExceptionInfo($parser, 'parse', [$query]);
+		$this->assertEquals(SQLQueryCommandNotSupported::class, $exCls);
+		$this->assertEquals('Invalid query passed: INSERT INTO test(col1) VALUES', $exMsg);
+	}
 }
