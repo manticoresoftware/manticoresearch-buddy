@@ -44,7 +44,7 @@ class Executor implements CommandExecutorInterface {
 		$isAsync = $this->request->options['async'] ?? false;
 		$method = $isAsync ? 'deferInRuntime' : 'createInRuntime';
 
-		$Task = Task::$method(
+		$task = Task::$method(
 			$runtime,
 			static function (Request $request): array {
 				$config = new ManticoreConfig($request->configPath);
@@ -77,7 +77,7 @@ class Executor implements CommandExecutorInterface {
 			[$this->request]
 		);
 
-		return $Task->run();
+		return $task->run();
 	}
 
 	/**
