@@ -9,7 +9,7 @@ copy_to() {
 
 get_destination() {
   if [ -z "${IS_RELEASE_DIGIT}" ]; then
-    IS_RELEASE_DIGIT="$(echo "$f" | cut -d. -f3 | cut -d- -f1)"
+    IS_RELEASE_DIGIT="$(echo "$f" | cut -d. -f3 | cut -d_ -f1)"
     if [[ $((IS_RELEASE_DIGIT % 2)) -eq 0 ]]; then
       DESTINATION="release"
     else
