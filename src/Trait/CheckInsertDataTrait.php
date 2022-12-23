@@ -66,10 +66,56 @@ trait CheckInsertDataTrait {
 	}
 
 	/**
+	 * Helper function for the incompatible column Datatypes check
+	 *
+	 * @param Datatype $type
+	 * @param string $col
+	 * @param int $i
+	 * @param array<Datatype> &$types
+	 * @param string &$error
+	 * @return void
+	 */
+	protected static function checkTypeBundlesCompatibility(
+		Datatype $type,
+		string $col,
+		int $i,
+		array &$types,
+		string &$error
+	): void {
+		$typeBundles = [
+			[Datatype::Json],
+			[Datatype::Multi64, Datatype::Multi],
+			[Datatype::Float, Datatype::Bigint, Datatype::Int],
+			[Datatype::Text, Datatype::String],
+		];
+		$isNewErrorCol = true;
+		foreach ($typeBundles as $tb) {
+			$i1 = array_search($type, $tb);
+			$i2 = array_search($types[$i], $tb);
+			// updating possible Datatype by priority set in $typeBundles
+			if ($i1 !== false && $i2 !== false && $i1 < $i2) {
+				$types[$i] = $tb[$i1];
+			}
+			if (($i1 !== false && $i2 !== false) || ($i1 === false && $i2 === false)) {
+				continue;
+			}
+			// Incompatible types are found
+			if ($error === '') {
+				$error = "Incompatible types in '{$col}': ";
+			} elseif ($isNewErrorCol) {
+				$error .= "; '{$col}': ";
+			}
+			$isNewErrorCol = false;
+			$error .= "'{$type->value} {$types[$i]->value}',";
+			break;
+		}
+	}
+
+	/**
 	 * Checking for incompatible column Datatypes in different rows
 	 *
 	 * @param array<Datatype> $curTypes
-	 * @param array<Datatype> $types
+	 * @param array<Datatype> &$types
 	 * @param array<string> $cols
 	 * @param class-string<GenericError> $errorHandler
 	 * @return void
@@ -80,36 +126,10 @@ trait CheckInsertDataTrait {
 		array $cols,
 		string $errorHandler
 	): void {
-		$TYPE_BUNDLES = [
-			[Datatype::Json],
-			[Datatype::Multi64, Datatype::Multi],
-			[Datatype::Float, Datatype::Bigint, Datatype::Int],
-			[Datatype::Text, Datatype::String],
-		];
 		$error = '';
 		foreach ($curTypes as $i => $t) {
-			$i0 = $i;
-			foreach ($TYPE_BUNDLES as $tb) {
-				$i1 = array_search($t, $tb);
-				$i2 = array_search($types[$i], $tb);
-				// updating possible Datatype by priority set in TYPE_BUNDLES
-				if ($i1 !== false && $i2 !== false && $i1 < $i2) {
-					$types[$i] = $tb[$i1];
-				}
-				if (($i1 !== false && $i2 !== false) || ($i1 === false && $i2 === false)) {
-					continue;
-				}
-				// Incompatible types are found
-				if ($error === '') {
-					$error = "Incompatible types in '{$cols[$i]}': ";
-				} elseif ($i !== $i0) {
-					$error .= "; '{$cols[$i]}': ";
-				}
-				$error .= "'{$t->value} {$types[$i]->value}',";
-				break;
-			}
+			self::checkTypeBundlesCompatibility($t, $cols[$i], $i, $types, $error);
 		}
-
 		if ($error !== '') {
 			throw new $errorHandler($error);
 		}

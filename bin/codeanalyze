@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-./vendor/bin/phpstan analyse -c "$(pwd)/phpstan.neon"
+./vendor/bin/phpstan --memory-limit=-1 analyse -c "$(pwd)/phpstan.neon"

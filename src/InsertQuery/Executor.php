@@ -45,11 +45,11 @@ class Executor implements CommandExecutorInterface {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = function (Request $request, HTTPClient $manticoreClient): array {
-			for ($i = 0, $max_i = sizeof($request->queries) - 1; $i <= $max_i; $i++) {
+			for ($i = 0, $maxI = sizeof($request->queries) - 1; $i <= $maxI; $i++) {
 				$query = $request->queries[$i];
 				// When processing the final query we need to make sure the response to client
 				// has the same format as the initial request, otherwise we just use 'cli' default endpoint
-				if ($i === $max_i) {
+				if ($i === $maxI) {
 					$manticoreClient->setEndpoint($request->endpoint);
 				}
 

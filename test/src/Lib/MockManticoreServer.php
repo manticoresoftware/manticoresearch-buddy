@@ -82,25 +82,7 @@ final class MockManticoreServer {
 	/**
 	 * @return void
 	 */
-	public function start(): void {
-		$connInfo = parse_url($this->addrPort);
-		if ($connInfo === false
-			|| (!array_key_exists('host', $connInfo) || !array_key_exists('port', $connInfo))) {
-			exit("<Mock Manticore server terminated: Wrong connection data '{$this->addrPort}' passed");
-		}
-
-		$this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-		if ($this->socket === false) {
-			throw new SocketError('Cannot create a socket');
-		} else {
-			if (!socket_bind($this->socket, $connInfo['host'], $connInfo['port']) || !socket_listen($this->socket)) {
-				throw new SocketError('Cannot connect to the socket');
-			}
-			socket_set_nonblock($this->socket);
-		}
-
-		echo "<Mock Manticore server started at {$this->addrPort}>";
-		$this->checkParentProc();
+	protected function run(): void {
 		while ($this->socket !== false) {
 			$this->conn = socket_accept($this->socket);
 			if ($this->conn === false) {
@@ -121,6 +103,31 @@ final class MockManticoreServer {
 				$this->process($reqBody);
 			}
 		}
+	}
+
+	/**
+	 * @return void
+	 */
+	public function start(): void {
+		$connInfo = parse_url($this->addrPort);
+		if ($connInfo === false
+			|| (!array_key_exists('host', $connInfo) || !array_key_exists('port', $connInfo))) {
+			exit("<Mock Manticore server terminated: Wrong connection data '{$this->addrPort}' passed");
+		}
+
+		$this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+		if ($this->socket === false) {
+			throw new SocketError('Cannot create a socket');
+		} else {
+			if (!socket_bind($this->socket, $connInfo['host'], $connInfo['port']) || !socket_listen($this->socket)) {
+				throw new SocketError('Cannot connect to the socket');
+			}
+			socket_set_nonblock($this->socket);
+		}
+
+		echo "<Mock Manticore server started at {$this->addrPort}>";
+		$this->checkParentProc();
+		$this->run();
 	}
 
 	/**
@@ -149,6 +156,40 @@ final class MockManticoreServer {
 	}
 
 	/**
+	 * @param mixed $dataPacket
+	 * @param bool &$isFinishing
+	 * @param bool &$isOk
+	 * @return string
+	 */
+	private function readSocketDataPacket(mixed $dataPacket, bool &$isFinishing, bool &$isOk): string {
+		switch ($dataPacket) {
+			case false:
+				if (in_array(
+					socket_last_error(),
+					[SOCKET_EINPROGRESS, SOCKET_EALREADY, SOCKET_EAGAIN, SOCKET_EWOULDBLOCK]
+				)) {
+					if ($isFinishing === false) {
+						$isFinishing = true;
+						usleep(10000);
+						$isOk = true;
+					} else {
+						$isOk = false;
+					}
+				} else {
+					$isOk = false;
+				}
+				return '';
+			case '':
+				$isOk = false;
+				return '';
+			default:
+				$isFinishing = false;
+				$isOk = true;
+				return is_string($dataPacket) ? $dataPacket : '';
+		}
+	}
+
+	/**
 	 * @return string
 	 */
 	private function readSocketData(): string {
@@ -159,33 +200,8 @@ final class MockManticoreServer {
 			if ($this->conn === false) {
 				$isOk = false;
 			} else {
-				$data_packet = socket_read($this->conn, 2048, PHP_BINARY_READ);
-				switch ($data_packet) {
-					case false:
-						if (in_array(
-							socket_last_error(),
-							[SOCKET_EINPROGRESS, SOCKET_EALREADY, SOCKET_EAGAIN, SOCKET_EWOULDBLOCK]
-						)) {
-							if ($isFinishing === false) {
-								$isFinishing = true;
-								usleep(10000);
-								$isOk = true;
-							} else {
-								$isOk = false;
-							}
-						} else {
-							$isOk = false;
-						}
-						break;
-					case '':
-						$isOk = false;
-						break;
-					default:
-						$data .= $data_packet;
-						$isFinishing = false;
-						$isOk = true;
-						break;
-				}
+				$dataPacket = socket_read($this->conn, 2048, PHP_BINARY_READ);
+				$data .= $this->readSocketDataPacket($dataPacket, $isFinishing, $isOk);
 			}
 		} while ($isOk);
 
