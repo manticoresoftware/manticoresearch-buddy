@@ -202,7 +202,7 @@ jobs:
             script: bin/upload_repo_rpm
             distro: 9
           - artifact: artifact
-            ext: {tar.gz,zip}
+            ext: "{tar.gz,zip}"
             script: bin/upload_repo_arc
             distro: ""
     steps:
