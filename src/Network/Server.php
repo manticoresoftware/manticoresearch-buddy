@@ -103,9 +103,9 @@ final class Server {
 	 * @return static
 	 */
 	public function start(): static {
-		buddy_metric('invocation', 1);
-
+		// This is must be first! Because its important
 		echo 'started ' . str_replace('tcp://', '', (string)$this->socket->getAddress()) . PHP_EOL;
+		buddy_metric('invocation', 1);
 		// First add all ticks to run periodically
 		foreach ($this->ticks['server'] as [$fn, $period]) {
 			Loop::addPeriodicTimer($period, $this->wrapFn($fn));
