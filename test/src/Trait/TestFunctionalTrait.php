@@ -237,7 +237,6 @@ trait TestFunctionalTrait {
 	/**
 	 * Helper that checks if the pathes defined in the manticore config exist
 	 * and tries to create them if not
-	 *
 	 * @return void
 	 */
 	protected static function checkManticorePathes(): void {
