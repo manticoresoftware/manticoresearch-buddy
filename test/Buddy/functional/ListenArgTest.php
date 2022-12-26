@@ -18,10 +18,6 @@ class ListenArgTest extends TestCase {
 
 	public function testListenArgumentChange(): void {
 		echo "\nTesting if the `listen` argument is passed from daemon to Buddy correctly\n";
-		if (!self::hasCurl()) {
-			echo "Curl is not installed\n";
-			$this->markTestSkipped();
-		}
 		$defPort = $this->getListenDefaultPort();
 		$this->setListenDefaultPort(8888);
 		$httpPort = self::getListenHttpPort();
