@@ -28,10 +28,6 @@ class InsertQueryTest extends TestCase {
 
 	public function testSqlInsertQueryOk(): void {
 		echo "\nTesting the execution of SQL insert query to a non-existing table\n";
-		if (!self::hasMySQL()) {
-			echo "MySQL is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
 		$out = static::runSqlQuery($query);
 		$result = [];
@@ -41,10 +37,6 @@ class InsertQueryTest extends TestCase {
 	public function testHTTPInsertQueryOk(): void {
 		// Making sure curl is installed
 		echo "\nTesting the execution of HTTP insert query to a non-existing table\n";
-		if (!self::hasCurl()) {
-			echo "Curl is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 1,'error' => '','warning' => '']];

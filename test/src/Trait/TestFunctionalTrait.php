@@ -221,7 +221,7 @@ trait TestFunctionalTrait {
 	 *
 	 * @param string $query
 	 * @param bool $redirectOutput
-	 * @return array<int,array{error:string,data:array<int,array<string,string>>}>
+	 * @return array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}>
 	 * @throws Exception
 	 */
 	protected static function runHttpQuery(string $query, bool $redirectOutput = true): array {
@@ -229,7 +229,7 @@ trait TestFunctionalTrait {
 		$query = \addslashes($query);
 		$redirect = $redirectOutput ? '2>&1' : '';
 		exec("curl -s 127.0.0.1:$port/cli -d '$query' $redirect", $output);
-		/** @var array<int,array{error:string,data:array<int,array<string,string>>}> $result */
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = (array)json_decode($output[0] ?? '{}', true);
 		return $result;
 	}
@@ -310,27 +310,5 @@ trait TestFunctionalTrait {
 			throw new Exception('Failed to find children pids for ' . self::$manticorePid);
 		}
 		self::$buddyPid = $pids[0];
-	}
-
-	/**
-	 * Helper that checks if curl is installed on the current machine
-	 *
-	 * @return bool
-	 */
-	protected static function hasCurl(): bool {
-		$out = [];
-		exec('whereis curl', $out);
-		return $out[0] !== 'curl:';
-	}
-
-	/**
-	 * Helper that checks if MySQL is installed on the current machine
-	 *
-	 * @return bool
-	 */
-	protected static function hasMySQL(): bool {
-		$out = [];
-		exec('whereis mysql', $out);
-		return $out[0] !== 'mysql:';
 	}
 }
