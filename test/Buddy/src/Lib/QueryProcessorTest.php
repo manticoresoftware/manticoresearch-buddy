@@ -59,8 +59,8 @@ class QueryProcessorTest extends TestCase {
 		$this->assertInstanceOf(ShowQueriesRequest::class, $request);
 	}
 
-	public function testCommandProcessFail(): void {
-		echo "\nTesting the processing of incorrect execution command\n";
+	public function testUnsupportedCommandProcessFail(): void {
+		echo "\nTesting the processing of unsupported execution command\n";
 		$this->expectException(SQLQueryCommandNotSupported::class);
 		$this->expectExceptionMessage('Failed to handle query: TEST');
 		$request = Request::fromArray(
@@ -76,5 +76,4 @@ class QueryProcessorTest extends TestCase {
 		$refCls->setStaticPropertyValue('inited', true);
 		QueryProcessor::process($request);
 	}
-
 }
