@@ -23,10 +23,6 @@ class ShowQueriesTest extends TestCase {
 
 	public function testSQLShowQueriesOk(): void {
 		echo "\nTesting the execution of SQL SHOW QUERIES statement\n";
-		if (!self::hasMySQL()) {
-			echo "MySQL is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = 'SHOW QUERIES';
 		$out = static::runSqlQuery($query);
 		$result = 'id	query	protocol	host';
@@ -38,10 +34,6 @@ class ShowQueriesTest extends TestCase {
 
 	public function testSQLShowQueriesFail(): void {
 		echo "\nTesting the fail on the execution of SQL SHOW QUERIES statement\n";
-		if (!self::hasMySQL()) {
-			echo "MySQL is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = 'SHOW QUERIES 123';
 		$out = static::runSqlQuery($query);
 		$result = [
@@ -53,10 +45,6 @@ class ShowQueriesTest extends TestCase {
 
 	public function testHTTPShowQueriesOk(): void {
 		echo "\nTesting the execution of HTTP SHOW QUEIRES statement\n";
-		if (!self::hasCurl()) {
-			echo "Curl is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = 'SHOW QUERIES';
 		$out = static::runHttpQuery($query);
 		$resultColumns = [
@@ -81,10 +69,6 @@ class ShowQueriesTest extends TestCase {
 
 	public function testHTTPShowQueriesFail(): void {
 		echo "\nTesting the fail on the execution of HTTP SHOW QUERIES statement\n";
-		if (!self::hasCurl()) {
-			echo "Curl is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = 'SHOW QUERIES 123';
 		$out = static::runHttpQuery($query);
 		$result = [
