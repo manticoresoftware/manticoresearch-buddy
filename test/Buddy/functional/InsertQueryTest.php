@@ -28,10 +28,6 @@ class InsertQueryTest extends TestCase {
 
 	public function testSqlInsertQueryOk(): void {
 		echo "\nTesting the execution of SQL insert query to a non-existing table\n";
-		if (!self::hasMySQL()) {
-			echo "MySQL is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
 		$out = static::runSqlQuery($query);
 		$result = [];
@@ -40,10 +36,6 @@ class InsertQueryTest extends TestCase {
 
 	public function testSqlInsertQueryFail(): void {
 		echo "\nTesting the fail on the execution of SQL insert query to a non-existing table\n";
-		if (!self::hasMySQL()) {
-			echo "MySQL is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1,2) ";
 		$out = static::runSqlQuery($query);
 		$result = ["ERROR 1064 (42000) at line 1: sphinxql: wrong number of values here near ')'"];
@@ -53,10 +45,6 @@ class InsertQueryTest extends TestCase {
 	public function testHTTPInsertQueryOk(): void {
 		// Making sure curl is installed
 		echo "\nTesting the execution of HTTP insert query to a non-existing table\n";
-		if (!self::hasCurl()) {
-			echo "Curl is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 1,'error' => '','warning' => '']];
@@ -65,10 +53,6 @@ class InsertQueryTest extends TestCase {
 
 	public function testHTTPInsertQueryFail(): void {
 		echo "\nTesting the fail on the execution of HTTP insert query to a non-existing table\n";
-		if (!self::hasCurl()) {
-			echo "Curl is not installed\n";
-			$this->markTestSkipped();
-		}
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1,2) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 0,'error' => "sphinxql: wrong number of values here near ') '",'warning' => '']];
