@@ -27,20 +27,11 @@ class CliArgsProcessorTest extends TestCase {
 		putenv('LISTEN');
 	}
 
-
 	public function testDefaultArgsProcessOk(): void {
 		echo "\nTesting the processing of the arguments with default values\n";
 		$this->assertEquals(1, getenv('TELEMETRY'));
 		$this->assertEquals(false, getenv('DEBUG'));
 	}
-
-	public function testVersionArgProcessOk(): void {
-		echo "\nTesting the processing of the `version` argument\n";
-		$version = trim((string)file_get_contents(__DIR__ . '/../../../../APP_VERSION'));
-		$res = "Manticore Buddy v$version\n"
-			. "Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)\n";
-		$this->assertEquals($res, self::invokeMethod(CliArgsProcessor::class, 'version'));
-  }
 
 	public function testListenArgProcessOk(): void {
 		echo "\nTesting the processing of the `listen` argument\n";
@@ -50,6 +41,13 @@ class CliArgsProcessorTest extends TestCase {
 			$this->assertEquals($consts['listen'], getenv('LISTEN'));
 		}
 		$this->assertEquals('127.0.0.1:9308', getenv('LISTEN'));
+	}
 
+	public function testVersionArgProcessOk(): void {
+		echo "\nTesting the processing of the `version` argument\n";
+		$version = trim((string)file_get_contents(__DIR__ . '/../../../../APP_VERSION'));
+		$res = "Manticore Buddy v$version\n"
+			. "Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)\n";
+		$this->assertEquals($res, self::invokeMethod(CliArgsProcessor::class, 'version'));
 	}
 }
