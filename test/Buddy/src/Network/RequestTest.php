@@ -9,6 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use Manticoresearch\Buddy\Network\Request;
@@ -34,6 +35,13 @@ class RequestTest extends TestCase {
 		$this->assertInstanceOf(Request::class, $request);
 		$this->assertEquals($payload['message']['body'], $request->payload);
 		$this->assertEquals(RequestFormat::JSON, $request->format);
+		$this->assertEquals($payload['version'], $request->version);
+		$this->assertEquals($payload['error'], $request->error);
+		$this->assertEquals(ManticoreEndpoint::Cli, $request->endpoint);
+
+		$payload['message']['path_query'] = '';
+		$request = Request::fromPayload($payload);
+		$this->assertEquals(ManticoreEndpoint::Sql, $request->endpoint);
 	}
 
 	public function testManticoreRequestValidationFail(): void {
@@ -57,10 +65,26 @@ class RequestTest extends TestCase {
 		$this->assertEquals(InvalidRequestError::class, $exCls);
 		$this->assertEquals("Do not know how to handle 'error request' type", $exMsg);
 
+		$payload['message']['path_query'] = '/test';
+		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
+		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals("Do not know how to handle '/test' path_query", $exMsg);
+
 		unset($payload['error']);
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
 		$this->assertEquals(InvalidRequestError::class, $exCls);
 		$this->assertEquals("Mandatory field 'error' is missing", $exMsg);
+
+		$payload['error'] = 123;
+		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
+		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals("Field 'error' must be a string", $exMsg);
+
+		$payload['error'] = 'some error';
+		$payload['message']['body'] = 123;
+		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
+		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals("Field 'body' must be a string", $exMsg);
 	}
 
 	public function testManticoreQueryValidationOk(): void {
