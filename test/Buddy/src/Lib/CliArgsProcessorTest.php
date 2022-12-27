@@ -40,6 +40,7 @@ class CliArgsProcessorTest extends TestCase {
 		$res = "Manticore Buddy v$version\n"
 			. "Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)\n";
 		$this->assertEquals($res, self::invokeMethod(CliArgsProcessor::class, 'version'));
+  }
 
 	public function testListenArgProcessOk(): void {
 		echo "\nTesting the processing of the `listen` argument\n";
