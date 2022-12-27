@@ -12,6 +12,7 @@
 use Manticoresearch\Buddy\Backup\Request as BackupRequest;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
 use Manticoresearch\Buddy\Network\Request;
 use PHPUnit\Framework\TestCase;
 
@@ -26,14 +27,8 @@ class BackupRequestTest extends TestCase {
 				'options' => [],
 			],
 		], [ #2
-			'args' => [],
-			'checks' => [
-				'tables' => [],
-				'options' => [],
-				'path' => '/var/lib/manticore',
-			],
-		], [ #3
 			'args' => [
+				'path' => '/tmp',
 				'options' => [
 					'async' => 1,
 				],
@@ -43,10 +38,10 @@ class BackupRequestTest extends TestCase {
 				'options' => [
 					'async' => true,
 				],
-				'path' => '/var/lib/manticore',
 			],
-		], [ #4
+		], [ #3
 			'args' => [
+				'path' => '/tmp',
 				'options' => [
 					'async' => 'off',
 				],
@@ -56,10 +51,10 @@ class BackupRequestTest extends TestCase {
 				'options' => [
 					'async' => false,
 				],
-				'path' => '/var/lib/manticore',
 			],
-		], [ #5
+		], [ #4
 			'args' => [
+				'path' => '/tmp',
 				'options' => [
 					'compress' => 'on',
 				],
@@ -69,10 +64,10 @@ class BackupRequestTest extends TestCase {
 				'options' => [
 					'compress' => true,
 				],
-				'path' => '/var/lib/manticore',
 			],
-		], [ #6
+		], [ #5
 			'args' => [
+				'path' => '/tmp',
 				'options' => [
 					'compress' => '0',
 				],
@@ -82,9 +77,8 @@ class BackupRequestTest extends TestCase {
 				'options' => [
 					'compress' => false,
 				],
-				'path' => '/var/lib/manticore',
 			],
-		], [ #7
+		], [ #6
 			'args' => [
 				'path' => '/tmp',
 				'options' => [
@@ -99,7 +93,7 @@ class BackupRequestTest extends TestCase {
 					'async' => true,
 				],
 			],
-		], [ #8
+		], [ #7
 			'args' => [
 				'tables' => ['user'],
 				'path' => '/tmp',
@@ -107,7 +101,7 @@ class BackupRequestTest extends TestCase {
 			'checks' => [
 				'options' => [],
 			],
-		], [ #9
+		], [ #8
 			'args' => [
 				'tables' => ['user', 'people'],
 				'path' => '/tmp',
@@ -115,7 +109,7 @@ class BackupRequestTest extends TestCase {
 			'checks' => [
 				'options' => [],
 			],
-		], [ #10
+		], [ #9
 			'args' => [
 				'path' => '/tmp',
 				'tables' => ['user', 'people'],
@@ -146,6 +140,85 @@ class BackupRequestTest extends TestCase {
 		}
 	}
 
+
+	public function testSQLQueryParsingSucceedOnRightSyntax(): void {
+		$testingSet = [
+			'backup to /tmp',
+			'backup table hahah to /tmp',
+			'backup TO /tmp',
+			'backup to /tmp options async=1',
+			'backup to /tmp options async =1, compress=0',
+			'backup to /tmp options ASYNC =1, COMPRESS=0',
+			'backup to /tmp options async = off, compress= yes',
+			'backup to /tmp options async = FALSE, compress= ON',
+			'backup table a, b to /tmp option async = 1',
+			'backup tables b to    /tmp',
+			'backup tables a, b to /tmp/path/somehwere-dir_name',
+			'backup table b   to /tmp/directory',
+			'backup   to  C:\windows\Backup option async     = on',
+		];
+
+		foreach ($testingSet as $query) {
+			try {
+				BackupRequest::fromNetworkRequest(
+					Request::fromArray(
+						[
+							'version' => 1,
+							'error' => '',
+							'payload' => $query,
+							'format' => RequestFormat::SQL,
+							'endpoint' => ManticoreEndpoint::Sql,
+						]
+					)
+				);
+			} catch (SQLQueryParsingError $e) {
+				$this->assertEquals(true, false, "Correct syntax parse failed: $query");
+			}
+			$this->assertEquals(true, true);
+		}
+	}
+
+	public function testSQLQueryParsingFailedOnWrongSyntax(): void {
+		$testingSet = [
+			'backup all to /tmp',
+			'backup all local(/tmp)',
+			'backup table %$ to local(/tmp)',
+			'backup table a to local(/tmp)',
+			'backup tables a, b, c to FD:\f/tmp',
+			'backup ttable a to local(/tmp)',
+			'backup table a to local(/tmp) options ha=1',
+			'backup table a to local(/tmp) options async=10',
+			'backup to local(/tmp) option async != 1',
+			'backup all to local(/tmp) option async = 1, compress=h',
+			'backup all option async = 1, compress=h to local(/tmp)',
+			'backup to local(/tmp)',
+		];
+
+		foreach ($testingSet as $query) {
+			try {
+				BackupRequest::fromNetworkRequest(
+					Request::fromArray(
+						[
+							'version' => 1,
+							'error' => '',
+							'payload' => $query,
+							'format' => RequestFormat::SQL,
+							'endpoint' => ManticoreEndpoint::Sql,
+						]
+					)
+				);
+			} catch (SQLQueryParsingError $e) {
+				$this->assertEquals(
+					'You have an error in your query. Please, double check it.',
+					$e->getResponseError()
+				);
+				continue;
+			}
+
+			$this->assertEquals(true, false, "Failure test succeeded: $query");
+		}
+	}
+
   /**
    * This is helper to build query from input array
    * to reduce the code we write for tests
@@ -160,12 +233,10 @@ class BackupRequestTest extends TestCase {
 		if (isset($args['tables'])) {
 			$tables = implode(', ', $args['tables']);
 			$query .= "TABLE $tables ";
-		} else {
-			$query .= 'ALL ';
 		}
 
 		if (isset($args['path'])) {
-			$query .= "TO local({$args['path']}) ";
+			$query .= "TO {$args['path']} ";
 		}
 
 		if (isset($args['options'])) {

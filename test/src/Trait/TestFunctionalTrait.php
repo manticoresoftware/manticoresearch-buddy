@@ -160,7 +160,7 @@ trait TestFunctionalTrait {
 		$result1 = static::runSqlQuery($query);
 		// TODO: dirty hack for backup but until we fix it
 		if (str_starts_with($query, 'backup')) {
-			usleep(1000000);
+			sleep(1);
 		}
 		$result2 = static::runHttpQuery($query);
 
@@ -177,15 +177,26 @@ trait TestFunctionalTrait {
 	 * @throws Exception
 	 */
 	protected function assertQueryResultContainsString(string $query, string $string): void {
-		$result1 = static::runSqlQuery($query, false);
+		$result1 = static::runSqlQuery($query, false, '\G');
+		// TODO: dirty hack for backup but until we fix it
+		if (str_starts_with($query, 'backup')) {
+			sleep(1);
+		}
 		$result2 = static::runHttpQuery($query);
 
 		$this->assertStringContainsString($string, implode(PHP_EOL, $result1));
-		foreach ($result2 as &$v) {
-			unset($v['error']);
+		$output = '';
+		if (isset($result2[0]['data'])) {
+			$i = 1;
+			foreach ($result2[0]['data'] as &$v) {
+				$output .= "*************************** $i. row ***************************\n";
+				foreach ($v as $key => $val) {
+					$output .= "$key: $val\n";
+				}
+				++$i;
+			}
 		}
-		$resultString = json_encode($result2) ?: '';
-		$this->assertStringContainsString($string, $resultString);
+		$this->assertStringContainsString($string, trim($output));
 	}
 
 	/**
@@ -193,14 +204,15 @@ trait TestFunctionalTrait {
 	 *
 	 * @param string $query
 	 * @param bool $redirectOutput
+	 * @param string $delimeter
 	 * @return array<string>
 	 * @throws Exception
 	 */
-	protected static function runSqlQuery(string $query, bool $redirectOutput = true): array {
+	protected static function runSqlQuery(string $query, bool $redirectOutput = true, string $delimeter = ';'): array {
 		$port = static::getListenSqlPort();
 		$query = \addslashes($query);
 		$redirect = $redirectOutput ? '2>&1' : '';
-		exec("mysql -P$port -h127.0.0.1 -e '$query' $redirect", $output);
+		exec("mysql -P$port -h127.0.0.1 -e '{$query}{$delimeter}' $redirect", $output);
 		return $output;
 	}
 
@@ -209,7 +221,7 @@ trait TestFunctionalTrait {
 	 *
 	 * @param string $query
 	 * @param bool $redirectOutput
-	 * @return array<int,array{error:string}>
+	 * @return array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}>
 	 * @throws Exception
 	 */
 	protected static function runHttpQuery(string $query, bool $redirectOutput = true): array {
@@ -217,7 +229,7 @@ trait TestFunctionalTrait {
 		$query = \addslashes($query);
 		$redirect = $redirectOutput ? '2>&1' : '';
 		exec("curl -s 127.0.0.1:$port/cli -d '$query' $redirect", $output);
-		/** @var array<int,array{error:string}> $result */
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = (array)json_decode($output[0] ?? '{}', true);
 		return $result;
 	}
@@ -298,27 +310,5 @@ trait TestFunctionalTrait {
 			throw new Exception('Failed to find children pids for ' . self::$manticorePid);
 		}
 		self::$buddyPid = $pids[0];
-	}
-
-	/**
-	 * Helper that checks if curl is installed on the current machine
-	 *
-	 * @return bool
-	 */
-	protected static function hasCurl(): bool {
-		$out = [];
-		exec('whereis curl', $out);
-		return $out[0] !== 'curl:';
-	}
-
-	/**
-	 * Helper that checks if MySQL is installed on the current machine
-	 *
-	 * @return bool
-	 */
-	protected static function hasMySQL(): bool {
-		$out = [];
-		exec('whereis mysql', $out);
-		return $out[0] !== 'mysql:';
 	}
 }

@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\QueryParser;
 use Manticoresearch\Buddy\Enum\Datalim;
 use Manticoresearch\Buddy\Enum\Datatype;
 use Manticoresearch\Buddy\Exception\QueryParserError;
+use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 
 class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
@@ -37,11 +38,16 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 		$this->cols = $this->colTypes = [];
 		$matches = [];
 		preg_match_all('/\s*INSERT\s+INTO\s+(.*?)\s*\((.*?)\)\s+VALUES\s*(.*?)\s*;?\s*$/i', $query, $matches);
+		if (empty($matches[2])) {
+			throw new SQLQueryCommandNotSupported("Cannot create table with column names missing in query: $query");
+		}
 		$name = $matches[1][0];
 		$colExpr = $matches[2][0];
 		$this->cols = array_map('trim', explode(',', $colExpr));
 		$valExpr = $matches[3][0];
-
+		if (!$name || !$valExpr) {
+			throw new SQLQueryCommandNotSupported("Invalid query passed: $query");
+		}
 		$rows = $this->parseInsertRows($valExpr);
 		foreach ($rows as $row) {
 			//self::checkUnescapedChars($row, QueryParserError::class);
@@ -58,6 +64,50 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 	}
 
 	/**
+	 * Helper function to build insert row expression
+	 *
+	 * @param string $valExpr
+	 * @param int $i
+	 * @param bool &$isValStarted
+	 * @param int &$parenthInd
+	 * @param string &$curVal
+	 * @return bool
+	 */
+	protected static function processExprChr(
+		string $valExpr,
+		int $i,
+		bool &$isValStarted,
+		int &$parenthInd,
+		string &$curVal
+	): bool {
+		switch ($valExpr[$i]) {
+			case '(':
+				if (!$isValStarted) {
+					$isValStarted = true;
+				} else {
+					$curVal .= '(' ;
+				}
+				$parenthInd++;
+				break;
+			case ')':
+				$parenthInd--;
+				if (!$parenthInd && $valExpr[$i - 1] !== '\\') {
+					$isValStarted = false;
+					return true;
+				} else {
+					$curVal .= ')' ;
+				}
+				break;
+			default:
+				if ($isValStarted) {
+					$curVal .= $valExpr[$i];
+				}
+				break;
+		}
+		return false;
+	}
+
+	/**
 	 * Splitting VALUES expression into separate row values
 	 *
 	 * @param string $valExpr
@@ -68,31 +118,12 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 		$parenthInd = 0;
 		$isValStarted = false;
 		for ($i = 0; $i < strlen($valExpr); $i++) {
-			switch ($valExpr[$i]) {
-				case '(':
-					if (!$isValStarted) {
-						$isValStarted = true;
-					} else {
-						$curVal .= '(' ;
-					}
-					$parenthInd++;
-					break;
-				case ')':
-					$parenthInd--;
-					if (!$parenthInd && $valExpr[$i - 1] !== '\\') {
-						yield $curVal;
-						$isValStarted = false;
-						$curVal = '';
-					} else {
-						$curVal .= ')' ;
-					}
-					break;
-				default:
-					if ($isValStarted) {
-						$curVal .= $valExpr[$i];
-					}
-					break;
+			$isRowFinished = self::processExprChr($valExpr, $i, $isValStarted, $parenthInd, $curVal);
+			if ($isRowFinished === false) {
+				continue;
 			}
+			yield $curVal;
+			$curVal = '';
 		}
 	}
 
@@ -186,22 +217,32 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 	}
 
 	/**
+	 * Helper function to detect numeric datatypes
+	 *
+	 * @param string $val
+	 * @return Datatype
+	 */
+	protected static function detectNumericValType(string $val): Datatype {
+		$int = (int)$val;
+		if ((string)$int !== $val) {
+			return Datatype::Float;
+		}
+
+		if ($int > Datalim::MySqlMaxInt->value) {
+			return Datatype::Bigint;
+		}
+
+		return Datatype::Int;
+	}
+
+	/**
 	 * @param string $val
 	 * @return Datatype
 	 */
 	protected static function detectValType(string $val): Datatype {
 		// numeric types
 		if (is_numeric($val)) {
-			$int = (int)$val;
-			if ((string)$int !== $val) {
-				return Datatype::Float;
-			}
-
-			if ($int > Datalim::MySqlMaxInt->value) {
-				return Datatype::Bigint;
-			}
-
-			return Datatype::Int;
+			return self::detectNumericValType($val);
 		}
 		// json type
 		if (substr($val, 1, 1) === '{' && substr($val, -2, 1) === '}') {

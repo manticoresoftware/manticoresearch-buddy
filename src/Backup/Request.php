@@ -56,42 +56,54 @@ class Request implements CommandRequestInterface {
    */
 	public static function fromNetworkRequest(NetRequest $request): Request {
 		$query = $request->payload;
-		$whatPattern = 'BACKUP\s*((?P<all>ALL)|(?:TABLES?\s*(?P<table>(,?\s*[\w]+\s*)+)))';
-		$toPattern = 'TO\s*local\(\s*(?P<path>[/\\_\-a-z/0-9]+)\s*\)';
+		$whatPattern = '(?:TABLES?\s*(?P<table>(,?\s*[\w]+\s*)+))';
+		$toPattern = 'TO\s*(?P<path>([\._\-a-z/0-9]+|[A-Z]\:\\\[\.\\\_\-a-z0-9]+))';
 		$optionsKeys = implode('|', array_keys(static::OPTIONS));
 		$optionsPattern = 'OPTIONS?\s*(?P<options>'
 			. '(,?\s*(?:' . $optionsKeys . ')\s*\=\s*(?:0|1|true|false|yes|no|on|off)'
 			. '\s*)+)'
 		;
-		$pattern = "($whatPattern)?\s*($toPattern)?\s*($optionsPattern)?";
+		$pattern = "BACKUP\s*($whatPattern)?\s*($toPattern)\s*($optionsPattern)?";
 		if (false === preg_match("#^$pattern$#ius", $query, $matches)) {
-			throw new SQLQueryParsingError();
+			static::throwSqlParseError();
 		}
 
 		$params = static::extractNamedMatches($matches);
-		// TODO: fix the default path
-		$path = $params['path'] ?? '/var/lib/manticore';
-		$tables = !isset($params['all']) && isset($params['table'])
+		if (!isset($params['path'])) {
+			static::throwSqlParseError();
+		}
+		$path = $params['path'];
+		$tables = isset($params['table'])
 			? array_map(trim(...), explode(',', $params['table']))
 			: []
 		;
+
 		/** @var array{async?:bool,compress?:bool} $options */
 		$options = isset($params['options'])
-		? array_reduce(
-			array_map(trim(...), explode(',', $params['options'])),
-			function (array $map, string $v): array {
-				[$key, $value] = array_map(trim(...), explode('=', $v));
-				$map[$key] = static::castOption($key, $value);
-				return $map;
-			},
-			[]
-		) : [];
+			? array_reduce(
+				array_map(trim(...), explode(',', $params['options'])),
+				function (array $map, string $v): array {
+					[$key, $value] = array_map(fn ($v) => trim(strtolower($v)), explode('=', $v));
+					$map[$key] = static::castOption($key, $value);
+					return $map;
+				},
+				[]
+			) : []
+		;
 
-		return new Request(
+		$self = new Request(
 			path: $path,
 			tables: $tables,
 			options: $options
 		);
+
+		$queryTokens = static::extractTokens($query);
+		$buildTokens = $self->tokenize();
+		if (array_diff($queryTokens, $buildTokens)) {
+			static::throwSqlParseError();
+		}
+
+		return $self;
 	}
 
   /**
@@ -126,5 +138,87 @@ class Request implements CommandRequestInterface {
 			'bool', 'boolean' => $value === 'true' || $value === '1' || $value === 'yes' || $value === 'on',
 			default => throw new RuntimeException("Unsupported type to cast the option '$key' to '$type"),
 		};
+	}
+
+	/**
+	 * Extract tokens from query to validate
+	 *
+	 * @param string $query
+	 * @return array<string>
+	 */
+	protected static function extractTokens(string $query): array {
+		$query = preg_replace(
+			[
+				'/\(\s*([^\)]+?)\s*\)/',
+				'/(' . implode('|', array_keys(static::OPTIONS)) . ')\s*=\s*/ius',
+				'/=\s*(on|1|yes|true)/ius',
+				'/=\s*(off|0|no|false)/ius',
+				'/options/ius',
+				'/tables/ius',
+			], [
+				'($1)',
+				'$1=',
+				'=1',
+				'=0',
+				'option',
+				'table',
+				'',
+			], $query
+		);
+		return static::prepareTokens((array)explode(' ', $query ?: ''));
+	}
+
+	/**
+	 * Do the same as extractTokens but with current request and opposite operation
+	 * We tokenize to single form of word and boolean to 0 or 1 by using replace query
+	 *
+	 * @return array<string>
+	 */
+	protected function tokenize(): array {
+		$tokens = [
+			'backup',
+			'to',
+			$this->path,
+		];
+
+		if ($this->tables) {
+			$tokens[] = 'table';
+			array_push($tokens, ...$this->tables);
+		}
+
+		if ($this->options) {
+			$tokens[] = 'option';
+			foreach ($this->options as $key => $value) {
+				$tokens[] = $key . '=' . ($value ? '1' : '0');
+			}
+		}
+
+		return static::prepareTokens($tokens);
+	}
+
+	/**
+	 * Helper to convert token list to single output
+	 *
+	 * @param array<string> $tokens
+	 * @return array<string>
+	 */
+	protected static function prepareTokens(array $tokens): array {
+		return array_unique(
+			array_filter(
+				array_map(
+					fn ($v) => strtolower(trim($v, ' ,')),
+					$tokens
+				)
+			)
+		);
+	}
+
+	/**
+	 * Throws parse error
+	 * @return void
+	 * @throws SQLQueryParsingError
+	 */
+	protected static function throwSqlParseError(): void {
+		throw SQLQueryParsingError::create('You have an error in your query. Please, double check it.');
 	}
 }

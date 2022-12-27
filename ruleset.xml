@@ -25,7 +25,7 @@
 	<rule ref="SlevomatCodingStandard.Functions.UnusedParameter"/>
 	<rule ref="SlevomatCodingStandard.Variables.UnusedVariable"/>
 	<rule ref="SlevomatCodingStandard.Variables.UselessVariable"/>
-	<rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
+		<rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
 		<properties>
 			<property name="searchAnnotations" value="true"/>
 		</properties>
@@ -38,6 +38,12 @@
 	<!-- <rule ref="SlevomatCodingStandard.TypeHints.DisallowMixedTypeHint"/> -->
 	<rule ref="SlevomatCodingStandard.PHP.TypeCast"/>
 	<rule ref="Squiz.Strings.DoubleQuoteUsage.NotRequired"/>
+		<rule ref="SlevomatCodingStandard.Complexity.Cognitive">
+		<properties>
+			<property name="maxComplexity" value="14"/>
+		</properties>
+	</rule>
+	<rule ref="Squiz.Strings.DoubleQuoteUsage.NotRequired" />
 	<rule ref="PSR2">
 		<exclude name="PSR1.Classes.ClassDeclaration.MissingNamespace"/>
 		<exclude name="Squiz.Functions.MultiLineFunctionDeclaration.BraceOnSameLine"/>
@@ -155,4 +161,7 @@
 			<property name="requiredSpacesBeforeColon" value="0" />
 		</properties>
 	</rule>
+	<rule ref="Squiz.NamingConventions.ValidVariableName.NotCamelCaps"/>
+	<rule ref="Squiz.NamingConventions.ValidVariableName.MemberNotCamelCaps"/>
+	<rule ref="Squiz.NamingConventions.ValidVariableName.StringNotCamelCaps"/>
 </ruleset>

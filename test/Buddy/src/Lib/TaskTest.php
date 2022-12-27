@@ -22,19 +22,19 @@ use stdClass;
 class TaskTest extends TestCase {
 	public function testTaskParallelRunSucceed(): void {
 		echo "\nTesting the task parallel run succeed\n";
-		$Task = Task::create(
+		$task = Task::create(
 			function (): bool {
 				usleep(2000000);
 				return true;
 			}
 		);
-		$this->assertEquals(TaskStatus::Pending, $Task->getStatus());
-		$Task->run();
-		$this->assertEquals(TaskStatus::Running, $Task->getStatus());
+		$this->assertEquals(TaskStatus::Pending, $task->getStatus());
+		$task->run();
+		$this->assertEquals(TaskStatus::Running, $task->getStatus());
 		usleep(2500000);
-		$this->assertEquals(TaskStatus::Finished, $Task->getStatus());
-		$this->assertEquals(true, $Task->isSucceed());
-		$this->assertEquals(true, $Task->getResult());
+		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
+		$this->assertEquals(true, $task->isSucceed());
+		$this->assertEquals(true, $task->getResult());
 	}
 
 	public function testTaskParallelRunWithArgumentsSucceed(): void {
@@ -43,7 +43,7 @@ class TaskTest extends TestCase {
 		$arg->name = 'test';
 		$arg->value = 123;
 
-		$Task = Task::create(
+		$task = Task::create(
 			function (stdClass $arg): stdClass {
 				usleep(2000000);
 				return $arg;
@@ -51,30 +51,30 @@ class TaskTest extends TestCase {
 			[$arg]
 		);
 
-		$this->assertEquals(TaskStatus::Pending, $Task->getStatus());
-		$Task->run();
-		$this->assertEquals(TaskStatus::Running, $Task->getStatus());
+		$this->assertEquals(TaskStatus::Pending, $task->getStatus());
+		$task->run();
+		$this->assertEquals(TaskStatus::Running, $task->getStatus());
 		usleep(2500000);
-		$this->assertEquals(TaskStatus::Finished, $Task->getStatus());
-		$this->assertEquals(true, $Task->isSucceed());
-		$this->assertEquals($arg, $Task->getResult());
+		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
+		$this->assertEquals(true, $task->isSucceed());
+		$this->assertEquals($arg, $task->getResult());
 	}
 
 	public function testTaskReturnsGenericErrorOnException(): void {
 		echo "\nTesting the task's exception converts to generic error\n";
 		$errorMessage = 'Here we go';
-		$Task = Task::create(
+		$task = Task::create(
 			function () use ($errorMessage): bool {
 				throw new Exception($errorMessage);
 			}
 		);
-		$this->assertEquals(TaskStatus::Pending, $Task->getStatus());
-		$Task->run();
-		$this->assertEquals(TaskStatus::Running, $Task->getStatus());
+		$this->assertEquals(TaskStatus::Pending, $task->getStatus());
+		$task->run();
+		$this->assertEquals(TaskStatus::Running, $task->getStatus());
 		usleep(500000);
-		$this->assertEquals(TaskStatus::Finished, $Task->getStatus());
-		$this->assertEquals(false, $Task->isSucceed());
-		$error = $Task->getError();
+		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
+		$this->assertEquals(false, $task->isSucceed());
+		$error = $task->getError();
 		$this->assertEquals(true, $error instanceof GenericError);
 		$this->assertEquals(Exception::class . ': ' . $errorMessage, $error->getMessage());
 		$this->assertEquals($errorMessage, $error->getResponseError());
@@ -83,18 +83,18 @@ class TaskTest extends TestCase {
 	public function testTaskReturnsGenericErrorOnCustomException(): void {
 		echo "\nTesting the task's custom exception converts to generic error\n";
 		$errorMessage = 'Custom error message';
-		$Task = Task::create(
+		$task = Task::create(
 			function () use ($errorMessage): bool {
 				throw new BuddyRequestError($errorMessage);
 			}
 		);
-		$this->assertEquals(TaskStatus::Pending, $Task->getStatus());
-		$Task->run();
-		$this->assertEquals(TaskStatus::Running, $Task->getStatus());
+		$this->assertEquals(TaskStatus::Pending, $task->getStatus());
+		$task->run();
+		$this->assertEquals(TaskStatus::Running, $task->getStatus());
 		usleep(500000);
-		$this->assertEquals(TaskStatus::Finished, $Task->getStatus());
-		$this->assertEquals(false, $Task->isSucceed());
-		$error = $Task->getError();
+		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
+		$this->assertEquals(false, $task->isSucceed());
+		$error = $task->getError();
 		$this->assertEquals(true, $error instanceof GenericError);
 		$this->assertEquals(BuddyRequestError::class . ': ' . $errorMessage, $error->getMessage());
 		$this->assertEquals($errorMessage, $error->getResponseError());

@@ -90,9 +90,9 @@ final class Task {
 	 * @see static::create()
 	 */
 	public static function defer(Closure $fn, array $argv = []): static {
-		$Self = static::createInRuntime(static::createRuntime(), $fn, $argv);
-		$Self->isDeferred = true;
-		return $Self;
+		$self = static::createInRuntime(static::createRuntime(), $fn, $argv);
+		$self->isDeferred = true;
+		return $self;
 	}
 
 	/**

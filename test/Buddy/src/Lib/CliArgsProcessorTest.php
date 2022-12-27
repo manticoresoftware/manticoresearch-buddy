@@ -27,6 +27,7 @@ class CliArgsProcessorTest extends TestCase {
 		putenv('LISTEN');
 	}
 
+
 	public function testDefaultArgsProcessOk(): void {
 		echo "\nTesting the processing of the arguments with default values\n";
 		$this->assertEquals(1, getenv('TELEMETRY'));
@@ -39,5 +40,15 @@ class CliArgsProcessorTest extends TestCase {
 		$res = "Manticore Buddy v$version\n"
 			. "Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)\n";
 		$this->assertEquals($res, self::invokeMethod(CliArgsProcessor::class, 'version'));
+
+	public function testListenArgProcessOk(): void {
+		echo "\nTesting the processing of the `listen` argument\n";
+		$refCls = new \ReflectionClass(CliArgsProcessor::class);
+		$consts = $refCls->getConstant('DEFAULT_OPTS');
+		if (is_array($consts)) {
+			$this->assertEquals($consts['listen'], getenv('LISTEN'));
+		}
+		$this->assertEquals('127.0.0.1:9308', getenv('LISTEN'));
+
 	}
 }

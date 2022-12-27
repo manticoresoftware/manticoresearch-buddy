@@ -168,15 +168,7 @@ jobs:
           - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
-            distro: stretch
-          - artifact: artifact-deb
-            ext: deb
-            script: bin/upload_repo_deb
             distro: buster
-          - artifact: artifact-deb
-            ext: deb
-            script: bin/upload_repo_deb
-            distro: xenial
           - artifact: artifact-deb
             ext: deb
             script: bin/upload_repo_deb
@@ -210,7 +202,7 @@ jobs:
             script: bin/upload_repo_rpm
             distro: 9
           - artifact: artifact
-            ext: {tar.gz,zip}
+            ext: "{tar.gz,zip}"
             script: bin/upload_repo_arc
             distro: ""
     steps:

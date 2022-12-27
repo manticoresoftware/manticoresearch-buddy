@@ -16,13 +16,22 @@ class ListenArgTest extends TestCase {
 
 	use TestFunctionalTrait;
 
+	/**
+	 * @var int $defaultPort
+	 */
+	protected int $defaultPort;
+
+	protected function setUp(): void {
+		$this->defaultPort = $this->getListenDefaultPort();
+	}
+
+	protected function tearDown(): void {
+		// Restoring listen default port
+		$this->setListenDefaultPort($this->defaultPort);
+	}
+
 	public function testListenArgumentChange(): void {
 		echo "\nTesting if the `listen` argument is passed from daemon to Buddy correctly\n";
-		if (!self::hasCurl()) {
-			echo "Curl is not installed\n";
-			$this->markTestSkipped();
-		}
-		$defPort = $this->getListenDefaultPort();
 		$this->setListenDefaultPort(8888);
 		$httpPort = self::getListenHttpPort();
 		exec("curl localhost:$httpPort/cli -d 'drop table if exists test' 2>&1");
@@ -30,8 +39,6 @@ class ListenArgTest extends TestCase {
 		exec("curl localhost:$httpPort/cli -d '$query' 2>&1", $out);
 		$result = '[{"total":1,"error":"","warning":""}]';
 		$this->assertEquals($result, $out[3]);
-		// Restoring listen default port
-		$this->setListenDefaultPort($defPort);
 	}
 
 }
