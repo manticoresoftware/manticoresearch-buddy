@@ -57,7 +57,7 @@ trait TestFunctionalTrait {
 		self::checkManticorePathes();
 		system('searchd --config ' . self::$manticoreConfigFile);
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
-		sleep(2); // <- give 2 secs to protect from any kind of lags
+		sleep(5); // <- give 5 secs to protect from any kind of lags
 		self::loadBuddyPid();
 
 		// Clean up all tables and run fresh instance
