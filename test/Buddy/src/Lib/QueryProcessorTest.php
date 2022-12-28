@@ -82,7 +82,7 @@ class QueryProcessorTest extends TestCase {
 
 	public function testNotAllowedCommandProcessFail(): void {
 		echo "\nTesting the processing of not allowed execution command\n";
-		
+
 		$netRequest = Request::fromArray(
 			[
 				'version' => 1,
@@ -102,8 +102,8 @@ class QueryProcessorTest extends TestCase {
 
 		$refCls = new ReflectionClass(QueryProcessor::class);
 		$refCls->setStaticPropertyValue('searchdSettings', ['searchd.auto_schema' => '0']);
- 		$this->expectException(CommandNotAllowed::class);
- 		$this->expectExceptionMessage('Request handling is disabled: INSERT INTO test(col1) VALUES("test")');
+		$this->expectException(CommandNotAllowed::class);
+		$this->expectExceptionMessage('Request handling is disabled: INSERT INTO test(col1) VALUES("test")');
 		QueryProcessor::process($netRequest);
 	}
 }
