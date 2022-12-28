@@ -12,7 +12,9 @@
 namespace Manticoresearch\Buddy\Lib;
 
 use Exception;
+use Manticoresearch\Buddy\Enum\Command;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
+use Manticoresearch\Buddy\Exception\CommandNotAllowed;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
@@ -27,8 +29,8 @@ class QueryProcessor {
 	// We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
 
-	/** @var bool */
-	protected static bool $inited = false;
+	/** @var ?array<mixed,mixed> $searchdSettings */
+	protected static ?array $searchdSettings = null;
 
 	/**
 	 * Setter for container property
@@ -49,18 +51,24 @@ class QueryProcessor {
 	 *  The request struct to process
 	 * @return CommandExecutorInterface
 	 *  The CommandExecutorInterface to execute to process the final query
+	 * @throws CommandNotAllowed
 	 */
 	public static function process(Request $request): CommandExecutorInterface {
-		if (!static::$inited) {
+		if (static::$searchdSettings === null) {
 			static::init();
 		}
-		$prefix = static::extractPrefixFromRequest($request);
-		debug("[$request->id] Executor: $prefix");
-		buddy_metric(camelcase_to_underscore($prefix), 1);
-		$requestClassName = static::NAMESPACE_PREFIX . "{$prefix}\\Request";
+		$command = static::extractCommandFromRequest($request);
+		//throw new CommandNotAllowed("Request handling is disabled: $request->payload");
+		if (!self::isCommandAllowed($command)) {
+			throw new CommandNotAllowed("Request handling is disabled: $request->payload");
+		}
+		$commandPrefix = $command->value;
+		debug("[$request->id] Executor: $commandPrefix");
+		buddy_metric(camelcase_to_underscore($commandPrefix), 1);
+		$requestClassName = static::NAMESPACE_PREFIX . "{$commandPrefix}\\Request";
 		$commandRequest = $requestClassName::fromNetworkRequest($request);
-		debug("[$request->id] Command request: {$prefix}\\Request " . json_encode($commandRequest));
-		$executorClassName = static::NAMESPACE_PREFIX . "{$prefix}\\Executor";
+		debug("[$request->id] Command request: {$commandPrefix}\\Request " . json_encode($commandRequest));
+		$executorClassName = static::NAMESPACE_PREFIX . "{$commandPrefix}\\Executor";
 		/** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
 		$executor = new $executorClassName($commandRequest);
 		foreach ($executor->getProps() as $prop) {
@@ -81,7 +89,9 @@ class QueryProcessor {
 		$resp = $manticoreClient->sendRequest('SHOW SETTINGS');
 		/** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
 		$data = (array)json_decode($resp->getBody(), true);
+		static::$searchdSettings = [];
 		foreach ($data[0]['data'] as ['Setting_name' => $key, 'Value' => $value]) {
+			static::$searchdSettings[$key] = $value;
 			if ($key !== 'configuration_file') {
 				continue;
 			}
@@ -89,8 +99,6 @@ class QueryProcessor {
 			debug("using config file = '$value'");
 			putenv("SEARCHD_CONFIG={$value}");
 		}
-
-		static::$inited = true;
 	}
 
 	/**
@@ -109,25 +117,40 @@ class QueryProcessor {
 	}
 
 	/**
+	 * Check if a command is currently supported by Buddy and daemon
+	 *
+	 * @param Command $command
+	 * @return bool
+	 */
+	protected static function isCommandAllowed(Command $command): bool {
+		return match (true) {
+			($command === Command::Insert && isset(self::$searchdSettings['searchd.auto_schema'])
+				&& self::$searchdSettings['searchd.auto_schema'] === '0') => false,
+			default => true,
+		};
+	}
+
+	/**
 	 * This method extracts all supported prefixes from input query
 	 * that buddy able to handle
 	 *
 	 * @param Request $request
-	 * @return string
+	 * @return Command
+	 * @throws SQLQueryCommandNotSupported
 	 */
-	public static function extractPrefixFromRequest(Request $request): string {
+	public static function extractCommandFromRequest(Request $request): Command {
 		$queryLowercase = strtolower($request->payload);
 		$isInsertSQLQuery = in_array($request->endpoint, [ManticoreEndpoint::Sql, ManticoreEndpoint::Cli])
-			&& str_starts_with($queryLowercase, 'insert ');
+			&& str_starts_with($queryLowercase, 'insert into');
 		$isInsertHTTPQuery = ($request->endpoint === ManticoreEndpoint::Insert)
 			|| ($request->endpoint === ManticoreEndpoint::Bulk
 				&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')
 		);
-		$isInsertError = preg_match('/table (.*?) absent/s', $request->error);
+		$isInsertError = preg_match('/table (.*?) absent/', $request->error);
 		return match (true) {
-			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => 'InsertQuery',
-			str_starts_with($queryLowercase, 'show queries') => 'ShowQueries',
-			str_starts_with($queryLowercase, 'backup') => 'Backup',
+			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => Command::Insert,
+			str_starts_with($queryLowercase, 'show queries') => Command::Show,
+			str_starts_with($queryLowercase, 'backup') => Command::Backup,
 			default => throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload"),
 		};
 	}

@@ -13,7 +13,10 @@ use Manticoresearch\Buddy\Backup\Executor as BackupExecutor;
 use Manticoresearch\Buddy\Backup\Request as BackupRequest;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Exception\CommandNotAllowed;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
+use Manticoresearch\Buddy\InsertQuery\Executor as InsertQueryExecutor;
+use Manticoresearch\Buddy\InsertQuery\Request as InsertQueryRequest;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\Buddy\ShowQueries\Executor as ShowQueriesExecutor;
@@ -36,7 +39,7 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('inited', true);
+		$refCls->setStaticPropertyValue('searchdSettings', []);
 		$executor = QueryProcessor::process($request);
 		$this->assertInstanceOf(BackupExecutor::class, $executor);
 		$refCls = new ReflectionClass($executor);
@@ -73,7 +76,34 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('inited', true);
+		$refCls->setStaticPropertyValue('searchdSettings', []);
 		QueryProcessor::process($request);
+	}
+
+	public function testNotAllowedCommandProcessFail(): void {
+		echo "\nTesting the processing of not allowed execution command\n";
+		
+		$netRequest = Request::fromArray(
+			[
+				'version' => 1,
+				'error' => "table 'test' absent, or does not support INSERT",
+				'payload' => 'INSERT INTO test(col1) VALUES("test")',
+				'format' => RequestFormat::SQL,
+				'endpoint' => ManticoreEndpoint::Cli,
+			]
+		);
+		$refCls = new ReflectionClass(QueryProcessor::class);
+		$refCls->setStaticPropertyValue('searchdSettings', ['searchd.auto_schema' => '1']);
+		$executor = QueryProcessor::process($netRequest);
+		$this->assertInstanceOf(InsertQueryExecutor::class, $executor);
+		$refCls = new ReflectionClass($executor);
+		$request = $refCls->getProperty('request')->getValue($executor);
+		$this->assertInstanceOf(InsertQueryRequest::class, $request);
+
+		$refCls = new ReflectionClass(QueryProcessor::class);
+		$refCls->setStaticPropertyValue('searchdSettings', ['searchd.auto_schema' => '0']);
+ 		$this->expectException(CommandNotAllowed::class);
+ 		$this->expectExceptionMessage('Request handling is disabled: INSERT INTO test(col1) VALUES("test")');
+		QueryProcessor::process($netRequest);
 	}
 }
