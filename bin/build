@@ -29,14 +29,15 @@ if (file_exists($pharFile . '.gz')) {
   unlink($pharFile . '.gz');
 }
 
-if (!is_dir(BUILD_DIR)) {
-  mkdir(BUILD_DIR, 0755);
+if (is_dir(BUILD_DIR)) {
+  exec('rm -fr ' . BUILD_DIR);
 }
+mkdir(BUILD_DIR, 0755);
 
 $phar = new Phar($pharFile);
 $phar->startBuffering();
 $default_stub = $phar->createDefaultStub($opts['index']);
-$phar->buildFromDirectory('.', '/src\/.+$/');
+$phar->buildFromDirectory('.', '/^\.\/src\/.+$/');
 $phar->setStub($default_stub);
 $phar->addFile(BUILD_DIR . '/../PHP_VERSION', 'PHP_VERSION');
 $phar->addFile(BUILD_DIR . '/../APP_VERSION', 'APP_VERSION');
