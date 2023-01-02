@@ -23,6 +23,7 @@ final class DirectRequestTest extends TestCase {
 	public function testShowQueries(): void {
 		$response = static::runHttpBuddyRequest('SHOW QUERIES');
 		$this->assertBasicChecks($response);
+		$this->assertDataChecks($response);
 	}
 
 	public function testBackupAll(): void {
@@ -30,6 +31,7 @@ final class DirectRequestTest extends TestCase {
 		static::runSqlQuery('INSERT INTO test (name) values ("some data")');
 		$response = static::runHttpBuddyRequest('BACKUP TO /tmp');
 		$this->assertBasicChecks($response);
+		$this->assertDataChecks($response);
 		$this->assertEquals(true, isset($response['message'][0]['data'][0]['Path']));
 		static::runSqlQuery('DROP TABLE IF EXISTS test');
 	}
@@ -58,6 +60,13 @@ final class DirectRequestTest extends TestCase {
 		$this->assertEquals(1, sizeof($response['message']));
 		$this->assertEquals(true, isset($response['message'][0]['error']));
 		$this->assertEquals('', $response['message'][0]['error']);
+	}
+
+	/**
+	 * @param array{message?:array<int,array{columns?:array<mixed>,data?:array<mixed>}>} $response
+	 * @return void
+	 */
+	protected function assertDataChecks(array $response): void {
 		$this->assertEquals(true, isset($response['message'][0]['columns']));
 		$this->assertEquals(true, isset($response['message'][0]['data']));
 	}
