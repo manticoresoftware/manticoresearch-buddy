@@ -11,22 +11,28 @@
 
 namespace Manticoresearch\BuddyTest\Trait;
 
-use \Exception;
+use Exception;
 
 trait TestFunctionalTrait {
 
 	/**
-	 * @var int $listenDefaultPort
+	 * @var ?int $listenDefaultPort
 	 */
 	protected static ?int $listenDefaultPort = null;
 	/**
-	 * @var int $listenSqlPort
+	 * @var ?int $listenSqlPort
 	 */
 	protected static ?int $listenSqlPort = null;
 	/**
-	 * @var int $listenHttpPort
+	 * @var ?int $listenHttpPort
 	 */
 	protected static ?int $listenHttpPort = null;
+
+	/**
+	 * @var ?int $listenBuddyPort
+	 */
+	protected static ?int $listenBuddyPort = null;
+
 	/**
 	 * @var string $manticoreConfigFile
 	 */
@@ -59,6 +65,9 @@ trait TestFunctionalTrait {
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
 		sleep(5); // <- give 5 secs to protect from any kind of lags
 		self::loadBuddyPid();
+
+		$buddyPid = self::$buddyPid;
+		static::$listenBuddyPort = (int)system("ss -nlp | grep 'pid={$buddyPid},' | cut -d: -f2 | cut -d' ' -f1");
 
 		// Clean up all tables and run fresh instance
 		$output = static::runSqlQuery('show tables');
@@ -231,6 +240,40 @@ trait TestFunctionalTrait {
 		exec("curl -s 127.0.0.1:$port/cli -d '$query' $redirect", $output);
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = (array)json_decode($output[0] ?? '{}', true);
+		return $result;
+	}
+
+
+	/**
+	 * Run direct HTTP request to the Buddy
+	 *
+	 * @param string $query
+	 * @param string $error
+	 * @param bool $redirectOutput
+	 * @return array{version:int,type:string,message:array<int,array{columns:array<string>,data:array<int,array<string,string>>}>}
+	 * @throws Exception
+	 */
+	protected static function runHttpBuddyRequest(
+		string $query,
+		string $error = '',
+		bool $redirectOutput = true
+	): array {
+		$port = static::$listenBuddyPort;
+		$request = [
+			'type' => 'unknown json request',
+			'error' => $error,
+			'version' => 1,
+			'message' => [
+				'path_query' => '/cli',
+				'body' => $query,
+			],
+		];
+		$payload = json_encode($request);
+		$redirect = $redirectOutput ? '2>&1' : '';
+		exec("curl -s 127.0.0.1:$port -H 'Content-type: application/json' -d '$payload' $redirect", $output);
+		/** @var array{version:int,type:string,message:array<int,array{columns:array<string>,data:array<int,array<string,string>>}>} $result */
+		$result = (array)json_decode($output[0] ?? '{}', true);
+		var_dump($result);
 		return $result;
 	}
 
