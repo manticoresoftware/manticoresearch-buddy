@@ -29,8 +29,22 @@ class QueryProcessor {
 	// We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
 
-	/** @var ?array<mixed,mixed> $searchdSettings */
-	protected static ?array $searchdSettings = null;
+	/** @var ?array{
+	 * 'configuration_file'?:string,
+	 * 'worker_pid'?:string,
+	 * 'searchd.auto_schema'?:string,
+	 * 'searchd.listen'?:string,
+	 * 'searchd.log'?:string,
+	 * 'searchd.query_log'?:string,
+	 * 'searchd.pid_file'?:string,
+	 * 'searchd.data_dir'?:string,
+	 * 'searchd.query_log_format'?:string,
+	 * 'searchd.buddy_path'?:string,
+	 * 'searchd.binlog_path'?:string,
+	 * 'common.plugin_dir'?:string,
+	 * 'common.lemmatizer_base'?:string,
+	 * } $configSettings */
+	protected static ?array $configSettings = null;
 
 	/**
 	 * Setter for container property
@@ -54,7 +68,7 @@ class QueryProcessor {
 	 * @throws CommandNotAllowed
 	 */
 	public static function process(Request $request): CommandExecutorInterface {
-		if (static::$searchdSettings === null) {
+		if (static::$configSettings === null) {
 			static::init();
 		}
 		$command = static::extractCommandFromRequest($request);
@@ -89,9 +103,9 @@ class QueryProcessor {
 		$resp = $manticoreClient->sendRequest('SHOW SETTINGS');
 		/** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
 		$data = (array)json_decode($resp->getBody(), true);
-		static::$searchdSettings = [];
+		static::$configSettings = [];
 		foreach ($data[0]['data'] as ['Setting_name' => $key, 'Value' => $value]) {
-			static::$searchdSettings[$key] = $value;
+			static::$configSettings[$key] = $value;
 			if ($key !== 'configuration_file') {
 				continue;
 			}
@@ -124,8 +138,8 @@ class QueryProcessor {
 	 */
 	protected static function isCommandAllowed(Command $command): bool {
 		return match (true) {
-			($command === Command::Insert && isset(self::$searchdSettings['searchd.auto_schema'])
-				&& self::$searchdSettings['searchd.auto_schema'] === '0') => false,
+			($command === Command::Insert && isset(self::$configSettings['searchd.auto_schema'])
+				&& self::$configSettings['searchd.auto_schema'] === '0') => false,
 			default => true,
 		};
 	}

@@ -39,7 +39,7 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('searchdSettings', []);
+		$refCls->setStaticPropertyValue('configSettings', []);
 		$executor = QueryProcessor::process($request);
 		$this->assertInstanceOf(BackupExecutor::class, $executor);
 		$refCls = new ReflectionClass($executor);
@@ -76,7 +76,7 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('searchdSettings', []);
+		$refCls->setStaticPropertyValue('configSettings', []);
 		QueryProcessor::process($request);
 	}
 
@@ -93,7 +93,7 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('searchdSettings', ['searchd.auto_schema' => '1']);
+		$refCls->setStaticPropertyValue('configSettings', ['searchd.auto_schema' => '1']);
 		$executor = QueryProcessor::process($netRequest);
 		$this->assertInstanceOf(InsertQueryExecutor::class, $executor);
 		$refCls = new ReflectionClass($executor);
@@ -101,7 +101,7 @@ class QueryProcessorTest extends TestCase {
 		$this->assertInstanceOf(InsertQueryRequest::class, $request);
 
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('searchdSettings', ['searchd.auto_schema' => '0']);
+		$refCls->setStaticPropertyValue('configSettings', ['searchd.auto_schema' => '0']);
 		$this->expectException(CommandNotAllowed::class);
 		$this->expectExceptionMessage('Request handling is disabled: INSERT INTO test(col1) VALUES("test")');
 		QueryProcessor::process($netRequest);
