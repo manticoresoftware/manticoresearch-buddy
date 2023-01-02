@@ -70,7 +70,7 @@ $bash = implode(PHP_EOL, [
   '}',
   // Validate minimum php version
   "min_version=$minPhpVersion",
-  'executor_version=$($executor -v | head -n 1 | cut -d" " -f2)',
+  'executor_version=$($executor -v | head -n 1 | cut -d" " -f2 | cut -d- -f1)',
   'if [[ $(ver $executor_version) < $(ver $min_version) ]]; then',
   "echo >&2 {$opts['name']} requires php \$min_version+",
   'fi',
