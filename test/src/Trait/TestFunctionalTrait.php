@@ -268,12 +268,12 @@ trait TestFunctionalTrait {
 				'body' => $query,
 			],
 		];
-		$payload = json_encode($request);
+		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.json';
+		file_put_contents($payloadFile, json_encode($request));
 		$redirect = $redirectOutput ? '2>&1' : '';
-		exec("curl -s 127.0.0.1:$port -H 'Content-type: application/json' -d '$payload' $redirect", $output);
+		exec("curl -s 127.0.0.1:$port -H 'Content-type: application/json' -d @$payloadFile $redirect", $output);
 		/** @var array{version:int,type:string,message:array<int,array{columns:array<string>,data:array<int,array<string,string>>}>} $result */
 		$result = (array)json_decode($output[0] ?? '{}', true);
-		var_dump($result);
 		return $result;
 	}
 
