@@ -34,16 +34,15 @@ final class DirectRequestTest extends TestCase {
 		static::runSqlQuery('DROP TABLE IF EXISTS test');
 	}
 
-	// public function testInsertQuery(): void {
-	// 	sleep(5);
-	// 	$table = uniqid();
-	// 	$response = static::runHttpBuddyRequest(
-	//	"INSERT INTO $table (name, value) values (\"Hello\", 10), (\"World\", 100)",
-	// "table $table absent"
-	// );
-	// 	var_dump($response);
-	// 	static::runSqlQuery("DROP TABLE IF EXISTS $table");
-	// }
+	public function testInsertQuery(): void {
+		$table = 'test_' . uniqid();
+		$response = static::runHttpBuddyRequest(
+			"INSERT INTO $table (name, value) values ('Hello', 10), ('World', 100)",
+			"table $table absent"
+		);
+		$this->assertBasicChecks($response);
+		static::runSqlQuery("DROP TABLE IF EXISTS $table");
+	}
 
 	/**
 	 * @param array<mixed> $response
