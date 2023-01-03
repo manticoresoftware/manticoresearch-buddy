@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Network;
 
 use Exception;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Exception\CommandNotAllowed;
 use Manticoresearch\Buddy\Exception\GenericError;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
@@ -68,6 +69,16 @@ final class EventHandler {
 	}
 
 	/**
+	 * Check if a custom error should be sent
+	 *
+	 * @param Throwable $e
+	 * @return bool
+	 */
+	protected static function isCustomError(Throwable $e): bool {
+		return is_a($e, SQLQueryCommandNotSupported::class) || is_a($e, CommandNotAllowed::class);
+	}
+
+	/**
 	 * Process 'data' event on connecction
 	 *
 	 * @param ServerRequestInterface $serverRequest
@@ -94,7 +105,7 @@ final class EventHandler {
 			};
 			// We proxy original error in case when we do not know how to handle query
 			// otherwise we send our custom error
-			if (is_a($e, SQLQueryCommandNotSupported::class)) {
+			if (self::isCustomError($e)) {
 				/** @var GenericError $e */
 				$e->setResponseError($originalError);
 			} elseif (!is_a($e, GenericError::class)) {
