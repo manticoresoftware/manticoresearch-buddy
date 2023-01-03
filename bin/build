@@ -61,19 +61,10 @@ $minPhpVersion = trim($phar['PHP_VERSION']->getContent());
 // Rewrite the resulting file to support dynamic executor
 $bash = implode(PHP_EOL, [
   '#!/usr/bin/env bash',
-  'executor=$(which manticore-executor 2> /dev/null || which php 2> /dev/null)',
+  'executor=$(which manticore-executor 2> /dev/null)',
   'if [[ -z "$executor" ]]; then',
-  "echo >&2 {$opts['name']} requires php or manticore-executor. Please install package 'manticore-extra'.",
+  "echo >&2 {$opts['name']} requires manticore-executor. Please install package 'manticore-extra'.",
   'exit 1',
-  'fi',
-  'function ver {',
-  "printf '%03d%03d%03d' $(echo \"$1\" | tr '.' ' ')",
-  '}',
-  // Validate minimum php version
-  "min_version=$minPhpVersion",
-  'executor_version=$($executor -v | head -n 1 | cut -d" " -f2 | cut -d- -f1)',
-  'if [[ $(ver $executor_version) < $(ver $min_version) ]]; then',
-  "echo >&2 {$opts['name']} requires php \$min_version+",
   'fi',
   'tmp=$($executor -r \'echo sys_get_temp_dir();\')',
   "php_file=\"\$tmp\"/{$opts['package']}.phar",
