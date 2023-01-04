@@ -21,7 +21,8 @@ class MetricThreadTest extends TestCase {
 	protected static string $configFileName = 'manticore-debug.conf';
 
 	public function testMetricThreadPrintDebugMessages(): void {
-		sleep(2);
+		sleep(7);
+		system('echo "127.0.0.1 telemetry.manticoresearch.com" >> /etc/hosts');
 		$labels = (string)system('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep ^labels');
 		$this->assertStringContainsString('"collector":"buddy"', $labels);
 		$this->assertStringContainsString('"buddy_version"', $labels);
@@ -29,5 +30,33 @@ class MetricThreadTest extends TestCase {
 		$this->assertStringContainsString('"manticore_binlog_enabled"', $labels);
 		$this->assertStringContainsString('"manticore_binlog_enabled"', $labels);
 		$this->assertStringContainsString('"manticore_secondary_indexes_enabled"', $labels);
+
+		$metrics = (string)system('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep ^metrics');
+		$this->assertStringContainsString('"uptime"', $metrics);
+		$this->assertStringContainsString('"command_search"', $metrics);
+		$this->assertStringContainsString('"command_excerpt"', $metrics);
+		$this->assertStringContainsString('"command_update"', $metrics);
+		$this->assertStringContainsString('"command_persist"', $metrics);
+		$this->assertStringContainsString('"command_status"', $metrics);
+		$this->assertStringContainsString('"command_flushattrs"', $metrics);
+		$this->assertStringContainsString('"command_sphinxql"', $metrics);
+		$this->assertStringContainsString('"command_ping"', $metrics);
+		$this->assertStringContainsString('"command_delete"', $metrics);
+		$this->assertStringContainsString('"command_set"', $metrics);
+		$this->assertStringContainsString('"command_insert"', $metrics);
+		$this->assertStringContainsString('"command_replace"', $metrics);
+		$this->assertStringContainsString('"command_commit"', $metrics);
+		$this->assertStringContainsString('"command_suggest"', $metrics);
+		$this->assertStringContainsString('"command_json"', $metrics);
+		$this->assertStringContainsString('"command_callpq"', $metrics);
+		$this->assertStringContainsString('"command_cluster"', $metrics);
+		$this->assertStringContainsString('"command_getfield"', $metrics);
+		$this->assertStringContainsString('"workers_total"', $metrics);
+
+		$output = [];
+		exec('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep metric:', $output);
+		$executes = implode(PHP_EOL, $output);
+		$this->assertStringContainsString('metric: add ["invocation",1]', $executes);
+		$this->assertStringContainsString('metric: snapshot []', $executes);
 	}
 }

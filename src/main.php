@@ -52,7 +52,7 @@ if (is_telemetry_enabled()) {
 		function () {
 			debug('running metric snapshot');
 			MetricThread::instance()->execute('snapshot');
-		}, 300, 'server'
+		}, (int)(getenv('TELEMETRY_PERIOD', true) ?: 300), 'server'
 	);
 	register_shutdown_function(MetricThread::destroy(...));
 }
