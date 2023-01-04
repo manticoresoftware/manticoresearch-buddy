@@ -120,6 +120,8 @@ final class MetricThread {
 	 * @return static
 	 */
 	public function execute(string $method, array $args = []): static {
+		$argsJson = json_encode($args);
+		debug("metric: $method $argsJson");
 		$this->channel->send([$method, $args]);
 		return $this;
 	}

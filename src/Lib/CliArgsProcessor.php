@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Lib;
 final class CliArgsProcessor {
 
 	private const LONG_OPTS  = [
-		'disable-telemetry', 'debug', 'version', 'help', 'listen:',
+		'telemetry-period:', 'disable-telemetry', 'debug', 'version', 'help', 'listen:',
 	];
 	private const DEFAULT_OPTS = ['listen' => '127.0.0.1:9308'];
 
@@ -33,11 +33,12 @@ final class CliArgsProcessor {
 		return "Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)\n\n"
 			. "Usage: $script [ARGUMENTS]\n\n"
 			. "Arguments are:\n"
-			. "--listen             HTTP endpoint to accept Manticore requests\n"
-			. "--version            display the current version of Buddy\n"
-			. "--help               display this help message\n"
-			. "--disable-telemetry  disables telemetry for Buddy\n"
-			. "--debug              enable debug mode for testing\n"
+			. "--listen               HTTP endpoint to accept Manticore requests\n"
+			. "--version              display the current version of Buddy\n"
+			. "--help                 display this help message\n"
+			. "--telemetry-period=[N] set period for telemetry when we do snapshots\n"
+			. "--disable-telemetry    disables telemetry for Buddy\n"
+			. "--debug                enable debug mode for testing\n"
 			. "Examples:\n"
 			. "$script --debug\n"
 			. "$script --disable-telemetry\n\n";
@@ -57,10 +58,10 @@ final class CliArgsProcessor {
 	/**
 	 * Process cli arguments passed
 	 *
-	 * @return array{disable-telemetry?:bool,debug?:bool,help?:bool,version?:bool,listen:string}
+	 * @return array{telemetry-period?:int,disable-telemetry?:bool,debug?:bool,help?:bool,version?:bool,listen:string}
 	 */
 	public static function run(): array {
-		/** @var array{disable-telemetry?:bool,debug?:bool,help?:bool,version?:bool,listen:string} */
+		/** @var array{telemetry-period?:int,disable-telemetry?:bool,debug?:bool,help?:bool,version?:bool,listen:string} */
 		$opts = array_replace(self::DEFAULT_OPTS, getopt('', self::LONG_OPTS));
 		if (isset($opts['help'])) {
 			echo self::help();
@@ -80,6 +81,14 @@ final class CliArgsProcessor {
 
 		if (isset($opts['debug'])) {
 			putenv('DEBUG=1');
+		}
+
+		if (isset($opts['telemetry-period'])) {
+			if ($opts['telemetry-period'] < 5 || $opts['telemetry-period'] > 1800) {
+				echo "The --telemetry-period must be in range of 5 to 1800 secs.\n";
+				exit(1);
+			}
+			putenv('TELEMETRY_PERIOD=' . (int)$opts['telemetry-period']);
 		}
 
 		if (str_starts_with($opts['listen'], 'http://0.0.0.0')) {
