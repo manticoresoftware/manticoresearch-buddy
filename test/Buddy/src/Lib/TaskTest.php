@@ -28,6 +28,7 @@ class TaskTest extends TestCase {
 				return true;
 			}
 		);
+		$this->assertEquals(false, $task->isDeferred());
 		$this->assertEquals(TaskStatus::Pending, $task->getStatus());
 		$task->run();
 		$this->assertEquals(TaskStatus::Running, $task->getStatus());
@@ -98,5 +99,23 @@ class TaskTest extends TestCase {
 		$this->assertEquals(true, $error instanceof GenericError);
 		$this->assertEquals(BuddyRequestError::class . ': ' . $errorMessage, $error->getMessage());
 		$this->assertEquals($errorMessage, $error->getResponseError());
+	}
+
+	public function testTaskDeferredHasFLag(): void {
+		echo "\nTesting the task parallel run has deferred flag\n";
+		$task = Task::defer(
+			function (): bool {
+				usleep(2000000);
+				return true;
+			}
+		);
+		$this->assertEquals(true, $task->isDeferred());
+		$this->assertEquals(TaskStatus::Pending, $task->getStatus());
+		$task->run();
+		$this->assertEquals(TaskStatus::Running, $task->getStatus());
+		usleep(2500000);
+		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
+		$this->assertEquals(true, $task->isSucceed());
+		$this->assertEquals(true, $task->getResult());
 	}
 }
