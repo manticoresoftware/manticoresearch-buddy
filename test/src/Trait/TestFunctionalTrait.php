@@ -57,10 +57,12 @@ trait TestFunctionalTrait {
 	public static function setUpBeforeClass(): void {
 		// Getting the absolute path to the Manticore config file
 		$refCls = new \ReflectionClass(static::class);
-		self::$manticoreConfigFile = dirname((string)$refCls->getFileName()) . '/config/manticore.conf';
+		$configFile = static::$configFileName ?? 'manticore.conf';
+		self::$manticoreConfigFile = dirname((string)$refCls->getFileName()) . '/config/' . $configFile;
 
 		self::setConfWithBuddyPath();
 		self::checkManticorePathes();
+		system('rm -f /var/log/manticore-test/searchd.log');
 		system('searchd --config ' . self::$manticoreConfigFile);
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
 		sleep(5); // <- give 5 secs to protect from any kind of lags
