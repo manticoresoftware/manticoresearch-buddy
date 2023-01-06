@@ -46,13 +46,12 @@ final class EventHandler {
 	 * @return void
 	 */
 	public static function init(): void {
-		static::$runtimes = [
-			Task::createRuntime(),
-			Task::createRuntime(),
-			Task::createRuntime(),
-			Task::createRuntime(),
-		];
-		static::$maxRuntimeIndex = 3;
+		$threads = (int)(getenv('THREADS', true) ?: 4);
+		static::$runtimes = [];
+		for ($i = 0; $i < $threads; $i++) {
+			static::$runtimes[] = Task::createRuntime();
+		}
+		static::$maxRuntimeIndex = $threads - 1;
 	}
 
 	/**

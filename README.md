@@ -36,7 +36,6 @@ Let's now take a look at an example of creating the abstract RESTORE command:
 
 5. Finally, add a case for our new command to the `extractCommandFromRequest` method of the `QueryProcessor` class. This will allow the `QueryProcessor` to recognize and handle requests for the RESTORE command.
 
-
 ### Debug
 
 To debug the flow of the command, you can use the `bin/query` script. To run it, pass the query as an argument. For example:
@@ -77,9 +76,11 @@ To run a Buddy instance from the command line interface (CLI), use the following
   --help                 display this help message
   --telemetry-period=[N] set period for telemetry when we do snapshots
   --disable-telemetry    disables telemetry for Buddy
+  --threads=[N]          start N threads on launch, default is 4
   --debug                enable debug mode for testing
   Examples:
   manticore-executor src/main.php --debug
   manticore-executor src/main.php --disable-telemetry
 ```
+
 You can find more detailed information on the Manticore executor [here](https://github.com/manticoresoftware/executor).

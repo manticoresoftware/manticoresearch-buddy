@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Lib;
 final class CliArgsProcessor {
 
 	private const LONG_OPTS  = [
-		'telemetry-period:', 'disable-telemetry', 'debug', 'version', 'help', 'listen:',
+		'threads:', 'telemetry-period:', 'disable-telemetry', 'debug', 'version', 'help', 'listen:',
 	];
 	private const DEFAULT_OPTS = ['listen' => '127.0.0.1:9308'];
 
@@ -38,6 +38,7 @@ final class CliArgsProcessor {
 			. "--help                 display this help message\n"
 			. "--telemetry-period=[N] set period for telemetry when we do snapshots\n"
 			. "--disable-telemetry    disables telemetry for Buddy\n"
+			. "--threads=[N]          start N threads on launch, default is 4\n"
 			. "--debug                enable debug mode for testing\n"
 			. "Examples:\n"
 			. "$script --debug\n"
@@ -58,10 +59,27 @@ final class CliArgsProcessor {
 	/**
 	 * Process cli arguments passed
 	 *
-	 * @return array{telemetry-period?:int,disable-telemetry?:bool,debug?:bool,help?:bool,version?:bool,listen:string}
+	 * @return array{
+	 * threads?:int,
+	 * telemetry-period?:int,
+	 * disable-telemetry?:bool,
+	 * debug?:bool,
+	 * help?:bool,
+	 * version?:bool,
+	 * listen:string
+	 * }
 	 */
 	public static function run(): array {
-		/** @var array{telemetry-period?:int,disable-telemetry?:bool,debug?:bool,help?:bool,version?:bool,listen:string} */
+		/** @var array{
+		 * threads?:int,
+		 * telemetry-period?:int,
+		 * disable-telemetry?:bool,
+		 * debug?:bool,
+		 * help?:bool,
+		 * version?:bool,
+		 * listen:string
+		 * }
+		 */
 		$opts = array_replace(self::DEFAULT_OPTS, getopt('', self::LONG_OPTS));
 		if (isset($opts['help'])) {
 			echo self::help();
@@ -71,6 +89,15 @@ final class CliArgsProcessor {
 		if (isset($opts['version'])) {
 			echo self::version();
 			exit(0);
+		}
+
+		if (isset($opts['threads'])) {
+			if ($opts['threads'] < 2 || $opts['threads'] > 256) {
+				echo "The --threads must be in range of 2 to 256 secs.\n";
+				exit(1);
+			}
+
+			putenv('THREADS=' . (int)$opts['threads']);
 		}
 
 		if (isset($opts['disable-telemetry'])) {
