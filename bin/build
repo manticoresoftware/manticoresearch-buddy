@@ -54,6 +54,13 @@ add_directory_to_phar($buildVendorDir, $phar, 'vendor');
 // Done with composer
 
 $phar->stopBuffering();
+// TODO: We can use phar as a binary with proper length deduction
+system('sed  -i "1i #!/usr/bin/env manticore-executor"' . $pharFile); // +36
+// Remove chdir($origdir)
+system('sed -i.bak "287,1d" ' . $pharFile); // -17
+// Update LEN to make it work
+system('sed -i.bak "s/LEN = 6646/LEN = 6629/" ' . $pharFile);
+
 // TODO: we should add gz to manticore-executor or do not use it
 // $phar->compressFiles(Phar::GZ);
 
