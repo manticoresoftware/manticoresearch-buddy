@@ -8,7 +8,7 @@ Manticore Buddy is a sidecar for Manticore Search, written in PHP, which helps w
 
 To control different SQL commands, we use the following architecture. Each command consists of a prefix and the rest of the parameters. For example, we have "backup to /path/to/folder". In this case, `backup` is the command, and `to /path/to/folder` is the rest.
 
-### The flow
+### Execution flow
 
 Each request is handled by ReactPHP, parsed in the main loop, and forwarded to the `QueryProcessor`, which is the main entry point for command detection.
 
@@ -22,9 +22,9 @@ Exceptions can be thrown when implementing a new command because they are all ca
 
 There is a `GenericError` class that implements the `setResponseError` and `getResponseError` methods. If you want to provide a user-friendly error message, you can use the `setResponseError` method or create an exception with `GenericError::create('User-friendly error message goes here')`. It's important to note that the default exception message will not be included in the user response, but rather in the Manticore log file.
 
-### Steps example of command creation
+### Steps for creating a new command
 
-Great! Let's take a look at an example of creating the abstract RESTORE command:
+Let's now take a look at an example of creating the abstract RESTORE command:
 
 1. First, create a directory with our command namespace src/Restore and implement the `Request` and `Executor` classes.
 
