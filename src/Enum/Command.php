@@ -15,4 +15,5 @@ enum Command: string {
 	case Insert = 'InsertQuery';
 	case Show = 'ShowQueries';
 	case Backup = 'Backup';
+	case Test = 'Test';
 }
