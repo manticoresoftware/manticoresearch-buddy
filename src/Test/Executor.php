@@ -44,7 +44,7 @@ class Executor implements CommandExecutorInterface {
 
 		$taskFn = static function (int $timeout): array {
 			sleep($timeout);
-			return [];
+			return [[]];
 		};
 
 		$createMethod = $this->request->isDeferred ? 'deferInRuntime' : 'createInRuntime';
