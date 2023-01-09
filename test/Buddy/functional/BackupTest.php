@@ -34,9 +34,9 @@ class BackupTest extends TestCase {
 		exec('rm -fr /tmp/backup1 /tmp/backup2 /tmp/backup3');
 		exec('mkdir -p /tmp/backup1 /tmp/backup2 /tmp/backup3');
 
-		$this->assertQueryResultContainsString('backup to /tmp/backup1', 'Path: /tmp/backup1/backup-');
-		$this->assertQueryResultContainsString('backup tables a, b to /tmp/backup2', 'Path: /tmp/backup2/backup-');
-		$this->assertQueryResultContainsString('backup table a to /tmp/backup3', 'Path: /tmp/backup3/backup-');
+		$this->assertQueryResult('backup to /tmp/backup1', 'Path: /tmp/backup1/backup-');
+		$this->assertQueryResult('backup tables a, b to /tmp/backup2', 'Path: /tmp/backup2/backup-');
+		$this->assertQueryResult('backup table a to /tmp/backup3', 'Path: /tmp/backup3/backup-');
 
 		static::runSqlQuery('drop table if exists a');
 		static::runSqlQuery('drop table if exists b');
