@@ -13,7 +13,8 @@ namespace Manticoresearch\Buddy\Enum;
 
 enum Command: string {
 	case Insert = 'InsertQuery';
-	case Show = 'ShowQueries';
+	case ShowQueries = 'ShowQueries';
 	case Backup = 'Backup';
+	case ShowFullTables = 'ShowFullTables';
 	case Test = 'Test';
 }
