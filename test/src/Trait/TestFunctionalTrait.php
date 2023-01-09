@@ -183,11 +183,24 @@ trait TestFunctionalTrait {
 	 * Same as error checker but for asserts OK results
 	 *
 	 * @param string $query
-	 * @param string $string
+	 * @param string|string[] $contains
+	 * @param string|string[] $excludes
 	 * @return void
 	 * @throws Exception
 	 */
-	protected function assertQueryResultContainsString(string $query, string $string): void {
+	protected function assertQueryResult(
+		string $query,
+		string|array $contains = [],
+		string|array $excludes = []
+	): void {
+		if (is_string($contains)) {
+			$contains = [$contains];
+		}
+
+		if (is_string($excludes)) {
+			$excludes = [$excludes];
+		}
+
 		$result1 = static::runSqlQuery($query, false, '\G');
 		// TODO: dirty hack for backup but until we fix it
 		if (str_starts_with($query, 'backup')) {
@@ -195,7 +208,14 @@ trait TestFunctionalTrait {
 		}
 		$result2 = static::runHttpQuery($query);
 
-		$this->assertStringContainsString($string, implode(PHP_EOL, $result1));
+		foreach ($contains as $string) {
+			$this->assertStringContainsString($string, implode(PHP_EOL, $result1));
+		}
+
+		foreach ($excludes as $string) {
+			$this->assertStringNotContainsString($string, implode(PHP_EOL, $result1));
+		}
+
 		$output = '';
 		if (isset($result2[0]['data'])) {
 			$i = 1;
@@ -207,7 +227,14 @@ trait TestFunctionalTrait {
 				++$i;
 			}
 		}
-		$this->assertStringContainsString($string, trim($output));
+
+		foreach ($contains as $string) {
+			$this->assertStringContainsString($string, trim($output));
+		}
+
+		foreach ($excludes as $string) {
+			$this->assertStringNotContainsString($string, trim($output));
+		}
 	}
 
 	/**
@@ -221,9 +248,12 @@ trait TestFunctionalTrait {
 	 */
 	protected static function runSqlQuery(string $query, bool $redirectOutput = true, string $delimeter = ';'): array {
 		$port = static::getListenSqlPort();
-		$query = \addslashes($query);
+		// We use temporarely file just to skip issues with escaping post data in command line arg
+		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.data';
+		file_put_contents($payloadFile, $query . $delimeter);
+
 		$redirect = $redirectOutput ? '2>&1' : '';
-		exec("mysql -P$port -h127.0.0.1 -e '{$query}{$delimeter}' $redirect", $output);
+		exec("mysql -P$port -h127.0.0.1 < $payloadFile $redirect", $output);
 		return $output;
 	}
 
@@ -237,9 +267,11 @@ trait TestFunctionalTrait {
 	 */
 	protected static function runHttpQuery(string $query, bool $redirectOutput = true): array {
 		$port = static::getListenHttpPort();
-		$query = \addslashes($query);
+		// We use temporarely file just to skip issues with escaping post data in command line arg
+		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.data';
+		file_put_contents($payloadFile, $query);
 		$redirect = $redirectOutput ? '2>&1' : '';
-		exec("curl -s 127.0.0.1:$port/cli -d '$query' $redirect", $output);
+		exec("curl -s 127.0.0.1:$port/cli -d @$payloadFile $redirect", $output);
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = (array)json_decode($output[0] ?? '{}', true);
 		return $result;
