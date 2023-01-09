@@ -41,12 +41,12 @@ class HungRequestTest extends TestCase {
 
 	public function testDeferredHungRequestHandling(): void {
 		$port = static::getListenHttpPort();
-		$task1 = Task::create(...$this->generateTaskArgs([$port, 'test 3/deferred']));
+		$task1 = Task::create(...$this->generateTaskArgs([$port, 'test 4/deferred']));
 		$task2 = Task::create(...$this->generateTaskArgs([$port, 'show queries']));
 		$task1->run();
-		usleep(500000);
+		usleep(1000000);
 		$task2->run();
-		usleep(500000);
+		usleep(1000000);
 
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
 		$this->assertEquals(true, $task1->isSucceed());
