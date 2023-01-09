@@ -50,37 +50,43 @@ class HungRequestTest extends TestCase {
 
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
 		$this->assertEquals(true, $task1->isSucceed());
-		$res1 = $task1->getResult();
+		$res1 = (array)$task1->getResult();
 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
- 		$this->assertEquals(true, $task2->isSucceed());
- 		$res2 = $task2->getResult();
+		$this->assertEquals(true, $task2->isSucceed());
+		$res2 = (array)$task2->getResult();
 		// Making sure that the id of the last running query is the id of the hung request task
- 		$this->assertEquals($res1[0]['data'][0]['id'], $res2[0]['data'][2]['id']);
- 		sleep(4);
-		$this->assertEquals(1,1);
+		if (!is_array($res1[0]) || !is_array($res2[0])) {
+			$this->fail();
+		}
+		$this->assertEquals($res1[0]['data'][0]['id'], $res2[0]['data'][2]['id']);
+		sleep(4);
 	}
 
 	/**
 	 * @depends testDeferredHungRequestHandling
 	 */
 	public function testHungRequestHandling(): void {
- 		$port = static::getListenHttpPort();
- 		$task1 = Task::create(...$this->generateTaskArgs([$port, 'test 3']));
- 		$task2 = Task::create(...$this->generateTaskArgs([$port, 'show queries']));
- 		$task1->run();
- 		usleep(500000);
- 		$task2->run();
- 		usleep(500000);
+		$port = static::getListenHttpPort();
+		$task1 = Task::create(...$this->generateTaskArgs([$port, 'test 3']));
+		$task2 = Task::create(...$this->generateTaskArgs([$port, 'show queries']));
+		$task1->run();
+		usleep(500000);
+		$task2->run();
+		usleep(500000);
 
- 		$this->assertEquals(TaskStatus::Running, $task1->getStatus());
- 		$this->assertEquals(TaskStatus::Running, $task2->getStatus());
- 		sleep(4);
- 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
- 		$this->assertEquals([[]], $task1->getResult());
- 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
- 		$this->assertEquals(true, $task2->isSucceed());
+		$this->assertEquals(TaskStatus::Running, $task1->getStatus());
+		$this->assertEquals(TaskStatus::Running, $task2->getStatus());
+		sleep(4);
+		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
+		$this->assertEquals([[]], $task1->getResult());
+		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
+		$this->assertEquals(true, $task2->isSucceed());
 	}
 
+	/**
+	 * @param array{0:int,1:string} $taskFnArgs
+	 * @return array{0:Closure,1:array{0:int,1:string}}
+	 */
 	protected function generateTaskArgs(array $taskFnArgs): array {
 		return [
 			function (int $port, string $query): array {

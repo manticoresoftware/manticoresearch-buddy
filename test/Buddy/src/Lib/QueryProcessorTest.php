@@ -65,12 +65,12 @@ class QueryProcessorTest extends TestCase {
 	public function testUnsupportedCommandProcessFail(): void {
 		echo "\nTesting the processing of unsupported execution command\n";
 		$this->expectException(SQLQueryCommandNotSupported::class);
-		$this->expectExceptionMessage('Failed to handle query: TEST');
+		$this->expectExceptionMessage('Failed to handle query: Some command');
 		$request = Request::fromArray(
 			[
 				'version' => 1,
 				'error' => '',
-				'payload' => 'TEST',
+				'payload' => 'Some command',
 				'format' => RequestFormat::SQL,
 				'endpoint' => ManticoreEndpoint::Cli,
 			]
