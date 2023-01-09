@@ -1,3 +1,5 @@
 vendor/**
 build/**
 .phpunit.result.cache
+/.ptp-sync/
+.ptp-sync-folder

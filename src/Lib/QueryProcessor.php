@@ -165,6 +165,7 @@ class QueryProcessor {
 			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => Command::Insert,
 			str_starts_with($queryLowercase, 'show queries') => Command::Show,
 			str_starts_with($queryLowercase, 'backup') => Command::Backup,
+			str_starts_with($queryLowercase, 'test') => Command::Test,
 			default => throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload"),
 		};
 	}
