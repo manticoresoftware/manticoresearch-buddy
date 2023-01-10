@@ -129,7 +129,7 @@ class ShowFullTablesRequestTest extends TestCase {
 				);
 			} catch (SQLQueryParsingError $e) {
 				$this->assertEquals(
-					'You have an error in your query. Please, double check it.',
+					'You have an error in your query. Please, double-check it.',
 					$e->getResponseError()
 				);
 				continue;
