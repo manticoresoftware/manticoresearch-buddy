@@ -34,8 +34,11 @@ use parallel\Runtime;
  * for work with connection initiated by React framework
  */
 final class EventHandler {
-	/** @var array<Runtime> */
-	public static array $runtimes = [];
+	/** @var array{available:array<Runtime>,blocked:array<int,Runtime>} */
+	public static array $runtimes = [
+		'available' => [],
+		'blocked' => [],
+	];
 
 	/** @var int */
 	public static int $maxRuntimeIndex;
@@ -47,9 +50,8 @@ final class EventHandler {
 	 */
 	public static function init(): void {
 		$threads = (int)(getenv('THREADS', true) ?: 4);
-		static::$runtimes = [];
 		for ($i = 0; $i < $threads; $i++) {
-			static::$runtimes[] = Task::createRuntime();
+			static::$runtimes['available'][] = Task::createRuntime();
 		}
 		static::$maxRuntimeIndex = $threads - 1;
 	}
@@ -59,10 +61,16 @@ final class EventHandler {
 	 */
 	public static function destroy(): void {
 		try {
-			foreach (static::$runtimes as $runtime) {
+			foreach (static::$runtimes['available'] as $runtime) {
 				$runtime->kill();
 			}
-			static::$runtimes = [];
+			foreach (static::$runtimes['blocked'] as $runtime) {
+				$runtime->kill();
+			}
+			static::$runtimes = [
+				'available' => [],
+				'blocked' => [],
+			];
 		} catch (Throwable) {
 		}
 	}
@@ -88,52 +96,51 @@ final class EventHandler {
 		$deferred = new Deferred;
 		$id = static::getRequestId($serverRequest);
 		debug("[$id] request data: $data");
-		try {
-			$request = Request::fromString($data, $id);
-			$executor = QueryProcessor::process($request);
-			$task = $executor->run(static::$runtimes[mt_rand(0, static::$maxRuntimeIndex)]);
-		} catch (Throwable $e) {
-			debug("[$id] data parse error: {$e->getMessage()}");
-
-			// Create special generic error in case we have system exception
-			// And shadowing $e with it
-			/** @var string $originalError */
-			$originalError = match (true) {
-				isset($request) => $request->error,
-				default => ((array)json_decode($data, true))['error'] ?? '',
-			};
-			// We proxy original error in case when we do not know how to handle query
-			// otherwise we send our custom error
-			if (self::isCustomError($e)) {
-				/** @var GenericError $e */
-				$e->setResponseError($originalError);
-			} elseif (!is_a($e, GenericError::class)) {
-				$e = GenericError::create($originalError);
-			}
-
-			$deferred->resolve(
-				[
-					$request ?? Request::default(),
-					Response::fromError($e, $request->format ?? RequestFormat::JSON),
-				]
-			);
-			return $deferred->promise();
-		}
 
 		// Get extra properties to identified connectio and host
 		// and set it for the task first
 		/** @var string $host */
 		$host = $serverRequest->getHeader('Host')[0] ?? '';
-		$task
-			->setHost($host)
-			->setBody($request->payload);
-		// Add task to running pool first
-		TaskPool::add($task);
 
 		// We always add periodic timer, just because we keep tracking deferred tasks
 		// to show it in case of show queries
-		$tickFn = static function (?TimerInterface $timer = null) use ($request, $task, $deferred) {
+		$tickFn = static function (?TimerInterface $timer = null) use ($id, $data, $host, $deferred) {
 			static $ts;
+			static $request;
+			static $executor;
+			static $task;
+			static $firstCall = true;
+
+			if (!isset($task)) {
+				try {
+					// we try to pop runtime and when we have some, process, otherwise just queue
+					$runtime = array_pop(static::$runtimes['available']);
+					if (!$runtime) {
+						return;
+					}
+					static::$runtimes['blocked'][$id] = $runtime;
+					$request = Request::fromString($data, $id);
+					$executor = QueryProcessor::process($request);
+					$task = $executor->run($runtime);
+				} catch (Throwable $e) {
+					return static::handleExceptionWhileDataProcessing(
+						$e, $id, $request ?? null, $data, $deferred, $timer, $runtime ?? null
+					);
+				}
+
+				$task
+					->setHost($host)
+					->setBody($request->payload);
+				// Add task to running pool first
+				TaskPool::add($task);
+			}
+
+			// Instantly return in case it's a deferred task
+			if ($firstCall && $task->isDeferred()) {
+				$firstCall = false;
+				return static::handleDeferredTask($request, $deferred, $task);
+			}
+
 			if (!isset($ts)) {
 				$ts = time();
 			}
@@ -149,12 +156,8 @@ final class EventHandler {
 				return;
 			}
 
-			// task is finished, we can remove it from the pool
-			TaskPool::remove($task);
+			static::handleTaskFinished($task, $timer, $id);
 
-			if ($timer) {
-				Loop::cancelTimer($timer);
-			}
 			if ($task->isSucceed()) {
 				/** @var array<mixed> */
 				$result = $task->getResult();
@@ -176,32 +179,7 @@ final class EventHandler {
 		// In case we work with deferred task we
 		// should return response to the client without waiting
 		// for results of it
-		if ($task->isDeferred()) {
-			$tickFn(Loop::addPeriodicTimer(0.001, $tickFn));
-			// TODO: extract it somewhere for better code
-			$response = [[
-				'columns' => [
-					'id' => [
-						'type' => 'long long',
-					],
-				],
-				'data' => [
-					[
-						'id' => $task->getId(),
-					],
-				],
-			],
-			];
-			$deferred->resolve(
-				[
-					$request,
-					Response::fromMessage($response, $request->format),
-				]
-			);
-		} else {
-			$task->wait();
-			$tickFn();
-		}
+		$tickFn(Loop::addPeriodicTimer(0.001, $tickFn));
 
 		return $deferred->promise();
 	}
@@ -284,5 +262,85 @@ final class EventHandler {
 	 */
 	protected static function getRequestId(ServerRequestInterface $serverRequest): int {
 		return (int)($serverRequest->getHeader('Request-ID')[0] ?? 0);
+	}
+
+	protected static function handleDeferredTask(Request $request, Deferred $deferred, Task $task): PromiseInterface {
+		// TODO: extract it somewhere for better code
+		$response = [[
+			'columns' => [
+				'id' => [
+					'type' => 'long long',
+				],
+			],
+			'data' => [
+				[
+					'id' => $task->getId(),
+				],
+			],
+		],
+		];
+		$deferred->resolve(
+			[
+				$request,
+				Response::fromMessage($response, $request->format),
+			]
+		);
+		return $deferred->promise();
+	}
+
+	protected static function handleExceptionWhileDataProcessing(
+		Throwable $e,
+		int $id,
+		?Request $request,
+		string $data,
+		Deferred $deferred,
+		?TimerInterface $timer,
+		?Runtime $runtime
+	): PromiseInterface {
+		debug("[$id] data parse error: {$e->getMessage()}");
+
+		// If we pop runtime, return back in case of error
+		array_unshift(static::$runtimes['available'], $runtime);
+
+		// Create special generic error in case we have system exception
+		// And shadowing $e with it
+		/** @var string $originalError */
+		$originalError = match (true) {
+			isset($request) => $request->error,
+			default => ((array)json_decode($data, true))['error'] ?? '',
+		};
+		// We proxy original error in case when we do not know how to handle query
+		// otherwise we send our custom error
+		if (self::isCustomError($e)) {
+			/** @var GenericError $e */
+			$e->setResponseError($originalError);
+		} elseif (!is_a($e, GenericError::class)) {
+			$e = GenericError::create($originalError);
+		}
+
+		static::handleTaskFinished(null, $timer, $id);
+		$deferred->resolve(
+			[
+				$request ?? Request::default(),
+				Response::fromError($e, $request->format ?? RequestFormat::JSON),
+			]
+		);
+
+		return $deferred->promise();
+	}
+
+	public static function handleTaskFinished(?Task $task, ?TimerInterface $timer, int $requestId): void {
+		// task is finished, we can remove it from the pool
+		if (isset($task)) {
+			TaskPool::remove($task);
+		}
+
+		if ($timer) {
+			Loop::cancelTimer($timer);
+		}
+
+		// Return runtime back to pool
+		array_unshift(static::$runtimes['available'], static::$runtimes['blocked'][$requestId]);
+		unset(static::$runtimes['blocked'][$requestId]);
 	}
 }
