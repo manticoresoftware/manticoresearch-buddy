@@ -124,7 +124,7 @@ final class CliArgsProcessor {
 		}
 
 		if ($opts['threads'] < 1 || $opts['threads'] > 256) {
-			echo "The --threads must be in range of 1 to 256 secs.\n";
+			echo "The --threads value must be in the range of 1 to 256.\n";
 			exit(1);
 		}
 
