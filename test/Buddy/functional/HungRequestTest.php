@@ -75,7 +75,7 @@ class HungRequestTest extends TestCase {
 		usleep(500000);
 
 		$this->assertEquals(TaskStatus::Running, $task1->getStatus());
-		$this->assertEquals(TaskStatus::Running, $task2->getStatus());
+		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		sleep(4);
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
 		$this->assertEquals([[]], $task1->getResult());
