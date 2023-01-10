@@ -42,6 +42,7 @@ final class Task {
 	// Extended properties for make things simpler
 	protected string $host = '';
 	protected string $body = '';
+	protected int $requestId = 0;
 
 	/**
 	 * @param mixed[] $argv
