@@ -1,14 +1,14 @@
 FROM manticoresearch/manticore-executor:0.4.1-dev
 
 ARG TARGET_ARCH=amd64
-ENV MANTICORE_VERSION=5.0.3-221219-dfe8543d2
+ENV MANTICORE_VERSION=5.0.3-230109-8832c302e
 ENV EXECUTOR_VERSION=0.5.3-22121910-2bcf464
 RUN apt-get -y update && apt-get -y upgrade && \
   apt-get -y install bash figlet mysql-client curl iproute2 && \
   curl -sSL  http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb > libssl.deb && \
   dpkg -i libssl.deb && rm -f libssl.deb && \
   curl -sSL https://repo.manticoresearch.com/repository/manticoresearch_buster_dev/dists/manticore_${MANTICORE_VERSION}_${TARGET_ARCH}.tgz | tar -xzf - && \
-  curl -sSL https://repo.manticoresearch.com/repository/manticoresearch_buster_dev/dists/buster/main/binary-${TARGET_ARCH}/manticore-buddy_0.1.33-22121913-b132099_all.deb > manticore-buddy.deb && \
+  curl -sSL https://repo.manticoresearch.com/repository/manticoresearch_buster_dev/dists/buster/main/binary-${TARGET_ARCH}/manticore-buddy_0.2.1-23011012-ca4a1d5_all.deb > manticore-buddy.deb && \
   dpkg -i manticore*.deb && rm -f manticore*.deb && \
   mv /usr/bin/manticore-executor /usr/bin/manticore-executor-dev && \
   ln -sf /usr/bin/manticore-executor-dev /usr/bin/php && \
