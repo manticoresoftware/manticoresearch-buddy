@@ -49,7 +49,7 @@ class Request implements CommandRequestInterface {
 			. '$#ius';
 
 		if (!preg_match($pattern, $request->payload, $m)) {
-			throw SQLQueryParsingError::create('You have an error in your query. Please, double check it.');
+			throw SQLQueryParsingError::create('You have an error in your query. Please, double-check it.');
 		}
 
 		$self = new self();
