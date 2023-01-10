@@ -60,11 +60,11 @@ class CliArgsProcessorTest extends TestCase {
 	}
 
 	public function testThreadsArgProcessOk(): void {
-		$threads = mt_rand(5, 10);
-		CliArgsProcessor::run(['threads' => $threads]);
-
 		echo "\nTesting the processing of the `threads` argument\n";
-		$this->assertEquals($threads, (int)getenv('THREADS', true));
+		for ($threads = 1; $threads < 12; $threads++) {
+			CliArgsProcessor::run(['threads' => $threads]);
+			$this->assertEquals($threads, (int)getenv('THREADS', true));
+		}
 	}
 
 	public function testDisableTelemetryArgProcessOk(): void {
