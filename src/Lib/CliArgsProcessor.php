@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)
+ Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License version 2 or any later
@@ -30,7 +30,7 @@ final class CliArgsProcessor {
 			$script = 'manticore-executor src/main.php';
 		}
 
-		return "Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)\n\n"
+		return "Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)\n\n"
 			. "Usage: $script [ARGUMENTS]\n\n"
 			. "Arguments are:\n"
 			. "--listen               HTTP endpoint to accept Manticore requests\n"
@@ -52,7 +52,7 @@ final class CliArgsProcessor {
 	 */
 	private static function version(): string {
 		return 'Manticore Buddy v' . buddy_version() . "\n"
-			. "Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)\n"
+			. "Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)\n"
 		;
 	}
 

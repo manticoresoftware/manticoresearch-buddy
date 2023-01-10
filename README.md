@@ -66,7 +66,7 @@ To run a Buddy instance from the command line interface (CLI), use the following
 
 ```bash
   $ manticore-executor src/main.php [ARGUMENTS]
-  Copyright (c) 2022, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
 
   Usage: manticore-executor src/main.php [ARGUMENTS]
 
