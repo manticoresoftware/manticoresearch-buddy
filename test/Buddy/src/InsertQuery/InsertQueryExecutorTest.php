@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\InsertQuery\Request;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response as ManticoreResponse;
+use Manticoresearch\Buddy\Network\ManticoreClient\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 use Manticoresearch\Buddy\Network\Response;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
@@ -36,6 +37,24 @@ class InsertQueryExecutorTest extends TestCase {
 	 */
 	protected function runTask(NetRequest $networkRequest, string $serverUrl, string $resp): void {
 		$request = Request::fromNetworkRequest($networkRequest);
+		$request->setManticoreSettings(
+			ManticoreSettings::fromArray(
+				[
+					'configuration_file' => '/etc/manticoresearch/manticore.conf',
+					'worker_pid' => 7718,
+					'searchd.auto_schema' => '1',
+					'searchd.listen' => '0.0.0:9308:http',
+					'searchd.log' => '/var/log/manticore/searchd.log',
+					'searchd.query_log' => '/var/log/manticore/query.log',
+					'searchd.pid_file' => '/var/run/manticore/searchd.pid',
+					'searchd.data_dir' => '/var/lib/manticore',
+					'searchd.query_log_format' => 'sphinxql',
+					'searchd.buddy_path' => 'manticore-executor /workdir/src/main.php --debug',
+					'common.plugin_dir' => '/usr/local/lib/manticore',
+					'common.lemmatizer_base' => '/usr/share/manticore/morph/',
+				]
+			)
+		);
 
 		$manticoreClient = new HTTPClient(new ManticoreResponse(), $serverUrl);
 		$executor = new Executor($request);

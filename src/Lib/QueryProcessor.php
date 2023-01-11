@@ -18,61 +18,48 @@ use Manticoresearch\Buddy\Exception\CommandNotAllowed;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
+use Manticoresearch\Buddy\Network\ManticoreClient\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Network\Request;
 use Psr\Container\ContainerInterface;
 
 class QueryProcessor {
-	/** @var string */
+  /** @var string */
 	protected const NAMESPACE_PREFIX = 'Manticoresearch\\Buddy\\';
 
-	/** @var ContainerInterface */
-	// We set this on initialization (init.php) so we are sure we have it in class
+  /** @var ContainerInterface */
+  // We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
 
-	/** @var ?array{
-	 * 'configuration_file'?:string,
-	 * 'worker_pid'?:string,
-	 * 'searchd.auto_schema'?:string,
-	 * 'searchd.listen'?:string,
-	 * 'searchd.log'?:string,
-	 * 'searchd.query_log'?:string,
-	 * 'searchd.pid_file'?:string,
-	 * 'searchd.data_dir'?:string,
-	 * 'searchd.query_log_format'?:string,
-	 * 'searchd.buddy_path'?:string,
-	 * 'searchd.binlog_path'?:string,
-	 * 'common.plugin_dir'?:string,
-	 * 'common.lemmatizer_base'?:string,
-	 * } $configSettings */
-	protected static ?array $configSettings = null;
+	/** @var ManticoreSettings */
+	protected static ManticoreSettings $settings;
 
-	/**
-	 * Setter for container property
-	 *
-	 * @param ContainerInterface $container
-	 *  The container object to resolve the executor's dependencies in case such exist
-	 * @return void
-	 *  The CommandExecutorInterface to execute to process the final query
-	 */
+  /**
+   * Setter for container property
+   *
+   * @param ContainerInterface $container
+   *  The container object to resolve the executor's dependencies in case such exist
+   * @return void
+   *  The CommandExecutorInterface to execute to process the final query
+   */
 	public static function setContainer(ContainerInterface $container): void {
 		self::$container = $container;
 	}
 
-	/**
-	 * This is the main entry point to start parsing and processing query
-	 *
-	 * @param Request $request
-	 *  The request struct to process
-	 * @return CommandExecutorInterface
-	 *  The CommandExecutorInterface to execute to process the final query
-	 * @throws CommandNotAllowed
-	 */
+  /**
+   * This is the main entry point to start parsing and processing query
+   *
+   * @param Request $request
+   *  The request struct to process
+   * @return CommandExecutorInterface
+   *  The CommandExecutorInterface to execute to process the final query
+   * @throws CommandNotAllowed
+   */
 	public static function process(Request $request): CommandExecutorInterface {
-		if (static::$configSettings === null) {
+		if (!isset(static::$settings)) {
 			static::init();
 		}
 		$command = static::extractCommandFromRequest($request);
-		//throw new CommandNotAllowed("Request handling is disabled: $request->payload");
+	  //throw new CommandNotAllowed("Request handling is disabled: $request->payload");
 		if (!self::isCommandAllowed($command)) {
 			throw new CommandNotAllowed("Request handling is disabled: $request->payload");
 		}
@@ -81,31 +68,32 @@ class QueryProcessor {
 		buddy_metric(camelcase_to_underscore($commandPrefix), 1);
 		$requestClassName = static::NAMESPACE_PREFIX . "{$commandPrefix}\\Request";
 		$commandRequest = $requestClassName::fromNetworkRequest($request);
+		$commandRequest->setManticoreSettings(static::$settings);
 		debug("[$request->id] Command request: {$commandPrefix}\\Request " . json_encode($commandRequest));
 		$executorClassName = static::NAMESPACE_PREFIX . "{$commandPrefix}\\Executor";
-		/** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
+	  /** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
 		$executor = new $executorClassName($commandRequest);
 		foreach ($executor->getProps() as $prop) {
 			$executor->{'set' . ucfirst($prop)}(static::getObjFromContainer($prop));
 		}
-		/** @var CommandExecutorInterface */
+	  /** @var CommandExecutorInterface */
 		return $executor;
 	}
 
-	/**
-	 * Load show settings response and setup things on first request
-	 *
-	 * @return void
-	 */
+  /**
+   * Load show settings response and setup things on first request
+   *
+   * @return void
+   */
 	protected static function init(): void {
-		/** @var HTTPClient */
+	  /** @var HTTPClient */
 		$manticoreClient = static::getObjFromContainer('manticoreClient');
 		$resp = $manticoreClient->sendRequest('SHOW SETTINGS');
-		/** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
+	  /** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
 		$data = (array)json_decode($resp->getBody(), true);
-		static::$configSettings = [];
+		$settings = [];
 		foreach ($data[0]['data'] as ['Setting_name' => $key, 'Value' => $value]) {
-			static::$configSettings[$key] = $value;
+			$settings[$key] = $value;
 			if ($key !== 'configuration_file') {
 				continue;
 			}
@@ -113,52 +101,52 @@ class QueryProcessor {
 			debug("using config file = '$value'");
 			putenv("SEARCHD_CONFIG={$value}");
 		}
+		static::$settings = ManticoreSettings::fromArray($settings);
 	}
 
-	/**
-	 * Retrieve object from the DI container
-	 *
-	 * @param string $objName
-	 * @return object
-	 */
+  /**
+   * Retrieve object from the DI container
+   *
+   * @param string $objName
+   * @return object
+   */
 	protected static function getObjFromContainer(string $objName): object {
 		if (!self::$container->has($objName)) {
 			throw new Exception("Failed to find '$objName' in container");
 		}
 
-		/** @var object */
+	  /** @var object */
 		return self::$container->get($objName);
 	}
 
-	/**
-	 * Check if a command is currently supported by Buddy and daemon
-	 *
-	 * @param Command $command
-	 * @return bool
-	 */
+  /**
+   * Check if a command is currently supported by Buddy and daemon
+   *
+   * @param Command $command
+   * @return bool
+   */
 	protected static function isCommandAllowed(Command $command): bool {
 		return match (true) {
-			($command === Command::Insert && isset(self::$configSettings['searchd.auto_schema'])
-				&& self::$configSettings['searchd.auto_schema'] === '0') => false,
+			($command === Command::Insert && !self::$settings->searchdAutoSchema) => false,
 			default => true,
 		};
 	}
 
-	/**
-	 * This method extracts all supported prefixes from input query
-	 * that buddy able to handle
-	 *
-	 * @param Request $request
-	 * @return Command
-	 * @throws SQLQueryCommandNotSupported
-	 */
+  /**
+   * This method extracts all supported prefixes from input query
+   * that buddy able to handle
+   *
+   * @param Request $request
+   * @return Command
+   * @throws SQLQueryCommandNotSupported
+   */
 	public static function extractCommandFromRequest(Request $request): Command {
 		$queryLowercase = strtolower($request->payload);
 		$isInsertSQLQuery = in_array($request->endpoint, [ManticoreEndpoint::Sql, ManticoreEndpoint::Cli])
-			&& str_starts_with($queryLowercase, 'insert into');
+		&& str_starts_with($queryLowercase, 'insert into');
 		$isInsertHTTPQuery = ($request->endpoint === ManticoreEndpoint::Insert)
-			|| ($request->endpoint === ManticoreEndpoint::Bulk
-				&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')
+		|| ($request->endpoint === ManticoreEndpoint::Bulk
+		&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')
 		);
 		$isInsertError = preg_match('/table (.*?) absent/', $request->error);
 		return match (true) {

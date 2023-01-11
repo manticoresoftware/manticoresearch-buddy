@@ -11,13 +11,13 @@
 
 namespace Manticoresearch\Buddy\Test;
 
-use Manticoresearch\Buddy\Interface\CommandRequestInterface;
+use Manticoresearch\Buddy\Base\CommandRequestBase;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
  */
-class Request implements CommandRequestInterface {
+class Request extends CommandRequestBase {
 
 	public function __construct(public int $timeout = 0, public bool $isDeferred = false) {
 	}

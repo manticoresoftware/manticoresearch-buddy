@@ -12,15 +12,17 @@ To control different SQL commands, we use the following architecture. Each comma
 
 Each request is handled by ReactPHP, parsed in the main loop, and forwarded to the `QueryProcessor`, which is the main entry point for command detection.
 
-Each command that Buddy can process consists of the implementation of two interfaces: `CommandRequestInterface` and `CommandExecutorInterface`.
+Each command that Buddy can process consists of implementing two interfaces: `CommandRequestInterface` and `CommandExecutorInterface`.
 
 The `CommandRequestInterface` represents the parsing of raw network data from JSON and its preparation for future request processing by the command. Its primary purpose is to parse the data into a `CommandRequest` object and throw exceptions in case of any errors.
 
-The `CommandExecutorInterface` contains the logic for the command that must be executed. It uses the `Task` class, which is run in parallel in a separate thread to make the process nonblocking.
+There is a base class – `ComandRequestBase`, that implements the required interface and adds some base logic to all requests we support. You should extend this class when you create a new command request.
+
+The `CommandExecutorInterface` contains the logic for the command that must be executed. It uses the `Task` class, which is run in parallel in a separate thread to make the process non-blocking.
 
 Exceptions can be thrown when implementing a new command because they are all caught in a loop and processed.
 
-There is a `GenericError` class that implements the `setResponseError` and `getResponseError` methods. If you want to provide a user-friendly error message, you can use the `setResponseError` method or create an exception with `GenericError::create('User-friendly error message goes here')`. It's important to note that the default exception message will not be included in the user response, but rather in the Manticore log file.
+There is a `GenericError` class that implements the `setResponseError` and `getResponseError` methods. If you want to provide a user-friendly error message, you can use the `setResponseError` method or create an exception with `GenericError::create('User-friendly error message goes here')`. It's important to note that the default exception message will not be included in the user response but in the Manticore log file.
 
 ### Steps for creating a new command
 
@@ -28,9 +30,9 @@ Let's now take a look at an example of creating the abstract RESTORE command:
 
 1. First, create a directory with our command namespace src/Restore and implement the `Request` and `Executor` classes.
 
-2. Next, write code that implements the `fromNetworkRequest` method in the `Request` class. This method should parse the input network request and return a new `Request` instance with all data loaded in it, ready to be used in the `Executor`.
+2. Next, write code that implements the `fromNetworkRequest` method in the `Request` class. This method should parse the input network request and return a new `Request` instance with all data loaded and ready to be used in the `Executor`.
 
-3. In the `Executor` class, write code that implements the `run` method and contains all the logic for the command. This method should return an instance of the `Task` class.
+3. In the `Executor`, write code that implements the `run` method and contains all the logic for the command. This method should return an instance of the `Task` class.
 
 4. The `Task` instance can be used to check the status, get the result, and have complete control over the asynchronous execution of the command.
 
@@ -38,7 +40,7 @@ Let's now take a look at an example of creating the abstract RESTORE command:
 
 ### Debug
 
-To debug the flow of the command, you can use the `bin/query` script. To run it, pass the query as an argument. For example:
+To debug the command flow, you can use the `bin/query` script. To run it, pass the query as an argument. For example:
 
 ```bash
   $ bin/query "BACKUP"

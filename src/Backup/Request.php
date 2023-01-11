@@ -11,15 +11,15 @@
 
 namespace Manticoresearch\Buddy\Backup;
 
+use Manticoresearch\Buddy\Base\CommandRequestBase;
 use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
-use Manticoresearch\Buddy\Interface\CommandRequestInterface;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 use RuntimeException;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
  */
-class Request implements CommandRequestInterface {
+final class Request extends CommandRequestBase {
 	const OPTIONS = [
 		'async' => 'bool',
 		'compress' => 'bool',
@@ -135,7 +135,7 @@ class Request implements CommandRequestInterface {
 	protected static function castOption(string $key, string $value): bool {
 		$type = static::OPTIONS[$key] ?? 'undefined';
 		return match ($type) {
-			'bool', 'boolean' => $value === 'true' || $value === '1' || $value === 'yes' || $value === 'on',
+			'bool' => $value === 'true' || $value === '1' || $value === 'yes' || $value === 'on',
 			default => throw new RuntimeException("Unsupported type to cast the option '$key' to '$type"),
 		};
 	}
