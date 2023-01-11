@@ -18,6 +18,7 @@ use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\InsertQuery\Executor as InsertQueryExecutor;
 use Manticoresearch\Buddy\InsertQuery\Request as InsertQueryRequest;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Network\ManticoreClient\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Network\Request;
 use Manticoresearch\Buddy\ShowQueries\Executor as ShowQueriesExecutor;
 use Manticoresearch\Buddy\ShowQueries\Request as ShowQueriesRequest;
@@ -39,7 +40,7 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('configSettings', []);
+		$refCls->setStaticPropertyValue('settings', static::getManticoreSettings());
 		$executor = QueryProcessor::process($request);
 		$this->assertInstanceOf(BackupExecutor::class, $executor);
 		$refCls = new ReflectionClass($executor);
@@ -76,7 +77,7 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('configSettings', []);
+		$refCls->setStaticPropertyValue('settings', static::getManticoreSettings());
 		QueryProcessor::process($request);
 	}
 
@@ -93,7 +94,7 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('configSettings', ['searchd.auto_schema' => '1']);
+		$refCls->setStaticPropertyValue('settings', static::getManticoreSettings(['searchd.auto_schema' => '1']));
 		$executor = QueryProcessor::process($netRequest);
 		$this->assertInstanceOf(InsertQueryExecutor::class, $executor);
 		$refCls = new ReflectionClass($executor);
@@ -101,9 +102,52 @@ class QueryProcessorTest extends TestCase {
 		$this->assertInstanceOf(InsertQueryRequest::class, $request);
 
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('configSettings', ['searchd.auto_schema' => '0']);
+		$refCls->setStaticPropertyValue('settings', static::getManticoreSettings(['searchd.auto_schema' => '0']));
 		$this->expectException(CommandNotAllowed::class);
 		$this->expectExceptionMessage('Request handling is disabled: INSERT INTO test(col1) VALUES("test")');
 		QueryProcessor::process($netRequest);
+	}
+
+	/**
+	 * @param array<string,int|string> $settings
+	 * @return ManticoreSettings
+	 */
+	protected static function getManticoreSettings(array $settings = []): ManticoreSettings {
+		/**
+		 * @var array{
+		 * 'configuration_file'?:string,
+		 * 'worker_pid'?:int,
+		 * 'searchd.auto_schema'?:string,
+		 * 'searchd.listen'?:string,
+		 * 'searchd.log'?:string,
+		 * 'searchd.query_log'?:string,
+		 * 'searchd.pid_file'?:string,
+		 * 'searchd.data_dir'?:string,
+		 * 'searchd.query_log_format'?:string,
+		 * 'searchd.buddy_path'?:string,
+		 * 'searchd.binlog_path'?:string,
+		 * 'common.plugin_dir'?:string,
+		 * 'common.lemmatizer_base'?:string,
+		 * } $settings
+		 * @return static
+		 */
+		$settings = array_replace(
+			[
+				'configuration_file' => '/etc/manticoresearch/manticore.conf',
+				'worker_pid' => 7718,
+				'searchd.auto_schema' => '1',
+				'searchd.listen' => '0.0.0:9308:http',
+				'searchd.log' => '/var/log/manticore/searchd.log',
+				'searchd.query_log' => '/var/log/manticore/query.log',
+				'searchd.pid_file' => '/var/run/manticore/searchd.pid',
+				'searchd.data_dir' => '/var/lib/manticore',
+				'searchd.query_log_format' => 'sphinxql',
+				'searchd.buddy_path' => 'manticore-executor /workdir/src/main.php --debug',
+				'common.plugin_dir' => '/usr/local/lib/manticore',
+				'common.lemmatizer_base' => '/usr/share/manticore/morph/',
+			],
+			$settings
+		);
+		return ManticoreSettings::fromArray($settings);
 	}
 }

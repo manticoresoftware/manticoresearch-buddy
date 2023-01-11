@@ -100,6 +100,7 @@ class HTTPClient {
 					. "Connection: close\n",
 				'content' => $prefix . $request,
 				'timeout' => static::HTTP_REQUEST_TIMEOUT,
+				'ignore_errors' => true,
 			],
 		];
 

@@ -11,12 +11,13 @@
 
 namespace Manticoresearch\Buddy\InsertQuery;
 
+use Manticoresearch\Buddy\Base\CommandRequestBase;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 use Manticoresearch\Buddy\QueryParser\Loader;
 
-class Request  {
+final class Request extends CommandRequestBase {
 	/** @var array<string> */
 	public array $queries = [];
 
