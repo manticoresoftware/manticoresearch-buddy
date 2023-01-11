@@ -133,7 +133,7 @@ final class Task {
 	 * @return Runtime
 	 */
 	public static function createRuntime(): Runtime {
-		return new Runtime(__DIR__. '/../../vendor/autoload.php');
+		return new Runtime(__DIR__. '/../runtime.php');
 	}
 
 	/**
