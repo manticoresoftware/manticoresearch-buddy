@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\InsertQuery;
 
 use Exception;
+use Manticoresearch\Buddy\Exception\GenericError;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
@@ -42,6 +43,15 @@ class Executor implements CommandExecutorInterface {
 	 * @throws RuntimeException
 	 */
 	public function run(Runtime $runtime): Task {
+		// Check that we run it in rt mode because it will not work in plain
+		$settings = $this->request->getManticoreSettings();
+		if (!$settings->isRtMode()) {
+			throw GenericError::create(
+				'Cannot create the table automatically in Plain mode.'
+				. ' Make sure the table exists before inserting into it'
+			);
+		}
+
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = function (Request $request, HTTPClient $manticoreClient): array {

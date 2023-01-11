@@ -11,15 +11,15 @@
 
 namespace Manticoresearch\Buddy\ShowFullTables;
 
+use Manticoresearch\Buddy\Base\CommandRequestBase;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
-use Manticoresearch\Buddy\Interface\CommandRequestInterface;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
  */
-class Request implements CommandRequestInterface {
+final class Request extends CommandRequestBase {
 	/**
 	 * @var string $database Manticore single database with no name
 	 *  so it does not matter but for future usage maybe we also parse it

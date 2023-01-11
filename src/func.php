@@ -70,6 +70,16 @@ function camelcase_to_underscore(string $string): string {
 }
 
 /**
+ * Single iteration implementation of camelcase to underscore
+ *
+ * @param string $string
+ * @return string
+ */
+function underscore_to_camelcase(string $string): string {
+	return lcfirst(str_replace('_', '', ucwords($string, '_')));
+}
+
+/**
  * This is helper to display debug info in debug mode
  *
  * @param string $message
