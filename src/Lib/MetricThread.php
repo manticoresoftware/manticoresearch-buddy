@@ -87,6 +87,10 @@ final class MetricThread {
 		$channel = new Channel();
 		$task = Task::createInRuntime(
 			$runtime, static function (Channel $ch, ContainerInterface $container) {
+				// This fix issue when we get "sh: 1: cd: can't cd to" error
+				// while running buddy inside directory that are not allowed for us
+				chdir(sys_get_temp_dir());
+
 				Metric::setContainer($container);
 				$metric = Metric::instance();
 				while ($msg = $ch->recv()) {
