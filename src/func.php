@@ -121,3 +121,19 @@ function process_exists(int $pid): bool {
 	}
 	return $isRunning;
 }
+
+/**
+ * @param int $errno
+ * @param string $errstr
+ * @param string $errfile
+ * @param int $errline
+ * @return void
+ */
+function buddy_error_handler(int $errno, string $errstr, string $errfile, int $errline): void {
+	if (!(error_reporting() & $errno)) {
+	  // This error code is not included in error_reporting
+		return;
+	}
+
+	throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+}

@@ -24,6 +24,8 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 	. 'autoload.php'
 ;
 
+set_error_handler(buddy_error_handler(...)); // @phpstan-ignore-line
+
 // Build container dependencies
 $container = new ContainerBuilder();
 $container->register('ManticoreResponseBuilder', Response::class);
