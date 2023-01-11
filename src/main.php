@@ -22,6 +22,11 @@ use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
 $container = include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
 
 $opts = CliArgsProcessor::run();
+if (!isset($opts['debug'])) {
+	// Set error reporting with excluding warnings
+	error_reporting(E_ALL & ~E_WARNING);
+}
+
 /** @var HTTPClient $manticoreClient */
 $manticoreClient = $container->get('manticoreClient');
 $manticoreClient->setServerUrl($opts['listen']);
