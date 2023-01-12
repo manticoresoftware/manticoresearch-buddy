@@ -4,7 +4,7 @@
 get_destination() {
   if [ -z "${IS_RELEASE_DIGIT}" ]; then
     IS_RELEASE_DIGIT="$(echo "$f" | cut -d. -f3 | cut -d_ -f1)"
-    if [[ $(($IS_RELEASE_DIGIT % 2)) -eq 0 ]]; then
+    if [[ $((IS_RELEASE_DIGIT % 2)) -eq 0 ]]; then
       DESTINATION="release"
     else
       DESTINATION="dev"
@@ -15,20 +15,19 @@ get_destination() {
 echo "Collected archives"
 ls -1 build/
 
+container="$(basename "$f")"
 for f in build/*.zip build/*.exe; do
   if [ -f "$f" ]; then
     get_destination
-    /usr/bin/docker exec -i repo-generator /generator.sh --path "/repository/manticoresearch_windows/$DESTINATION/x64/" --name $(basename $f) --not-index --skip-signing < $f
+    /usr/bin/docker exec -i repo-generator /generator.sh --path "/repository/manticoresearch_windows/$DESTINATION/x64/" --name "$container" --not-index --skip-signing < "$f"
   fi
 done
 
 for f in build/*.gz; do
   if [ -f "$f" ]; then
     get_destination
-    /usr/bin/docker exec -i repo-generator /generator.sh --path "/repository/manticoresearch_macos/$DESTINATION/" --name $(basename $f) --not-index --skip-signing < $f
+    /usr/bin/docker exec -i repo-generator /generator.sh --path "/repository/manticoresearch_macos/$DESTINATION/" --name "$container" --not-index --skip-signing < "$f"
   fi
 done
 
-rm -rf build/*.zip
-rm -rf build/*.exe
-rm -rf build/*.gz
+rm -rf build/*.{zip,gz,exe}
