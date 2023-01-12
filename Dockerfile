@@ -1,25 +1,43 @@
-FROM manticoresearch/manticore-executor:0.4.1-dev
+FROM manticoresearch/manticore-executor:0.6.1-dev
 
 ARG TARGET_ARCH=amd64
-ENV MANTICORE_VERSION=5.0.3-230109-8832c302e
-ENV EXECUTOR_VERSION=0.5.3-22121910-2bcf464
-RUN apt-get -y update && apt-get -y upgrade && \
-  apt-get -y install bash figlet mysql-client curl iproute2 && \
-  curl -sSL  http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.0g-2ubuntu4_amd64.deb > libssl.deb && \
-  dpkg -i libssl.deb && rm -f libssl.deb && \
-  curl -sSL https://repo.manticoresearch.com/repository/manticoresearch_buster_dev/dists/manticore_${MANTICORE_VERSION}_${TARGET_ARCH}.tgz | tar -xzf - && \
-  curl -sSL https://repo.manticoresearch.com/repository/manticoresearch_buster_dev/dists/buster/main/binary-${TARGET_ARCH}/manticore-buddy_0.2.1-23011012-ca4a1d5_all.deb > manticore-buddy.deb && \
-  dpkg -i manticore*.deb && rm -f manticore*.deb && \
+ENV MANTICORE_REV=9dcd3f47d12d8c40e20db030d2f2ded6ba57a795
+ENV COLUMNAR_REV=2ca756ce46520d514022d4d145009e362ba9cb74
+ENV EXECUTOR_VERSION=0.6.1-230116-424b1dc
+
+# Build manticore and columnar first
+ENV BUILD_DEPS="curl autoconf automake cmake alpine-sdk openssl-dev bison flex git boost-static boost-dev"
+RUN apk update && apk add gcc $BUILD_DEPS && \
+  git clone https://github.com/manticoresoftware/columnar.git && \
+    cd columnar && \
+    git checkout $COLUMNAR_REV && \
+    mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DWITH_GALERA=0 -DBUILD_TESTING=OFF .. && \
+    make -j8 && make install && cd .. && rm -fr columnar && \
+  git clone https://github.com/manticoresoftware/manticoresearch.git && \
+    cd manticoresearch && \
+    git checkout $MANTICORE_REV && \
+    mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DWITH_GALERA=0 -DBUILD_TESTING=OFF .. && \
+    make -j8 && make install && cd .. && rm -fr manticoresearch && \
+  apk del $BUILD_DEPS && \
+  rm -fr /var/cache/apk/* && \
+  cp /usr/local/etc/manticoresearch/manticore.conf /etc/manticore.conf
+
+# Get production version and keep dev for executor
+RUN apk update && \
+  apk add bash figlet mysql-client curl iproute2 apache2-utils && \
   mv /usr/bin/manticore-executor /usr/bin/manticore-executor-dev && \
   ln -sf /usr/bin/manticore-executor-dev /usr/bin/php && \
-  curl -sSL https://github.com/manticoresoftware/executor/releases/download/v0.5.3/manticore-executor_${EXECUTOR_VERSION}_${TARGET_ARCH}.deb > executor.deb && \
-  dpkg -i executor.deb && rm -f executor.deb && \
-  apt-get -y autoremove && apt-get -y clean
+  curl -sSL https://github.com/manticoresoftware/executor/releases/download/v0.6.1/manticore-executor_${EXECUTOR_VERSION}_linux_${TARGET_ARCH}.tar.gz | tar -xzf - && \
+  mv manticore-executor_${EXECUTOR_VERSION}_linux_${TARGET_ARCH}/manticore-executor /usr/bin && \
+  rm -fr manticore-executor_${EXECUTOR_VERSION}_linux_${TARGET_ARCH} && \
+  apk clean cache
 
 # alter bash prompt
 ENV PS1A="\u@manticore-backup.test:\w> "
 RUN echo 'PS1=$PS1A' >> ~/.bashrc && \
-  echo 'figlet -w 120 manticore-backup script testing' >> ~/.bashrc
+  echo 'figlet -w 120 Manticore Buddy Test Kit' >> ~/.bashrc
 
 RUN mkdir -p /var/run/manticore && \
   bash -c "mkdir -p /var/{run,log,lib}/manticore-test" && \
