@@ -15,18 +15,20 @@ get_destination() {
 echo "Collected archives"
 ls -1 build/
 
-container="$(basename "$f")"
+
 for f in build/*.zip build/*.exe; do
+  packageName="$(basename $f)"
   if [ -f "$f" ]; then
     get_destination
-    /usr/bin/docker exec -i repo-generator /generator.sh --path "/repository/manticoresearch_windows/$DESTINATION/x64/" --name "$container" --not-index --skip-signing < "$f"
+    /usr/bin/docker exec -i repo-generator /generator.sh --path "/repository/manticoresearch_windows/$DESTINATION/x64/" --name "$packageName" --not-index --skip-signing < "$f"
   fi
 done
 
 for f in build/*.gz; do
+  packageName="$(basename $f)"
   if [ -f "$f" ]; then
     get_destination
-    /usr/bin/docker exec -i repo-generator /generator.sh --path "/repository/manticoresearch_macos/$DESTINATION/" --name "$container" --not-index --skip-signing < "$f"
+    /usr/bin/docker exec -i repo-generator /generator.sh --path "/repository/manticoresearch_macos/$DESTINATION/" --name "$packageName" --not-index --skip-signing < "$f"
   fi
 done
 
