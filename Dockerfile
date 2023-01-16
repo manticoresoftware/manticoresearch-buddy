@@ -1,13 +1,13 @@
 FROM manticoresearch/manticore-executor:0.6.1-dev
 
-ARG TARGET_ARCH=amd64
-ENV MANTICORE_REV=9dcd3f47d12d8c40e20db030d2f2ded6ba57a795
-ENV COLUMNAR_REV=2ca756ce46520d514022d4d145009e362ba9cb74
-ENV EXECUTOR_VERSION=0.6.1-230116-424b1dc
+ARG TARGET_ARCH="amd64"
+ENV MANTICORE_REV="9dcd3f47d12d8c40e20db030d2f2ded6ba57a795"
+ENV COLUMNAR_REV='2ca756ce46520d514022d4d145009e362ba9cb74'
+ENV EXECUTOR_VERSION="0.6.1-230116-72395b6"
 
 # Build manticore and columnar first
-ENV BUILD_DEPS="curl autoconf automake cmake alpine-sdk openssl-dev bison flex git boost-static boost-dev"
-RUN apk update && apk add gcc $BUILD_DEPS && \
+ENV BUILD_DEPS="curl autoconf automake cmake alpine-sdk openssl-dev bison flex git boost-static boost-dev curl-dev"
+RUN apk update && apk add gcc libcurl vim $BUILD_DEPS && \
   git clone https://github.com/manticoresoftware/columnar.git && \
     cd columnar && \
     git checkout $COLUMNAR_REV && \
@@ -31,8 +31,7 @@ RUN apk update && \
   ln -sf /usr/bin/manticore-executor-dev /usr/bin/php && \
   curl -sSL https://github.com/manticoresoftware/executor/releases/download/v0.6.1/manticore-executor_${EXECUTOR_VERSION}_linux_${TARGET_ARCH}.tar.gz | tar -xzf - && \
   mv manticore-executor_${EXECUTOR_VERSION}_linux_${TARGET_ARCH}/manticore-executor /usr/bin && \
-  rm -fr manticore-executor_${EXECUTOR_VERSION}_linux_${TARGET_ARCH} && \
-  apk clean cache
+  rm -fr manticore-executor_${EXECUTOR_VERSION}_linux_${TARGET_ARCH}
 
 # alter bash prompt
 ENV PS1A="\u@manticore-backup.test:\w> "
@@ -44,7 +43,7 @@ RUN mkdir -p /var/run/manticore && \
   mkdir -p /usr/share/manticore/morph/ && \
   echo -e 'a\nb\nc\nd\n' > /usr/share/manticore/morph/test
 
-RUN echo "common { \n\
+RUN echo -e "common { \n\
     plugin_dir = /usr/local/lib/manticore\n\
     lemmatizer_base = /usr/share/manticore/morph/\n\
 }\n\
@@ -57,7 +56,11 @@ searchd {\n\
     pid_file = /var/run/manticore/searchd.pid\n\
     data_dir = /var/lib/manticore\n\
     query_log_format = sphinxql\n\
-}\n" > "/etc/manticoresearch/manticore.conf"
+}\n" > "/usr/local/etc/manticoresearch/manticore.conf" && \
+  rm -f /etc/manticore.conf && \
+  ln -sf /usr/local/etc/manticoresearch/manticore.conf /etc/manticore.conf && \
+  ln -sf /usr/local/var/lib/manticore/ /var/lib/manticore && \
+  ln -sf /usr/local/var/log/manticore/ /var/log/manticore
 
 # Prevent the container from exiting
 ENTRYPOINT ["tail"]
