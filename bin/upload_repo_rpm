@@ -33,20 +33,20 @@ for f in build/*."el$DISTRO".{x86_64,aarch64,noarch}.rpm; do
       fi
     fi
 
-    container="$(basename "$f")"
+    packageName="$(basename "$f")"
     if [[ $ARCH == "x86_64" ]]; then
-      /usr/bin/docker exec -i repo-generator /generator.sh -n "$container" -d centos -v "$DISTRO" -t "$DESTINATION" -a x86_64 --not-index < "$f"
+      /usr/bin/docker exec -i repo-generator /generator.sh -n "$packageName" -d centos -v "$DISTRO" -t "$DESTINATION" -a x86_64 --not-index < "$f"
       archs[x86_64]=1
     fi
 
     if [[ $ARCH == "aarch64" ]]; then
-      /usr/bin/docker exec -i repo-generator /generator.sh -n "$container" -d centos -v "$DISTRO" -t "$DESTINATION" -a aarch64 --not-index < "$f"
+      /usr/bin/docker exec -i repo-generator /generator.sh -n "$packageName" -d centos -v "$DISTRO" -t "$DESTINATION" -a aarch64 --not-index < "$f"
       archs[aarch64]=1
     fi
 
     if [[ $ARCH == "noarch" ]]; then
-      /usr/bin/docker exec -i repo-generator /generator.sh -n "$container" -d centos -v "$DISTRO" -t "$DESTINATION" -a x86_64 --not-index < "$f"
-      /usr/bin/docker exec -i repo-generator /generator.sh -n "$container" -d centos -v "$DISTRO" -t "$DESTINATION" -a aarch64 --not-index < "$f"
+      /usr/bin/docker exec -i repo-generator /generator.sh -n "$packageName" -d centos -v "$DISTRO" -t "$DESTINATION" -a x86_64 --not-index < "$f"
+      /usr/bin/docker exec -i repo-generator /generator.sh -n "$packageName" -d centos -v "$DISTRO" -t "$DESTINATION" -a aarch64 --not-index < "$f"
       archs[x86_64]=1
       archs[aarch64]=1
     fi

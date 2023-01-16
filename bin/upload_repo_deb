@@ -10,7 +10,7 @@ declare -A archs
 
 for f in build/*deb; do
 
-  container="$(basename "$f")"
+  packageName="$(basename "$f")"
 
   ARCH=$(echo "$f" | cut -d_ -f3 | cut -d. -f1)
   echo "Arch: $ARCH"
@@ -27,17 +27,17 @@ for f in build/*deb; do
 
     if [[ $ARCH == "amd64" ]]; then
       archs[amd]=1
-      /usr/bin/docker exec -i repo-generator /generator.sh --distro "$DISTRO" --architecture amd --target "$TARGET" --name "$container" --not-index < "$f"
+      /usr/bin/docker exec -i repo-generator /generator.sh --distro "$DISTRO" --architecture amd --target "$TARGET" --name "$packageName" --not-index < "$f"
     fi
 
     if [[ $ARCH == "arm64" ]]; then
       archs[arm]=1
-      /usr/bin/docker exec -i repo-generator /generator.sh --distro "$DISTRO" --architecture arm --target "$TARGET" --name "$container" --not-index < "$f"
+      /usr/bin/docker exec -i repo-generator /generator.sh --distro "$DISTRO" --architecture arm --target "$TARGET" --name "$packageName" --not-index < "$f"
     fi
 
     if [[ $ARCH == "all" ]]; then
-      /usr/bin/docker exec -i repo-generator /generator.sh --distro "$DISTRO" --architecture amd --target "$TARGET" --name "$container" --not-index < "$f"
-      /usr/bin/docker exec -i repo-generator /generator.sh --distro "$DISTRO" --architecture arm --target "$TARGET" --name "$container" --not-index < "$f"
+      /usr/bin/docker exec -i repo-generator /generator.sh --distro "$DISTRO" --architecture amd --target "$TARGET" --name "$packageName" --not-index < "$f"
+      /usr/bin/docker exec -i repo-generator /generator.sh --distro "$DISTRO" --architecture arm --target "$TARGET" --name "$packageName" --not-index < "$f"
       archs[amd]=1
       archs[arm]=1
     fi
