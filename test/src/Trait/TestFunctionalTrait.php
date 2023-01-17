@@ -375,19 +375,10 @@ trait TestFunctionalTrait {
 	 * @return void
 	 */
 	protected static function loadBuddyPid(): void {
-		exec('ps --ppid ' . self::$manticorePid, $psOut);
-		/** @var array<int,int> $pids */
-		$pids = [];
-		for ($i = 1, $max = sizeof($psOut); $i < $max; $i++) {
-			$split = preg_split('/\s+/', trim($psOut[$i]));
-			if (!$split) {
-				continue;
-			}
-			$pids[] = (int)($split[0]);
+		$buddyPid = (int)trim(system('pgrep -P ' . self::$manticorePid) ?: '');
+		if (!$buddyPid) {
+			throw new Exception('Failed to find Buddy pid for ' . self::$manticorePid);
 		}
-		if (!$pids) {
-			throw new Exception('Failed to find children pids for ' . self::$manticorePid);
-		}
-		self::$buddyPid = $pids[0];
+		self::$buddyPid = $buddyPid;
 	}
 }
