@@ -26,11 +26,6 @@ class DebugModeTest extends TestCase {
 	 */
 	protected string $searchdLogFilepath;
 
-	/**
-	 * @var ?string $configFileName
-	 */
-	protected static ?string $configFileName = null;
-
 	public function setUp(): void {
 		$conf = (string)file_get_contents(self::$manticoreConfigFile);
 		preg_match('/log = (.*?)[\r\n]/', $conf, $matches);

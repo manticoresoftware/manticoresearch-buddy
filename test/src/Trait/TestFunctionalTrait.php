@@ -50,6 +50,9 @@ trait TestFunctionalTrait {
 	 */
 	protected static int $buddyPid = 0;
 
+	/** @var string $configFileName */
+	protected static string $configFileName = 'manticore.conf';
+
 	/**
 	 * Launch daemon as as setup stage
 	 * @return void
@@ -57,8 +60,7 @@ trait TestFunctionalTrait {
 	public static function setUpBeforeClass(): void {
 		// Getting the absolute path to the Manticore config file
 		$refCls = new \ReflectionClass(static::class);
-		$configFile = static::$configFileName ?? 'manticore.conf';
-		self::$manticoreConfigFile = dirname((string)$refCls->getFileName()) . '/config/' . $configFile;
+		self::$manticoreConfigFile = dirname((string)$refCls->getFileName()) . '/config/' . static::$configFileName;
 
 		self::setConfWithBuddyPath();
 		self::checkManticorePathes();

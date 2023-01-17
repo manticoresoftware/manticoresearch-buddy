@@ -18,7 +18,9 @@ class MetricThreadTest extends TestCase {
 
 	use TestFunctionalTrait;
 
-	protected static string $configFileName = 'manticore-debug.conf';
+	public static function setUpBeforeClass(): void {
+		static::$configFileName = 'manticore-debug.conf';
+	}
 
 	public function testMetricThreadPrintDebugMessages(): void {
 		sleep(7);
