@@ -16,10 +16,13 @@ class MetricThreadTest extends TestCase {
 
 	const SEARCHD_LOG_PATH = '/var/log/manticore-test/searchd.log';
 
-	use TestFunctionalTrait;
-
+	use TestFunctionalTrait {
+		setUpBeforeClass as traitSetUpBeforeClass;
+	}
 	public static function setUpBeforeClass(): void {
 		static::$configFileName = 'manticore-debug.conf';
+
+		static::traitSetUpBeforeClass();
 	}
 
 	public function testMetricThreadPrintDebugMessages(): void {
