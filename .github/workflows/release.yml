@@ -237,5 +237,7 @@ jobs:
 
       - name: Deploy package
         run: |
+          curl -sSL https://raw.githubusercontent.com/manticoresoftware/repo_scripts/main/${{ matrix.script }} > ${{ matrix.script }}
+          chmod +x ${{ matrix.script }}
           DISTRO=${{ matrix.distro }} DIGIT_DELIMITER2="${{ matrix.delimiter }}" FILE_MASK="${{ matrix.mask }}" ./${{ matrix.script }}
         shell: bash
