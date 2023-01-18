@@ -237,5 +237,5 @@ jobs:
 
       - name: Deploy package
         run: |
-          DISTRO=${{ matrix.distro }} DIGIT_DELIMITER2="${{ matrix.delimiter }}" FILE_MASK="${{ matrix.mask }}" ${{ matrix.script }}
+          DISTRO=${{ matrix.distro }} DIGIT_DELIMITER2="${{ matrix.delimiter }}" FILE_MASK="${{ matrix.mask }}" ./${{ matrix.script }}
         shell: bash
