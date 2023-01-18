@@ -204,19 +204,19 @@ jobs:
           - artifact: artifact-rpm
             ext: rpm
             script: upload_repo_rpm
-            mask: "el7.{x86_64,aarch64,noarch}.rpm"
+            mask: "*.el7.{x86_64,aarch64,noarch}.rpm"
             delimiter: "_"
             distro: 7
           - artifact: artifact-rpm
             ext: rpm
             script: upload_repo_rpm
-            mask: "el8.{x86_64,aarch64,noarch}.rpm"
+            mask: "*.el8.{x86_64,aarch64,noarch}.rpm"
             delimiter: "_"
             distro: 8
           - artifact: artifact-rpm
             ext: rpm
             script: upload_repo_rpm
-            mask: "el9.{x86_64,aarch64,noarch}.rpm"
+            mask: "*.el9.{x86_64,aarch64,noarch}.rpm"
             delimiter: "_"
             distro: 9
           - artifact: artifact
