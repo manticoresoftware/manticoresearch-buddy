@@ -167,43 +167,62 @@ jobs:
         include:
           - artifact: artifact-deb
             ext: deb
-            script: bin/upload_repo_deb
+            script: upload_repo_deb
+            mask: ""
+            delimiter: "-"
             distro: buster
           - artifact: artifact-deb
             ext: deb
-            script: bin/upload_repo_deb
+            script: upload_repo_deb
+            mask: ""
+            delimiter: "-"
             distro: bionic
           - artifact: artifact-deb
             ext: deb
-            script: bin/upload_repo_deb
+            script: upload_repo_deb
+            mask: ""
+            delimiter: "-"
             distro: focal
           - artifact: artifact-deb
             ext: deb
-            script: bin/upload_repo_deb
+            script: upload_repo_deb
+            mask: ""
+            delimiter: "-"
             distro: jammy
           - artifact: artifact-deb
             ext: deb
-            script: bin/upload_repo_deb
+            script: upload_repo_deb
+            mask: ""
+            delimiter: "-"
             distro: bullseye
           - artifact: artifact-deb
             ext: deb
-            script: bin/upload_repo_deb
+            script: upload_repo_deb
+            mask: ""
+            delimiter: "-"
             distro: bookworm
           - artifact: artifact-rpm
             ext: rpm
-            script: bin/upload_repo_rpm
+            script: upload_repo_rpm
+            mask: "el7.{x86_64,aarch64,noarch}.rpm"
+            delimiter: "_"
             distro: 7
           - artifact: artifact-rpm
             ext: rpm
-            script: bin/upload_repo_rpm
+            script: upload_repo_rpm
+            mask: "el8.{x86_64,aarch64,noarch}.rpm"
+            delimiter: "_"
             distro: 8
           - artifact: artifact-rpm
             ext: rpm
-            script: bin/upload_repo_rpm
+            script: upload_repo_rpm
+            mask: "el9.{x86_64,aarch64,noarch}.rpm"
+            delimiter: "_"
             distro: 9
           - artifact: artifact
             ext: "{tar.gz,zip}"
-            script: bin/upload_repo_arc
+            script: upload_repo_arc
+            delimiter: "_"
             distro: ""
     steps:
       - uses: actions/checkout@v3
@@ -218,6 +237,5 @@ jobs:
 
       - name: Deploy package
         run: |
-          export GPG_SECRET=${{ secrets.GPG_SECRET }}
-          DISTRO=${{ matrix.distro }} ${{ matrix.script }}
+          DISTRO=${{ matrix.distro }} DIGIT_DELIMITER2="${{ matrix.delimiter }}" FILE_MASK="${{ matrix.mask }}" ${{ matrix.script }}
         shell: bash
