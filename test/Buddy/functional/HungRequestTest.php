@@ -89,7 +89,7 @@ class HungRequestTest extends TestCase {
 	 */
 	protected function generateTaskArgs(array $taskFnArgs): array {
 		return [
-			function (int $port, string $query): array {
+			static function (int $port, string $query): array {
 				$output = [];
 				exec("curl -s 127.0.0.1:$port/cli -d '$query' 2>&1", $output);
 				/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
