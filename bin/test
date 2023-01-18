@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
+# TODO: temporarily solution to fix segfault: https://github.com/docker-library/php/issues/689
+export USE_ZEND_ALLOC=0
 ./vendor/bin/phpunit -d memory_limit=4G --stop-on-failure "$@" test/
