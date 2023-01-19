@@ -140,11 +140,6 @@ final class Task {
 	public static function createInRuntime(Runtime $runtime, Closure $fn, array $argv = []): static {
 		$task = new static([$fn, $argv]);
 		$task->runtime = $runtime;
-		// Currently we use channels only for metric threads,
-		// Thats why we hardcoded capacity here, and it's totally ok for now
-		// Buffered channel does not block on send and blocks only when
-		// we reach passed capacity, we use 50 for now, but it's subject to change
-		$task->channel = new Channel(static::CHANNEL_CAPACITY);
 		return $task;
 	}
 
@@ -177,6 +172,11 @@ final class Task {
 	public static function loopInRuntime(Runtime $runtime, Closure $fn, array $argv = []): static {
 		$task = static::createInRuntime($runtime, $fn, $argv);
 		$task->isLooped = true;
+		// Currently we use channels only for metric threads,
+		// Thats why we hardcoded capacity here, and it's totally ok for now
+		// Buffered channel does not block on send and blocks only when
+		// we reach passed capacity, we use 50 for now, but it's subject to change
+		$task->channel = new Channel(static::CHANNEL_CAPACITY);
 		// Add channel as first argument for argv in case it's lopped
 		array_unshift($task->argv[1], $task->channel); // @phpstan-ignore-line
 		return $task;
@@ -346,14 +346,6 @@ final class Task {
 		}
 
 		return $this->result;
-	}
-
-	/**
-	 *
-	 * @return Runtime
-	 */
-	public function getRuntime(): Runtime {
-		return $this->runtime;
 	}
 
 	/**
