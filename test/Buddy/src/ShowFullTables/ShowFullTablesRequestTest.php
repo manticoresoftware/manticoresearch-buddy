@@ -95,7 +95,6 @@ class ShowFullTablesRequestTest extends TestCase {
 					)
 				);
 			} catch (SQLQueryParsingError $e) {
-				var_dump($e->getMessage());
 				$this->assertEquals(true, false, "Correct syntax parse failed: $query");
 			}
 			$this->assertEquals(true, true);

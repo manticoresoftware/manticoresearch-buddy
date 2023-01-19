@@ -15,6 +15,7 @@ use Closure;
 use Manticoresearch\Buddy\Exception\GenericError;
 use Manticoresearch\Buddy\Lib\TaskStatus;
 use RuntimeException;
+use parallel\Channel;
 use parallel\Future;
 use parallel\Runtime;
 
@@ -28,6 +29,14 @@ final class Task {
 	 * @var bool $isDeferred
 	 */
 	protected bool $isDeferred = false;
+
+	/**
+	 * This is type of task that run in a loop and has auto restart logic
+	 *
+	 * @var bool $isLooped
+	 */
+	protected bool $isLooped = false;
+
 	/**
 	 * Current task status
 	 *
@@ -36,6 +45,7 @@ final class Task {
 	protected TaskStatus $status;
 	protected Future $future;
 	protected Runtime $runtime;
+	protected Channel $channel;
 	protected GenericError $error;
 	protected mixed $result;
 
@@ -58,6 +68,14 @@ final class Task {
 	 */
 	public function isDeferred(): bool {
 		return $this->isDeferred;
+	}
+
+	/**
+	 * Check if this task is looped task and long running
+	 * @return bool
+	 */
+	public function isLooped(): bool {
+		return $this->isLooped;
 	}
 
 	/**
@@ -108,6 +126,11 @@ final class Task {
 	public static function createInRuntime(Runtime $runtime, Closure $fn, array $argv = []): static {
 		$task = new static([$fn, $argv]);
 		$task->runtime = $runtime;
+		// Currently we use channels only for metric threads,
+		// Thats why we hardcoded capacity here, and it's totally ok for now
+		// Buffered channel does not block on send and blocks only when
+		// we reach passed capacity, we use 50 for now, but it's subject to change
+		$task->channel = new Channel(50);
 		return $task;
 	}
 
@@ -116,7 +139,7 @@ final class Task {
 	 *
 	 * @param Runtime $runtime
 	 * @param Closure $fn
-	 *  The closure should be catch all exception and work properly withou failure
+	 *  The closure should be catch all exception and work properly without failure
 	 *  Otherwise the all loop will be stopped
 	 * @param mixed[] $argv
 	 * @return static
@@ -124,6 +147,24 @@ final class Task {
 	public static function deferInRuntime(Runtime $runtime, Closure $fn, array $argv = []): static {
 		$task = static::createInRuntime($runtime, $fn, $argv);
 		$task->isDeferred = true;
+		return $task;
+	}
+
+	/**
+	 * Create specific task that is long running and we need to maintain it on crash
+	 *
+	 * @param Runtime $runtime
+	 * @param Closure $fn
+	 *  The closure should be catch all exception and work properly without failure
+	 *  Otherwise the all loop will be stopped
+	 * @param mixed[] $argv
+	 * @return static
+	 */
+	public static function loopInRuntime(Runtime $runtime, Closure $fn, array $argv = []): static {
+		$task = static::createInRuntime($runtime, $fn, $argv);
+		// This is special task that requires channel, add it as first argument
+		array_unshift($task->argv, $task->channel);
+		$task->isLooped = true;
 		return $task;
 	}
 
@@ -202,7 +243,7 @@ final class Task {
 	 * @throws RuntimeException
 	 */
 	protected function checkStatus(): static {
-		if ($this->future->done()) {
+		if ($this->isDone()) {
 			$this->status = TaskStatus::Finished;
 
 			try {
@@ -259,6 +300,14 @@ final class Task {
 	}
 
 	/**
+	 * Return if task is done (even when crashed)
+	 * @return bool
+	 */
+	public function isDone(): bool {
+		return $this->future->done();
+	}
+
+	/**
 	 * Just getter for current error
 	 *
 	 * @return GenericError
@@ -283,6 +332,27 @@ final class Task {
 		}
 
 		return $this->result;
+	}
+
+	/**
+	 *
+	 * @return Runtime
+	 */
+	public function getRuntime(): Runtime {
+		return $this->runtime;
+	}
+
+	/**
+	 * Get current assigned channel
+	 * @return Channel
+	 */
+	public function getChannel(): Channel {
+		// This is a bit tricky but to fight with killed/crashed runtimes
+		// We check if it's still running here and in case not, restart it
+		if ($this->isDone()) {
+			$this->run();
+		}
+		return $this->channel;
 	}
 
 	/**
