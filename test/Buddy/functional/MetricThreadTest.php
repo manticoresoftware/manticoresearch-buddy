@@ -26,7 +26,7 @@ class MetricThreadTest extends TestCase {
 	}
 
 	public function testMetricThreadPrintDebugMessages(): void {
-		sleep(7);
+		sleep(11);
 		system('echo "127.0.0.1 telemetry.manticoresearch.com" >> /etc/hosts');
 		$labels = (string)system('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep ^labels');
 		$this->assertStringContainsString('"collector":"buddy"', $labels);
@@ -62,6 +62,6 @@ class MetricThreadTest extends TestCase {
 		exec('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep metric:', $output);
 		$executes = implode(PHP_EOL, $output);
 		$this->assertStringContainsString('metric: add ["invocation",1]', $executes);
-		$this->assertStringContainsString('metric: snapshot []', $executes);
+		$this->assertStringContainsString('metric: checkAndSnapshot', $executes);
 	}
 }
