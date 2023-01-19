@@ -59,8 +59,7 @@ final class MetricThread {
 	 * @return void
 	 */
 	public static function destroy(): void {
-		static::instance()->task->getChannel()->close();
-		static::instance()->task->getRuntime()->kill();
+		static::$instance->destroy();
 	}
 
 	/**
@@ -124,7 +123,7 @@ final class MetricThread {
 	public function execute(string $method, array $args = []): static {
 		$argsJson = json_encode($args);
 		debug("metric: $method $argsJson");
-		$this->task->getChannel()->send([$method, $args]);
+		$this->task->transmit([$method, $args]);
 		return $this;
 	}
 }

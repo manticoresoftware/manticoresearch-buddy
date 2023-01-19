@@ -20,6 +20,9 @@ use parallel\Future;
 use parallel\Runtime;
 
 final class Task {
+	// Higher is better for perf just because we monitor looped tasks during transmitting
+	const CHANNEL_CAPACITY = 100;
+
 	protected int $id;
 
 	/**
@@ -49,6 +52,8 @@ final class Task {
 	protected GenericError $error;
 	protected mixed $result;
 
+	protected int $channelBufferCount = 0;
+
 	// Extended properties for make things simpler
 	protected string $host = '';
 	protected string $body = '';
@@ -60,6 +65,15 @@ final class Task {
 	public function __construct(protected array $argv = []) {
 		$this->id = (int)(microtime(true) * 10000);
 		$this->status = TaskStatus::Pending;
+	}
+
+	/**
+	 * Destroy it and make sure that runtime is killed and channel closed
+	 * @return void
+	 */
+	public function destroy(): void {
+		$this->channel->close();
+		$this->runtime->kill();
 	}
 
 	/**
@@ -130,7 +144,7 @@ final class Task {
 		// Thats why we hardcoded capacity here, and it's totally ok for now
 		// Buffered channel does not block on send and blocks only when
 		// we reach passed capacity, we use 50 for now, but it's subject to change
-		$task->channel = new Channel(50);
+		$task->channel = new Channel(static::CHANNEL_CAPACITY);
 		return $task;
 	}
 
@@ -162,9 +176,9 @@ final class Task {
 	 */
 	public static function loopInRuntime(Runtime $runtime, Closure $fn, array $argv = []): static {
 		$task = static::createInRuntime($runtime, $fn, $argv);
-		// This is special task that requires channel, add it as first argument
-		array_unshift($task->argv, $task->channel);
 		$task->isLooped = true;
+		// Add channel as first argument for argv in case it's lopped
+		array_unshift($task->argv[1], $task->channel); // @phpstan-ignore-line
 		return $task;
 	}
 
@@ -343,16 +357,27 @@ final class Task {
 	}
 
 	/**
-	 * Get current assigned channel
-	 * @return Channel
+	 * This method simply send the message to the running function for this task
+	 * and also check and rerun the closure in case if its looped
+	 *
+	 * @param array<mixed> $data
+	 * @return static
 	 */
-	public function getChannel(): Channel {
+	public function transmit(array $data): static {
+		$shouldCheck = false;
+		++$this->channelBufferCount;
+		if ($this->channelBufferCount === static::CHANNEL_CAPACITY) {
+			$this->channelBufferCount = 0;
+			$shouldCheck = true;
+		}
 		// This is a bit tricky but to fight with killed/crashed runtimes
 		// We check if it's still running here and in case not, restart it
-		if ($this->isDone()) {
+		if ($this->isLooped && $shouldCheck && $this->isDone()) {
 			$this->run();
 		}
-		return $this->channel;
+
+		$this->channel->send($data);
+		return $this;
 	}
 
 	/**
