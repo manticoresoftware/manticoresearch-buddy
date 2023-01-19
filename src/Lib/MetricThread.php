@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Lib;
 
 use Psr\Container\ContainerInterface;
 use parallel\Channel;
-use parallel\Runtime;
 
 // This is class that allows us to run separate thread for telemetry collection
 /**
@@ -38,10 +37,10 @@ final class MetricThread {
 
 
 	/**
-	 * @param Runtime $runtime
+	 * @param Task $task
 	 * @return void
 	 */
-	public function __construct(protected Runtime $runtime, protected Channel $channel, protected Task $task) {
+	public function __construct(protected Task $task) {
 	}
 
 	/**
@@ -60,8 +59,8 @@ final class MetricThread {
 	 * @return void
 	 */
 	public static function destroy(): void {
-		static::instance()->channel->close();
-		static::instance()->runtime->kill();
+		static::instance()->task->getChannel()->close();
+		static::instance()->task->getRuntime()->kill();
 	}
 
 	/**
@@ -83,10 +82,9 @@ final class MetricThread {
 	 * @return self
 	 */
 	public static function start(): self {
-		$runtime = Task::createRuntime();
-		$channel = new Channel();
-		$task = Task::createInRuntime(
-			$runtime, static function (Channel $ch, ContainerInterface $container) {
+		$task = Task::loopInRuntime(
+			Task::createRuntime(),
+			static function (Channel $ch, ContainerInterface $container) {
 				// This fix issue when we get "sh: 1: cd: can't cd to" error
 				// while running buddy inside directory that are not allowed for us
 				chdir(sys_get_temp_dir());
@@ -100,10 +98,10 @@ final class MetricThread {
 					[$method, $args] = $msg;
 					$metric->$method(...$args);
 				}
-			}, [$channel, static::$container]
+			}, [static::$container]
 		);
 
-		return (new self($runtime, $channel, $task))->run();
+		return (new self($task))->run();
 	}
 
 	/**
@@ -126,7 +124,7 @@ final class MetricThread {
 	public function execute(string $method, array $args = []): static {
 		$argsJson = json_encode($args);
 		debug("metric: $method $argsJson");
-		$this->channel->send([$method, $args]);
+		$this->task->getChannel()->send([$method, $args]);
 		return $this;
 	}
 }
