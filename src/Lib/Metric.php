@@ -11,11 +11,19 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
+use Exception;
+use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresoftware\Telemetry\Metric as TelemetryMetric;
+use OpenMetrics\Exposition\Text\Exceptions\InvalidArgumentException;
+use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
+use Psr\Container\NotFoundExceptionInterface;
+use RuntimeException;
 
 final class Metric {
+	const MAX_QUEUE_SIZE = 200;
+
 	/** @var ContainerInterface */
 	// We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
@@ -25,6 +33,9 @@ final class Metric {
 
 	/** @var TelemetryMetric $telemetry */
 	protected TelemetryMetric $telemetry;
+
+	/** @var int $queueCount */
+	protected int $queueCount = 0;
 
 	/**
 	 * Setter for container property
@@ -95,6 +106,7 @@ final class Metric {
 	public function add(string $name, int|float $value): static {
 		if ($this->isEnabled()) {
 			$this->telemetry->add($name, $value);
+			++$this->queueCount;
 		}
 		return $this;
 	}
@@ -103,6 +115,7 @@ final class Metric {
 	 * @see TelemetryMetric::send
 	 */
 	public function send(): bool {
+		$this->queueCount = 0;
 		return $this->telemetry->send();
 	}
 
@@ -134,6 +147,33 @@ final class Metric {
 				'secondary_version' => $m[5] ?? null,
 			]
 		);
+	}
+
+	/**
+	 *
+	 * @param int $period
+	 * @return void
+	 * @throws NotFoundExceptionInterface
+	 * @throws ContainerExceptionInterface
+	 * @throws RuntimeException
+	 * @throws ManticoreHTTPClientError
+	 * @throws InvalidArgumentException
+	 * @throws Exception
+	 */
+	public function checkAndSnapshot(int $period): void {
+		static $ts = 0;
+
+		// Find if we should send it due to queue size or period
+		$shouldSendByQueue = $this->queueCount >= static::MAX_QUEUE_SIZE;
+		$shouldSendByPeriod = (time() - $ts) >= $period;
+
+		// If this is not time yet, we just do early ereturn
+		if (!$shouldSendByQueue && !$shouldSendByPeriod) {
+			return;
+		}
+
+		$ts = time();
+		$this->snapshot();
 	}
 
 	/**
