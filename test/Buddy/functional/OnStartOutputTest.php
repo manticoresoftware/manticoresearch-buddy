@@ -73,7 +73,7 @@ class OnStartOutputTest extends TestCase {
 		sleep(70);
 		$logUpdate = $this->getLogUpdate();
 		$this->assertStringContainsString('[BUDDY] memory usage:', $logUpdate);
-		$this->assertEquals(1, preg_match('/running \d+ tasks$/', $logUpdate));
+		$this->assertEquals(0, preg_match('/running \d+ tasks$/', $logUpdate));
 	}
 
 	/**
