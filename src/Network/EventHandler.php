@@ -26,6 +26,7 @@ use React\Http\Message\Response as HttpResponse;
 use React\Promise\Deferred;
 use React\Promise\Promise;
 use React\Promise\PromiseInterface;
+use RuntimeException;
 use Throwable;
 use parallel\Runtime;
 
@@ -34,7 +35,10 @@ use parallel\Runtime;
  * for work with connection initiated by React framework
  */
 final class EventHandler {
-	/** @var array{available:array<Runtime>,blocked:array<int,Runtime>} */
+	// How many request we handle in single runtime after we destroy and create new one
+	const RUNTIME_LIFETIME = 100;
+
+	/** @var array{available:array<array{0:int,1:Runtime}>,blocked:array<array{0:int,1:Runtime}>} $runtimes */
 	public static array $runtimes = [
 		'available' => [],
 		'blocked' => [],
@@ -51,7 +55,7 @@ final class EventHandler {
 	public static function init(): void {
 		$threads = (int)(getenv('THREADS', true) ?: 4);
 		for ($i = 0; $i < $threads; $i++) {
-			static::$runtimes['available'][] = Task::createRuntime();
+			static::$runtimes['available'][] = [0, Task::createRuntime()];
 		}
 		static::$maxRuntimeIndex = $threads - 1;
 	}
@@ -61,10 +65,10 @@ final class EventHandler {
 	 */
 	public static function destroy(): void {
 		try {
-			foreach (static::$runtimes['available'] as $runtime) {
+			foreach (static::$runtimes['available'] as [, $runtime]) {
 				$runtime->kill();
 			}
-			foreach (static::$runtimes['blocked'] as $runtime) {
+			foreach (static::$runtimes['blocked'] as [, $runtime]) {
 				$runtime->kill();
 			}
 			static::$runtimes = [
@@ -110,21 +114,22 @@ final class EventHandler {
 			static $executor;
 			static $task;
 			static $firstCall = true;
-
 			if (!isset($task)) {
 				try {
 					// we try to pop runtime and when we have some, process, otherwise just queue
-					$runtime = array_pop(static::$runtimes['available']);
-					if (!$runtime) {
+					if (!static::$runtimes['available']) {
 						return;
 					}
-					static::$runtimes['blocked'][$id] = $runtime;
+					/** @var array{0:int,1:Runtime} */
+					$runtimeStruct = array_pop(static::$runtimes['available']);
+					[$usageCount, $runtime] = $runtimeStruct;
+					static::$runtimes['blocked'][$id] = [++$usageCount, $runtime];
 					$request = Request::fromString($data, $id);
 					$executor = QueryProcessor::process($request);
 					$task = $executor->run($runtime);
 				} catch (Throwable $e) {
 					return static::handleExceptionWhileDataProcessing(
-						$e, $id, $request ?? null, $data, $deferred, $timer, $runtime ?? null
+						$e, $id, $request ?? null, $data, $deferred, $timer, $runtimeStruct ?? null
 					);
 				}
 
@@ -288,6 +293,18 @@ final class EventHandler {
 		return $deferred->promise();
 	}
 
+	/**
+	 *
+	 * @param Throwable $e
+	 * @param int $id
+	 * @param ?Request $request
+	 * @param string $data
+	 * @param Deferred $deferred
+	 * @param ?TimerInterface $timer
+	 * @param ?array{0:int,1:Runtime} $runtimeStruct
+	 * @return PromiseInterface
+	 * @throws RuntimeException
+	 */
 	protected static function handleExceptionWhileDataProcessing(
 		Throwable $e,
 		int $id,
@@ -295,12 +312,15 @@ final class EventHandler {
 		string $data,
 		Deferred $deferred,
 		?TimerInterface $timer,
-		?Runtime $runtime
+		?array $runtimeStruct
 	): PromiseInterface {
 		debug("[$id] data parse error: {$e->getMessage()}");
 
 		// If we pop runtime, return back in case of error
-		array_unshift(static::$runtimes['available'], $runtime);
+		if ($runtimeStruct) {
+			[$usageCount, $runtime] = $runtimeStruct;
+			array_unshift(static::$runtimes['available'], [++$usageCount, $runtime]);
+		}
 
 		// Create special generic error in case we have system exception
 		// And shadowing $e with it
@@ -339,7 +359,16 @@ final class EventHandler {
 			Loop::cancelTimer($timer);
 		}
 
+		// Check if runtime is expired and we need to create one
+		// We do this just because we still do not know the reason of memory leak
+		// When after many request of one type of query we switch to another one
+		// that makes instant memory overflow
 		// Return runtime back to pool
+		if (static::$runtimes['blocked'][$requestId][0] > static::RUNTIME_LIFETIME) {
+			static::$runtimes['blocked'][$requestId][1]->kill();
+			unset(static::$runtimes['blocked'][$requestId]);
+			static::$runtimes['blocked'][$requestId] = [0, Task::createRuntime()];
+		}
 		array_unshift(static::$runtimes['available'], static::$runtimes['blocked'][$requestId]);
 		unset(static::$runtimes['blocked'][$requestId]);
 	}
