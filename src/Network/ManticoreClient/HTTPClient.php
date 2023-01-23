@@ -106,7 +106,6 @@ class HTTPClient {
 
 		$context = stream_context_create($opts);
 		$result = file_get_contents($fullReqUrl, false, $context);
-
 		if ($result === false) {
 			throw new ManticoreHTTPClientError("Cannot connect to server at $fullReqUrl");
 		} else {

@@ -64,6 +64,7 @@ trait TestFunctionalTrait {
 
 		self::setConfWithBuddyPath();
 		self::checkManticorePathes();
+		system('rm -f /var/log/manticore-test/searchd.pid');
 		system('rm -f /var/log/manticore-test/searchd.log');
 		system('searchd --config ' . self::$manticoreConfigFile);
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
@@ -90,7 +91,14 @@ trait TestFunctionalTrait {
 	 * @return void
 	 */
 	public static function tearDownAfterClass(): void {
-		system('pkill -9 searchd');
+		system('pgrep -f searchd | xargs kill -9');
+		// echo "Waiting searchd to stop…\n";
+		// while(shell_exec('pgrep -f searchd')) {
+		// 	echo '.';
+		// 	sleep(1);
+		// }
+		// echo "\n";
+
 		// To be sure run again kills for each pid
 		system('kill -9 ' . self::$manticorePid . ' 2> /dev/null');
 		system('kill -9 ' . self::$buddyPid . ' 2> /dev/null');
@@ -208,8 +216,6 @@ trait TestFunctionalTrait {
 		if (str_starts_with($query, 'backup')) {
 			sleep(1);
 		}
-		$result2 = static::runHttpQuery($query);
-
 		foreach ($contains as $string) {
 			$this->assertStringContainsString($string, implode(PHP_EOL, $result1));
 		}
@@ -218,6 +224,7 @@ trait TestFunctionalTrait {
 			$this->assertStringNotContainsString($string, implode(PHP_EOL, $result1));
 		}
 
+		$result2 = static::runHttpQuery($query);
 		$output = '';
 		if (isset($result2[0]['data'])) {
 			$i = 1;
@@ -273,7 +280,7 @@ trait TestFunctionalTrait {
 		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.data';
 		file_put_contents($payloadFile, $query);
 		$redirect = $redirectOutput ? '2>&1' : '';
-		exec("curl -s 127.0.0.1:$port/cli -d @$payloadFile $redirect", $output);
+		exec("curl -s 127.0.0.1:$port/cli -H 'Content-type: application/json' -d @$payloadFile $redirect", $output);
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = (array)json_decode($output[0] ?? '{}', true);
 		return $result;
