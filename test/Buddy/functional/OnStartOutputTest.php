@@ -27,8 +27,7 @@ class OnStartOutputTest extends TestCase {
 	protected string $searchdLogFilepath;
 
 	public function setUp(): void {
-		$conf = (string)file_get_contents(self::$manticoreConfigFile);
-		preg_match('/log = (.*?)[\r\n]/', $conf, $matches);
+		preg_match('/log = (.*?)[\r\n]/', self::$manticoreConf, $matches);
 		$this->searchdLogFilepath = $matches[1];
 		$this->searchdLog = (string)file_get_contents($this->searchdLogFilepath);
 	}
@@ -42,6 +41,7 @@ class OnStartOutputTest extends TestCase {
 		$logUpdate = $this->getLogUpdate();
 		$matches = [];
 		preg_match('/\[BUDDY\] started (.*?) at (.*?)$/', $logUpdate, $matches);
+		print_r($matches);
 		$this->assertCount(3, $matches);
 		$addr1 = $matches[2];
 
@@ -59,15 +59,14 @@ class OnStartOutputTest extends TestCase {
 	public function testTickersOutput(): void {
 		echo "\nTesting if the output from ticker functions is passed from Buddy to daemon correctly\n";
 		// Setting debug mode in Manticore config
-		$conf = (string)file_get_contents(self::$manticoreConfigFile);
-		$conf = preg_replace('/buddy_path(.*?)(\r|\n)/', 'buddy_path$1 --debug$2', $conf);
-		file_put_contents(self::$manticoreConfigFile, $conf);
+		$conf = preg_replace('/buddy_path(.*?)(\r|\n)/', 'buddy_path$1 --debug$2', self::$manticoreConf);
+		echo $conf;
+		self::updateManticoreConf($conf);
 		self::tearDownAfterClass();
 		self::setUpBeforeClass();
 		// Unsetting debug mode in manticore config
-		$conf = (string)file_get_contents(self::$manticoreConfigFile);
-		$conf = str_replace(' --debug', '', $conf);
-		file_put_contents(self::$manticoreConfigFile, $conf);
+		$conf = str_replace(' --debug', '', self::$manticoreConf);
+		self::updateManticoreConf($conf);
 
 		ob_flush();
 		sleep(70);

@@ -27,8 +27,7 @@ class DebugModeTest extends TestCase {
 	protected string $searchdLogFilepath;
 
 	public function setUp(): void {
-		$conf = (string)file_get_contents(self::$manticoreConfigFile);
-		preg_match('/log = (.*?)[\r\n]/', $conf, $matches);
+		preg_match('/log = (.*?)[\r\n]/', self::$manticoreConf, $matches);
 		$this->searchdLogFilepath = $matches[1];
 		$this->searchdLog = (string)file_get_contents($this->searchdLogFilepath);
 		self::setUpBeforeClass();
@@ -46,7 +45,8 @@ class DebugModeTest extends TestCase {
 		// Checking the log part corresponding to the latest searchd start
 		$logUpdate = str_replace($this->searchdLog, '', (string)file_get_contents($this->searchdLogFilepath));
 		$this->assertStringNotContainsString('[BUDDY] memory usage:', $logUpdate);
-		self::$configFileName = 'manticore-debug.conf';
+		//self::$configFileName = 'manticore-debug.conf';
+		self::setManticoreConfigFile('manticore-debug.conf');
 	}
 
 	/**
