@@ -34,9 +34,9 @@ trait TestFunctionalTrait {
 	protected static ?int $listenBuddyPort = null;
 
 	/**
-	 * @var ?string $manticoreConfigFilePath
+	 * @var string $manticoreConfigFilePath
 	 */
-	protected static ?string $manticoreConfigFilePath = null;
+	protected static string $manticoreConfigFilePath = '';
 	/**
 	 * @var string $manticoreConf
 	 */
@@ -59,7 +59,7 @@ trait TestFunctionalTrait {
 	 */
 	public static function setUpBeforeClass(): void {
 		// Setting the absolute path to the Manticore config file
-		if (self::$manticoreConfigFilePath === null) {
+		if (self::$manticoreConfigFilePath === '') {
 			self::setManticoreConfigFile(static::$configFileName);
 		}
 
