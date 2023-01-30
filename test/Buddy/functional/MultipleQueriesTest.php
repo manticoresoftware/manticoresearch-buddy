@@ -64,16 +64,6 @@ class MultipleQueriesTest extends TestCase {
 
 	public function testSqlMultipleBuddyQueriesWithHungOk(): void {
 		echo "\nTesting the execution of multiple SQL queries with Buddy when some of them hung\n";
-		$query = 'TEST 3/deferred;'
-			. "INSERT into {$this->testTable1}(col1,col2) VALUES(1,2)";
-		$out = static::runSqlQuery($query);
-		$this->assertCount(2, $out);
-		$selectResult = [
-			'col1	col2',
-			'1	2',
-		];
-		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
-		$this->assertEquals($selectResult, $out);
 
 		$query = 'TEST 3;'
 			. "INSERT into {$this->testTable2}(col1,col2) VALUES(1,2)";
@@ -84,6 +74,17 @@ class MultipleQueriesTest extends TestCase {
 			'1	2',
 		];
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable2}");
+		$this->assertEquals($selectResult, $out);
+
+		$query = 'TEST 3/deferred;'
+			. "INSERT into {$this->testTable1}(col1,col2) VALUES(1,2)";
+		$out = static::runSqlQuery($query);
+		$this->assertCount(2, $out);
+		$selectResult = [
+			'col1	col2',
+			'1	2',
+		];
+		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
 		$this->assertEquals($selectResult, $out);
 	}
 
