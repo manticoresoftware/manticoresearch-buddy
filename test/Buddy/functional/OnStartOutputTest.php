@@ -41,7 +41,6 @@ class OnStartOutputTest extends TestCase {
 		$logUpdate = $this->getLogUpdate();
 		$matches = [];
 		preg_match('/\[BUDDY\] started (.*?) at (.*?)$/', $logUpdate, $matches);
-		print_r($matches);
 		$this->assertCount(3, $matches);
 		$addr1 = $matches[2];
 
