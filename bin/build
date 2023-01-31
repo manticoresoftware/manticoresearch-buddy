@@ -57,14 +57,14 @@ $phar->stopBuffering();
 // TODO: We can use phar as a binary with proper length deduction
 // system('sed  -i "1i #!/usr/bin/env manticore-executor" ' . $pharFile); // +36
 // Remove chdir($origdir)
-system('sed -i.bak "287,1d" ' . $pharFile); // -17
-// Update LEN to make it work
-system('sed -i.bak "s/LEN = 6646/LEN = 6629/" ' . $pharFile);
+
+$pharContent = file_get_contents($pharFile);
+$pharContent = str_replace("chdir(\$origdir);\n", '', $pharContent);
+$pharContent = str_replace('LEN = 6646', 'LEN = 6629', $pharContent);
 // TODO: we should add gz to manticore-executor or do not use it
 // $phar->compressFiles(Phar::GZ);
 
 // Now update signature
-$pharContent = file_get_contents($pharFile);
 // $oldSignature = substr($pharContent, -40, -8);
 $signatureSuffix = substr($pharContent, -8);
 $pharData = substr($pharContent, 0, -40);
