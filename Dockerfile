@@ -26,7 +26,7 @@ RUN apk update && apk add gcc libcurl vim $BUILD_DEPS && \
 
 # Get production version and keep dev for executor
 RUN apk update && \
-  apk add bash figlet mysql-client curl iproute2 apache2-utils && \
+  apk add bash figlet mysql-client curl iproute2 apache2-utils coreutils neovim && \
   mv /usr/bin/manticore-executor /usr/bin/manticore-executor-dev && \
   ln -sf /usr/bin/manticore-executor-dev /usr/bin/php && \
   curl -sSL https://github.com/manticoresoftware/executor/releases/download/v0.6.1/manticore-executor_${EXECUTOR_VERSION}_linux_${TARGET_ARCH}.tar.gz | tar -xzf - && \
@@ -56,6 +56,7 @@ searchd {\n\
     pid_file = /var/run/manticore/searchd.pid\n\
     data_dir = /var/lib/manticore\n\
     query_log_format = sphinxql\n\
+    buddy_path = manticore-executor-dev /workdir/src/main.php\n\
 }\n" > "/usr/local/etc/manticoresearch/manticore.conf" && \
   rm -f /etc/manticore.conf && \
   ln -sf /usr/local/etc/manticoresearch/manticore.conf /etc/manticore.conf && \
