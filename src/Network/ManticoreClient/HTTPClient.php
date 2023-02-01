@@ -18,7 +18,6 @@ use RuntimeException;
 class HTTPClient {
 
 	const CONTENT_TYPE_HEADER = 'Content-Type: text/plain';
-	const CUSTOM_REDIRECT_DISABLE_HEADER = 'X-Manticore-Error-Redirect: disable';
 	const URL_PREFIX = 'http://';
 	const HTTP_REQUEST_TIMEOUT = 1;
 	const DEFAULT_URL = 'http://127.0.0.1:9308';
@@ -31,6 +30,9 @@ class HTTPClient {
 	/** @var string $url */
 	protected string $url;
 
+	/** @var string $buddyVersion */
+	protected string $buddyVersion;
+
 	/**
 	 * @param ?Response $responseBuilder
 	 * @param ?string $url
@@ -40,7 +42,7 @@ class HTTPClient {
 	public function __construct(
 		protected ?Response $responseBuilder = null,
 		?string $url = null,
-		protected ManticoreEndpoint $endpoint = ManticoreEndpoint::Cli
+		protected ManticoreEndpoint $endpoint = ManticoreEndpoint::CliJson
 	) {
 		// If no url passed, set default one
 		if (!$url) {
@@ -48,6 +50,7 @@ class HTTPClient {
 		}
 
 		$this->setServerUrl($url);
+		$this->buddyVersion = buddy_version();
 	}
 
 	/**
@@ -79,7 +82,11 @@ class HTTPClient {
 	 * @param ?ManticoreEndpoint $endpoint
 	 * @return Response
 	 */
-	public function sendRequest(string $request, ManticoreEndpoint $endpoint = null): Response {
+	public function sendRequest(
+		string $request,
+		ManticoreEndpoint $endpoint = null,
+		bool $disableAgentHeader = false
+	): Response {
 		$t = microtime(true);
 		if (!isset($this->responseBuilder)) {
 			throw new RuntimeException("'responseBuilder' property of ManticoreHTTPClient class is not instantiated");
@@ -91,19 +98,18 @@ class HTTPClient {
 		// Hmm, This is strange, but $endpoint === ManticoreEndpoint::Sql is not working
 		$prefix = ($endpoint->name === 'Sql' ? 'query=' : '');
 		$fullReqUrl = "{$this->url}/{$endpoint->value}";
-		$buddyVersion = buddy_version();
+		$agentHeader = $disableAgentHeader ? '' : "User-Agent: Manticore Buddy/{$this->buddyVersion}\n";
 		$opts = [
 			'http' => [
 				'method'  => 'POST',
 				'header'  => "Content-Type: application/x-www-form-urlencoded\n"
-					. "User-Agent: Manticore Buddy/{$buddyVersion}\n"
+					. $agentHeader
 					. "Connection: close\n",
 				'content' => $prefix . $request,
 				'timeout' => static::HTTP_REQUEST_TIMEOUT,
 				'ignore_errors' => true,
 			],
 		];
-
 		$context = stream_context_create($opts);
 		$result = file_get_contents($fullReqUrl, false, $context);
 		if ($result === false) {

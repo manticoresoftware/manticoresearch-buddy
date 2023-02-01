@@ -50,7 +50,7 @@ final class Request {
 		$self = new static;
 		$self->id = $id;
 		$self->time = microtime(true);
-		$self->endpoint = ManticoreEndpoint::Cli;
+		$self->endpoint = ManticoreEndpoint::Sql;
 		$self->format = RequestFormat::JSON;
 		$self->error = '';
 		$self->payload = '{}';
@@ -136,6 +136,7 @@ final class Request {
 		// Checking if request format and endpoint are supported
 		$endpoint = match (ltrim($payload['message']['path_query'], '/')) {
 			'cli' => ManticoreEndpoint::Cli,
+			'cli_json' => ManticoreEndpoint::CliJson,
 			'sql?mode=raw' => ManticoreEndpoint::Sql,
 			'sql' => ManticoreEndpoint::Sql,
 			'insert' => ManticoreEndpoint::Insert,

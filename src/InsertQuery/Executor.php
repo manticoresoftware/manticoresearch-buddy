@@ -12,8 +12,8 @@
 namespace Manticoresearch\Buddy\InsertQuery;
 
 use Exception;
+use Manticoresearch\Buddy\Base\ClientQueryExecutor;
 use Manticoresearch\Buddy\Exception\GenericError;
-use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
@@ -22,10 +22,7 @@ use parallel\Runtime;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class Executor implements CommandExecutorInterface {
-	/** @var HTTPClient */
-	protected HTTPClient $manticoreClient;
-
+class Executor extends ClientQueryExecutor {
 	/**
 	 *  Initialize the executor
 	 *
@@ -58,7 +55,7 @@ class Executor implements CommandExecutorInterface {
 			for ($i = 0, $maxI = sizeof($request->queries) - 1; $i <= $maxI; $i++) {
 				$query = $request->queries[$i];
 				// When processing the final query we need to make sure the response to client
-				// has the same format as the initial request, otherwise we just use 'cli' default endpoint
+				// has the same format as the initial request, otherwise we just use 'sql' default endpoint
 				if ($i === $maxI) {
 					$manticoreClient->setEndpoint($request->endpoint);
 				}
@@ -75,23 +72,5 @@ class Executor implements CommandExecutorInterface {
 		return Task::createInRuntime(
 			$runtime, $taskFn, [$this->request, $this->manticoreClient]
 		)->run();
-	}
-
-	/**
-	 * @return array<string>
-	 */
-	public function getProps(): array {
-		return ['manticoreClient'];
-	}
-
-	/**
-	 * Instantiating the http client to execute requests to Manticore server
-	 *
-	 * @param HTTPClient $client
-	 * $return HTTPClient
-	 */
-	public function setManticoreClient(HTTPClient $client): HTTPClient {
-		$this->manticoreClient = $client;
-		return $this->manticoreClient;
 	}
 }

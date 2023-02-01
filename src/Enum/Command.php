@@ -16,5 +16,6 @@ enum Command: string {
 	case ShowQueries = 'ShowQueries';
 	case Backup = 'Backup';
 	case ShowFullTables = 'ShowFullTables';
+	case CliTable = 'CliTable';
 	case Test = 'Test';
 }

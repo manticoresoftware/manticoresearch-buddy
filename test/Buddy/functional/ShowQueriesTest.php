@@ -44,7 +44,7 @@ class ShowQueriesTest extends TestCase {
 	}
 
 	public function testHTTPShowQueriesOk(): void {
-		echo "\nTesting the execution of HTTP SHOW QUEIRES statement\n";
+		echo "\nTesting the execution of HTTP SHOW QUERIES statement\n";
 		$query = 'SHOW QUERIES';
 		$out = static::runHttpQuery($query);
 		$resultColumns = [

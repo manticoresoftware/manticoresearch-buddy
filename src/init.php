@@ -11,6 +11,7 @@
 
 use Manticoresearch\Buddy\Lib\MetricThread;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Lib\TableFormatter;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response;
 use Manticoresearch\Buddy\QueryParser\Loader;
@@ -34,6 +35,7 @@ $container
 	->register('manticoreClient', HTTPClient::class)
 	->addArgument(new Reference('ManticoreResponseBuilder'))
 	->addArgument('127.0.0.1:9308');
+$container->register('tableFormatter', TableFormatter::class);
 
 QueryProcessor::setContainer($container);
 MetricThread::setContainer($container);

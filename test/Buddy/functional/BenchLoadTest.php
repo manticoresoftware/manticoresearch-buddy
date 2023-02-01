@@ -92,7 +92,7 @@ class BenchLoadTest extends TestCase {
 			'error' => '',
 			'version' => 1,
 			'message' => [
-				'path_query' => '/cli',
+				'path_query' => '/cli_json',
 				'body' => $query,
 			],
 		];

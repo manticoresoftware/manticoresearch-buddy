@@ -11,6 +11,7 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Lib\TableFormatter;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response;
@@ -20,49 +21,48 @@ use Manticoresearch\Buddy\ShowQueries\Request;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
-class ExecutorTest extends TestCase {
+class CliTableExecutorTest extends TestCase {
 
 	use TestHTTPServerTrait;
 
-	public function testShowQueriesExecutesProperly(): void {
-		echo "\nTesting the 'show queries' executes properly and we got the correct Manticore response received\n";
-		$respBody = json_decode(
-			"[{\n"
-			. '"columns":[{"id":{"type":"long long"}},{"query":{"type":"string"}},'
-			. '{"protocol":{"type":"string"}},{"host":{"type":"string"}}],'
+	public function testCliTableOk(): void {
+		echo "\nTesting that request to '/cli' is executed properly\n";
+		$respBody = '+----+--------+----------+---------------+'
 			. "\n"
-			. '"data":[{"protocol":"http","host":"127.0.0.1:584","id":19,"query":"select"}'
-			. "\n],\n"
-			. '"total":1,'
+			. '| id | query  | protocol | host          |'
 			. "\n"
-			. '"error":"",'
+			. '+----+--------+----------+---------------+'
 			. "\n"
-			. '"warning":""'
-			. "\n}]", true
-		);
+			. '| 19 | select | http     | 127.0.0.1:584 |'
+			. "\n"
+			. '+----+--------+----------+---------------+'
+			. "\n"
+			. '1 row in set';
 
 		$request = NetRequest::fromArray(
 			[
-				'error' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
+				'error' => '',
 				'payload' => 'SHOW QUERIES',
 				'version' => 1,
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::CliJson,
+				'endpoint' => ManticoreEndpoint::Cli,
 			]
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);
 		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
+		$tableFormatter = new TableFormatter();
 		$request = Request::fromNetworkRequest($request);
 
 		$executor = new Executor($request);
 		$refCls = new ReflectionClass($executor);
 		$refCls->getProperty('manticoreClient')->setValue($executor, $manticoreClient);
+		$refCls->getProperty('tableFormatter')->setValue($executor, $tableFormatter);
 		$task = $executor->run(Task::createRuntime());
 		$task->wait();
 		$this->assertEquals(true, $task->isSucceed());
 		$result = $task->getResult();
-		$this->assertIsArray($result);
-		$this->assertEquals($respBody, $result);
+		$this->assertIsString($result);
+		$this->assertStringContainsString($respBody, $result);
 		self::finishMockManticoreServer();
 	}
 }

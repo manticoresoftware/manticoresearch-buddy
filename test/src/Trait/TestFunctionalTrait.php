@@ -34,9 +34,9 @@ trait TestFunctionalTrait {
 	protected static ?int $listenBuddyPort = null;
 
 	/**
-	 * @var string $manticoreConfigFilePath
+	 * @var string $manticoreConfigFile
 	 */
-	protected static string $manticoreConfigFilePath = '';
+	protected static string $manticoreConfigFile = '';
 	/**
 	 * @var string $manticoreConf
 	 */
@@ -58,16 +58,15 @@ trait TestFunctionalTrait {
 	 * @return void
 	 */
 	public static function setUpBeforeClass(): void {
-		// Setting the absolute path to the Manticore config file
-		if (self::$manticoreConfigFilePath === '') {
-			self::setManticoreConfigFile(static::$configFileName);
-		}
+		// Getting the absolute path to the Manticore config file
+		$refCls = new \ReflectionClass(static::class);
+		self::$manticoreConfigFile = dirname((string)$refCls->getFileName()) . '/config/' . static::$configFileName;
 
 		self::setConfWithBuddyPath();
 		self::checkManticorePathes();
 		system('rm -f /var/log/manticore-test/searchd.pid');
 		system('rm -f /var/log/manticore-test/searchd.log');
-		system('searchd --config ' . self::$manticoreConfigFilePath);
+		system('searchd --config ' . self::$manticoreConfigFile);
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
 		sleep(5); // <- give 5 secs to protect from any kind of lags
 		self::loadBuddyPid();
@@ -143,23 +142,6 @@ trait TestFunctionalTrait {
 		$replRegex = '/(listen = [^:]+:?)(\d+)(\r|\n)/';
 		$conf = preg_replace_callback($replRegex, fn($m) => $m[1] . (string)$port . $m[3], self::$manticoreConf);
 		self::updateManticoreConf((string)$conf);
-	}
-
-	/**
-	 * Helper that creates a config file from specified config template file
-	 * to avoid the possible modifications of the original config file
-	 *
-	 * @param string $configTplFileName
-	 * @return void
-	 */
-	protected static function setManticoreConfigFile(string $configTplFileName): void {
-		$refCls = new \ReflectionClass(static::class);
-		$configTplFilePath = dirname((string)$refCls->getFileName()) . "/config/$configTplFileName";
-		self::$manticoreConfigFilePath = \sys_get_temp_dir() . "/config-$configTplFileName";
-		system("cp -r $configTplFilePath " . self::$manticoreConfigFilePath, $res);
-		if ($res !== 0) {
-			throw new Exception('Cannot create Manticore config file at `' . self::$manticoreConfigFilePath . '`');
-		}
 	}
 
 	/**
@@ -289,18 +271,30 @@ trait TestFunctionalTrait {
 	 *
 	 * @param string $query
 	 * @param bool $redirectOutput
+	 * @param string $endpoint
 	 * @return array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}>
 	 * @throws Exception
 	 */
-	protected static function runHttpQuery(string $query, bool $redirectOutput = true): array {
+	protected static function runHttpQuery(
+		string $query,
+		bool $redirectOutput = true,
+		string $endpoint = 'cli_json'
+	): array {
 		$port = static::getListenHttpPort();
 		// We use temporarely file just to skip issues with escaping post data in command line arg
 		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.data';
 		file_put_contents($payloadFile, $query);
 		$redirect = $redirectOutput ? '2>&1' : '';
-		exec("curl -s 127.0.0.1:$port/cli -H 'Content-type: application/json' -d @$payloadFile $redirect", $output);
+		exec(
+			"curl -s 127.0.0.1:$port/$endpoint -H 'Content-type: application/json' -d @$payloadFile $redirect",
+			$output
+		);
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
-		$result = (array)json_decode($output[0] ?? '{}', true);
+		$result = ($endpoint === 'cli_json')
+			? (array)json_decode($output[0] ?? '{}', true)
+			: [
+				['columns' => implode(PHP_EOL, $output), 'data' => [], 'error' => ''],
+			];
 		return $result;
 	}
 
@@ -325,7 +319,7 @@ trait TestFunctionalTrait {
 			'error' => $error,
 			'version' => 1,
 			'message' => [
-				'path_query' => '/cli',
+				'path_query' => '/cli_json',
 				'body' => $query,
 			],
 		];
@@ -371,7 +365,7 @@ trait TestFunctionalTrait {
 	 */
 	protected static function setConfWithBuddyPath(): void {
 		$buddyPath = __DIR__ . '/../../..';
-		$configFile = self::$manticoreConfigFilePath;
+		$configFile = self::$manticoreConfigFile;
 		$conf = file_get_contents($configFile);
 		if ($conf === false) {
 			throw new Exception("Invalid Manticore config found at $configFile");
@@ -387,9 +381,9 @@ trait TestFunctionalTrait {
 	 * @throws Exception
 	 */
 	protected static function updateManticoreConf($conf): void {
-		$isConfUpdated = file_put_contents(self::$manticoreConfigFilePath, $conf);
+		$isConfUpdated = file_put_contents(self::$manticoreConfigFile, $conf);
 		if ($isConfUpdated === false) {
-			throw new Exception('Cannot update Manticore config at ' . self::$manticoreConfigFilePath);
+			throw new Exception('Cannot update Manticore config at ' . self::$manticoreConfigFile);
 		}
 		self::$manticoreConf = $conf;
 	}

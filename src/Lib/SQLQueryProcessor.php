@@ -71,7 +71,7 @@ class SQLQueryProcessor {
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::Sql,
 			]
 		);
 	  /** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
