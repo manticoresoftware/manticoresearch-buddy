@@ -12,12 +12,13 @@
 namespace Manticoresearch\Buddy\Base;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
+use Manticoresearch\Buddy\Interface\CommandRequestInterface;
 use Manticoresearch\Buddy\Lib\TableFormatter;
 
 /**
  * This is the parent class to format Manticore client responses as tables
  */
-abstract class FormattableQueryExecutor extends ClientQueryExecutor {
+abstract class FormattableClientQueryExecutor extends ClientQueryExecutor {
 	/** @var TableFormatter $tableFormatter */
 	protected TableFormatter $tableFormatter;
 

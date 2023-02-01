@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\CliTable;
 
-use Manticoresearch\Buddy\Base\FormattableQueryExecutor;
+use Manticoresearch\Buddy\Base\FormattableClientQueryExecutor;
 use Manticoresearch\Buddy\Lib\TableFormatter;
 use Manticoresearch\Buddy\Lib\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
@@ -21,7 +21,7 @@ use parallel\Runtime;
 /**
  * This is the class to return response to the '/cli' endpoint in table format
  */
-class Executor extends FormattableQueryExecutor {
+class Executor extends FormattableClientQueryExecutor {
 
 	/**
 	 *  Initialize the executor

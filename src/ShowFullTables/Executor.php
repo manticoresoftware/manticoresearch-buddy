@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\ShowFullTables;
 
-use Manticoresearch\Buddy\Base\FormattableQueryExecutor;
+use Manticoresearch\Buddy\Base\FormattableClientQueryExecutor;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Lib\TableFormatter;
 use Manticoresearch\Buddy\Lib\Task;
@@ -22,7 +22,7 @@ use parallel\Runtime;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class Executor extends FormattableQueryExecutor {
+class Executor extends FormattableClientQueryExecutor {
 	/**
 	 *  Initialize the executor
 	 *
