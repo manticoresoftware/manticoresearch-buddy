@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c2ec384e9971acac0946f462aaa6aa10",
+    "content-hash": "7366e568d93a42f2a8d3e057acdd13c2",
     "packages": [
         {
             "name": "evenement/evenement",
@@ -115,16 +115,16 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/manticoresearch-backup.git",
-                "reference": "324cfbcb42e86b51244e69a850e12a46edd37c7c"
+                "reference": "4a3793286c03860ce1b0c46ebee6c6f58a1948de"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/324cfbcb42e86b51244e69a850e12a46edd37c7c",
-                "reference": "324cfbcb42e86b51244e69a850e12a46edd37c7c",
+                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/4a3793286c03860ce1b0c46ebee6c6f58a1948de",
+                "reference": "4a3793286c03860ce1b0c46ebee6c6f58a1948de",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/telemetry": "^0.1.1",
+                "manticoresoftware/telemetry": "^0.1.6",
                 "php": ">=8.1"
             },
             "require-dev": {
@@ -162,7 +162,7 @@
                 "issues": "https://github.com/manticoresoftware/manticoresearch-backup/issues",
                 "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/v0.5.2"
             },
-            "time": "2023-01-26T04:49:41+00:00"
+            "time": "2023-02-02T13:48:53+00:00"
         },
         {
             "name": "manticoresoftware/openmetrics",
@@ -223,16 +223,16 @@
         },
         {
             "name": "manticoresoftware/telemetry",
-            "version": "0.1.4",
+            "version": "v0.1.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/telemetry-lib.git",
-                "reference": "1d8d54238112614118502595a3e77fab9f99d6a6"
+                "reference": "29dc5e46c4d94169baee983a14e7f2d7f4406ad4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/1d8d54238112614118502595a3e77fab9f99d6a6",
-                "reference": "1d8d54238112614118502595a3e77fab9f99d6a6",
+                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/29dc5e46c4d94169baee983a14e7f2d7f4406ad4",
+                "reference": "29dc5e46c4d94169baee983a14e7f2d7f4406ad4",
                 "shasum": ""
             },
             "require": {
@@ -269,9 +269,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/telemetry-lib/issues",
-                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.4"
+                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/v0.1.6"
             },
-            "time": "2023-02-02T03:23:13+00:00"
+            "time": "2023-02-02T13:47:28+00:00"
         },
         {
             "name": "psr/container",
