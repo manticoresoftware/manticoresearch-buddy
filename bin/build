@@ -52,7 +52,8 @@ shell_exec('cd ' . BUILD_DIR . ' && composer install --no-dev --optimize-autoloa
 $buildVendorDir = BUILD_DIR . '/vendor';
 add_directory_to_phar($buildVendorDir, $phar, 'vendor');
 // Done with composer
-
+$minPhpVersion = trim($phar['PHP_VERSION']->getContent());
+$phar->compressFiles(Phar::GZ);
 $phar->stopBuffering();
 // TODO: We can use phar as a binary with proper length deduction
 // system('sed  -i "1i #!/usr/bin/env manticore-executor" ' . $pharFile); // +36
@@ -61,8 +62,6 @@ $phar->stopBuffering();
 $pharContent = file_get_contents($pharFile);
 $pharContent = str_replace("chdir(\$origdir);\n", '', $pharContent);
 $pharContent = str_replace('LEN = 6646', 'LEN = 6629', $pharContent);
-// TODO: we should add gz to manticore-executor or do not use it
-// $phar->compressFiles(Phar::GZ);
 
 // Now update signature
 // $oldSignature = substr($pharContent, -40, -8);
@@ -72,7 +71,6 @@ $newSignature = hash('sha256', $pharData, true) . $signatureSuffix;
 $pharContent = $pharData . $newSignature;
 file_put_contents($pharFile, $pharContent);
 
-$minPhpVersion = trim($phar['PHP_VERSION']->getContent());
 // Rewrite the resulting file to support dynamic executor
 $bash = implode(PHP_EOL, [
   '#!/usr/bin/env bash',
