@@ -69,7 +69,8 @@ $pharContent = str_replace('LEN = 6646', 'LEN = 6629', $pharContent);
 $signatureSuffix = substr($pharContent, -8);
 $pharData = substr($pharContent, 0, -40);
 $newSignature = hash('sha256', $pharData, true) . $signatureSuffix;
-file_put_contents($pharFile, $pharData . $newSignature);
+$pharContent = $pharData . $newSignature;
+file_put_contents($pharFile, $pharContent);
 
 $minPhpVersion = trim($phar['PHP_VERSION']->getContent());
 // Rewrite the resulting file to support dynamic executor
@@ -84,7 +85,7 @@ $bash = implode(PHP_EOL, [
   "php_file=\"\$tmp\"/{$opts['package']}.phar",
   'self_ts=$(date -r "$0" +%s)',
   'phar_ts=$(test -f "$php_file" && date -r $_ +%s || echo 0)',
-  'test "$self_ts" -gt "$phar_ts" && echo \'<?php file_put_contents("\'$php_file\'", hex2bin("' . bin2hex(file_get_contents($pharFile)) . '"));\' | $executor',
+  'test "$self_ts" -gt "$phar_ts" && echo \'<?php file_put_contents("\'$php_file\'", hex2bin("' . bin2hex($pharContent) . '"));\' | $executor',
   // 'EOF',
   'exec $executor -n "$php_file" "$@"',
   '',
