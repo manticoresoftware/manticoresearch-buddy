@@ -137,7 +137,7 @@ final class MockManticoreServer {
 	 * @return void
 	 */
 	private function checkParentProc(): void {
-		if (strncasecmp(PHP_OS, 'win', 3) === 0) {
+		if (PHP_OS_FAMILY === 'Windows') {
 			$pid = getmypid();
 			$parentPidInfo = shell_exec("wmic process where (processid=$pid) get parentprocessid");
 			if (!isset($parentPidInfo) || $parentPidInfo === false) {

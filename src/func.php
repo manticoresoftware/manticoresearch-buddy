@@ -100,7 +100,7 @@ function debug(string $message, string $eol = PHP_EOL): void {
  * @return int
  */
 function get_parent_pid(): int {
-	if (strncasecmp(PHP_OS, 'win', 3) === 0) {
+	if (PHP_OS_FAMILY === 'Windows') {
 		$pid = getmypid();  // child process ID
 		$parentPid = (string)shell_exec("wmic process where (processid=$pid) get parentprocessid");
 		$parentPid = explode("\n", $parentPid);
@@ -120,7 +120,7 @@ function get_parent_pid(): int {
  */
 function process_exists(int $pid): bool {
 	$isRunning = false;
-	if (strncasecmp(PHP_OS, 'win', 3) === 0) {
+	if (PHP_OS_FAMILY === 'Windows') {
 		$out = [];
 		exec("TASKLIST /FO LIST /FI \"PID eq $pid\"", $out);
 		if (sizeof($out) > 1) {
