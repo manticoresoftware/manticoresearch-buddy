@@ -12,7 +12,8 @@
 namespace Manticoresearch\Buddy\Test;
 
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
-use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
 use parallel\Runtime;
@@ -42,9 +43,9 @@ class Executor implements CommandExecutorInterface {
 	 */
 	public function run(Runtime $runtime): Task {
 
-		$taskFn = static function (int $timeout): array {
+		$taskFn = static function (int $timeout): TaskResult {
 			sleep($timeout);
-			return [[]];
+			return new TaskResult([[]]);
 		};
 
 		$createMethod = $this->request->isDeferred ? 'deferInRuntime' : 'createInRuntime';

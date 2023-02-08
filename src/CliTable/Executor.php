@@ -13,7 +13,8 @@ namespace Manticoresearch\Buddy\CliTable;
 
 use Manticoresearch\Buddy\Base\FormattableClientQueryExecutor;
 use Manticoresearch\Buddy\Lib\TableFormatter;
-use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
 use parallel\Runtime;
@@ -46,18 +47,19 @@ class Executor extends FormattableClientQueryExecutor {
 			Request $request,
 			HTTPClient $manticoreClient,
 			?TableFormatter $tableFormatter
-		): mixed {
+		): TaskResult {
 			$time0 = hrtime(true);
 			$resp = $manticoreClient->sendRequest($request->query, null, true);
-			$data = $total = null;
+			$data = null;
+			$total = -1;
 			$respBody = $resp->getBody();
 			$result = (array)json_decode($respBody, true);
 			if ($tableFormatter === null || !isset($result[0]) || !is_array($result[0])) {
-				return $result;
+				return new TaskResult($result);
 			}
 			// Convert JSON response from Manticore to table format
 			if (isset($result[0]['error']) && $result[0]['error'] !== '') {
-				return $tableFormatter->getTable($time0, $data, $total, $result[0]['error']);
+				return new TaskResult($tableFormatter->getTable($time0, $data, $total, $result[0]['error']));
 			}
 			if (isset($result[0]['data']) && is_array($result[0]['data'])) {
 				$data = $result[0]['data'];
@@ -65,7 +67,7 @@ class Executor extends FormattableClientQueryExecutor {
 			if (isset($result[0]['total'])) {
 				$total = $result[0]['total'];
 			}
-			return $tableFormatter->getTable($time0, $data, $total);
+			return new TaskResult($tableFormatter->getTable($time0, $data, $total));
 		};
 
 		return Task::createInRuntime(

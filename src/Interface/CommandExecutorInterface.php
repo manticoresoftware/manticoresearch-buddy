@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Interface;
 
-use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Lib\Task\Task;
 use parallel\Runtime;
 
 interface CommandExecutorInterface {

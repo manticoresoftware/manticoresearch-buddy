@@ -23,9 +23,6 @@ final class Request extends CommandRequestBase {
 	public string $query;
 	public ManticoreEndpoint $endpoint;
 
-	public function __construct() {
-	}
-
 	/**
 	 * @param NetRequest $request
 	 * @return self

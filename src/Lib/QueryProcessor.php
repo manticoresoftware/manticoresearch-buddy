@@ -142,11 +142,12 @@ class QueryProcessor {
 	 */
 	public static function extractCommandFromRequest(Request $request): Command {
 		$queryLowercase = strtolower($request->payload);
-		$isInsertSQLQuery = in_array(
-			$request->endpoint,
-			[ManticoreEndpoint::Sql, ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson]
-		)
-		&& str_starts_with($queryLowercase, 'insert into');
+		$isInsertSQLQuery = match ($request->endpoint) {
+			ManticoreEndpoint::Sql, ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson => str_starts_with(
+				$queryLowercase, 'insert into'
+			),
+			default => false,
+		};
 		$isInsertHTTPQuery = ($request->endpoint === ManticoreEndpoint::Insert)
 			|| ($request->endpoint === ManticoreEndpoint::Bulk
 				&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')

@@ -25,23 +25,16 @@ final class Request extends CommandRequestBase {
 	public ManticoreEndpoint $endpoint = ManticoreEndpoint::Cli;
 
 	/**
-	 * @return void
-	 */
-	public function __construct() {
-	}
-
-	/**
 	 * @param NetRequest $request
 	 * @return self
 	 */
 	public static function fromNetworkRequest(NetRequest $request): self {
 		$self = new self();
 		// Resolve the possible ambiguity with Manticore query format as it may not correspond to request format
-		$queryFormat = in_array(
-			$request->endpoint,
-			[ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson, ManticoreEndpoint::Sql]
-		)
-		? RequestFormat::SQL : RequestFormat::JSON;
+		$queryFormat = match ($request->endpoint) {
+			ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson, ManticoreEndpoint::Sql => RequestFormat::SQL,
+			default => RequestFormat::JSON,
+		};
 		$parser = Loader::getInsertQueryParser($queryFormat);
 		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->payload));
 		$self->queries[] = $request->payload;

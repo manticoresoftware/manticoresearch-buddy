@@ -35,8 +35,8 @@ class TableFormatter {
 	 * @param ?array<array<string,mixed>|object> $origData
 	 * @return void
 	 */
-	public function __construct(?array $origData = []) {
-		$this->setData($origData);
+	public function __construct(?array $origData = null) {
+		$this->setData($origData ?? []);
 		$this->table = '';
 	}
 
@@ -46,44 +46,41 @@ class TableFormatter {
 
 	/**
 	 * @param float $startTime
-	 * @param ?array<mixed> $origData
-	 * @param ?int $total
+	 * @param array<mixed> $origData
+	 * @param int $total
 	 * @return string
 	 */
 	public function getTable(
 		float $startTime,
-		?array $origData = null,
-		?int $total = null,
-		?string $error = null
+		?array $origData = [],
+		int $total = -1,
+		string $error = ''
 	): string {
-		if ($error !== null) {
+		if ($error) {
 			return "ERROR: $error" . PHP_EOL . PHP_EOL;
 		}
 		$table = '';
-		if ($origData !== null) {
+		if (isset($origData) && $origData) {
 			$this->setData($origData);
-		}
-		$data = $this->prepare();
-		if (!empty($data)) {
+			$data = $this->prepare();
 			$borderLine = $this->borderLine();
 			$table .= $borderLine . PHP_EOL;
 			$keysRow = array_combine($this->keys, $this->keys);
 			$table .= implode(PHP_EOL, $this->row($keysRow)) . PHP_EOL;
 			$table .= $borderLine . PHP_EOL;
-			foreach ($data as $row) {
-				$table .= implode(PHP_EOL, $this->row($row)) . PHP_EOL;
-			}
+			$table .= implode(PHP_EOL, array_map(fn($row) => implode(PHP_EOL, $this->row($row)), $data)) . PHP_EOL;
 			$table .= $borderLine . PHP_EOL;
 		}
-		if ($total === null) {
+		if ($total === -1) {
 			return $table;
 		}
 		// Adding the summary info row
-		$totalRow = ($origData === null) ? 'Query OK, ' : '';
+		$hasNoData = !isset($origData);
+		$totalRow = $hasNoData ? 'Query OK, ' : '';
 		$totalRow .= match (true) {
-			($total === 0) => ($origData === null) ? '0 rows affected ' : 'Empty set ',
-			($total === 1) => '1 row ' . ($origData === null ? 'affected ' : 'in set '),
-			default => "$total rows " . ($origData === null ? 'affected ' : 'in set '),
+			($total === 0) => $hasNoData ? '0 rows affected ' : 'Empty set ',
+			($total === 1) => '1 row ' . ($hasNoData ? 'affected ' : 'in set '),
+			default => "$total rows " . ($hasNoData ? 'affected ' : 'in set '),
 		};
 		$duration = number_format(((hrtime(true) - $startTime) / 1e+9), 3);
 		$totalRow .= "($duration sec)";
@@ -92,14 +89,10 @@ class TableFormatter {
 	}
 
 	/**
-	 * @param ?array<mixed> $data
+	 * @param array<mixed> $data
 	 * @return self
 	 */
-	public function setData(?array $data): self {
-		if (!is_array($data)) {
-			$data = [];
-		}
-
+	public function setData(array $data): self {
 		$arrayData = [];
 		foreach ($data as $row) {
 			if (is_object($row)) {
@@ -215,8 +208,7 @@ class TableFormatter {
 		}
 
 		foreach (static::valueToLines($value) as $line) {
-			//$width = mb_strlen($line) + self::countCJK($line);
-			$width = strlen($line) + self::countCJK($line);
+			$width = mb_strlen($line) + self::countCJK($line);
 			if ($width <= $this->widths[$key]) {
 				continue;
 			}
@@ -238,9 +230,8 @@ class TableFormatter {
 	 * @return string
 	 */
 	protected static function mbStrPad($input, $padLength): string {
-		//$encoding = mb_internal_encoding();
-		//$padLength -= mb_strlen($input, $encoding) + self::countCJK($input);
-		$padLength -= strlen($input) + self::countCJK($input);
+		$encoding = mb_internal_encoding();
+		$padLength -= mb_strlen($input, $encoding) + self::countCJK($input);
 		return $input . str_repeat(' ', max(0, $padLength));
 	}
 

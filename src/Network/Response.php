@@ -74,7 +74,6 @@ final class Response {
    */
 	public static function fromMessageAndError(
 		mixed $message = [],
-		//bool $isMultilineMessage = false,
 		?GenericError $error = null,
 		RequestFormat $format = RequestFormat::JSON
 	): static {

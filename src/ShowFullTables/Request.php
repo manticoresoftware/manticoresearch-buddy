@@ -31,11 +31,7 @@ final class Request extends CommandRequestBase {
 	 * 	It contains match pattern from LIKE statement if its presented
 	 */
 	public string $like = '';
-
 	public ManticoreEndpoint $endpoint;
-
-	public function __construct() {
-	}
 
 	/**
 	 * @param NetRequest $request
@@ -59,7 +55,9 @@ final class Request extends CommandRequestBase {
 		if ($m['like'] ?? '') {
 			$self->like = $m['like'];
 		}
-		$self->endpoint = $request->endpoint;
+		// Buddy redirects all /cli requests to /sql
+		$self->endpoint = ($request->endpoint === ManticoreEndpoint::Cli)
+			? ManticoreEndpoint::Sql : $request->endpoint;
 		return $self;
 	}
 }

@@ -12,9 +12,9 @@
 namespace Manticoresearch\Buddy\ShowFullTables;
 
 use Manticoresearch\Buddy\Base\FormattableClientQueryExecutor;
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Lib\TableFormatter;
-use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
 use parallel\Runtime;
@@ -39,10 +39,7 @@ class Executor extends FormattableClientQueryExecutor {
 	 * @throws RuntimeException
 	 */
 	public function run(Runtime $runtime): Task {
-		$endpoint = ($this->request->endpoint === ManticoreEndpoint::Cli)
-			? ManticoreEndpoint::Sql
-			: $this->request->endpoint;
-		$this->manticoreClient->setEndpoint($endpoint);
+		$this->manticoreClient->setEndpoint($this->request->endpoint);
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
@@ -50,7 +47,7 @@ class Executor extends FormattableClientQueryExecutor {
 			Request $request,
 			HTTPClient $manticoreClient,
 			?TableFormatter $tableFormatter
-		): mixed {
+		): TaskResult {
 			$time0 = hrtime(true);
 			// First, get response from the manticore
 			$query = 'SHOW TABLES';
@@ -60,11 +57,11 @@ class Executor extends FormattableClientQueryExecutor {
 			$resp = $manticoreClient->sendRequest($query);
 			/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:int,columns?:string}> $result */
 			$result = $resp->getResult();
-			$total = $result[0]['total'] ?? null;
+			$total = $result[0]['total'] ?? -1;
 			if ($tableFormatter !== null) {
-				return $tableFormatter->getTable($time0, $result[0]['data'], $total);
+				return new TaskResult($tableFormatter->getTable($time0, $result[0]['data'], $total));
 			}
-			return $result;
+			return new TaskResult($result);
 		};
 
 		return Task::createInRuntime(

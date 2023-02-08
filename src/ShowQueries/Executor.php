@@ -14,8 +14,9 @@ namespace Manticoresearch\Buddy\ShowQueries;
 use Manticoresearch\Buddy\Base\FormattableClientQueryExecutor;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Lib\TableFormatter;
-use Manticoresearch\Buddy\Lib\Task;
-use Manticoresearch\Buddy\Lib\TaskPool;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskPool;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
 use parallel\Runtime;
@@ -59,7 +60,7 @@ class Executor extends FormattableClientQueryExecutor {
 			HTTPClient $manticoreClient,
 			?TableFormatter $tableFormatter,
 			array $tasks
-		): mixed {
+		): TaskResult {
 			// First, get response from the manticore
 			$time0 = hrtime(true);
 			$resp = $manticoreClient->sendRequest($request->query);
@@ -69,9 +70,9 @@ class Executor extends FormattableClientQueryExecutor {
 			$result[0]['data'] = array_merge($result[0]['data'], $tasks);
 			$result[0]['total'] += sizeof($tasks);
 			if ($tableFormatter !== null) {
-				$result = $tableFormatter->getTable($time0, $result[0]['data'], $result[0]['total']);
+				return new TaskResult($tableFormatter->getTable($time0, $result[0]['data'], $result[0]['total']));
 			}
-			return $result;
+			return new TaskResult($result);
 		};
 
 		return Task::createInRuntime(

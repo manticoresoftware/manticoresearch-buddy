@@ -14,7 +14,8 @@ namespace Manticoresearch\Buddy\InsertQuery;
 use Exception;
 use Manticoresearch\Buddy\Base\ClientQueryExecutor;
 use Manticoresearch\Buddy\Exception\GenericError;
-use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
 use parallel\Runtime;
@@ -51,7 +52,7 @@ class Executor extends ClientQueryExecutor {
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = function (Request $request, HTTPClient $manticoreClient): array {
+		$taskFn = function (Request $request, HTTPClient $manticoreClient): TaskResult {
 			for ($i = 0, $maxI = sizeof($request->queries) - 1; $i <= $maxI; $i++) {
 				$query = $request->queries[$i];
 				// When processing the final query we need to make sure the response to client
@@ -67,7 +68,7 @@ class Executor extends ClientQueryExecutor {
 				throw new Exception('Empty queries to process');
 			}
 
-			return (array)json_decode($resp->getBody(), true);
+			return new TaskResult((array)json_decode($resp->getBody(), true));
 		};
 		return Task::createInRuntime(
 			$runtime, $taskFn, [$this->request, $this->manticoreClient]
