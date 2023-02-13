@@ -28,6 +28,9 @@ final class Request extends CommandRequestBase {
 	/** @var string */
 	public string $configPath;
 
+	/** @var bool */
+	public bool $isQuotedPath = false;
+
   /**
    * @param string $path
    * @param string[] $tables
@@ -57,7 +60,8 @@ final class Request extends CommandRequestBase {
 	public static function fromNetworkRequest(NetRequest $request): Request {
 		$query = $request->payload;
 		$whatPattern = '(?:TABLES?\s*(?P<table>(,?\s*[\w]+\s*)+))';
-		$toPattern = 'TO\s*(?P<path>([\._\-a-z/0-9]+|[A-Z]\:\\\[\.\\\_\-a-z0-9]+))';
+		$toPattern = 'TO\s*(?P<path>(\'[^\']+\'|[\._\-a-z\/0-9]+|'
+			. '\'[A-Z]\:\\\[^\']\'|[A-Z]\:\\\[\.\\\_\-a-z0-9]+))';
 		$optionsKeys = implode('|', array_keys(static::OPTIONS));
 		$optionsPattern = 'OPTIONS?\s*(?P<options>'
 			. '(,?\s*(?:' . $optionsKeys . ')\s*\=\s*(?:0|1|true|false|yes|no|on|off)'
@@ -67,12 +71,12 @@ final class Request extends CommandRequestBase {
 		if (false === preg_match("#^$pattern$#ius", $query, $matches)) {
 			static::throwSqlParseError();
 		}
-
 		$params = static::extractNamedMatches($matches);
 		if (!isset($params['path'])) {
 			static::throwSqlParseError();
 		}
-		$path = $params['path'];
+		$path = trim($params['path'], "'");
+		$isQuotedPath = $path !== $params['path'];
 		$tables = isset($params['table'])
 			? array_map(trim(...), explode(',', $params['table']))
 			: []
@@ -97,6 +101,7 @@ final class Request extends CommandRequestBase {
 			options: $options
 		);
 
+		$self->isQuotedPath = $isQuotedPath;
 		$queryTokens = static::extractTokens($query);
 		$buildTokens = $self->tokenize();
 		if (array_diff($queryTokens, $buildTokens)) {
@@ -165,7 +170,10 @@ final class Request extends CommandRequestBase {
 				'',
 			], $query
 		);
-		return static::prepareTokens((array)explode(' ', $query ?: ''));
+		$splitRegex = '/\s+(?=([^\']*\'[^\']*\')*[^\']*$)/';
+		/** @var array<string> $parts */
+		$parts = (array)preg_split($splitRegex, $query ?: '');
+		return static::prepareTokens($parts);
 	}
 
 	/**
@@ -178,7 +186,7 @@ final class Request extends CommandRequestBase {
 		$tokens = [
 			'backup',
 			'to',
-			$this->path,
+			$this->isQuotedPath ? "'$this->path'" : $this->path,
 		];
 
 		if ($this->tables) {
