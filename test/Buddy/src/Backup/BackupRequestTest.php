@@ -155,7 +155,11 @@ class BackupRequestTest extends TestCase {
 			'backup tables b to    /tmp',
 			'backup tables a, b to /tmp/path/somehwere-dir_name',
 			'backup table b   to /tmp/directory',
+			'backup to \'/tmp/dir\'',
+			'backup to \'/tmp/folder with spaces\'',
 			'backup   to  C:\windows\Backup option async     = on',
+			'backup to \'C:\path\'',
+			'backup to \'C:\path with spaces\'',
 		];
 
 		foreach ($testingSet as $query) {
