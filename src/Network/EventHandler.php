@@ -15,6 +15,7 @@ use Exception;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\CommandNotAllowed;
 use Manticoresearch\Buddy\Exception\GenericError;
+use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Lib\Task\Task;
@@ -86,7 +87,9 @@ final class EventHandler {
 	 * @return bool
 	 */
 	protected static function isCustomError(Throwable $e): bool {
-		return is_a($e, SQLQueryCommandNotSupported::class) || is_a($e, CommandNotAllowed::class);
+		return is_a($e, SQLQueryCommandNotSupported::class)
+			|| is_a($e, CommandNotAllowed::class)
+			|| is_a($e, InvalidRequestError::class);
 	}
 
 	/**

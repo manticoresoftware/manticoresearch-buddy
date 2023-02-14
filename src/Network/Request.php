@@ -134,15 +134,13 @@ final class Request {
 		static::validateInputFields($payload, static::PAYLOAD_FIELDS);
 
 		// Checking if request format and endpoint are supported
-		$endpoint = match (ltrim($payload['message']['path_query'], '/')) {
+		[$path] = explode('?', ltrim($payload['message']['path_query'], '/'));
+		$endpoint = match ($path) {
 			'cli' => ManticoreEndpoint::Cli,
 			'cli_json' => ManticoreEndpoint::CliJson,
-			'sql?mode=raw' => ManticoreEndpoint::Sql,
-			'sql' => ManticoreEndpoint::Sql,
-			'insert' => ManticoreEndpoint::Insert,
-			'replace' => ManticoreEndpoint::Insert,
+			'sql?mode=raw', 'sql', '' => ManticoreEndpoint::Sql,
+			'insert', 'replace' => ManticoreEndpoint::Insert,
 			'bulk' => ManticoreEndpoint::Bulk,
-			'' => ManticoreEndpoint::Sql,
 			default => throw new InvalidRequestError(
 				"Do not know how to handle '{$payload['message']['path_query']}' path_query"
 			),

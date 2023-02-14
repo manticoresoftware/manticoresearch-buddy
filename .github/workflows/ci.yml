@@ -18,13 +18,14 @@ jobs:
       - name: Run tests inside docker container
         uses: manticoresoftware/addnab-docker-run-action@v3
         with:
-          image: manticoresearch/manticoresearch-buddy-test-kit:5.0.3
+          image: manticoresearch/manticore-executor-kit:0.6.4
           options: -v ${{ github.workspace }}:/workdir --cap-add SYS_ADMIN --security-opt apparmor=unconfined
           run: |
             # the entrypoint is rewritten so we need to launch searchd manually
             searchd
             cd /workdir
             composer install --prefer-dist
+            git clone https://github.com/manticoresoftware/phar_builder.git
             bin/test
 
   codestyle:
@@ -38,7 +39,7 @@ jobs:
       - name: Run PHPCS to check following the standard
         uses: manticoresoftware/addnab-docker-run-action@v3
         with:
-          image: manticoresearch/manticoresearch-buddy-test-kit:5.0.3
+          image: manticoresearch/manticore-executor-kit:0.6.4
           options: -v ${{ github.workspace }}:/workdir
           run: |
             cd /workdir
@@ -56,7 +57,7 @@ jobs:
       - name: Run PHPStan to analyze the codebase
         uses: manticoresoftware/addnab-docker-run-action@v3
         with:
-          image: manticoresearch/manticoresearch-buddy-test-kit:5.0.3
+          image: manticoresearch/manticore-executor-kit:0.6.4
           options: -v ${{ github.workspace }}:/workdir
           run: |
             cd /workdir

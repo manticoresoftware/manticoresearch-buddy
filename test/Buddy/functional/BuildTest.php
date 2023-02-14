@@ -55,6 +55,6 @@ final class BuildTest extends TestCase {
 	}
 
 	protected static function buildBinary(): void {
-		system('bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"');
+		system('phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"');
 	}
 }

@@ -4,3 +4,4 @@ build/**
 .phpunit.result.cache
 /.ptp-sync/
 .ptp-sync-folder
+phar_builder

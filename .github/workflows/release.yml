@@ -21,7 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build binary
-        run: ./bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"
+        run: |
+          git clone https://github.com/manticoresoftware/phar_builder.git
+          ./phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"
 
       - id: vars
         run: |
@@ -50,7 +52,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build binary
-        run: ./bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"
+        run: |
+          git clone https://github.com/manticoresoftware/phar_builder.git
+          ./phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"
       - id: vars
         run: |
           echo "::set-output name=app_version::$(<APP_VERSION)"
