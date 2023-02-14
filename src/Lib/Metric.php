@@ -237,10 +237,10 @@ final class Metric {
 	 */
 	protected static function getTablesMetrics(): array {
 		$metrics = [];
-		/** @var array{array{Index:string,Type:String}} */
-		$tablesResult = static::sendManticoreRequest('SHOW TABLES');
-		// TODO: change Index -> Table
-		foreach ($tablesResult as ['Index' => $table, 'Type' => $tableType]) {
+		/** @var HTTPClient */
+		$client = static::$container->get('manticoreClient');
+		$tables = $client->getAllTables();
+		foreach ($tables as [$table, $tableType]) {
 			$tableTypeKey = "table_{$tableType}_count";
 			$metrics[$tableTypeKey] ??= 0;
 			$metrics[$tableTypeKey] += 1;

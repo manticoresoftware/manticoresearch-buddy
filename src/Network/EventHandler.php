@@ -86,7 +86,7 @@ final class EventHandler {
 	 * @param Throwable $e
 	 * @return bool
 	 */
-	protected static function isCustomError(Throwable $e): bool {
+	protected static function shouldProxyError(Throwable $e): bool {
 		return is_a($e, SQLQueryCommandNotSupported::class)
 			|| is_a($e, CommandNotAllowed::class)
 			|| is_a($e, InvalidRequestError::class);
@@ -335,7 +335,7 @@ final class EventHandler {
 		};
 		// We proxy original error in case when we do not know how to handle query
 		// otherwise we send our custom error
-		if (self::isCustomError($e)) {
+		if (self::shouldProxyError($e)) {
 			/** @var GenericError $e */
 			$e->setResponseError($originalError);
 		} elseif (!is_a($e, GenericError::class)) {

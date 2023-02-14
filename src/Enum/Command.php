@@ -15,7 +15,13 @@ enum Command: string {
 	case Insert = 'InsertQuery';
 	case ShowQueries = 'ShowQueries';
 	case Backup = 'Backup';
-	case ShowFullTables = 'ShowFullTables';
 	case CliTable = 'CliTable';
+	case ShowFullTables = 'ShowFullTables';
+	case EmptyQuery = 'EmptyQuery';
+	case LockTables = 'LockTables';
+	case UnlockTables = 'UnlockTables';
+	case Select = 'Select';
+	case Set = 'Set';
+	case ShowFields = 'ShowFields';
 	case Test = 'Test';
 }

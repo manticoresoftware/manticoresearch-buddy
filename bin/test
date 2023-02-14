@@ -1,3 +1,2 @@
 #!/usr/bin/env bash
-# ! In case we need to enable memprof WE SHOULD do not enable it in threads or will get segfault
-MEMPROF_PROFILE="" ./vendor/bin/phpunit -d memory_limit=4G --stop-on-failure "$@" test/
+./vendor/bin/phpunit -d memory_limit=4G --stop-on-failure "$@" test/

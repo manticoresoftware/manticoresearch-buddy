@@ -59,7 +59,6 @@ class QueryProcessor {
 			static::init();
 		}
 		$command = static::extractCommandFromRequest($request);
-		//throw new CommandNotAllowed("Request handling is disabled: $request->payload");
 		if (!self::isCommandAllowed($command)) {
 			throw new CommandNotAllowed("Request handling is disabled: $request->payload");
 		}
@@ -154,12 +153,19 @@ class QueryProcessor {
 		);
 		$isInsertError = preg_match('/table (.*?) absent/', $request->error);
 		return match (true) {
+			$queryLowercase === '',
+				str_starts_with($queryLowercase, 'set'),
+				str_starts_with($queryLowercase, 'create database') => Command::EmptyQuery,
 			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => Command::Insert,
 			str_starts_with($queryLowercase, 'show queries') => Command::ShowQueries,
 			str_starts_with($queryLowercase, 'backup') => Command::Backup,
 			str_starts_with($queryLowercase, 'show full tables') => Command::ShowFullTables,
 			str_starts_with($queryLowercase, 'test') => Command::Test,
 			($request->endpoint === ManticoreEndpoint::Cli) => Command::CliTable,
+			str_starts_with($queryLowercase, 'lock tables') => Command::LockTables,
+			str_starts_with($queryLowercase, 'unlock tables') => Command::UnlockTables,
+			str_starts_with($queryLowercase, 'select') => Command::Select,
+			str_starts_with($queryLowercase, 'show fields') => Command::ShowFields,
 			default => throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload"),
 		};
 	}
