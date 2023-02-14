@@ -42,6 +42,16 @@ class GenericError extends Exception {
 	}
 
 	/**
+	 * Little proxy to little helper to not just create but throw also
+	 *
+	 * @param string $responseError
+	 * @return static
+	 */
+	public static function throw(string $responseError): static {
+		throw static::create($responseError);
+	}
+
+	/**
 	 * Set response error that we will return to client
 	 *
 	 * @param string $responseError

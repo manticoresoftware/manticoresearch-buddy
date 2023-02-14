@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Network;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\InvalidRequestError;
+use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
 
 final class Request {
 	const PAYLOAD_FIELDS = [
@@ -154,7 +155,7 @@ final class Request {
 
 		$this->format = $format;
 		$this->endpoint = $endpoint;
-		$this->payload = $payload['message']['body'];
+		$this->payload = static::removeComments($payload['message']['body']);
 		$this->error = $payload['error'];
 		$this->version = $payload['version'];
 		return $this;
@@ -191,5 +192,24 @@ final class Request {
 
 			static::validateInputFields($payload[$k], static::MESSAGE_FIELDS);
 		}
+	}
+
+	/**
+	 * Remove all types of comments from the query, because we do not use it for now
+	 * @param string $query
+	 * @return string
+	 * @throws SQLQueryParsingError
+	 */
+	protected static function removeComments(string $query): string {
+		$query = preg_replace(
+			'/(?<!\')(?<=\s)(--|#)[^\r\n\'\"]*(?=[\r\n]|$)|\/\*.*?\*\//ms',
+			'',
+			$query
+		);
+		if ($query === null) {
+			throw new SQLQueryParsingError('Error while removing comments from the query using regex');
+		}
+		/** @var string $query */
+		return trim($query);
 	}
 }

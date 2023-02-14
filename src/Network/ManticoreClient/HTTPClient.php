@@ -11,6 +11,8 @@
 
 namespace Manticoresearch\Buddy\Network\ManticoreClient;
 
+use Exception;
+use Generator;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
 use RuntimeException;
@@ -95,8 +97,7 @@ class HTTPClient {
 			throw new ManticoreHTTPClientError('Empty request passed');
 		}
 		$endpoint ??= $this->endpoint;
-		// Hmm, This is strange, but $endpoint === ManticoreEndpoint::Sql is not working
-		$prefix = ($endpoint->name === 'Sql' ? 'query=' : '');
+		$prefix = $endpoint->name === 'Sql' ? 'query=' : '';
 		$fullReqUrl = "{$this->url}/{$endpoint->value}";
 		$agentHeader = $disableAgentHeader ? '' : "User-Agent: Manticore Buddy/{$this->buddyVersion}\n";
 		$opts = [
@@ -135,4 +136,68 @@ class HTTPClient {
 		$this->endpoint = $endpoint;
 	}
 
+
+	// Bunch of methods to help us reduce copy pasting, maybe we will move it out to separate class
+	// but now it's totally fine to have 3-5 methods here for help
+	// ---
+
+	/**
+	 * Get all tables for this instance by running SHOW TABLES
+	 * And filter only required types or any if not specified
+	 * @param array<string> $types
+	 * @return Generator<array{0:string,1:string}>
+	 *  Contains array with table and type as [table, type]
+	 * @throws RuntimeException
+	 * @throws ManticoreHTTPClientError
+	 */
+	public function getAllTables(array $types = []): Generator {
+		/** @var array<array{data:array<array{Type:string,Index:string}>}> $res */
+		$res = $this->sendRequest('SHOW TABLES')->getResult();
+
+		// TODO: still not changed to Table in manticore?
+		$typesMap = array_flip($types);
+		foreach ($res[0]['data'] as ['Type' => $type, 'Index' => $table]) {
+			if ($typesMap && !isset($typesMap[$type])) {
+				continue;
+			}
+
+			yield [$table, $type];
+		}
+	}
+
+	/**
+	 * Validate input tables and return all tables when empty array passed
+	 * or validate and throw error if we have missing table in the list
+	 * @param array<string> $tables
+	 * @param array<string> $types
+	 * @return array<string>
+	 * @throws RuntimeException
+	 * @throws ManticoreHTTPClientError
+	 * @throws Exception
+	 */
+	public function validateTables(array $tables = [], array $types = []): array {
+		// Request for all tables first to validate request
+		$allTables = array_column(
+			iterator_to_array($this->getAllTables($types)),
+			0
+		);
+
+		// No tables passed? lock all
+		if (!$tables) {
+			$tables = $allTables;
+		}
+
+		// Validate that all tables exist
+		$tablesDiff = array_diff($tables, $allTables);
+		if ($tablesDiff) {
+			throw new Exception(
+				sprintf(
+					'Query contains missing tables: %s',
+					implode(', ', $tablesDiff)
+				)
+			);
+		}
+
+		return $tables;
+	}
 }

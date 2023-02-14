@@ -24,6 +24,16 @@ Exceptions can be thrown when implementing a new command because they are all ca
 
 There is a `GenericError` class that implements the `setResponseError` and `getResponseError` methods. If you want to provide a user-friendly error message, you can use the `setResponseError` method or create an exception with `GenericError::create('User-friendly error message goes here')`. It's important to note that the default exception message will not be included in the user response but in the Manticore log file.
 
+### Helper tool to start new command development
+
+We have a tool that helps to simplify the process of adding new command. For example,
+
+```bash
+bin/create-command NameOfTheCommand
+```
+
+Will create all required structures for `NameOfTheCommand` command. Everything you need to do to check all files and update them with code. For more information about how things work, check the next section.
+
 ### Steps for creating a new command
 
 Let's now take a look at an example of creating the abstract RESTORE command:
