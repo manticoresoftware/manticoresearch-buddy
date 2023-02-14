@@ -13,7 +13,7 @@ use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\InsertQuery\Executor;
 use Manticoresearch\Buddy\InsertQuery\Request;
-use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Lib\Task\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response as ManticoreResponse;
 use Manticoresearch\Buddy\Network\ManticoreClient\Settings as ManticoreSettings;
@@ -66,7 +66,7 @@ class InsertQueryExecutorTest extends TestCase {
 
 		$this->assertEquals(true, $task->isSucceed());
 		/** @var Response */
-		$result = $task->getResult();
+		$result = $task->getResult()->getMessage();
 		$this->assertEquals($resp, json_encode($result));
 	}
 
@@ -80,7 +80,7 @@ class InsertQueryExecutorTest extends TestCase {
 				'error' => "table 'test' absent, or does not support INSERT",
 				'payload' => 'INSERT INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::Cli,
+				'endpoint' => ManticoreEndpoint::CliJson,
 			]
 		);
 		$this->runTask($request, $mockServerUrl, $resp);

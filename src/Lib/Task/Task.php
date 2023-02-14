@@ -9,11 +9,10 @@
 	program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Lib\Task;
 
 use Closure;
 use Manticoresearch\Buddy\Exception\GenericError;
-use Manticoresearch\Buddy\Lib\TaskStatus;
 use RuntimeException;
 use parallel\Channel;
 use parallel\Future;
@@ -50,7 +49,7 @@ final class Task {
 	protected Runtime $runtime;
 	protected Channel $channel;
 	protected GenericError $error;
-	protected mixed $result;
+	protected TaskResult $result;
 
 	protected int $channelBufferCount = 0;
 
@@ -188,7 +187,7 @@ final class Task {
 	 * @return Runtime
 	 */
 	public static function createRuntime(): Runtime {
-		return new Runtime(__DIR__. '/../runtime.php');
+		return new Runtime(__DIR__. '/../../runtime.php');
 	}
 
 	/**
@@ -261,7 +260,7 @@ final class Task {
 			$this->status = TaskStatus::Finished;
 
 			try {
-				/** @var array<mixed> */
+				/** @var array{0:?array{0:string,1:string}, 1:TaskResult} */
 				$value = $this->future->value();
 				[$error, $result] = $value;
 				if ($error) {
@@ -337,10 +336,10 @@ final class Task {
 	/**
 	 * Just getter for result of future
 	 *
-	 * @return mixed
+	 * @return TaskResult
 	 * @throws RuntimeException
 	 */
-	public function getResult(): mixed {
+	public function getResult(): TaskResult {
 		if (!isset($this->result)) {
 			throw new RuntimeException('There result was not set, you should be sure that isSucceed returned true.');
 		}

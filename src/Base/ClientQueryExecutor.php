@@ -9,53 +9,45 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Test;
+namespace Manticoresearch\Buddy\Base;
 
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Lib\Task\Task;
-use Manticoresearch\Buddy\Lib\Task\TaskResult;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
 use parallel\Runtime;
 
 /**
- * This is the parent class to handle erroneous Manticore queries
+ * This is the parent class to handle erroneous queries via Manticore client requests
  */
-class Executor implements CommandExecutorInterface {
-
+abstract class ClientQueryExecutor implements CommandExecutorInterface {
 	/** @var HTTPClient $manticoreClient */
 	protected HTTPClient $manticoreClient;
 
 	/**
-	 *  Initialize the executor
-	 *
-	 * @param Request $request
-	 * @return void
-	 */
-	public function __construct(public Request $request) {
-	}
-
-	/**
 	 * Process the request and return self for chaining
 	 *
+	 * @param Runtime $runtime
 	 * @return Task
 	 * @throws RuntimeException
 	 */
-	public function run(Runtime $runtime): Task {
-
-		$taskFn = static function (int $timeout): TaskResult {
-			sleep($timeout);
-			return new TaskResult([[]]);
-		};
-
-		$createMethod = $this->request->isDeferred ? 'deferInRuntime' : 'createInRuntime';
-		return Task::$createMethod($runtime, $taskFn, [$this->request->timeout])->run();
-	}
+	abstract public function run(Runtime $runtime): Task;
 
 	/**
 	 * @return array<string>
 	 */
 	public function getProps(): array {
-		return [];
+		return ['manticoreClient'];
+	}
+
+	/**
+	 * Instantiating the http client to execute requests to Manticore server
+	 *
+	 * @param HTTPClient $client
+	 * $return HTTPClient
+	 */
+	public function setManticoreClient(HTTPClient $client): HTTPClient {
+		$this->manticoreClient = $client;
+		return $this->manticoreClient;
 	}
 }

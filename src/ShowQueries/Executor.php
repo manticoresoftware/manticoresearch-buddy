@@ -11,9 +11,12 @@
 
 namespace Manticoresearch\Buddy\ShowQueries;
 
-use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
-use Manticoresearch\Buddy\Lib\Task;
-use Manticoresearch\Buddy\Lib\TaskPool;
+use Manticoresearch\Buddy\Base\FormattableClientQueryExecutor;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
+use Manticoresearch\Buddy\Lib\TableFormatter;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskPool;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use RuntimeException;
 use parallel\Runtime;
@@ -21,16 +24,13 @@ use parallel\Runtime;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class Executor implements CommandExecutorInterface {
+class Executor extends FormattableClientQueryExecutor {
 	const COL_MAP = [
 		'connid' => 'id',
 		'last cmd' => 'query',
 		'proto' => 'protocol',
 		'host' => 'host',
 	];
-
-	/** @var HTTPClient $manticoreClient */
-	protected HTTPClient $manticoreClient;
 
 	/**
 	 *  Initialize the executor
@@ -48,23 +48,37 @@ class Executor implements CommandExecutorInterface {
 	 * @throws RuntimeException
 	 */
 	public function run(Runtime $runtime): Task {
-		$this->manticoreClient->setEndpoint($this->request->endpoint);
+		$endpoint = ($this->request->endpoint === ManticoreEndpoint::Cli)
+			? ManticoreEndpoint::Sql
+			: $this->request->endpoint;
+		$this->manticoreClient->setEndpoint($endpoint);
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
-		$taskFn = static function (Request $request, HTTPClient $manticoreClient, array $tasks): array {
+		$taskFn = static function (
+			Request $request,
+			HTTPClient $manticoreClient,
+			?TableFormatter $tableFormatter,
+			array $tasks
+		): TaskResult {
 			// First, get response from the manticore
+			$time0 = hrtime(true);
 			$resp = $manticoreClient->sendRequest($request->query);
 			$result = static::formatResponse($resp->getBody());
 			// Second, get our own queries and append to the final result
 			/** @var array{0:array{data:array<mixed>,total:int}} $result */
 			$result[0]['data'] = array_merge($result[0]['data'], $tasks);
 			$result[0]['total'] += sizeof($tasks);
-			return $result;
+			if ($tableFormatter !== null) {
+				return new TaskResult($tableFormatter->getTable($time0, $result[0]['data'], $result[0]['total']));
+			}
+			return new TaskResult($result);
 		};
 
 		return Task::createInRuntime(
-			$runtime, $taskFn, [$this->request, $this->manticoreClient, static::getTasksToAppend()]
+			$runtime,
+			$taskFn,
+			[$this->request, $this->manticoreClient, $this->checkForTableFormatter(), static::getTasksToAppend()]
 		)->run();
 	}
 
@@ -141,21 +155,4 @@ class Executor implements CommandExecutorInterface {
 		return $data;
 	}
 
-	/**
-	 * @return array<string>
-	 */
-	public function getProps(): array {
-		return ['manticoreClient'];
-	}
-
-	/**
-	 * Instantiating the http client to execute requests to Manticore server
-	 *
-	 * @param HTTPClient $client
-	 * $return HTTPClient
-	 */
-	public function setManticoreClient(HTTPClient $client): HTTPClient {
-		$this->manticoreClient = $client;
-		return $this->manticoreClient;
-	}
 }

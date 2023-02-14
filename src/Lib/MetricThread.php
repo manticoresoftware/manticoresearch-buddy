@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Lib;
 
+use Manticoresearch\Buddy\Lib\Task\Task;
 use Psr\Container\ContainerInterface;
 use parallel\Channel;
 

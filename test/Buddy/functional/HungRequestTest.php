@@ -9,8 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Lib\Task;
-use Manticoresearch\Buddy\Lib\TaskStatus;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
+use Manticoresearch\Buddy\Lib\Task\TaskStatus;
 use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -50,10 +51,10 @@ class HungRequestTest extends TestCase {
 
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
 		$this->assertEquals(true, $task1->isSucceed());
-		$res1 = (array)$task1->getResult();
+		$res1 = $task1->getResult()->getMessage();
 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		$this->assertEquals(true, $task2->isSucceed());
-		$res2 = (array)$task2->getResult();
+		$res2 = $task2->getResult()->getMessage();
 		// Making sure that the id of the last running query is the id of the hung request task
 		if (!is_array($res1[0]) || !is_array($res2[0])) {
 			$this->fail();
@@ -78,7 +79,7 @@ class HungRequestTest extends TestCase {
 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		sleep(4);
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
-		$this->assertEquals([[]], $task1->getResult());
+		$this->assertEquals([[]], $task1->getResult()->getMessage());
 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		$this->assertEquals(true, $task2->isSucceed());
 	}
@@ -89,12 +90,12 @@ class HungRequestTest extends TestCase {
 	 */
 	protected function generateTaskArgs(array $taskFnArgs): array {
 		return [
-			static function (int $port, string $query): array {
+			static function (int $port, string $query): TaskResult {
 				$output = [];
-				exec("curl -s 127.0.0.1:$port/cli -d '$query' 2>&1", $output);
+				exec("curl -s 127.0.0.1:$port/cli_json -d '$query' 2>&1", $output);
 				/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 				$result = (array)json_decode($output[0] ?? '{}', true);
-				return $result;
+				return new TaskResult($result);
 			},
 			$taskFnArgs,
 		];

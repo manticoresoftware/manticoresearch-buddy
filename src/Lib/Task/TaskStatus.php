@@ -9,7 +9,7 @@
 	program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Lib\Task;
 
 enum TaskStatus {
 	case Pending;

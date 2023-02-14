@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\ShowFullTables;
+namespace Manticoresearch\Buddy\CliTable;
 
 use Manticoresearch\Buddy\Base\FormattableClientQueryExecutor;
 use Manticoresearch\Buddy\Lib\TableFormatter;
@@ -20,9 +20,10 @@ use RuntimeException;
 use parallel\Runtime;
 
 /**
- * This is the parent class to handle erroneous Manticore queries
+ * This is the class to return response to the '/cli' endpoint in table format
  */
 class Executor extends FormattableClientQueryExecutor {
+
 	/**
 	 *  Initialize the executor
 	 *
@@ -40,7 +41,6 @@ class Executor extends FormattableClientQueryExecutor {
 	 */
 	public function run(Runtime $runtime): Task {
 		$this->manticoreClient->setEndpoint($this->request->endpoint);
-
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = static function (
@@ -49,23 +49,31 @@ class Executor extends FormattableClientQueryExecutor {
 			?TableFormatter $tableFormatter
 		): TaskResult {
 			$time0 = hrtime(true);
-			// First, get response from the manticore
-			$query = 'SHOW TABLES';
-			if ($request->like) {
-				$query .= " LIKE '{$request->like}'";
+			$resp = $manticoreClient->sendRequest($request->query, null, true);
+			$data = null;
+			$total = -1;
+			$respBody = $resp->getBody();
+			$result = (array)json_decode($respBody, true);
+			if ($tableFormatter === null || !isset($result[0]) || !is_array($result[0])) {
+				return new TaskResult($result);
 			}
-			$resp = $manticoreClient->sendRequest($query);
-			/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:int,columns?:string}> $result */
-			$result = $resp->getResult();
-			$total = $result[0]['total'] ?? -1;
-			if ($tableFormatter !== null) {
-				return new TaskResult($tableFormatter->getTable($time0, $result[0]['data'], $total));
+			// Convert JSON response from Manticore to table format
+			if (isset($result[0]['error']) && $result[0]['error'] !== '') {
+				return new TaskResult($tableFormatter->getTable($time0, $data, $total, $result[0]['error']));
 			}
-			return new TaskResult($result);
+			if (isset($result[0]['data']) && is_array($result[0]['data'])) {
+				$data = $result[0]['data'];
+			}
+			if (isset($result[0]['total'])) {
+				$total = $result[0]['total'];
+			}
+			return new TaskResult($tableFormatter->getTable($time0, $data, $total));
 		};
 
 		return Task::createInRuntime(
-			$runtime, $taskFn, [$this->request, $this->manticoreClient, $this->checkForTableFormatter()]
+			$runtime,
+			$taskFn,
+			[$this->request, $this->manticoreClient, $this->tableFormatter]
 		)->run();
 	}
 }

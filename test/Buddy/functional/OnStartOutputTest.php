@@ -40,7 +40,7 @@ class OnStartOutputTest extends TestCase {
 		// Checking the log part corresponding to the latest searchd start
 		$logUpdate = $this->getLogUpdate();
 		$matches = [];
-		preg_match('/\[BUDDY\] started (.*?) at (.*?)$/', $logUpdate, $matches);
+		preg_match('/\[BUDDY\] started (.*?) at (.*?)$/s', $logUpdate, $matches);
 		$this->assertCount(3, $matches);
 		$addr1 = $matches[2];
 
@@ -48,7 +48,7 @@ class OnStartOutputTest extends TestCase {
 		self::tearDownAfterClass();
 		self::setUpBeforeClass();
 		$logUpdate = $this->getLogUpdate();
-		preg_match('/\[BUDDY\] started (.*) at (.*?)$/', $logUpdate, $matches);
+		preg_match('/\[BUDDY\] started (.*) at (.*?)$/s', $logUpdate, $matches);
 		$this->assertCount(3, $matches);
 		$addr2 = $matches[2];
 

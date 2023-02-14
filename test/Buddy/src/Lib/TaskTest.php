@@ -14,8 +14,9 @@ namespace Manticoresearch\BuddyUnitTest\Lib;
 use Exception;
 use Manticoresearch\Buddy\Exception\BuddyRequestError;
 use Manticoresearch\Buddy\Exception\GenericError;
-use Manticoresearch\Buddy\Lib\Task;
-use Manticoresearch\Buddy\Lib\TaskStatus;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
+use Manticoresearch\Buddy\Lib\Task\TaskStatus;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 
@@ -23,9 +24,9 @@ class TaskTest extends TestCase {
 	public function testTaskParallelRunSucceed(): void {
 		echo "\nTesting the task parallel run succeed\n";
 		$task = Task::create(
-			function (): bool {
+			function (): TaskResult {
 				usleep(2000000);
-				return true;
+				return new TaskResult('ok');
 			}
 		);
 		$this->assertEquals(false, $task->isDeferred());
@@ -35,7 +36,7 @@ class TaskTest extends TestCase {
 		usleep(2500000);
 		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
 		$this->assertEquals(true, $task->isSucceed());
-		$this->assertEquals(true, $task->getResult());
+		$this->assertEquals('ok', $task->getResult()->getMessage());
 	}
 
 	public function testTaskParallelRunWithArgumentsSucceed(): void {
@@ -45,9 +46,9 @@ class TaskTest extends TestCase {
 		$arg->value = 123;
 
 		$task = Task::create(
-			function (stdClass $arg): stdClass {
+			function (stdClass $arg): TaskResult {
 				usleep(2000000);
-				return $arg;
+				return new TaskResult((array)$arg);
 			},
 			[$arg]
 		);
@@ -58,7 +59,7 @@ class TaskTest extends TestCase {
 		usleep(2500000);
 		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
 		$this->assertEquals(true, $task->isSucceed());
-		$this->assertEquals($arg, $task->getResult());
+		$this->assertEquals((array)$arg, $task->getResult()->getMessage());
 	}
 
 	public function testTaskReturnsGenericErrorOnException(): void {
@@ -104,9 +105,9 @@ class TaskTest extends TestCase {
 	public function testTaskDeferredHasFLag(): void {
 		echo "\nTesting the task parallel run has deferred flag\n";
 		$task = Task::defer(
-			function (): bool {
+			function (): TaskResult {
 				usleep(2000000);
-				return true;
+				return new TaskResult('ok');
 			}
 		);
 		$this->assertEquals(true, $task->isDeferred());
@@ -116,6 +117,6 @@ class TaskTest extends TestCase {
 		usleep(2500000);
 		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
 		$this->assertEquals(true, $task->isSucceed());
-		$this->assertEquals(true, $task->getResult());
+		$this->assertEquals('ok', $task->getResult()->getMessage());
 	}
 }

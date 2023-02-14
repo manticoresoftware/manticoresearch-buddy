@@ -31,11 +31,14 @@ final class Response {
 
   /**
    * @see static::fromStringAndError()
-   * @param array<mixed> $message
+   * @param mixed $message
    * @param RequestFormat $format
    * @return static
    */
-	public static function fromMessage(array $message, RequestFormat $format = RequestFormat::JSON): static {
+	public static function fromMessage(
+		mixed $message,
+		RequestFormat $format = RequestFormat::JSON
+	): static {
 		return static::fromMessageAndError($message, null, $format);
 	}
 
@@ -64,13 +67,13 @@ final class Response {
 	}
 
   /**
-   * @param array<mixed> $message
+   * @param mixed $message
    * @param ?GenericError $error
    * @param RequestFormat $format
    * @return static
    */
 	public static function fromMessageAndError(
-		array $message = [],
+		mixed $message = [],
 		?GenericError $error = null,
 		RequestFormat $format = RequestFormat::JSON
 	): static {

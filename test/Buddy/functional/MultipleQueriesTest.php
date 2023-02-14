@@ -63,8 +63,9 @@ class MultipleQueriesTest extends TestCase {
 	}
 
 	public function testSqlMultipleBuddyQueriesWithHungOk(): void {
+		// TODO: fix the problem with the Request-Id header of multiple queries
+		// to avoid the incorrect handling of hunq requests
 		echo "\nTesting the execution of multiple SQL queries with Buddy when some of them hung\n";
-
 		$query = 'TEST 3;'
 			. "INSERT into {$this->testTable2}(col1,col2) VALUES(1,2)";
 		$out = static::runSqlQuery($query);

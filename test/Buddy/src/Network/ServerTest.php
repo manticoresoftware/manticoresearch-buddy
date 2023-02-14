@@ -9,7 +9,8 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
 use Manticoresearch\Buddy\Network\EventHandler;
 use Manticoresearch\Buddy\Network\Server;
 use PHPUnit\Framework\TestCase;
@@ -148,7 +149,7 @@ class ServerTest extends TestCase {
 		};
 
 		$task = Task::create(
-			function () use ($fn, $testTarget): bool {
+			function () use ($fn, $testTarget): TaskResult {
 				$server = Server::create();
 				$server->addHandler('request', EventHandler::request(...));
 				switch ($testTarget) {
@@ -166,27 +167,27 @@ class ServerTest extends TestCase {
 				$refCls = new ReflectionClass($server);
 				$socket = $refCls->getProperty('socket')->getValue($server);
 				if (!is_object($socket) || !is_a($socket, SocketServer::class)) {
-					return false;
+					return new TaskResult('error');
 				}
 				$addr = $socket->getAddress();
 				if ($addr === null) {
-					return false;
+					return new TaskResult('error');
 				}
 				$addr = trim($addr, 'tcp://');
 				[$host, $port] = explode(':', $addr);
 				$clientSocket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 				if ($clientSocket === false) {
-					return false;
+					return new TaskResult('error');
 				}
 				socket_connect($clientSocket, $host, (int)$port);
 				socket_close($clientSocket);
-				return true;
+				return new TaskResult('ok');
 			}
 		);
 		$task->run();
 		sleep(1);
 		$this->assertEquals(true, $task->isSucceed());
-		$this->assertEquals(true, $task->getResult());
+		$this->assertEquals('ok', $task->getResult()->getMessage());
 
 		// Workaround to get response from server before the current unit test finishes
 		self::$onTearDown = function () use ($testFilepath) {

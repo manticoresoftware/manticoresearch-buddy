@@ -18,8 +18,8 @@ use Manticoresearch\Buddy\Exception\GenericError;
 use Manticoresearch\Buddy\Exception\InvalidRequestError;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Lib\QueryProcessor;
-use Manticoresearch\Buddy\Lib\Task;
-use Manticoresearch\Buddy\Lib\TaskPool;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskPool;
 use Psr\Http\Message\ServerRequestInterface;
 use React\EventLoop\Loop;
 use React\EventLoop\TimerInterface;
@@ -167,10 +167,11 @@ final class EventHandler {
 			static::handleTaskFinished($task, $timer, $id);
 
 			if ($task->isSucceed()) {
-				/** @var array<mixed> */
 				$result = $task->getResult();
 				if (!$task->isDeferred()) {
-					return $deferred->resolve([$request, Response::fromMessage($result, $request->format)]);
+					return $deferred->resolve(
+						[$request, Response::fromMessage($result->getMessage(), $request->format)]
+					);
 				}
 			}
 

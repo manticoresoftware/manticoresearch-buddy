@@ -214,7 +214,10 @@ final class MockManticoreServer {
 	 * @return void
 	 */
 	private function process(string $request): void {
-		//echo "\mnt request $request \n";
+		// Removing the query prefix if exists
+		if (str_starts_with($request, 'query=')) {
+			$request = substr($request, 6);
+		}
 		if (stripos($request, 'CREATE') === 0) {
 			$resp = $this->hasErrorResponse ? self::CREATE_RESPONSE_FAIL : self::CREATE_RESPONSE_OK;
 		} elseif (stripos($request, 'INSERT') === 0) {

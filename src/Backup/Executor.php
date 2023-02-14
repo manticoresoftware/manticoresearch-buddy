@@ -16,7 +16,8 @@ use Manticoresearch\Backup\Lib\ManticoreBackup;
 use Manticoresearch\Backup\Lib\ManticoreClient;
 use Manticoresearch\Backup\Lib\ManticoreConfig;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
-use Manticoresearch\Buddy\Lib\Task;
+use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Lib\Task\TaskResult;
 use parallel\Runtime;
 
 /**
@@ -46,7 +47,7 @@ class Executor implements CommandExecutorInterface {
 
 		$task = Task::$method(
 			$runtime,
-			static function (Request $request): array {
+			static function (Request $request): TaskResult {
 				$config = new ManticoreConfig($request->configPath);
 				$client = new ManticoreClient($config);
 				$storage = new FileStorage(
@@ -55,24 +56,26 @@ class Executor implements CommandExecutorInterface {
 				);
 				ManticoreBackup::run('store', [$client, $storage, $request->tables]);
 				// TODO: make standard response interface
-				return [[
-					'total' => 1,
-					'error' => '',
-					'warning' => '',
-					'columns' => [
-						[
-							'Path' => [
-								'type' => 'string',
+				return new TaskResult(
+					[[
+						'total' => 1,
+						'error' => '',
+						'warning' => '',
+						'columns' => [
+							[
+								'Path' => [
+									'type' => 'string',
+								],
+							],
+						],
+						'data' => [
+							[
+								'Path' => $storage->getBackupPaths()['root'],
 							],
 						],
 					],
-					'data' => [
-						[
-							'Path' => $storage->getBackupPaths()['root'],
-						],
-					],
-				],
-				];
+					]
+				);
 			},
 			[$this->request]
 		);
