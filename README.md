@@ -26,14 +26,10 @@ There is a `GenericError` class that implements the `setResponseError` and `getR
 
 ### Helper tool to start new command development
 
-We have a tool that helps to simplify the process of adding new command. For example,
+We offer a tool that simplifies the process of adding a new command. Using the tool, you can create a new command with a single command-line instruction like this:
 
 ```bash
 bin/create-command NameOfTheCommand
-```
-
-Will create all required structures for `NameOfTheCommand` command. Everything you need to do to check all files and update them with code. For more information about how things work, check the next section.
-
 ### Steps for creating a new command
 
 Let's now take a look at an example of creating the abstract RESTORE command:
