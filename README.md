@@ -30,19 +30,19 @@ We offer a tool that simplifies the process of adding a new command. Using the t
 
 ```bash
 bin/create-command NameOfTheCommand
+```
+
+Once you execute this command, all the necessary structures for the `NameOfTheCommand` command will be created automatically. All that's left for you to do is to review the files and add your code where necessary. For further information on how this tool works, please refer to the next section.
+
 ### Steps for creating a new command
 
-Let's now take a look at an example of creating the abstract RESTORE command:
+Let's take a closer look at an example of how to create an abstract RESTORE command:
 
-1. First, create a directory with our command namespace src/Restore and implement the `Request` and `Executor` classes.
-
-2. Next, write code that implements the `fromNetworkRequest` method in the `Request` class. This method should parse the input network request and return a new `Request` instance with all data loaded and ready to be used in the `Executor`.
-
-3. In the `Executor`, write code that implements the `run` method and contains all the logic for the command. This method should return an instance of the `Task` class.
-
-4. The `Task` instance can be used to check the status, get the result, and have complete control over the asynchronous execution of the command.
-
-5. Finally, add a case for our new command to the `extractCommandFromRequest` method of the `QueryProcessor` class. This will allow the `QueryProcessor` to recognize and handle requests for the RESTORE command.
+1. Start by creating a directory with our command namespace `src/Restore` and implementing the Request and Executor classes.
+2. Then, write code that implements the `fromNetworkRequest` method in the `Request` class. This method should parse the input network request and return a new Request instance with all the necessary data loaded and ready to be used in the `Executor`.
+3. In the `Executor`, write code that implements the run method and contains all the logic for the command. This method should return an instance of the `Task` class.
+4. With the `Task` instance, you can check the status, get the result, and have full control over the asynchronous execution of the command.
+5.Finally, add a case for our new command to the `extractCommandFromRequest` method of the `QueryProcessor` class. This ensures that the `QueryProcessor` can recognize and handle requests for the `RESTORE` command.
 
 ### Debug
 
@@ -66,7 +66,8 @@ To debug the command flow, you can use the `bin/query` script. To run it, pass t
   done
 ```
 
-This will execute the `BACKUP` command and print some results. The output will show the Manticore configuration, versions, and the status and result of the command.
+
+This will execute the `BACKUP` command and display the results. The output will present the Manticore configuration, versions, and the status and outcome of the command.
 
 ### Running from CLI
 
