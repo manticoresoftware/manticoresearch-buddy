@@ -117,7 +117,9 @@ final class Server {
 	 */
 	public function start(): static {
 		// This is must be first! Because its important
-		echo 'started ' . str_replace('tcp://', '', (string)$this->socket->getAddress()) . PHP_EOL;
+		echo 'Buddy v' . buddy_version()
+			. ' started ' . str_replace('tcp://', '', (string)$this->socket->getAddress())
+			. PHP_EOL;
 		usleep(200000); // <-- TODO: remove it when we will have fix on manticore side
 		// Process first functions to run on start
 		foreach ($this->onstart as $fn) {
