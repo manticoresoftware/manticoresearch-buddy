@@ -88,7 +88,8 @@ class ServerTest extends TestCase {
 			$this->fail();
 		}
 		$addr = trim($addr, 'tcp://');
-		$this->expectOutputString("started $addr\n");
+		$version = buddy_version();
+		$this->expectOutputString("Buddy v{$version} started {$addr}\n");
 		try {
 			self::$server->start();
 		} catch (Exception $e) {
