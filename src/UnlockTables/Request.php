@@ -11,11 +11,10 @@
 namespace Manticoresearch\Buddy\UnlockTables;
 
 use Manticoresearch\Buddy\Base\CommandRequestBase;
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 
 final class Request extends CommandRequestBase {
-	public ManticoreEndpoint $endpoint;
+	public string $endpoint;
 
 	/**
 	 * Initialize request with tables to lock
@@ -44,7 +43,7 @@ final class Request extends CommandRequestBase {
 		}
 
 		$self = new self($tables);
-		$self->endpoint = $request->endpoint;
+		$self->endpoint = $request->endpointBundle->value;
 		return $self;
 	}
 }

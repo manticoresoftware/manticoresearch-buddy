@@ -12,7 +12,6 @@
 namespace Manticoresearch\Buddy\ShowFullTables;
 
 use Manticoresearch\Buddy\Base\CommandRequestBase;
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 
@@ -31,7 +30,9 @@ final class Request extends CommandRequestBase {
 	 * 	It contains match pattern from LIKE statement if its presented
 	 */
 	public string $like = '';
-	public ManticoreEndpoint $endpoint;
+
+	public string $endpoint;
+	public bool $hasCliEndpoint;
 
 	/**
 	 * @param NetRequest $request
@@ -55,9 +56,7 @@ final class Request extends CommandRequestBase {
 		if ($m['like'] ?? '') {
 			$self->like = $m['like'];
 		}
-		// Buddy redirects all /cli requests to /sql
-		$self->endpoint = ($request->endpoint === ManticoreEndpoint::Cli)
-			? ManticoreEndpoint::Sql : $request->endpoint;
+		[$self->endpoint, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;
 	}
 }

@@ -47,7 +47,8 @@ class ExecutorTest extends TestCase {
 				'payload' => 'SHOW QUERIES',
 				'version' => 1,
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::CliJson,
+				'endpointBundle' => ManticoreEndpoint::CliJson,
+				'path' => '',
 			]
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);

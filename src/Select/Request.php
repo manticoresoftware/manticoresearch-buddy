@@ -11,7 +11,6 @@
 namespace Manticoresearch\Buddy\Select;
 
 use Manticoresearch\Buddy\Base\CommandRequestBase;
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 
@@ -22,7 +21,7 @@ final class Request extends CommandRequestBase {
 		'information_schema.triggers',
 	];
 
-	public ManticoreEndpoint $endpoint;
+	public string $endpoint;
 
 	/** @var string */
 	public string $table;
@@ -43,7 +42,7 @@ final class Request extends CommandRequestBase {
 	 */
 	public static function fromNetworkRequest(NetRequest $request): Request {
 		$self = new self();
-		$self->endpoint = $request->endpoint;
+		$self->endpoint = $request->endpointBundle->value;
 
 		// Match fields
 		preg_match(

@@ -32,25 +32,28 @@ class HTTPClient {
 	/** @var string $url */
 	protected string $url;
 
+	/** @var string $endpoint */
+	protected string $endpoint;
+
 	/** @var string $buddyVersion */
 	protected string $buddyVersion;
 
 	/**
 	 * @param ?Response $responseBuilder
 	 * @param ?string $url
-	 * @param ManticoreEndpoint $endpoint
+	 * @param ManticoreEndpoint $endpointBundle
 	 * @return void
 	 */
 	public function __construct(
 		protected ?Response $responseBuilder = null,
 		?string $url = null,
-		protected ManticoreEndpoint $endpoint = ManticoreEndpoint::CliJson
+		ManticoreEndpoint $endpointBundle = ManticoreEndpoint::CliJson
 	) {
 		// If no url passed, set default one
 		if (!$url) {
 			$url = static::DEFAULT_URL;
 		}
-
+		$this->endpoint = $endpointBundle->value;
 		$this->setServerUrl($url);
 		$this->buddyVersion = buddy_version();
 	}
@@ -81,14 +84,11 @@ class HTTPClient {
 
 	/**
 	 * @param string $request
-	 * @param ?ManticoreEndpoint $endpoint
+	 * @param ?string $endpoint
+	 * @param bool $disableAgentHeader
 	 * @return Response
 	 */
-	public function sendRequest(
-		string $request,
-		ManticoreEndpoint $endpoint = null,
-		bool $disableAgentHeader = false
-	): Response {
+	public function sendRequest(string $request, string $endpoint = null, bool $disableAgentHeader = false): Response {
 		$t = microtime(true);
 		if (!isset($this->responseBuilder)) {
 			throw new RuntimeException("'responseBuilder' property of ManticoreHTTPClient class is not instantiated");
@@ -97,8 +97,8 @@ class HTTPClient {
 			throw new ManticoreHTTPClientError('Empty request passed');
 		}
 		$endpoint ??= $this->endpoint;
-		$prefix = $endpoint->name === 'Sql' ? 'query=' : '';
-		$fullReqUrl = "{$this->url}/{$endpoint->value}";
+		$prefix = (str_starts_with($endpoint, 'sql') ? 'query=' : '');
+		$fullReqUrl = "{$this->url}/$endpoint";
 		$agentHeader = $disableAgentHeader ? '' : "User-Agent: Manticore Buddy/{$this->buddyVersion}\n";
 		$opts = [
 			'http' => [
@@ -113,6 +113,7 @@ class HTTPClient {
 		];
 		$context = stream_context_create($opts);
 		$result = file_get_contents($fullReqUrl, false, $context);
+
 		if ($result === false) {
 			throw new ManticoreHTTPClientError("Cannot connect to server at $fullReqUrl");
 		} else {
@@ -129,13 +130,12 @@ class HTTPClient {
 	}
 
 	/**
-	 * @param ManticoreEndpoint $endpoint
+	 * @param string $endpoint
 	 * @return void
 	 */
-	public function setEndpoint(ManticoreEndpoint $endpoint): void {
-		$this->endpoint = $endpoint;
+	public function setEndpoint(string $endpoint): void {
+		$this->endpoint = $endpoint ?: ManticoreEndpoint::CliJson->value;
 	}
-
 
 	// Bunch of methods to help us reduce copy pasting, maybe we will move it out to separate class
 	// but now it's totally fine to have 3-5 methods here for help

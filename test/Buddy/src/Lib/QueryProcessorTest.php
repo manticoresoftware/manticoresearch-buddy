@@ -36,7 +36,8 @@ class QueryProcessorTest extends TestCase {
 				'error' => '',
 				'payload' => 'BACKUP TO /tmp',
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::CliJson,
+				'endpointBundle' => ManticoreEndpoint::CliJson,
+				'path' => '',
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
@@ -53,7 +54,8 @@ class QueryProcessorTest extends TestCase {
 				'error' => '',
 				'payload' => 'SHOW QUERIES',
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::CliJson,
+				'endpointBundle' => ManticoreEndpoint::CliJson,
+				'path' => '',
 			]
 		);
 		$executor = QueryProcessor::process($request);
@@ -73,7 +75,8 @@ class QueryProcessorTest extends TestCase {
 				'error' => '',
 				'payload' => 'Some command',
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::CliJson,
+				'endpointBundle' => ManticoreEndpoint::CliJson,
+				'path' => '',
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
@@ -90,7 +93,8 @@ class QueryProcessorTest extends TestCase {
 				'error' => "table 'test' absent, or does not support INSERT",
 				'payload' => 'INSERT INTO test(col1) VALUES("test")',
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::CliJson,
+				'endpointBundle' => ManticoreEndpoint::CliJson,
+				'path' => 'cli_json',
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);

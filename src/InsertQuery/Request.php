@@ -12,8 +12,6 @@
 namespace Manticoresearch\Buddy\InsertQuery;
 
 use Manticoresearch\Buddy\Base\CommandRequestBase;
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 use Manticoresearch\Buddy\QueryParser\Loader;
 
@@ -21,8 +19,14 @@ final class Request extends CommandRequestBase {
 	/** @var array<string> */
 	public array $queries = [];
 
-	/** @var ManticoreEndpoint */
-	public ManticoreEndpoint $endpoint = ManticoreEndpoint::Cli;
+	/** @var string $endpoint */
+	public string $endpoint;
+
+	/**
+	 * @return void
+	 */
+	public function __construct() {
+	}
 
 	/**
 	 * @param NetRequest $request
@@ -30,15 +34,10 @@ final class Request extends CommandRequestBase {
 	 */
 	public static function fromNetworkRequest(NetRequest $request): self {
 		$self = new self();
-		// Resolve the possible ambiguity with Manticore query format as it may not correspond to request format
-		$queryFormat = match ($request->endpoint) {
-			ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson, ManticoreEndpoint::Sql => RequestFormat::SQL,
-			default => RequestFormat::JSON,
-		};
-		$parser = Loader::getInsertQueryParser($queryFormat);
+		$parser = Loader::getInsertQueryParser($request->path, $request->endpointBundle);
 		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->payload));
 		$self->queries[] = $request->payload;
-		$self->endpoint = $request->endpoint;
+		$self->endpoint = $request->path;
 		return $self;
 	}
 

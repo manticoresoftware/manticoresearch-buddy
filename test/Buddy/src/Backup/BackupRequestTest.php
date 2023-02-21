@@ -171,7 +171,8 @@ class BackupRequestTest extends TestCase {
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
-							'endpoint' => ManticoreEndpoint::Sql,
+							'endpointBundle' => ManticoreEndpoint::Sql,
+							'path' => '',
 						]
 					)
 				);
@@ -207,7 +208,8 @@ class BackupRequestTest extends TestCase {
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
-							'endpoint' => ManticoreEndpoint::Sql,
+							'endpointBundle' => ManticoreEndpoint::Sql,
+							'path' => '',
 						]
 					)
 				);
@@ -229,7 +231,14 @@ class BackupRequestTest extends TestCase {
    * ! each assigment to query should end with space
    *
    * @param array{path?:string,tables?:string[],options?:array{async?:bool,compress?:bool}} $args
-   * @return array{version:int,error:string,payload:string,format:RequestFormat,endpoint:ManticoreEndpoint}
+   * @return array{
+   *  version:int,
+   *  error:string,
+   *  payload:string,
+   *  format:RequestFormat,
+   *  endpointBundle:ManticoreEndpoint,
+   *  path:string
+   * }
    */
 	protected static function buildSQLQuery(array $args): array {
 		$query = 'BACKUP ';
@@ -256,7 +265,8 @@ class BackupRequestTest extends TestCase {
 			'error' => '',
 			'payload' => $query,
 			'format' => RequestFormat::SQL,
-			'endpoint' => ManticoreEndpoint::Sql,
+			'endpointBundle' => ManticoreEndpoint::Sql,
+			'path' => '',
 		];
 	}
 }

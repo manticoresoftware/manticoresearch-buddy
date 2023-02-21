@@ -14,7 +14,6 @@ namespace Manticoresearch\Buddy\Network;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
 use Manticoresearch\Buddy\Exception\InvalidRequestError;
-use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
 
 final class Request {
 	const PAYLOAD_FIELDS = [
@@ -29,8 +28,9 @@ final class Request {
 	public int $id;
 	public float $time;
 
-	public ManticoreEndpoint $endpoint;
+	public ManticoreEndpoint $endpointBundle;
 	public RequestFormat $format;
+	public string $path;
 	public string $error;
 	public string $payload;
 	public int $version;
@@ -51,7 +51,8 @@ final class Request {
 		$self = new static;
 		$self->id = $id;
 		$self->time = microtime(true);
-		$self->endpoint = ManticoreEndpoint::Sql;
+		$self->endpointBundle = ManticoreEndpoint::Sql;
+		$self->path = ManticoreEndpoint::Sql->value;
 		$self->format = RequestFormat::JSON;
 		$self->error = '';
 		$self->payload = '{}';
@@ -78,7 +79,14 @@ final class Request {
 	 * Helper to create request from prepare array data
 	 * It can be useful for tests
 	 *
-	 * @param array{error:string,payload:string,version:int,format:RequestFormat,endpoint:ManticoreEndpoint} $data
+	 * @param array{
+	 * 	error:string,
+	 * 	payload:string,
+	 * 	version:int,
+	 * 	format:RequestFormat,
+	 * 	endpointBundle:ManticoreEndpoint,
+	 *  path:string
+	 * } $data
 	 * @param int $id
 	 * @return static
 	 */
@@ -135,17 +143,23 @@ final class Request {
 		static::validateInputFields($payload, static::PAYLOAD_FIELDS);
 
 		// Checking if request format and endpoint are supported
-		[$path] = explode('?', ltrim($payload['message']['path_query'], '/'));
-		$endpoint = match ($path) {
-			'cli' => ManticoreEndpoint::Cli,
-			'cli_json' => ManticoreEndpoint::CliJson,
-			'sql?mode=raw', 'sql', '' => ManticoreEndpoint::Sql,
-			'insert', 'replace' => ManticoreEndpoint::Insert,
-			'bulk' => ManticoreEndpoint::Bulk,
-			default => throw new InvalidRequestError(
-				"Do not know how to handle '{$payload['message']['path_query']}' path_query"
-			),
-		};
+		$this->path = ltrim($payload['message']['path_query'], '/');
+		if (str_contains($this->path, '/_doc/') || str_contains($this->path, '/_create/')) {
+			// We don't differentiate elastic-like insert and replace queries here
+			// since this is irrelevant for Buddy processing logic
+			$endpointBundle = ManticoreEndpoint::Insert;
+		} else {
+			$endpointBundle = match ($this->path) {
+				'cli' => ManticoreEndpoint::Cli,
+				'cli_json' => ManticoreEndpoint::CliJson,
+				'sql?mode=raw', 'sql', '' => ManticoreEndpoint::Sql,
+				'insert', 'replace' => ManticoreEndpoint::Insert,
+				'bulk', '_bulk' => ManticoreEndpoint::Bulk,
+				default => throw new InvalidRequestError(
+					"Do not know how to handle '{$payload['message']['path_query']}' path_query"
+				),
+			};
+		}
 
 		$format = match ($payload['type']) {
 			'unknown json request' => RequestFormat::JSON,
@@ -154,8 +168,8 @@ final class Request {
 		};
 
 		$this->format = $format;
-		$this->endpoint = $endpoint;
-		$this->payload = static::removeComments($payload['message']['body']);
+		$this->endpointBundle = $endpointBundle;
+		$this->payload = $payload['message']['body'];
 		$this->error = $payload['error'];
 		$this->version = $payload['version'];
 		return $this;
@@ -192,24 +206,5 @@ final class Request {
 
 			static::validateInputFields($payload[$k], static::MESSAGE_FIELDS);
 		}
-	}
-
-	/**
-	 * Remove all types of comments from the query, because we do not use it for now
-	 * @param string $query
-	 * @return string
-	 * @throws SQLQueryParsingError
-	 */
-	protected static function removeComments(string $query): string {
-		$query = preg_replace(
-			'/(?<!\')(?<=\s)(--|#)[^\r\n\'\"]*(?=[\r\n]|$)|\/\*.*?\*\//ms',
-			'',
-			$query
-		);
-		if ($query === null) {
-			throw new SQLQueryParsingError('Error while removing comments from the query using regex');
-		}
-		/** @var string $query */
-		return trim($query);
 	}
 }

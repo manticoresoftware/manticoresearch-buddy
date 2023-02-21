@@ -30,17 +30,6 @@ abstract class FormattableClientQueryExecutor extends ClientQueryExecutor {
 
 	/**
 	 *
-	 * $return ?TableFormatter
-	 */
-	public function checkForTableFormatter(): ?TableFormatter {
-		return (property_exists($this, 'request') && property_exists($this->request, 'endpoint')
-			&& $this->request->endpoint === ManticoreEndpoint::Cli)
-			? $this->tableFormatter
-			: null;
-	}
-
-	/**
-	 *
 	 * @param TableFormatter $formatter
 	 * $return TableFormatter
 	 */

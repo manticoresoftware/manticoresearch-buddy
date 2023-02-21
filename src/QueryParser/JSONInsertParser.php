@@ -21,6 +21,11 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	use \Manticoresearch\Buddy\Trait\CheckInsertDataTrait;
 
 	/**
+	 * @var int $id
+	 */
+	protected ?int $id = null;
+
+	/**
 	 * @param string $query
 	 * @return array{name:string,cols:array<string>,colTypes:array<string>}
 	 */
@@ -34,8 +39,9 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	 * @param array{index:string,id:int,doc:array<mixed>}|array<
 	 * string, array{index:string,id:int,doc:array<mixed>}> $query
 	 * @return array<mixed>
+	 * @throws QueryParserError
 	 */
-	public function parseJSONRow(array $query): array {
+	protected function extractRow(array $query): array {
 		if ($this->isNdJSON) {
 			if (!array_key_exists('insert', $query)) {
 				throw new QueryParserError("Operation name 'insert' is missing");
@@ -58,10 +64,19 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 		if (!is_array($query['doc'])) {
 			throw new QueryParserError("Mandatory request field 'doc' must be an object");
 		}
+		return $query['doc'];
+	}
+
+	/**
+	 * @param array{index:string,id:int,doc:array<mixed>}|array<
+	 * string, array{index:string,id:int,doc:array<mixed>}> $query
+	 * @return array<mixed>
+	 */
+	public function parseJSONRow(array $query): array {
+		$row = $this->extractRow($query);
 		if (empty($this->cols)) {
-			$this->cols = array_keys($query['doc']);
+			$this->cols = array_keys($row);
 		}
-		$row = $query['doc'];
 		self::checkUnescapedChars($row, QueryParserError::class);
 		self::checkColTypesError(
 			[$this, 'detectValType'],

@@ -11,12 +11,11 @@
 namespace Manticoresearch\Buddy\ShowFields;
 
 use Manticoresearch\Buddy\Base\CommandRequestBase;
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 
 final class Request extends CommandRequestBase {
-	public ManticoreEndpoint $endpoint;
+	public string $endpoint;
 
 	public function __construct(public string $table) {
 	}
@@ -34,7 +33,7 @@ final class Request extends CommandRequestBase {
 		}
 
 		$self = new self($m['table']);
-		$self->endpoint = $request->endpoint;
+		$self->endpoint = $request->endpointBundle->value;
 		return $self;
 	}
 }
