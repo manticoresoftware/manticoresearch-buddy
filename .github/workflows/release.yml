@@ -27,9 +27,9 @@ jobs:
 
       - id: vars
         run: |
-          echo "::set-output name=app_version::$(<APP_VERSION)"
-          echo "::set-output name=rpm_suffix::_$( date +%y%m%d%H ).${GITHUB_SHA:0:7}"
-          echo "::set-output name=deb_suffix::-$( date +%y%m%d%H )-${GITHUB_SHA:0:7}"
+          echo "app_version=$(<APP_VERSION)" >> $GITHUB_OUTPUT
+          echo "rpm_suffix=_$( date +%y%m%d%H ).${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+          echo "deb_suffix=-$( date +%y%m%d%H )-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
 
       - name: Create artifact
         run: |
@@ -57,9 +57,9 @@ jobs:
           ./phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"
       - id: vars
         run: |
-          echo "::set-output name=app_version::$(<APP_VERSION)"
-          echo "::set-output name=rpm_suffix::_$( date +%y%m%d%H ).${GITHUB_SHA:0:7}"
-          echo "::set-output name=deb_suffix::-$( date +%y%m%d%H )-${GITHUB_SHA:0:7}"
+          echo "app_version=$(<APP_VERSION)" >> $GITHUB_OUTPUT
+          echo "rpm_suffix=_$( date +%y%m%d%H ).${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+          echo "deb_suffix=-$( date +%y%m%d%H )-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
       - name: Prepare packages structure
         run: |
           mkdir -p .debpkg/usr/share/manticore/modules
@@ -237,7 +237,7 @@ jobs:
           path: ./build
       - id: vars
         run: |
-          echo "::set-output name=asset_name::$(ls ./build/*.${{ matrix.ext }} | head -n 1)"
+          echo "asset_name=$(ls ./build/*.${{ matrix.ext }} | head -n 1)" >> $GITHUB_OUTPUT
 
       - name: Deploy package
         run: |
