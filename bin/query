@@ -35,7 +35,7 @@ try {
   \$task = QueryProcessor::process(\$request)->run(Task::createRuntime());
   \$status = \$task->wait(true);
   printf('Status code: %s' . PHP_EOL, \$status->name);
-  printf('Result: %s' . PHP_EOL, str_replace('    ', '  ', json_encode(\$task->getResult(), JSON_PRETTY_PRINT)));
+  printf('Result: %s' . PHP_EOL, \$task->getResult()->getMessage());
 } catch (Throwable \$e) {
   echo 'Error:' . PHP_EOL;
   echo ' ' . \$e::class . ': ' . \$e->getMessage() . PHP_EOL;
