@@ -156,15 +156,22 @@ class QueryProcessor {
 			default => false,
 		};
 		$isInsertError = str_contains($request->error, 'no such index')
-		|| preg_match('/table (.*?) absent/', $request->error);
-
+			|| preg_match('/table (.*?) absent/', $request->error);
+		
 		return match (true) {
+			$queryLowercase === '',
+				str_starts_with($queryLowercase, 'set'),
+				str_starts_with($queryLowercase, 'create database') => Command::EmptyQuery,
 			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => Command::Insert,
 			str_starts_with($queryLowercase, 'show queries') => Command::ShowQueries,
 			str_starts_with($queryLowercase, 'backup') => Command::Backup,
 			str_starts_with($queryLowercase, 'show full tables') => Command::ShowFullTables,
 			str_starts_with($queryLowercase, 'test') => Command::Test,
 			($request->endpointBundle === ManticoreEndpoint::Cli) => Command::CliTable,
+			str_starts_with($queryLowercase, 'lock tables') => Command::LockTables,
+			str_starts_with($queryLowercase, 'unlock tables') => Command::UnlockTables,
+			str_starts_with($queryLowercase, 'select') => Command::Select,
+			str_starts_with($queryLowercase, 'show fields') => Command::ShowFields,
 			default => throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload"),
 		};
 	}

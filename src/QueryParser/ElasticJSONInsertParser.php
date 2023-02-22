@@ -31,10 +31,9 @@ class ElasticJSONInsertParser extends JSONInsertParser {
 	 */
 	protected function parseQueryPath(string $path): array {
 		$pathParts = explode('/', $path);
-		debug('test ' . implode('-', $pathParts));
 		$tableName = $pathParts[0];
-		$rowId = $pathParts[2] ?: null;
-		return [$tableName, (int)$rowId];
+		$rowId = isset($pathParts[2]) ? (int)$pathParts[2] : null;
+		return [$tableName, $rowId];
 	}
 
 	/**

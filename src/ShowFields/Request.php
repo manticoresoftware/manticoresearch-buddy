@@ -33,7 +33,7 @@ final class Request extends CommandRequestBase {
 		}
 
 		$self = new self($m['table']);
-		$self->endpoint = $request->endpointBundle->value;
+		$self->endpoint = $request->path;
 		return $self;
 	}
 }

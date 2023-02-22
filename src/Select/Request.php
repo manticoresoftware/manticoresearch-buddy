@@ -42,7 +42,7 @@ final class Request extends CommandRequestBase {
 	 */
 	public static function fromNetworkRequest(NetRequest $request): Request {
 		$self = new self();
-		$self->endpoint = $request->endpointBundle->value;
+		$self->endpoint = $request->path;
 
 		// Match fields
 		preg_match(

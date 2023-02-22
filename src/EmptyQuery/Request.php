@@ -27,7 +27,7 @@ final class Request extends CommandRequestBase {
 	public static function fromNetworkRequest(NetRequest $request): Request {
 		$self = new self();
 		// We just need to do something, but actually its' just for PHPstan
-		$self->endpoint = $request->endpointBundle->value;
+		$self->endpoint = $request->path;
 		return $self;
 	}
 }

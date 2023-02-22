@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base;
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Lib\TableFormatter;
 
 /**
