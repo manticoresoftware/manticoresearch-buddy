@@ -20,46 +20,46 @@ class MysqlDumpTest extends TestCase {
 			'file' => 'all-databases-no-data.sql',
 			'code' => 0,
 		],
-// 		[
-// 			'query' => '--no-data Manticore a b',
-// 			'file' => 'no-data-only-a-b.sql',
-// 			'code' => 0,
-// 		],
-// 		[
-// 			'query' => '--no-data Manticore c',
-// 			'file' => 'no-data-only-c.sql',
-// 			'code' => 0,
-// 		],
-// 		[
-// 			'query' => '--no-data Manticore nosuchtable',
-// 			'file' => 'no-data-only-nosuchtable.sql',
-// 			'code' => 6,
-// 		],
-// 		[
-// 			'query' => '--all-databases',
-// 			'file' => 'all-databases.sql',
-// 			'code' => 0,
-// 		],
-// 		[
-// 			'query' => '--all-databases --quick',
-// 			'file' => 'all-databases-quick.sql',
-// 			'code' => 0,
-// 		],
-// 		[
-// 			'query' => 'Manticore a b',
-// 			'file' => 'only-a-b.sql',
-// 			'code' => 0,
-// 		],
-// 		[
-// 			'query' => 'Manticore c',
-// 			'file' => 'only-c.sql',
-// 			'code' => 0,
-// 		],
-// 		[
-// 			'query' => 'Manticore nosuchtable',
-// 			'file' => 'only-nosuchtable.sql',
-// 			'code' => 6,
-// 		],
+		[
+			'query' => '--no-data Manticore a b',
+			'file' => 'no-data-only-a-b.sql',
+			'code' => 0,
+		],
+		[
+			'query' => '--no-data Manticore c',
+			'file' => 'no-data-only-c.sql',
+			'code' => 0,
+		],
+		[
+			'query' => '--no-data Manticore nosuchtable',
+			'file' => 'no-data-only-nosuchtable.sql',
+			'code' => 6,
+		],
+		[
+			'query' => '--all-databases',
+			'file' => 'all-databases.sql',
+			'code' => 0,
+		],
+		[
+			'query' => '--all-databases --quick',
+			'file' => 'all-databases-quick.sql',
+			'code' => 0,
+		],
+		[
+			'query' => 'Manticore a b',
+			'file' => 'only-a-b.sql',
+			'code' => 0,
+		],
+		[
+			'query' => 'Manticore c',
+			'file' => 'only-c.sql',
+			'code' => 0,
+		],
+		[
+			'query' => 'Manticore nosuchtable',
+			'file' => 'only-nosuchtable.sql',
+			'code' => 6,
+		],
 	];
 
 	use TestFunctionalTrait;

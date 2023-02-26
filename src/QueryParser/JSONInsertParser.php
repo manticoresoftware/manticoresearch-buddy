@@ -74,6 +74,9 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	 */
 	public function parseJSONRow(array $query): array {
 		$row = $this->extractRow($query);
+		if (empty($row)) {
+			return $row;
+		}
 		if (empty($this->cols)) {
 			$this->cols = array_keys($row);
 		}

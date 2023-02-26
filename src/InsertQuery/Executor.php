@@ -59,6 +59,9 @@ class Executor extends ClientQueryExecutor {
 				// has the same format as the initial request, otherwise we just use 'sql' default endpoint
 				if ($i === $maxI) {
 					$manticoreClient->setEndpoint($request->endpoint);
+					if ($request->endpointHeader) {
+						$manticoreClient->setHeader($request->endpointHeader);
+					}
 				}
 
 				$resp = $manticoreClient->sendRequest($query);

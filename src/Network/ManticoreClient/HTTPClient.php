@@ -19,7 +19,7 @@ use RuntimeException;
 
 class HTTPClient {
 
-	const CONTENT_TYPE_HEADER = 'Content-Type: text/plain';
+	const CONTENT_TYPE_HEADER = "Content-Type: application/x-www-form-urlencoded\n";
 	const URL_PREFIX = 'http://';
 	const HTTP_REQUEST_TIMEOUT = 1;
 	const DEFAULT_URL = 'http://127.0.0.1:9308';
@@ -34,6 +34,9 @@ class HTTPClient {
 
 	/** @var string $endpoint */
 	protected string $endpoint;
+
+	/** @var string $header */
+	protected string $header;
 
 	/** @var string $buddyVersion */
 	protected string $buddyVersion;
@@ -56,6 +59,7 @@ class HTTPClient {
 		$this->endpoint = $endpointBundle->value;
 		$this->setServerUrl($url);
 		$this->buddyVersion = buddy_version();
+		$this->header = static::CONTENT_TYPE_HEADER;
 	}
 
 	/**
@@ -103,7 +107,7 @@ class HTTPClient {
 		$opts = [
 			'http' => [
 				'method'  => 'POST',
-				'header'  => "Content-Type: application/x-www-form-urlencoded\n"
+				'header'  => $this->header
 					. $agentHeader
 					. "Connection: close\n",
 				'content' => $prefix . $request,
@@ -135,6 +139,14 @@ class HTTPClient {
 	 */
 	public function setEndpoint(string $endpoint): void {
 		$this->endpoint = $endpoint ?: ManticoreEndpoint::CliJson->value;
+	}
+
+	/**
+	 * @param string $header
+	 * @return void
+	 */
+	public function setHeader(string $header): void {
+		$this->header = $header ?: static::CONTENT_TYPE_HEADER;
 	}
 
 	// Bunch of methods to help us reduce copy pasting, maybe we will move it out to separate class

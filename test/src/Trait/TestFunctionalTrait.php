@@ -303,16 +303,24 @@ trait TestFunctionalTrait {
 		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.data';
 		file_put_contents($payloadFile, $query);
 		$redirect = $redirectOutput ? '2>&1' : '';
+		$header = ($endpoint === 'bulk' || $endpoint === '_bulk')
+			? 'Content-type: application/x-ndjson' : 'Content-type: application/json';
 		exec(
-			"curl -s 127.0.0.1:$port/$endpoint -H 'Content-type: application/json' -d @$payloadFile $redirect",
+			"curl -s 127.0.0.1:$port/$endpoint -H '$header' --data-binary @$payloadFile $redirect",
 			$output
 		);
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
-		$result = ($endpoint === 'cli_json')
-			? (array)json_decode($output[0] ?? '{}', true)
-			: [
+		$result = match ($endpoint) {
+			'cli_json' => (array)json_decode($output[0] ?? '{}', true),
+			'cli' => [
 				['columns' => implode(PHP_EOL, $output), 'data' => [], 'error' => ''],
-			];
+			],
+			// assuming Elastic-like endpoint is passed
+			default => [
+				['data' => [(array)json_decode($output[0] ?? '{}', true)], 'error' => ''],
+			],
+		};
+
 		return $result;
 	}
 

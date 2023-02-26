@@ -157,7 +157,7 @@ class QueryProcessor {
 		};
 		$isInsertError = str_contains($request->error, 'no such index')
 			|| preg_match('/table (.*?) absent/', $request->error);
-		
+
 		return match (true) {
 			$queryLowercase === '',
 				str_starts_with($queryLowercase, 'set'),

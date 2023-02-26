@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\QueryParser;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\ParserLoadError;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 
 class Loader {
@@ -30,14 +29,13 @@ class Loader {
 		// Resolve the possible ambiguity with Manticore query format as it may not correspond to request format
 		$reqFormat = match ($reqEndpointBundle) {
 			ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson, ManticoreEndpoint::Sql => RequestFormat::SQL,
-			default => RequestFormat::JSON,
+			ManticoreEndpoint::Insert, ManticoreEndpoint::Bulk => RequestFormat::JSON,
 		};
 		$parserClass = match ($reqFormat) {
 			RequestFormat::SQL => 'SQLInsertParser',
 			RequestFormat::JSON => ($reqEndpointBundle->value === $reqPath)
 				? 'JSONInsertParser'
 				: 'ElasticJSONInsertParser',
-			default => throw new ParserLoadError("Unrecognized request format '{$reqFormat->value}' passed"),
 		};
 		$parserClassFull = __NAMESPACE__ . '\\' . $parserClass;
 		$parser = ($parserClassFull === __NAMESPACE__ . '\ElasticJSONInsertParser')

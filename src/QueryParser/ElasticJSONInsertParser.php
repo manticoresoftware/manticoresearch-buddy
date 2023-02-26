@@ -18,22 +18,38 @@ class ElasticJSONInsertParser extends JSONInsertParser {
 	use \Manticoresearch\Buddy\Trait\CheckInsertDataTrait;
 
 	/**
+	 * @var bool $isBulkQuery
+	 */
+	private $isBulkQuery = false;
+
+	/**
+	 * @var bool $isIndexInfoRow
+	 */
+	private $isIndexInfoRow = false;
+
+	/**
 	* @param string $path
 	* @return void
 	*/
 	public function __construct(string $path) {
-		[$this->name, $this->id] = $this->parseQueryPath($path);
+		[$this->name, $this->id, $this->isBulkQuery] = $this->parseQueryPath($path);
 	}
 
 	/**
 	 * @param string $path
-	 * @return array{0:string,1:?int}
+	 * @return array{0:string,1:?int, 2:bool}
 	 */
 	protected function parseQueryPath(string $path): array {
 		$pathParts = explode('/', $path);
-		$tableName = $pathParts[0];
+		if ($pathParts[0] === '_bulk') {
+			$isBulkRequest = true;
+			$tableName = '';
+		} else {
+			$isBulkRequest = false;
+			$tableName = $pathParts[0];
+		}
 		$rowId = isset($pathParts[2]) ? (int)$pathParts[2] : null;
-		return [$tableName, $rowId];
+		return [$tableName, $rowId, $isBulkRequest];
 	}
 
 	/**
@@ -49,10 +65,18 @@ class ElasticJSONInsertParser extends JSONInsertParser {
 		if (empty($query)) {
 			throw new QueryParserError('Request cannot be an empty object');
 		}
-		if ($this->id !== null) {
-			$query['id'] = $this->id;
+		// When using the elastic-like format for bulk requests, table name is passed as the part of 'index' row info
+		$this->isIndexInfoRow = $this->isBulkQuery ? !$this->isIndexInfoRow : false;
+		if ($this->isIndexInfoRow && isset($query['index']['_index'])
+			&& is_string($query['index']['_index'])) {
+			$this->name = $query['index']['_index'];
 		}
-		return $query;
+		// When using the elastic-like format, the 'id' field is optional so we omit it
+		if (!$this->isIndexInfoRow && isset($query['id'])) {
+			unset($query['id']);
+		}
+
+		return $this->isIndexInfoRow ? [] : $query;
 	}
 
 }

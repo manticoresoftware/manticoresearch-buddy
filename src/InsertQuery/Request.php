@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\InsertQuery;
 
 use Manticoresearch\Buddy\Base\CommandRequestBase;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 use Manticoresearch\Buddy\QueryParser\Loader;
 
@@ -21,6 +22,9 @@ final class Request extends CommandRequestBase {
 
 	/** @var string $endpoint */
 	public string $endpoint;
+
+	/** @var string $header */
+	public string $endpointHeader = '';
 
 	/**
 	 * @return void
@@ -35,9 +39,15 @@ final class Request extends CommandRequestBase {
 	public static function fromNetworkRequest(NetRequest $request): self {
 		$self = new self();
 		$parser = Loader::getInsertQueryParser($request->path, $request->endpointBundle);
+		$self->endpoint = $request->path;
+		if ($request->endpointBundle === ManticoreEndpoint::Bulk) {
+			$self->endpointHeader = "Content-Type: application/x-ndjson\n";
+			if ((!str_ends_with($request->payload, "\n"))) {
+				$request->payload .= "\n";
+			}
+		}
 		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->payload));
 		$self->queries[] = $request->payload;
-		$self->endpoint = $request->path;
 		return $self;
 	}
 
