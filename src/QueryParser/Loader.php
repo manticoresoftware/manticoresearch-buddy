@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\QueryParser;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Exception\ParserLoadError;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 
 class Loader {
@@ -30,6 +31,7 @@ class Loader {
 		$reqFormat = match ($reqEndpointBundle) {
 			ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson, ManticoreEndpoint::Sql => RequestFormat::SQL,
 			ManticoreEndpoint::Insert, ManticoreEndpoint::Bulk => RequestFormat::JSON,
+			default => throw new ParserLoadError("Unsupported endpoint bundle '{$reqEndpointBundle->value}' passed"),
 		};
 		$parserClass = match ($reqFormat) {
 			RequestFormat::SQL => 'SQLInsertParser',

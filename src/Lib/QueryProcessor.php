@@ -159,6 +159,7 @@ class QueryProcessor {
 			|| preg_match('/table (.*?) absent/', $request->error);
 
 		return match (true) {
+			($request->endpointBundle === ManticoreEndpoint::Elastic) => Command::EmulateElastic,
 			$queryLowercase === '',
 				str_starts_with($queryLowercase, 'set'),
 				str_starts_with($queryLowercase, 'create database') => Command::EmptyQuery,

@@ -157,6 +157,7 @@ final class Request {
 				'sql?mode=raw', 'sql', '' => ManticoreEndpoint::Sql,
 				'insert', 'replace' => ManticoreEndpoint::Insert,
 				'bulk', '_bulk' => ManticoreEndpoint::Bulk,
+				'_license' => ManticoreEndpoint::Elastic,
 				default => throw new InvalidRequestError(
 					"Do not know how to handle '{$payload['message']['path_query']}' path_query"
 				),
