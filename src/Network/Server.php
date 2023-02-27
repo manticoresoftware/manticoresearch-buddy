@@ -42,6 +42,9 @@ final class Server {
 		'client' => [],
 	];
 
+	/** @var array<callable> */
+	protected array $onstart = [];
+
 	/** @var string $ip */
 	protected string $ip;
 
@@ -98,6 +101,16 @@ final class Server {
 	}
 
 	/**
+	 * Add function to be called and processed on server start
+	 * @param callable $fn
+	 * @return static
+	 */
+	public function onStart(callable $fn): static {
+		$this->onstart[] = $fn;
+		return $this;
+	}
+
+	/**
 	 * Finally start the server and accept connections
 	 *
 	 * @return static
@@ -106,7 +119,11 @@ final class Server {
 		// This is must be first! Because its important
 		echo 'started ' . str_replace('tcp://', '', (string)$this->socket->getAddress()) . PHP_EOL;
 		usleep(200000); // <-- TODO: remove it when we will have fix on manticore side
-		buddy_metric('invocation', 1);
+		// Process first functions to run on start
+		foreach ($this->onstart as $fn) {
+			$fn();
+		}
+
 		// First add all ticks to run periodically
 		foreach ($this->ticks['server'] as [$fn, $period]) {
 			Loop::addPeriodicTimer($period, $this->wrapFn($fn));

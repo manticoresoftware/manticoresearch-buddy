@@ -10,7 +10,9 @@
 */
 
 use Manticoresearch\Buddy\Lib\CliArgsProcessor;
+use Manticoresearch\Buddy\Lib\CrashDetector;
 use Manticoresearch\Buddy\Lib\MetricThread;
+use Manticoresearch\Buddy\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Lib\Task\TaskPool;
 use Manticoresearch\Buddy\Network\EventHandler;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
@@ -35,6 +37,20 @@ $manticoreClient->setServerUrl($opts['listen']);
 EventHandler::init();
 
 $server = Server::create()
+	->onStart(QueryProcessor::init(...))
+	->onStart(
+		function () {
+			buddy_metric('invocation', 1);
+
+			$settings = QueryProcessor::getSettings();
+			$crashDetector = new CrashDetector($settings);
+			if (!$crashDetector->hadCrash()) {
+				return;
+			}
+
+			buddy_metric('crash', 1);
+		}
+	)
 	->addHandler('request', EventHandler::request(...))
 	->addHandler('error', EventHandler::error(...))
 	->addTicker(
