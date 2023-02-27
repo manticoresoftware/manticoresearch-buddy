@@ -15,12 +15,16 @@ use Exception;
 use Manticoresearch\Buddy\Enum\Command;
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Exception\CommandNotAllowed;
+use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
 use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Network\Request;
+use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
+use Psr\Container\NotFoundExceptionInterface;
+use RuntimeException;
 
 class QueryProcessor {
 	/** @var string */
@@ -80,11 +84,24 @@ class QueryProcessor {
 	}
 
 	/**
-	 * Load show settings response and setup things on first request
-	 *
+	 * We should invoke this function before we do anything else with the request.
+	 * TODO: think about moving this code into init stage of Settings class itself
 	 * @return void
 	 */
-	protected static function init(): void {
+	public static function init(): void {
+		static::$settings = static::fetchManticoreSettings();
+	}
+
+	/**
+	 * Extractd logic to fetch manticore settings and store it in class property
+	 * @return ManticoreSettings
+	 * @throws Exception
+	 * @throws NotFoundExceptionInterface
+	 * @throws ContainerExceptionInterface
+	 * @throws RuntimeException
+	 * @throws ManticoreHTTPClientError
+	 */
+	protected static function fetchManticoreSettings(): ManticoreSettings {
 		/** @var HTTPClient */
 		$manticoreClient = static::getObjFromContainer('manticoreClient');
 		$resp = $manticoreClient->sendRequest('SHOW SETTINGS');
@@ -100,7 +117,15 @@ class QueryProcessor {
 			debug("using config file = '$value'");
 			putenv("SEARCHD_CONFIG={$value}");
 		}
-		static::$settings = ManticoreSettings::fromArray($settings);
+		return ManticoreSettings::fromArray($settings);
+	}
+
+	/**
+	 * Return inited settings just for readonly purpose in the external world
+	 * @return ManticoreSettings
+	 */
+	public static function getSettings(): ManticoreSettings {
+		return static::$settings;
 	}
 
 	/**
