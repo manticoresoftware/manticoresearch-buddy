@@ -12,7 +12,6 @@
 namespace Manticoresearch\Buddy\QueryParser;
 
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\ParserLoadError;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 
 class Loader {
@@ -25,7 +24,7 @@ class Loader {
 		$parserClass = match ($reqFormat) {
 			RequestFormat::SQL => 'SQLInsertParser',
 			RequestFormat::JSON => 'JSONInsertParser',
-			default => throw new ParserLoadError("Unrecognized request format '{$reqFormat->value}' passed"),
+			// default => throw new ParserLoadError("Unrecognized request format '{$reqFormat->value}' passed"),
 		};
 		$parserClass = __NAMESPACE__ . '\\' . $parserClass;
 		$parser = new $parserClass();
