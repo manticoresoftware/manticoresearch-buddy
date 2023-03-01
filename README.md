@@ -102,7 +102,7 @@ If you want to contribute to the project and develop extra features, we have pre
 Just go to your "buddy" folder on a host machine and run the following instructions.
 
 ```bash
-docker run --privileged --entrypoint bash -v $(pwd):/workdir --name manticore-buddy  -it manticoresearch/manticore-executor-kit:0.6.4
+docker run --privileged --entrypoint bash -v $(pwd):/workdir --name manticore-buddy  -it manticoresearch/manticore-executor-kit:0.6.6
 ```
 
 After that, you can go into the container and work as normal. It has pre-installed Manticoresearchd with the columnar library, production, and development version of executor.
@@ -115,7 +115,7 @@ Ensure you are in the directory where the Buddy repository is cloned. And follow
 
 ```bash
  git clone https://github.com/manticoresoftware/phar_builder.git
-docker run -rm --entrypoint bash -v $(pwd):/workdir --workdir /workdir --entrypoint bash -it manticoresearch/manticore-executor-kit:0.6.4 -c './phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"'
+docker run -rm --entrypoint bash -v $(pwd):/workdir --workdir /workdir --entrypoint bash -it manticoresearch/manticore-executor-kit:0.6.6 -c './phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"'
 ```
 
 Check the build directory and get the built version of Buddy from there and replace it in your another OS in the "modules" directory.

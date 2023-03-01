@@ -30,7 +30,7 @@
 		"react/http": "^1.8",
 		"react/socket": "^1.12",
 		"manticoresoftware/manticoresearch-backup": "^0.5.11",
-		"manticoresoftware/telemetry": "^0.1.6",
+		"manticoresoftware/telemetry": "^0.1.7",
 		"symfony/dependency-injection": "^6.1"
 	},
 	"require-dev": {

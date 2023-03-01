@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\QueryParser;
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\ParserLoadError;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
 
 class Loader {
