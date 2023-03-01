@@ -83,8 +83,6 @@ class QueryProcessor {
 		return $executor;
 	}
 
-	protected static function init(): void {
-	  /** @var HTTPClient */
 	/**
 	 * We should invoke this function before we do anything else with the request.
 	 * TODO: think about moving this code into init stage of Settings class itself
