@@ -41,14 +41,12 @@ class ElasticJSONInsertParser extends JSONInsertParser {
 	 */
 	protected function parseQueryPath(string $path): array {
 		$pathParts = explode('/', $path);
-		if ($pathParts[0] === '_bulk') {
-			$isBulkRequest = true;
-			$tableName = '';
-		} else {
-			$isBulkRequest = false;
-			$tableName = $pathParts[0];
-		}
+		[$isBulkRequest, $tableName] = match ($pathParts[0]) {
+			'_bulk' => [true, ''],
+			default => [false, $pathParts[0]],
+		};
 		$rowId = isset($pathParts[2]) ? (int)$pathParts[2] : null;
+
 		return [$tableName, $rowId, $isBulkRequest];
 	}
 

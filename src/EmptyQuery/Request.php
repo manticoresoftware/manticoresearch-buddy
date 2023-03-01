@@ -18,7 +18,7 @@ use Manticoresearch\Buddy\Network\Request as NetRequest;
  * which can be as a result of only comments in it that we strip
  */
 final class Request extends CommandRequestBase {
-	public string $endpoint;
+	public string $path;
 
   /**
 	 * @param NetRequest $request
@@ -27,7 +27,7 @@ final class Request extends CommandRequestBase {
 	public static function fromNetworkRequest(NetRequest $request): Request {
 		$self = new self();
 		// We just need to do something, but actually its' just for PHPstan
-		$self->endpoint = $request->path;
+		$self->path = $request->path;
 		return $self;
 	}
 }

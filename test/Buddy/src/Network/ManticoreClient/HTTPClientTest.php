@@ -43,7 +43,7 @@ class HTTPClientTest extends TestCase {
 		);
 		$this->assertEquals(
 			ManticoreEndpoint::CliJson->value,
-			$this->refCls->getProperty('endpoint')->getValue($this->client)
+			$this->refCls->getProperty('path')->getValue($this->client)
 		);
 
 		$client = new HTTPClient(new Response(), 'localhost:1000', ManticoreEndpoint::Insert);

@@ -141,7 +141,10 @@ class QueryProcessor {
    */
 	public static function extractCommandFromRequest(Request $request): Command {
 		$queryLowercase = strtolower($request->payload);
-		$queryNoSpaces = str_replace(' ', '', $queryLowercase);
+		// Making a bit of extra preprocessing to simplify following detection of the bulk insert query
+		if ($request->endpointBundle === ManticoreEndpoint::Bulk) {
+			$queryLowercase = ltrim(substr($queryLowercase, 1));
+		}
 
 		$isInsertSQLQuery = match ($request->endpointBundle) {
 			ManticoreEndpoint::Sql, ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson => str_starts_with(
@@ -151,12 +154,12 @@ class QueryProcessor {
 		};
 		$isInsertHTTPQuery = match ($request->endpointBundle) {
 			ManticoreEndpoint::Insert => true,
-			ManticoreEndpoint::Bulk => str_starts_with($queryNoSpaces, '{"insert"')
-			|| str_starts_with($queryNoSpaces, '{"index"'),
+			ManticoreEndpoint::Bulk => str_starts_with($queryLowercase, '"insert"')
+			|| str_starts_with($queryLowercase, '"index"'),
 			default => false,
 		};
 		$isInsertError = str_contains($request->error, 'no such index')
-			|| preg_match('/table (.*?) absent/', $request->error);
+		|| (str_contains($request->error, 'table ') && str_contains($request->error, ' absent'));
 
 		return match (true) {
 			($request->endpointBundle === ManticoreEndpoint::Elastic) => Command::EmulateElastic,

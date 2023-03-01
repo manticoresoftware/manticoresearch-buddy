@@ -37,7 +37,7 @@ final class Executor implements CommandExecutorInterface {
 	 * @throws RuntimeException
 	 */
 	public function run(Runtime $runtime): Task {
-		$this->manticoreClient->setEndpoint($this->request->endpoint);
+		$this->manticoreClient->setPath($this->request->path);
 
 		$taskFn = static function (Request $request, HTTPClient $manticoreClient): TaskResult {
 			$tables = $manticoreClient->validateTables(

@@ -31,7 +31,7 @@ final class Request extends CommandRequestBase {
 	 */
 	public string $like = '';
 
-	public string $endpoint;
+	public string $path;
 	public bool $hasCliEndpoint;
 
 	/**
@@ -56,7 +56,7 @@ final class Request extends CommandRequestBase {
 		if ($m['like'] ?? '') {
 			$self->like = $m['like'];
 		}
-		[$self->endpoint, $self->hasCliEndpoint] = self::getEndpointInfo($request);
+		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;
 	}
 }

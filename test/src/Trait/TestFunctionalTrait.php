@@ -289,28 +289,28 @@ trait TestFunctionalTrait {
 	 *
 	 * @param string $query
 	 * @param bool $redirectOutput
-	 * @param string $endpoint
+	 * @param string $path
 	 * @return array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}>
 	 * @throws Exception
 	 */
 	protected static function runHttpQuery(
 		string $query,
 		bool $redirectOutput = true,
-		string $endpoint = 'cli_json'
+		string $path = 'cli_json'
 	): array {
 		$port = static::getListenHttpPort();
 		// We use temporarely file just to skip issues with escaping post data in command line arg
 		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.data';
 		file_put_contents($payloadFile, $query);
 		$redirect = $redirectOutput ? '2>&1' : '';
-		$header = ($endpoint === 'bulk' || $endpoint === '_bulk')
+		$header = ($path === 'bulk' || $path === '_bulk')
 			? 'Content-type: application/x-ndjson' : 'Content-type: application/json';
 		exec(
-			"curl -s 127.0.0.1:$port/$endpoint -H '$header' --data-binary @$payloadFile $redirect",
+			"curl -s 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect",
 			$output
 		);
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
-		$result = match ($endpoint) {
+		$result = match ($path) {
 			'cli_json' => (array)json_decode($output[0] ?? '{}', true),
 			'cli' => [
 				['columns' => implode(PHP_EOL, $output), 'data' => [], 'error' => ''],

@@ -145,10 +145,10 @@ final class Request {
 
 		// Checking if request format and endpoint are supported
 		[$this->path] = explode('?', ltrim($payload['message']['path_query'], '/'));
-		if (preg_match('/\/\_doc(\/|$)/', $this->path)
-			|| preg_match('/\/\_create(\/|$)/', $this->path)) {
+		if (str_contains($this->path, '/_doc/') || str_contains($this->path, '/_create/')
+			|| str_ends_with($this->path, '/_doc') || str_ends_with($this->path, '/_create')) {
 			// We don't differentiate elastic-like insert and replace queries here
-			// since this is irrelevant for Buddy processing logic
+			// since this is irrelevant for the following Buddy processing logic
 			$endpointBundle = ManticoreEndpoint::Insert;
 		} else {
 			$endpointBundle = match ($this->path) {

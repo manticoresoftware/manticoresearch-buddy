@@ -20,7 +20,7 @@ use Manticoresearch\Buddy\Network\Request as NetRequest;
  */
 final class Request extends CommandRequestBase {
 	public string $query;
-	public string $endpoint;
+	public string $path;
 	public bool $hasCliEndpoint;
 
 	/**
@@ -33,7 +33,7 @@ final class Request extends CommandRequestBase {
 		}
 		$self = new self();
 		$self->query = 'SELECT * FROM @@system.sessions';
-		[$self->endpoint, $self->hasCliEndpoint] = self::getEndpointInfo($request);
+		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;
 	}
 }

@@ -104,7 +104,7 @@ final class Server {
 	 */
 	public function start(): static {
 		// This is must be first! Because its important
-		echo 'started ' . str_replace('tcp://', '', (string)$this->socket->getAddress()) . PHP_EOL;
+		echo 'Buddy ver, started ' . str_replace('tcp://', '', (string)$this->socket->getAddress()) . PHP_EOL;
 		usleep(200000); // <-- TODO: remove it when we will have fix on manticore side
 		buddy_metric('invocation', 1);
 		// First add all ticks to run periodically

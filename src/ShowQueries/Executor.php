@@ -47,7 +47,7 @@ class Executor extends FormattableClientQueryExecutor {
 	 * @throws RuntimeException
 	 */
 	public function run(Runtime $runtime): Task {
-		$this->manticoreClient->setEndpoint($this->request->endpoint);
+		$this->manticoreClient->setPath($this->request->path);
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done

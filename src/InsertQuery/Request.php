@@ -20,11 +20,11 @@ final class Request extends CommandRequestBase {
 	/** @var array<string> */
 	public array $queries = [];
 
-	/** @var string $endpoint */
-	public string $endpoint;
+	/** @var string $path */
+	public string $path;
 
-	/** @var string $header */
-	public string $endpointHeader = '';
+	/** @var string $contentType */
+	public string $contentType = '';
 
 	/**
 	 * @return void
@@ -39,9 +39,9 @@ final class Request extends CommandRequestBase {
 	public static function fromNetworkRequest(NetRequest $request): self {
 		$self = new self();
 		$parser = Loader::getInsertQueryParser($request->path, $request->endpointBundle);
-		$self->endpoint = $request->path;
+		$self->path = $request->path;
 		if ($request->endpointBundle === ManticoreEndpoint::Bulk) {
-			$self->endpointHeader = "Content-Type: application/x-ndjson\n";
+			$self->contentType = 'application/x-ndjson';
 			if ((!str_ends_with($request->payload, "\n"))) {
 				$request->payload .= "\n";
 			}

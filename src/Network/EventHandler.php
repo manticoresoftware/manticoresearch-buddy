@@ -204,7 +204,9 @@ final class EventHandler {
 			function (callable $resolve, callable $reject) use ($serverRequest) {
 				static $headers = ['Content-Type' => 'application/json'];
 
+				#debug("test1\n" . implode("\n", $serverRequest->getHeaders()));
 				$data = (string)$serverRequest->getBody();
+				#debug("test2\n" . $data);
 				$promise = static::data($serverRequest, $data);
 				// Allow only post and otherwise send bad request
 				if ($serverRequest->getMethod() !== 'POST') {

@@ -21,7 +21,7 @@ final class Request extends CommandRequestBase {
 		'information_schema.triggers',
 	];
 
-	public string $endpoint;
+	public string $path;
 
 	/** @var string */
 	public string $table;
@@ -42,7 +42,7 @@ final class Request extends CommandRequestBase {
 	 */
 	public static function fromNetworkRequest(NetRequest $request): Request {
 		$self = new self();
-		$self->endpoint = $request->path;
+		$self->path = $request->path;
 
 		// Match fields
 		preg_match(

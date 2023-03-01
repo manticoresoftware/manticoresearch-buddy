@@ -32,8 +32,8 @@ class HTTPClient {
 	/** @var string $url */
 	protected string $url;
 
-	/** @var string $endpoint */
-	protected string $endpoint;
+	/** @var string $path */
+	protected string $path;
 
 	/** @var string $header */
 	protected string $header;
@@ -56,7 +56,7 @@ class HTTPClient {
 		if (!$url) {
 			$url = static::DEFAULT_URL;
 		}
-		$this->endpoint = $endpointBundle->value;
+		$this->path = $endpointBundle->value;
 		$this->setServerUrl($url);
 		$this->buddyVersion = buddy_version();
 		$this->header = static::CONTENT_TYPE_HEADER;
@@ -88,11 +88,11 @@ class HTTPClient {
 
 	/**
 	 * @param string $request
-	 * @param ?string $endpoint
+	 * @param ?string $path
 	 * @param bool $disableAgentHeader
 	 * @return Response
 	 */
-	public function sendRequest(string $request, string $endpoint = null, bool $disableAgentHeader = false): Response {
+	public function sendRequest(string $request, string $path = null, bool $disableAgentHeader = false): Response {
 		$t = microtime(true);
 		if (!isset($this->responseBuilder)) {
 			throw new RuntimeException("'responseBuilder' property of ManticoreHTTPClient class is not instantiated");
@@ -100,9 +100,9 @@ class HTTPClient {
 		if ($request === '') {
 			throw new ManticoreHTTPClientError('Empty request passed');
 		}
-		$endpoint ??= $this->endpoint;
-		$prefix = (str_starts_with($endpoint, 'sql') ? 'query=' : '');
-		$fullReqUrl = "{$this->url}/$endpoint";
+		$path ??= $this->path;
+		$prefix = (str_starts_with($path, 'sql') ? 'query=' : '');
+		$fullReqUrl = "{$this->url}/$path";
 		$agentHeader = $disableAgentHeader ? '' : "User-Agent: Manticore Buddy/{$this->buddyVersion}\n";
 		$opts = [
 			'http' => [
@@ -134,19 +134,19 @@ class HTTPClient {
 	}
 
 	/**
-	 * @param string $endpoint
+	 * @param string $path
 	 * @return void
 	 */
-	public function setEndpoint(string $endpoint): void {
-		$this->endpoint = $endpoint ?: ManticoreEndpoint::CliJson->value;
+	public function setPath(string $path): void {
+		$this->path = $path ?: ManticoreEndpoint::CliJson->value;
 	}
 
 	/**
 	 * @param string $header
 	 * @return void
 	 */
-	public function setHeader(string $header): void {
-		$this->header = $header ?: static::CONTENT_TYPE_HEADER;
+	public function setContentTypeHeader(string $header): void {
+		$this->header = $header ? "Content-Type: $header\n" : static::CONTENT_TYPE_HEADER;
 	}
 
 	// Bunch of methods to help us reduce copy pasting, maybe we will move it out to separate class
