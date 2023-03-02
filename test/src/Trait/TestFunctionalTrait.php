@@ -309,7 +309,7 @@ trait TestFunctionalTrait {
 		);
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = ($endpoint === 'cli_json')
-			? (array)json_decode($output[0] ?? '{}', true)
+			? (array)json_decode(implode(PHP_EOL, $output), true)
 			: [
 				['columns' => implode(PHP_EOL, $output), 'data' => [], 'error' => ''],
 			];

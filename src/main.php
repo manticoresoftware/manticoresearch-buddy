@@ -39,7 +39,7 @@ EventHandler::init();
 $server = Server::create()
 	->onStart(QueryProcessor::init(...))
 	->onStart(
-		function () {
+		static function () {
 			buddy_metric('invocation', 1);
 
 			$settings = QueryProcessor::getSettings();
@@ -51,17 +51,26 @@ $server = Server::create()
 			buddy_metric('crash', 1);
 		}
 	)
+	->onStart(
+		static function () {
+			$settings = QueryProcessor::getSettings();
+
+			// Configure PHP memory limit and post data sizeMetricThreadTest.php
+			ini_set('memory_limit', '384M');
+			ini_set('post_max_size', $settings->maxAllowedPacket);
+		}
+	)
 	->addHandler('request', EventHandler::request(...))
 	->addHandler('error', EventHandler::error(...))
 	->addTicker(
-		function () {
+		static function () {
 			$memory = memory_get_usage() / 1024;
 			$formatted = number_format($memory, 3).'K';
 			debug("memory usage: {$formatted}");
 		}, 60
 	)
 	->addTicker(
-		function () {
+		static function () {
 			$taskCount = TaskPool::getCount();
 			debug("running {$taskCount} tasks");
 		}, 60
@@ -70,7 +79,7 @@ $server = Server::create()
 
 if (is_telemetry_enabled()) {
 	$server->addTicker(
-		function () {
+		static function () {
 			debug('running metric snapshot');
 			MetricThread::instance()->execute(
 				'checkAndSnapshot',

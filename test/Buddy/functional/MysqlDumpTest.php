@@ -91,7 +91,7 @@ class MysqlDumpTest extends TestCase {
 		]) {
 			echo "$query\n";
 			[$code, $output] = static::mysqldump($query);
-			$this->assertEquals($code, $exitCode);
+			$this->assertEquals($exitCode, $code);
 			$this->assertEquals($output, trim(file_get_contents(__DIR__ . "/mysqldump/$file") ?: ''));
 		}
 
@@ -153,7 +153,7 @@ class MysqlDumpTest extends TestCase {
 		exec(
 			'set -o pipefail; '
 			. 'mysqldump -h0 -P8306 --where "id > 0 ORDER BY id ASC" ' . $query
-			. ' | head -n-2| tac | head -n-6 | tac',
+			. ' | head -n-2 | tac | head -n-6 | tac',
 			$output,
 			$code
 		);
