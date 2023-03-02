@@ -14,6 +14,9 @@ namespace Manticoresearch\Buddy\Network;
 use Exception;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
+use React\Http\Middleware\RequestBodyBufferMiddleware;
+use React\Http\Middleware\RequestBodyParserMiddleware;
+use React\Http\Middleware\StreamingRequestMiddleware;
 use React\Socket\ConnectionInterface;
 use React\Socket\SocketServer;
 
@@ -136,7 +139,13 @@ final class Server {
 		if (!isset($this->handlers['request'])) {
 			throw new Exception('You are missing "request" handler to handle requeests');
 		}
-		$http = new HttpServer($this->handlers['request']);
+		$http = new HttpServer(
+			new StreamingRequestMiddleware(),
+			// new LimitConcurrentRequestsMiddleware(128), // 128 concurrent buffering handlers
+			new RequestBodyBufferMiddleware(return_bytes(ini_get('post_max_size') ?: '64k')), // 8 MiB per request
+			new RequestBodyParserMiddleware(),
+			$this->handlers['request']
+		);
 		unset($this->handlers['request']);
 
 		$this->socket->on(
