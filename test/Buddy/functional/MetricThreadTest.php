@@ -28,7 +28,7 @@ class MetricThreadTest extends TestCase {
 	public function testMetricThreadPrintDebugMessages(): void {
 		sleep(11);
 		system('echo "127.0.0.1 telemetry.manticoresearch.com" >> /etc/hosts');
-		$labels = (string)system('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep ^labels');
+		$labels = (string)system('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep labels:');
 		$this->assertStringContainsString('"collector":"buddy"', $labels);
 		$this->assertStringContainsString('"buddy_version"', $labels);
 		$this->assertStringContainsString('"manticore_version"', $labels);
@@ -36,7 +36,7 @@ class MetricThreadTest extends TestCase {
 		$this->assertStringContainsString('"manticore_binlog_enabled"', $labels);
 		$this->assertStringContainsString('"manticore_secondary_indexes_enabled"', $labels);
 
-		$metrics = (string)system('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep ^metrics');
+		$metrics = (string)system('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep metrics:');
 		$this->assertStringContainsString('"uptime"', $metrics);
 		$this->assertStringContainsString('"command_search"', $metrics);
 		$this->assertStringContainsString('"command_excerpt"', $metrics);
