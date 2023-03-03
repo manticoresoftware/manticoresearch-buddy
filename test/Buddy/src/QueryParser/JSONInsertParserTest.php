@@ -123,13 +123,6 @@ class JSONInsertParserTest extends TestCase {
 		$this->assertEquals(QueryParserError::class, $exCls);
 		$this->assertEquals("Incompatible types in 'col1': 'text int',", $exMsg);
 
-		$query = '{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }'
-			. "\n"
-			. '{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : 20, "col2": "b", "col3": "c" } } }';
-		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
-		$this->assertEquals(QueryParserError::class, $exCls);
-		$this->assertEquals('Column count mismatch in INSERT statement', $exMsg);
-
 		$query = '{ "update" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }';
 		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
 		$this->assertEquals(QueryParserError::class, $exCls);

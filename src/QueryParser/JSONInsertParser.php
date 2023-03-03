@@ -77,29 +77,63 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 		if (empty($row)) {
 			return $row;
 		}
-		if (empty($this->cols)) {
-			$this->cols = array_keys($row);
-		}
+		$vals = $this->parseInsertValues($row);
+
 		self::checkUnescapedChars($row, QueryParserError::class);
 		self::checkColTypesError(
 			[$this, 'detectValType'],
-			$this->parseInsertValues($row),
+			$vals,
 			$this->colTypes,
 			$this->cols,
 			QueryParserError::class
 		);
-
 		return $row;
 	}
 
 	/**
-	 * Splitting insert row values expression into separate values
+	 * Getting insert row values and their types
 	 *
 	 * @param mixed $insertRow
 	 * @return array<mixed>
 	 */
 	protected function parseInsertValues(mixed $insertRow): array {
-		return array_values((array)$insertRow);
+		$valuesRow = (array)$insertRow;
+		$this->cols = array_values(
+			array_unique(
+				array_merge($this->cols, array_keys($valuesRow))
+			)
+		);
+		$vals = [];
+		foreach ($this->cols as $i => $col) {
+			if (!is_string($col)) {
+				continue;
+			}
+			$vals[] = $valuesRow[$col] ?? null;
+			if (sizeof($this->colTypes) > $i) {
+				continue;
+			}
+			$this->colTypes[] = Datatype::Null;
+		}
+
+		return $vals;
+	}
+
+	/**
+	 * Helper to detect types of array items
+	 *
+	 * @param array<mixed> $val
+	 * @return Datatype
+	 */
+	protected static function detectArrayVal(array $val): Datatype {
+		if (!array_is_list($val)) {
+			return Datatype::Json;
+		}
+		foreach ($val as $subVal) {
+			if (self::detectValType($subVal) === Datatype::Bigint) {
+				return Datatype::Multi64;
+			}
+		}
+		return Datatype::Multi;
 	}
 
 	/**
@@ -107,6 +141,9 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	 * @return Datatype
 	 */
 	protected static function detectValType(mixed $val): Datatype {
+		if ($val === null) {
+			return Datatype::Null;
+		}
 		if (is_float($val)) {
 			return Datatype::Float;
 		}
@@ -117,15 +154,7 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 			return Datatype::Int;
 		}
 		if (is_array($val)) {
-			if (!array_is_list($val)) {
-				return Datatype::Json;
-			}
-			foreach ($val as $subVal) {
-				if (self::detectValType($subVal) === Datatype::Bigint) {
-					return Datatype::Multi64;
-				}
-			}
-			return Datatype::Multi;
+			return self::detectArrayVal($val);
 		}
 
 		return (is_string($val) && self::isManticoreString($val) === true) ? Datatype::String : Datatype::Text;

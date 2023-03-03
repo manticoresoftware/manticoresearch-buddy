@@ -83,10 +83,10 @@ trait CheckInsertDataTrait {
 		string &$error
 	): void {
 		$typeBundles = [
-			[Datatype::Json],
-			[Datatype::Multi64, Datatype::Multi],
-			[Datatype::Float, Datatype::Bigint, Datatype::Int],
-			[Datatype::Text, Datatype::String],
+			[Datatype::Json, Datatype::Null],
+			[Datatype::Multi64, Datatype::Multi, Datatype::Null],
+			[Datatype::Float, Datatype::Bigint, Datatype::Int, Datatype::Null],
+			[Datatype::Text, Datatype::String, Datatype::Null],
 		];
 		$isNewErrorCol = true;
 		foreach ($typeBundles as $tb) {
@@ -96,7 +96,8 @@ trait CheckInsertDataTrait {
 			if ($i1 !== false && $i2 !== false && $i1 < $i2) {
 				$types[$i] = $tb[$i1];
 			}
-			if (($i1 !== false && $i2 !== false) || ($i1 === false && $i2 === false)) {
+			if ($type === Datatype::Null || $types[$i] === Datatype::Null
+				|| ($i1 !== false && $i2 !== false) || ($i1 === false && $i2 === false)) {
 				continue;
 			}
 			// Incompatible types are found

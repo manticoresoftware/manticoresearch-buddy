@@ -149,4 +149,33 @@ class InsertQueryTest extends TestCase {
 		}
 		$this->assertEquals('id has already been specified', $outData[0]['error']);
 	}
+
+	public function testAutoColumnAddOnInsert(): void {
+		echo "\nTesting the execution of HTTP Elastic-like bulk insert query to a non-existing table\n";
+		$query = '{ "index" : { "_index" : "' . $this->testTable . '" } }'
+			. "\n"
+			. '{ "title" : "Yellow Bag", "price": 12 }'
+			. "\n"
+			. '{ "create" : { "_index" : "' . $this->testTable . '" } }'
+			. "\n"
+			. '{ "title" : "Red Bag"}'
+			. "\n"
+			. '{ "create" : { "_index" : "' . $this->testTable . '" } }'
+			. "\n"
+			. '{ "title" : "Green Bag", "new_price": 20.5 }'
+			. "\n";
+		$out = static::runHttpQuery($query, true, '_bulk');
+		/** @var array{items:array<int,array<string,array<string,mixed>>>} */
+		$outData = $out[0]['data'][0];
+		$this->assertEquals(3, sizeof($outData['items']));
+		$out = static::runSqlQuery("describe {$this->testTable}");
+		$res = [
+			'Field	Type	Properties',
+			'id	bigint',
+			'title	text	indexed stored',
+			'price	uint',
+			'new_price	float',
+		];
+		$this->assertEquals($res, $out);
+	}
 }
