@@ -147,3 +147,19 @@ function buddy_error_handler(int $errno, string $errstr, string $errfile, int $e
 
 	throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 }
+
+/**
+ * Little helper to convert config into int
+ * @param string $val
+ * @return int
+ */
+function return_bytes(string $val): int {
+	$val = trim($val);
+	$last = strtolower($val[strlen($val) - 1]);
+	return (int)$val * match ($last) {
+		'g' => 1024 * 1024 * 1024,
+		'm' => 1024 * 1024,
+		'k' => 1024,
+		default => 1,
+	};
+}

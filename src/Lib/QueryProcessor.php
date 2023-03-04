@@ -117,7 +117,18 @@ class QueryProcessor {
 			debug("using config file = '$value'");
 			putenv("SEARCHD_CONFIG={$value}");
 		}
-		return ManticoreSettings::fromArray($settings);
+
+		// Gather variables also
+		$resp = $manticoreClient->sendRequest('SHOW VARIABLES');
+		/** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
+		$data = (array)json_decode($resp->getBody(), true);
+		$variables = [];
+		foreach ($data[0]['data'] as ['Variable_name' => $key, 'Value' => $value]) {
+			$variables[$key] = $value;
+		}
+
+		// Finally build the settings
+		return ManticoreSettings::fromArray($settings, $variables);
 	}
 
 	/**

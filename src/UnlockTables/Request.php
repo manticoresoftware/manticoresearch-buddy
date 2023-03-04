@@ -35,8 +35,8 @@ final class Request extends CommandRequestBase {
 		preg_match_all('/(ALL|([a-z_]+)(\s*,\s*[a-z_]+)*)/i', $query, $matches, PREG_SET_ORDER);
 
 		// We parse lock type and alias but actually do not use now
-		if ($matches && $matches[1][0] !== 'ALL') {
-			$tables = explode(',', $matches[1][0]);
+		if ($matches && strtoupper($matches[0][0]) !== 'ALL') {
+			$tables = explode(',', $matches[0][0]);
 			$tables = array_map('trim', $tables);
 		} else {
 			$tables = [];
