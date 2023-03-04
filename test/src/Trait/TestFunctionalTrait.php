@@ -309,9 +309,10 @@ trait TestFunctionalTrait {
 			"curl -s 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect",
 			$output
 		);
+
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = match ($path) {
-			'cli_json' => (array)json_decode($output[0] ?? '{}', true),
+			'cli_json' => (array)json_decode(implode(PHP_EOL, $output), true),
 			'cli' => [
 				['columns' => implode(PHP_EOL, $output), 'data' => [], 'error' => ''],
 			],
@@ -320,7 +321,7 @@ trait TestFunctionalTrait {
 				['data' => [(array)json_decode($output[0] ?? '{}', true)], 'error' => ''],
 			],
 		};
-
+		print_r($output);
 		return $result;
 	}
 

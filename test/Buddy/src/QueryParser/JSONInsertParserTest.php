@@ -49,7 +49,7 @@ class JSONInsertParserTest extends TestCase {
 			Datatype::Multi64, self::invokeMethod(self::$parser, 'detectValType', [[1, 1111111111111]])
 		);
 		$this->assertEquals(Datatype::Multi, self::invokeMethod(self::$parser, 'detectValType', [[11, 1]]));
-		$this->assertEquals(Datatype::Multi, self::invokeMethod(self::$parser, 'detectValType', [[1, 0.1]]));
+		$this->assertEquals(Datatype::Json, self::invokeMethod(self::$parser, 'detectValType', [[1, 0.1]]));
 		$this->assertEquals(
 			Datatype::String,
 			self::invokeMethod(self::$parser, 'detectValType', ['testmail@google.com'])
