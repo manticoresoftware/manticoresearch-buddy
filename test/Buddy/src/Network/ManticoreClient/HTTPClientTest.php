@@ -42,7 +42,7 @@ class HTTPClientTest extends TestCase {
 			$this->refCls->getProperty('url')->getValue($this->client)
 		);
 		$this->assertEquals(
-			ManticoreEndpoint::CliJson->value,
+			ManticoreEndpoint::Sql->value,
 			$this->refCls->getProperty('path')->getValue($this->client)
 		);
 

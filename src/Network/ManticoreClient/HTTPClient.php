@@ -50,7 +50,7 @@ class HTTPClient {
 	public function __construct(
 		protected ?Response $responseBuilder = null,
 		?string $url = null,
-		ManticoreEndpoint $endpointBundle = ManticoreEndpoint::CliJson
+		ManticoreEndpoint $endpointBundle = ManticoreEndpoint::Sql
 	) {
 		// If no url passed, set default one
 		if (!$url) {
