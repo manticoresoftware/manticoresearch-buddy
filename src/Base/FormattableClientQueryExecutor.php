@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base;
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Lib\TableFormatter;
 
 /**
@@ -26,17 +25,6 @@ abstract class FormattableClientQueryExecutor extends ClientQueryExecutor {
 	 */
 	public function getProps(): array {
 		return ['manticoreClient', 'tableFormatter'];
-	}
-
-	/**
-	 *
-	 * $return ?TableFormatter
-	 */
-	public function checkForTableFormatter(): ?TableFormatter {
-		return (property_exists($this, 'request') && property_exists($this->request, 'endpoint')
-			&& $this->request->endpoint === ManticoreEndpoint::Cli)
-			? $this->tableFormatter
-			: null;
 	}
 
 	/**

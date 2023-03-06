@@ -20,4 +20,5 @@ enum Datatype: string {
 	case Bigint = 'bigint';
 	case Text = 'text';
 	case String = 'string';
+	case Null = 'null';
 }

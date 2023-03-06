@@ -35,10 +35,7 @@ final class Response {
    * @param RequestFormat $format
    * @return static
    */
-	public static function fromMessage(
-		mixed $message,
-		RequestFormat $format = RequestFormat::JSON
-	): static {
+	public static function fromMessage(mixed $message, RequestFormat $format = RequestFormat::JSON): static {
 		return static::fromMessageAndError($message, null, $format);
 	}
 
@@ -83,6 +80,7 @@ final class Response {
 			'message' => $message,
 			'error' => $error?->getResponseError() ?? '',
 		];
+
 		return new static(
 			json_encode($payload, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_IGNORE)
 		);

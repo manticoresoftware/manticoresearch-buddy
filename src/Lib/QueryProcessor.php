@@ -27,37 +27,37 @@ use Psr\Container\NotFoundExceptionInterface;
 use RuntimeException;
 
 class QueryProcessor {
-	/** @var string */
+  /** @var string */
 	protected const NAMESPACE_PREFIX = 'Manticoresearch\\Buddy\\';
 
-	/** @var ContainerInterface */
-	// We set this on initialization (init.php) so we are sure we have it in class
+  /** @var ContainerInterface */
+  // We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
 
 	/** @var ManticoreSettings */
 	protected static ManticoreSettings $settings;
 
-	/**
-	 * Setter for container property
-	 *
-	 * @param ContainerInterface $container
-	 *  The container object to resolve the executor's dependencies in case such exist
-	 * @return void
-	 *  The CommandExecutorInterface to execute to process the final query
-	 */
+  /**
+   * Setter for container property
+   *
+   * @param ContainerInterface $container
+   *  The container object to resolve the executor's dependencies in case such exist
+   * @return void
+   *  The CommandExecutorInterface to execute to process the final query
+   */
 	public static function setContainer(ContainerInterface $container): void {
 		self::$container = $container;
 	}
 
-	/**
-	 * This is the main entry point to start parsing and processing query
-	 *
-	 * @param Request $request
-	 *  The request struct to process
-	 * @return CommandExecutorInterface
-	 *  The CommandExecutorInterface to execute to process the final query
-	 * @throws CommandNotAllowed
-	 */
+  /**
+   * This is the main entry point to start parsing and processing query
+   *
+   * @param Request $request
+   *  The request struct to process
+   * @return CommandExecutorInterface
+   *  The CommandExecutorInterface to execute to process the final query
+   * @throws CommandNotAllowed
+   */
 	public static function process(Request $request): CommandExecutorInterface {
 		if (!isset(static::$settings)) {
 			static::init();
@@ -74,12 +74,12 @@ class QueryProcessor {
 		$commandRequest->setManticoreSettings(static::$settings);
 		debug("[$request->id] Command request: {$commandPrefix}\\Request " . json_encode($commandRequest));
 		$executorClassName = static::NAMESPACE_PREFIX . "{$commandPrefix}\\Executor";
-		/** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
+	  /** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
 		$executor = new $executorClassName($commandRequest);
 		foreach ($executor->getProps() as $prop) {
 			$executor->{'set' . ucfirst($prop)}(static::getObjFromContainer($prop));
 		}
-		/** @var CommandExecutorInterface */
+	  /** @var CommandExecutorInterface */
 		return $executor;
 	}
 
@@ -105,7 +105,7 @@ class QueryProcessor {
 		/** @var HTTPClient */
 		$manticoreClient = static::getObjFromContainer('manticoreClient');
 		$resp = $manticoreClient->sendRequest('SHOW SETTINGS');
-		/** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
+	  /** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
 		$data = (array)json_decode($resp->getBody(), true);
 		$settings = [];
 		foreach ($data[0]['data'] as ['Setting_name' => $key, 'Value' => $value]) {
@@ -139,27 +139,27 @@ class QueryProcessor {
 		return static::$settings;
 	}
 
-	/**
-	 * Retrieve object from the DI container
-	 *
-	 * @param string $objName
-	 * @return object
-	 */
+  /**
+   * Retrieve object from the DI container
+   *
+   * @param string $objName
+   * @return object
+   */
 	protected static function getObjFromContainer(string $objName): object {
 		if (!self::$container->has($objName)) {
 			throw new Exception("Failed to find '$objName' in container");
 		}
 
-		/** @var object */
+	  /** @var object */
 		return self::$container->get($objName);
 	}
 
-	/**
-	 * Check if a command is currently supported by Buddy and daemon
-	 *
-	 * @param Command $command
-	 * @return bool
-	 */
+  /**
+   * Check if a command is currently supported by Buddy and daemon
+   *
+   * @param Command $command
+   * @return bool
+   */
 	protected static function isCommandAllowed(Command $command): bool {
 		return match (true) {
 			($command === Command::Insert && !self::$settings->searchdAutoSchema) => false,
@@ -167,28 +167,38 @@ class QueryProcessor {
 		};
 	}
 
-	/**
-	 * This method extracts all supported prefixes from input query
-	 * that buddy able to handle
-	 *
-	 * @param Request $request
-	 * @return Command
-	 * @throws SQLQueryCommandNotSupported
-	 */
+  /**
+   * This method extracts all supported prefixes from input query
+   * that buddy able to handle
+   *
+   * @param Request $request
+   * @return Command
+   * @throws SQLQueryCommandNotSupported
+   */
 	public static function extractCommandFromRequest(Request $request): Command {
 		$queryLowercase = strtolower($request->payload);
-		$isInsertSQLQuery = match ($request->endpoint) {
+		// Making a bit of extra preprocessing to simplify following detection of the bulk insert query
+		if ($request->endpointBundle === ManticoreEndpoint::Bulk) {
+			$queryLowercase = ltrim(substr($queryLowercase, 1));
+		}
+
+		$isInsertSQLQuery = match ($request->endpointBundle) {
 			ManticoreEndpoint::Sql, ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson => str_starts_with(
 				$queryLowercase, 'insert into'
 			),
 			default => false,
 		};
-		$isInsertHTTPQuery = ($request->endpoint === ManticoreEndpoint::Insert)
-			|| ($request->endpoint === ManticoreEndpoint::Bulk
-				&& str_starts_with(str_replace(' ', '', $queryLowercase), '{"insert"')
-		);
-		$isInsertError = preg_match('/table (.*?) absent/', $request->error);
+		$isInsertHTTPQuery = match ($request->endpointBundle) {
+			ManticoreEndpoint::Insert => true,
+			ManticoreEndpoint::Bulk => str_starts_with($queryLowercase, '"insert"')
+			|| str_starts_with($queryLowercase, '"index"'),
+			default => false,
+		};
+		$isInsertError = str_contains($request->error, 'no such index')
+		|| (str_contains($request->error, 'table ') && str_contains($request->error, ' absent'));
+
 		return match (true) {
+			($request->endpointBundle === ManticoreEndpoint::Elastic) => Command::EmulateElastic,
 			$queryLowercase === '',
 				str_starts_with($queryLowercase, 'set'),
 				str_starts_with($queryLowercase, 'create database') => Command::EmptyQuery,
@@ -197,7 +207,7 @@ class QueryProcessor {
 			str_starts_with($queryLowercase, 'backup') => Command::Backup,
 			str_starts_with($queryLowercase, 'show full tables') => Command::ShowFullTables,
 			str_starts_with($queryLowercase, 'test') => Command::Test,
-			($request->endpoint === ManticoreEndpoint::Cli) => Command::CliTable,
+			($request->endpointBundle === ManticoreEndpoint::Cli) => Command::CliTable,
 			str_starts_with($queryLowercase, 'lock tables') => Command::LockTables,
 			str_starts_with($queryLowercase, 'unlock tables') => Command::UnlockTables,
 			str_starts_with($queryLowercase, 'select') => Command::Select,

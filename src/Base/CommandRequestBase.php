@@ -11,8 +11,10 @@
 
 namespace Manticoresearch\Buddy\Base;
 
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Interface\CommandRequestInterface;
 use Manticoresearch\Buddy\Network\ManticoreClient\Settings as ManticoreSettings;
+use Manticoresearch\Buddy\Network\Request;
 
 abstract class CommandRequestBase implements CommandRequestInterface {
 	protected ManticoreSettings $manticoreSettings;
@@ -34,5 +36,16 @@ abstract class CommandRequestBase implements CommandRequestInterface {
 	 */
 	public function getManticoreSettings(): ManticoreSettings {
 		return $this->manticoreSettings;
+	}
+
+	/**
+	 * Redirect all /cli requests to /sql endpoint
+	 *
+	 * @param Request $request
+	 * @return array{0:string,1:boolean}
+	 */
+	public static function getEndpointInfo(Request $request): array {
+		return ($request->endpointBundle === ManticoreEndpoint::Cli)
+			? [ManticoreEndpoint::Sql->value, true] : [$request->path, false];
 	}
 }

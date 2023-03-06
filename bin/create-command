@@ -64,7 +64,7 @@ final class Executor implements CommandExecutorInterface {
 	public function run(Runtime \$runtime): Task {
     // TODO: modify your code here ⬇
 
-    \$this->manticoreClient->setEndpoint(\$this->request->endpoint);
+    \$this->manticoreClient->setPath(\$this->request->path);
 
     \$taskFn = static function (Request \$request, HTTPClient \$manticoreClient): array {
 			\$query = 'SHOW TABLES';
@@ -111,7 +111,7 @@ use Manticoresearch\Buddy\Network\Request as NetRequest;
 final class Request extends CommandRequestBase {
   // TODO: your props definition goes here 👇
 
-	public ManticoreEndpoint \$endpoint;
+	public string \$path;
 
 	public function __construct() {
 	}
@@ -123,7 +123,7 @@ final class Request extends CommandRequestBase {
 	public static function fromNetworkRequest(NetRequest \$request): Request {
     // TODO: add your code to process request
     \$self = new self();
-    \$self->endpoint = \$request->endpoint;
+    \$self->path = \$request->path;
 		return \$self;
   }
 }

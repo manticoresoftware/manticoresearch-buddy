@@ -11,6 +11,7 @@
 
 use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Lib\TableFormatter;
 use Manticoresearch\Buddy\Lib\Task\Task;
 use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
 use Manticoresearch\Buddy\Network\ManticoreClient\Response;
@@ -47,7 +48,8 @@ class ExecutorTest extends TestCase {
 				'payload' => 'SHOW QUERIES',
 				'version' => 1,
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::CliJson,
+				'endpointBundle' => ManticoreEndpoint::CliJson,
+				'path' => 'cli_json',
 			]
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);
@@ -55,8 +57,8 @@ class ExecutorTest extends TestCase {
 		$request = Request::fromNetworkRequest($request);
 
 		$executor = new Executor($request);
-		$refCls = new ReflectionClass($executor);
-		$refCls->getProperty('manticoreClient')->setValue($executor, $manticoreClient);
+		$executor->setManticoreClient($manticoreClient);
+		$executor->setTableFormatter(new TableFormatter());
 		$task = $executor->run(Task::createRuntime());
 		$task->wait();
 		$this->assertEquals(true, $task->isSucceed());

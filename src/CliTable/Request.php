@@ -20,7 +20,7 @@ use Manticoresearch\Buddy\Network\Request as NetRequest;
  */
 final class Request extends CommandRequestBase {
 	public string $query;
-	public ManticoreEndpoint $endpoint;
+	public string $path;
 
 	/**
 	 * @param NetRequest $request
@@ -29,7 +29,7 @@ final class Request extends CommandRequestBase {
 	public static function fromNetworkRequest(NetRequest $request): Request {
 		$self = new self();
 		$self->query = $request->payload;
-		$self->endpoint = ManticoreEndpoint::Sql;
+		$self->path = ManticoreEndpoint::Sql->value;
 		return $self;
 	}
 }

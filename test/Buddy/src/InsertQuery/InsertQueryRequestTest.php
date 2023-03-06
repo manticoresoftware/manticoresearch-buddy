@@ -24,7 +24,8 @@ class InsertQueryRequestTest extends TestCase {
 				'error' => '',
 				'payload' => 'INSERT INTO test(int_col, string_col, float_col) VALUES(1, \'string\', 2.22)',
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::CliJson,
+				'endpointBundle' => ManticoreEndpoint::CliJson,
+				'path' => 'cli_json',
 			]
 		);
 		$request = Request::fromNetworkRequest($request);
