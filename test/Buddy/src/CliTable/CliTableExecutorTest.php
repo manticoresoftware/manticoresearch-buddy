@@ -45,7 +45,8 @@ class CliTableExecutorTest extends TestCase {
 				'payload' => 'SHOW QUERIES',
 				'version' => 1,
 				'format' => RequestFormat::SQL,
-				'endpoint' => ManticoreEndpoint::Cli,
+				'endpointBundle' => ManticoreEndpoint::Cli,
+				'path' => 'cli',
 			]
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);

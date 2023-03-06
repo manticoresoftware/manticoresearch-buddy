@@ -19,7 +19,7 @@ use RuntimeException;
 
 class HTTPClient {
 
-	const CONTENT_TYPE_HEADER = 'Content-Type: text/plain';
+	const CONTENT_TYPE_HEADER = "Content-Type: application/x-www-form-urlencoded\n";
 	const URL_PREFIX = 'http://';
 	const HTTP_REQUEST_TIMEOUT = 1;
 	const DEFAULT_URL = 'http://127.0.0.1:9308';
@@ -32,27 +32,34 @@ class HTTPClient {
 	/** @var string $url */
 	protected string $url;
 
+	/** @var string $path */
+	protected string $path;
+
+	/** @var string $header */
+	protected string $header;
+
 	/** @var string $buddyVersion */
 	protected string $buddyVersion;
 
 	/**
 	 * @param ?Response $responseBuilder
 	 * @param ?string $url
-	 * @param ManticoreEndpoint $endpoint
+	 * @param ManticoreEndpoint $endpointBundle
 	 * @return void
 	 */
 	public function __construct(
 		protected ?Response $responseBuilder = null,
 		?string $url = null,
-		protected ManticoreEndpoint $endpoint = ManticoreEndpoint::CliJson
+		ManticoreEndpoint $endpointBundle = ManticoreEndpoint::CliJson
 	) {
 		// If no url passed, set default one
 		if (!$url) {
 			$url = static::DEFAULT_URL;
 		}
-
+		$this->path = $endpointBundle->value;
 		$this->setServerUrl($url);
 		$this->buddyVersion = buddy_version();
+		$this->header = static::CONTENT_TYPE_HEADER;
 	}
 
 	/**
@@ -81,14 +88,11 @@ class HTTPClient {
 
 	/**
 	 * @param string $request
-	 * @param ?ManticoreEndpoint $endpoint
+	 * @param ?string $path
+	 * @param bool $disableAgentHeader
 	 * @return Response
 	 */
-	public function sendRequest(
-		string $request,
-		ManticoreEndpoint $endpoint = null,
-		bool $disableAgentHeader = false
-	): Response {
+	public function sendRequest(string $request, string $path = null, bool $disableAgentHeader = false): Response {
 		$t = microtime(true);
 		if (!isset($this->responseBuilder)) {
 			throw new RuntimeException("'responseBuilder' property of ManticoreHTTPClient class is not instantiated");
@@ -96,14 +100,14 @@ class HTTPClient {
 		if ($request === '') {
 			throw new ManticoreHTTPClientError('Empty request passed');
 		}
-		$endpoint ??= $this->endpoint;
-		$prefix = $endpoint->name === 'Sql' ? 'query=' : '';
-		$fullReqUrl = "{$this->url}/{$endpoint->value}";
+		$path ??= $this->path;
+		$prefix = (str_starts_with($path, 'sql') ? 'query=' : '');
+		$fullReqUrl = "{$this->url}/$path";
 		$agentHeader = $disableAgentHeader ? '' : "User-Agent: Manticore Buddy/{$this->buddyVersion}\n";
 		$opts = [
 			'http' => [
 				'method'  => 'POST',
-				'header'  => "Content-Type: application/x-www-form-urlencoded\n"
+				'header'  => $this->header
 					. $agentHeader
 					. "Connection: close\n",
 				'content' => $prefix . $request,
@@ -113,6 +117,7 @@ class HTTPClient {
 		];
 		$context = stream_context_create($opts);
 		$result = file_get_contents($fullReqUrl, false, $context);
+
 		if ($result === false) {
 			throw new ManticoreHTTPClientError("Cannot connect to server at $fullReqUrl");
 		} else {
@@ -129,13 +134,20 @@ class HTTPClient {
 	}
 
 	/**
-	 * @param ManticoreEndpoint $endpoint
+	 * @param string $path
 	 * @return void
 	 */
-	public function setEndpoint(ManticoreEndpoint $endpoint): void {
-		$this->endpoint = $endpoint;
+	public function setPath(string $path): void {
+		$this->path = $path ?: ManticoreEndpoint::CliJson->value;
 	}
 
+	/**
+	 * @param string $header
+	 * @return void
+	 */
+	public function setContentTypeHeader(string $header): void {
+		$this->header = $header ? "Content-Type: $header\n" : static::CONTENT_TYPE_HEADER;
+	}
 
 	// Bunch of methods to help us reduce copy pasting, maybe we will move it out to separate class
 	// but now it's totally fine to have 3-5 methods here for help

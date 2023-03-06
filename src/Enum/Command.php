@@ -16,6 +16,7 @@ enum Command: string {
 	case ShowQueries = 'ShowQueries';
 	case Backup = 'Backup';
 	case CliTable = 'CliTable';
+	case EmulateElastic = 'EmulateElastic';
 	case ShowFullTables = 'ShowFullTables';
 	case EmptyQuery = 'EmptyQuery';
 	case LockTables = 'LockTables';

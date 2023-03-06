@@ -90,11 +90,13 @@ class ShowFullTablesRequestTest extends TestCase {
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
-							'endpoint' => ManticoreEndpoint::Sql,
+							'endpointBundle' => ManticoreEndpoint::Sql,
+							'path' => '',
 						]
 					)
 				);
 			} catch (SQLQueryParsingError $e) {
+				var_dump($e->getMessage());
 				$this->assertEquals(true, false, "Correct syntax parse failed: $query");
 			}
 			$this->assertEquals(true, true);
@@ -122,7 +124,8 @@ class ShowFullTablesRequestTest extends TestCase {
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
-							'endpoint' => ManticoreEndpoint::Sql,
+							'endpointBundle' => ManticoreEndpoint::Sql,
+							'path' => '',
 						]
 					)
 				);
@@ -140,7 +143,14 @@ class ShowFullTablesRequestTest extends TestCase {
 
   /**
    * @param array{database?:string,like?:string} $args
-   * @return array{version:int,error:string,payload:string,format:RequestFormat,endpoint:ManticoreEndpoint}
+   * @return array{
+   *  version:int,
+   *  error:string,
+   *  payload:string,
+   *  format:RequestFormat,
+   *  endpointBundle:ManticoreEndpoint,
+   *  path:string
+   * }
    */
 	protected static function buildSQLQuery(array $args): array {
 		$query = 'SHOW FULL TABLES';
@@ -158,7 +168,8 @@ class ShowFullTablesRequestTest extends TestCase {
 			'error' => '',
 			'payload' => $query,
 			'format' => RequestFormat::SQL,
-			'endpoint' => ManticoreEndpoint::Sql,
+			'endpointBundle' => ManticoreEndpoint::Sql,
+			'path' => '',
 		];
 	}
 }

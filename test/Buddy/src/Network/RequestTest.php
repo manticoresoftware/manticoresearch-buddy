@@ -37,11 +37,11 @@ class RequestTest extends TestCase {
 		$this->assertEquals(RequestFormat::JSON, $request->format);
 		$this->assertEquals($payload['version'], $request->version);
 		$this->assertEquals($payload['error'], $request->error);
-		$this->assertEquals(ManticoreEndpoint::CliJson, $request->endpoint);
+		$this->assertEquals(ManticoreEndpoint::CliJson, $request->endpointBundle);
 
 		$payload['message']['path_query'] = '';
 		$request = Request::fromPayload($payload);
-		$this->assertEquals(ManticoreEndpoint::Sql, $request->endpoint);
+		$this->assertEquals(ManticoreEndpoint::Sql, $request->endpointBundle);
 	}
 
 	public function testManticoreRequestValidationFail(): void {

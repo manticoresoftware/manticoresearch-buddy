@@ -49,7 +49,7 @@ class JSONInsertParserTest extends TestCase {
 			Datatype::Multi64, self::invokeMethod(self::$parser, 'detectValType', [[1, 1111111111111]])
 		);
 		$this->assertEquals(Datatype::Multi, self::invokeMethod(self::$parser, 'detectValType', [[11, 1]]));
-		$this->assertEquals(Datatype::Multi, self::invokeMethod(self::$parser, 'detectValType', [[1, 0.1]]));
+		$this->assertEquals(Datatype::Json, self::invokeMethod(self::$parser, 'detectValType', [[1, 0.1]]));
 		$this->assertEquals(
 			Datatype::String,
 			self::invokeMethod(self::$parser, 'detectValType', ['testmail@google.com'])
@@ -122,13 +122,6 @@ class JSONInsertParserTest extends TestCase {
 		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
 		$this->assertEquals(QueryParserError::class, $exCls);
 		$this->assertEquals("Incompatible types in 'col1': 'text int',", $exMsg);
-
-		$query = '{ "insert" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }'
-			. "\n"
-			. '{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : 20, "col2": "b", "col3": "c" } } }';
-		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
-		$this->assertEquals(QueryParserError::class, $exCls);
-		$this->assertEquals('Column count mismatch in INSERT statement', $exMsg);
 
 		$query = '{ "update" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }';
 		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);

@@ -9,8 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\RequestFormat;
+use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
 use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
+use Manticoresearch\Buddy\QueryParser\ElasticJSONInsertParser;
 use Manticoresearch\Buddy\QueryParser\JSONInsertParser;
 use Manticoresearch\Buddy\QueryParser\Loader;
 use Manticoresearch\Buddy\QueryParser\SQLInsertParser;
@@ -20,12 +21,21 @@ class ParserLoaderTest extends TestCase {
 
 	public function testParserLoader(): void {
 		echo "\nGetting SQLInsertParser instance\n";
-		$parser = Loader::getInsertQueryParser(RequestFormat::SQL);
+		$parser = Loader::getInsertQueryParser('test', ManticoreEndpoint::Sql);
 		$this->assertInstanceOf(SQLInsertParser::class, $parser);
 		$this->assertInstanceOf(InsertQueryParserInterface::class, $parser);
+		$parser = Loader::getInsertQueryParser('test', ManticoreEndpoint::Cli);
+		$this->assertInstanceOf(SQLInsertParser::class, $parser);
 		echo "\nGetting JSONInsertParser instance\n";
-		$parser = Loader::getInsertQueryParser(RequestFormat::JSON);
+		$parser = Loader::getInsertQueryParser('insert', ManticoreEndpoint::Insert);
 		$this->assertInstanceOf(JSONInsertParser::class, $parser);
+		try {
+			$this->assertInstanceOf(ElasticJSONInsertParser::class, $parser);
+			$this->fail();
+		} catch (Exception) {
+		}
+		$parser = Loader::getInsertQueryParser('test/_doc/', ManticoreEndpoint::Bulk);
+		$this->assertInstanceOf(ElasticJSONInsertParser::class, $parser);
 	}
 
 }

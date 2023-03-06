@@ -39,14 +39,14 @@ class Executor extends FormattableClientQueryExecutor {
 	 * @throws RuntimeException
 	 */
 	public function run(Runtime $runtime): Task {
-		$this->manticoreClient->setEndpoint($this->request->endpoint);
+		$this->manticoreClient->setPath($this->request->path);
 
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = static function (
 			Request $request,
 			HTTPClient $manticoreClient,
-			?TableFormatter $tableFormatter
+			TableFormatter $tableFormatter
 		): TaskResult {
 			$time0 = hrtime(true);
 			// First, get response from the manticore
@@ -58,14 +58,14 @@ class Executor extends FormattableClientQueryExecutor {
 			/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:int,columns?:string}> $result */
 			$result = $resp->getResult();
 			$total = $result[0]['total'] ?? -1;
-			if ($tableFormatter !== null) {
+			if ($request->hasCliEndpoint) {
 				return new TaskResult($tableFormatter->getTable($time0, $result[0]['data'], $total));
 			}
 			return new TaskResult($result);
 		};
 
 		return Task::createInRuntime(
-			$runtime, $taskFn, [$this->request, $this->manticoreClient, $this->checkForTableFormatter()]
+			$runtime, $taskFn, [$this->request, $this->manticoreClient, $this->tableFormatter]
 		)->run();
 	}
 }

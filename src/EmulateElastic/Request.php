@@ -8,26 +8,23 @@
   version. You should have received a copy of the GPL license along with this
   program; if you did not, you can find it at http://www.gnu.org/
 */
-namespace Manticoresearch\Buddy\EmptyQuery;
+
+namespace Manticoresearch\Buddy\EmulateElastic;
 
 use Manticoresearch\Buddy\Base\CommandRequestBase;
 use Manticoresearch\Buddy\Network\Request as NetRequest;
 
 /**
- * This is simple do nothing request that handle empty queries
- * which can be as a result of only comments in it that we strip
+ * Request for Backup command that has parsed parameters from SQL
  */
 final class Request extends CommandRequestBase {
-	public string $path;
 
-  /**
+	/**
 	 * @param NetRequest $request
 	 * @return self
 	 */
 	public static function fromNetworkRequest(NetRequest $request): Request {
-		$self = new self();
-		// We just need to do something, but actually its' just for PHPstan
-		$self->path = $request->path;
-		return $self;
+		unset($request);
+		return new self();
 	}
 }
