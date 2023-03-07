@@ -25,8 +25,8 @@ final class Request {
 	];
 	const MESSAGE_FIELDS = ['path_query' => 'string', 'body' => 'string'];
 
-	/** @var int $id Request id from header Request-ID */
-	public int $id;
+	/** @var string $id Request id from header Request-ID */
+	public string $id;
 	public float $time;
 
 	public ManticoreEndpoint $endpointBundle;
@@ -45,10 +45,10 @@ final class Request {
 	/**
 	 * Create default filled request
 	 *
-	 * @param int $id
+	 * @param string $id
 	 * @return static
 	 */
-	public static function default(int $id = 0): static {
+	public static function default(string $id = '0'): static {
 		$self = new static;
 		$self->id = $id;
 		$self->time = microtime(true);
@@ -65,10 +65,10 @@ final class Request {
 	 * Create request from string and validate that it's ok for us
 	 *
 	 * @param string $data
-	 * @param int $id
+	 * @param string $id
 	 * @return static
 	 */
-	public static function fromString(string $data, int $id = 0): static {
+	public static function fromString(string $data, string $id = '0'): static {
 		$self = new static;
 		$self->id = $id;
 		$self->time = microtime(true);
@@ -88,10 +88,10 @@ final class Request {
 	 * 	endpointBundle:ManticoreEndpoint,
 	 *  path:string
 	 * } $data
-	 * @param int $id
+	 * @param string $id
 	 * @return static
 	 */
-	public static function fromArray(array $data, int $id = 0): static {
+	public static function fromArray(array $data, string $id = '0'): static {
 		$self = new static;
 		$self->id = $id;
 		$self->time = microtime(true);
@@ -105,10 +105,10 @@ final class Request {
 	 * This method is same as fromArray but applied to payload
 	 *
 	 * @param array{type:string,error:string,message:array{path_query:string,body:string},version:int} $payload
-	 * @param int $id
+	 * @param string $id
 	 * @return static
 	 */
-	public static function fromPayload(array $payload, int $id = 0): static {
+	public static function fromPayload(array $payload, string $id = '0'): static {
 		$self = new static;
 		$self->id = $id;
 		$self->time = microtime(true);
