@@ -296,15 +296,20 @@ trait TestFunctionalTrait {
 	protected static function runHttpQuery(
 		string $query,
 		bool $redirectOutput = true,
-		string $path = 'cli_json'
+		string $path = 'sql?mode=raw'
 	): array {
 		$port = static::getListenHttpPort();
+		$isSql = str_starts_with(ltrim($path, '/'), 'sql');
 		// We use temporarely file just to skip issues with escaping post data in command line arg
 		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.data';
-		file_put_contents($payloadFile, $query);
+		file_put_contents($payloadFile, $isSql ? 'query=' . rawurlencode($query) : $query);
 		$redirect = $redirectOutput ? '2>&1' : '';
 		$header = ($path === 'bulk' || $path === '_bulk')
-			? 'Content-type: application/x-ndjson' : 'Content-type: application/json';
+			? 'Content-type: application/x-ndjson'
+			: ($isSql
+				? 'Content-type: application/x-www-form-urlencoded'
+				: 'Content-type: application/json'
+			);
 		exec(
 			"curl -s 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect",
 			$output
@@ -312,7 +317,7 @@ trait TestFunctionalTrait {
 
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = match ($path) {
-			'cli_json' => (array)json_decode(implode(PHP_EOL, $output), true),
+			'cli_json', 'sql', 'sql?mode=raw' => (array)json_decode(implode(PHP_EOL, $output), true),
 			'cli' => [
 				['columns' => implode(PHP_EOL, $output), 'data' => [], 'error' => ''],
 			],
@@ -346,7 +351,7 @@ trait TestFunctionalTrait {
 			'error' => $error,
 			'version' => 1,
 			'message' => [
-				'path_query' => '/cli_json',
+				'path_query' => '/sql?mode=raw',
 				'body' => $query,
 			],
 		];

@@ -59,7 +59,16 @@ class HungRequestTest extends TestCase {
 		if (!is_array($res1[0]) || !is_array($res2[0])) {
 			$this->fail();
 		}
-		$this->assertEquals($res1[0]['data'][0]['id'], $res2[0]['data'][2]['id']);
+
+		$actualId = 0;
+		foreach ($res2[0]['data'] as $row) {
+			if ($row['query'] !== 'test 4/deferred') {
+				continue;
+			}
+
+			$actualId = $row['id'];
+		}
+		$this->assertEquals($res1[0]['data'][0]['id'], $actualId);
 		sleep(4);
 	}
 

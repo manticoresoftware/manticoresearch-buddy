@@ -80,8 +80,8 @@ class InsertQueryExecutorTest extends TestCase {
 				'error' => "table 'test' absent, or does not support INSERT",
 				'payload' => 'INSERT INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::CliJson,
-				'path' => 'cli_json',
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
 			]
 		);
 		$this->runTask($request, $mockServerUrl, $resp);

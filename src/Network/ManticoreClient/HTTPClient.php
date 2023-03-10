@@ -138,7 +138,7 @@ class HTTPClient {
 	 * @return void
 	 */
 	public function setPath(string $path): void {
-		$this->path = $path ?: ManticoreEndpoint::CliJson->value;
+		$this->path = $path ?: ManticoreEndpoint::Sql->value;
 	}
 
 	/**
