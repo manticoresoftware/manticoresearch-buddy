@@ -82,7 +82,7 @@ class AutoSchemaSupportTest extends TestCase {
 		echo "\nTesting the fail on the execution of HTTP insert query with searchd auto_schema=1\n";
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1) ";
 		$out = static::runHttpQuery($query);
-		$result = [['total' => 1,'error' => '','warning' => '']];
+		$result = [['total' => 1, 'error' => '','warning' => '']];
 		self::$checkAutoSchema = -1;
 		$this->assertEquals($result, $out);
 	}

@@ -34,9 +34,9 @@ class ListenArgTest extends TestCase {
 		echo "\nTesting if the `listen` argument is passed from daemon to Buddy correctly\n";
 		$this->setListenDefaultPort(8888);
 		$httpPort = self::getListenHttpPort();
-		exec("curl localhost:$httpPort/cli_json -d 'drop table if exists test' 2>&1");
+		exec("curl localhost:$httpPort/sql?mode=raw -d 'query=drop table if exists test' 2>&1");
 		$query = 'INSERT into test(col1) VALUES(1) ';
-		exec("curl localhost:$httpPort/cli_json -d '$query' 2>&1", $out);
+		exec("curl localhost:$httpPort/sql?mode=raw -d 'query=$query' 2>&1", $out);
 		$result = '[{"total":1,"error":"","warning":""}]';
 		$this->assertEquals($result, $out[3]);
 	}

@@ -26,7 +26,7 @@ class RequestTest extends TestCase {
 			'error' => 'some error',
 			'type' => 'unknown json request',
 			'message' => [
-				'path_query' => '/cli_json',
+				'path_query' => '/sql?mode=raw',
 				'body' => 'some query',
 			],
 			'version' => 1,
@@ -37,7 +37,7 @@ class RequestTest extends TestCase {
 		$this->assertEquals(RequestFormat::JSON, $request->format);
 		$this->assertEquals($payload['version'], $request->version);
 		$this->assertEquals($payload['error'], $request->error);
-		$this->assertEquals(ManticoreEndpoint::CliJson, $request->endpointBundle);
+		$this->assertEquals(ManticoreEndpoint::Sql, $request->endpointBundle);
 
 		$payload['message']['path_query'] = '';
 		$request = Request::fromPayload($payload);

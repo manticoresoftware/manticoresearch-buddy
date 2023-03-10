@@ -5,3 +5,6 @@ build/**
 /.ptp-sync/
 .ptp-sync-folder
 phar_builder
+cache
+manticoresearch
+plugins

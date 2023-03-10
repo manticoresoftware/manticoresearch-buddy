@@ -144,7 +144,7 @@ final class Request {
 		static::validateInputFields($payload, static::PAYLOAD_FIELDS);
 
 		// Checking if request format and endpoint are supported
-		[$this->path] = explode('?', ltrim($payload['message']['path_query'], '/'));
+		$this->path = rtrim(ltrim($payload['message']['path_query'], '/'), '?');
 		if (str_contains($this->path, '/_doc/') || str_contains($this->path, '/_create/')
 			|| str_ends_with($this->path, '/_doc') || str_ends_with($this->path, '/_create')) {
 			// We don't differentiate elastic-like insert and replace queries here
