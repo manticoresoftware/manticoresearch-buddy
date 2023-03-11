@@ -15,7 +15,7 @@
 	},
 	"autoload": {
 		"psr-4": {
-			"Manticoresearch\\Buddy\\": "src/"
+			"Manticoresearch\\Buddy\\Base\\": "src/"
 		},
 		"files": ["src/func.php"]
 	},
@@ -29,9 +29,22 @@
 	"require": {
 		"react/http": "^1.8",
 		"react/socket": "^1.12",
-		"manticoresoftware/manticoresearch-backup": "^0.5.11",
 		"manticoresoftware/telemetry": "^0.1.7",
-		"symfony/dependency-injection": "^6.1"
+		"symfony/dependency-injection": "^6.1",
+		"manticoresoftware/buddy-core": "dev-main",
+		"manticoresoftware/buddy-plugin-empty-string": "dev-main",
+		"manticoresoftware/buddy-plugin-backup": "dev-main",
+		"manticoresoftware/buddy-plugin-emulate-elastic": "dev-main",
+		"manticoresoftware/buddy-plugin-insert": "dev-main",
+		"manticoresoftware/buddy-plugin-lock-tables": "dev-main",
+		"manticoresoftware/buddy-plugin-unlock-tables": "dev-main",
+		"manticoresoftware/buddy-plugin-select": "dev-main",
+		"manticoresoftware/buddy-plugin-show-full-tables": "dev-main",
+		"manticoresoftware/buddy-plugin-show-fields": "dev-main",
+		"manticoresoftware/buddy-plugin-show-queries": "dev-main",
+		"manticoresoftware/buddy-plugin-cli-table": "dev-main",
+		"manticoresoftware/buddy-plugin-create-plugin": "dev-main",
+		"manticoresoftware/buddy-plugin-test": "dev-main"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^1.8",
@@ -39,5 +52,11 @@
 		"squizlabs/php_codesniffer": "^3.7",
 		"phpunit/phpunit": "^9.5"
 	},
+	"repositories": [
+		{
+			"type": "path",
+			"url": "./plugins/*"
+		}
+	],
 	"bin": ["manticore-buddy"]
 }

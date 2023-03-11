@@ -9,20 +9,20 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\InsertQuery\Executor;
-use Manticoresearch\Buddy\InsertQuery\Request;
-use Manticoresearch\Buddy\Lib\Task\Task;
-use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
-use Manticoresearch\Buddy\Network\ManticoreClient\Response as ManticoreResponse;
-use Manticoresearch\Buddy\Network\ManticoreClient\Settings as ManticoreSettings;
-use Manticoresearch\Buddy\Network\Request as NetRequest;
-use Manticoresearch\Buddy\Network\Response;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response as ManticoreResponse;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Network\Response;
+use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Plugin\Insert\Handler;
+use Manticoresearch\Buddy\Plugin\Insert\Payload;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
-class InsertQueryExecutorTest extends TestCase {
+class InsertQueryHandlerTest extends TestCase {
 
 	use TestHTTPServerTrait;
 
@@ -31,13 +31,13 @@ class InsertQueryExecutorTest extends TestCase {
 	}
 
 	/**
-	 * @param NetRequest $networkRequest
+	 * @param Request $networkRequest
 	 * @param string $serverUrl
 	 * @param string $resp
 	 */
-	protected function runTask(NetRequest $networkRequest, string $serverUrl, string $resp): void {
-		$request = Request::fromNetworkRequest($networkRequest);
-		$request->setManticoreSettings(
+	protected function runTask(Request $networkRequest, string $serverUrl, string $resp): void {
+		$payload = Payload::fromRequest($networkRequest);
+		$payload->setSettings(
 			ManticoreSettings::fromArray(
 				[
 					'configuration_file' => '/etc/manticoresearch/manticore.conf',
@@ -57,11 +57,11 @@ class InsertQueryExecutorTest extends TestCase {
 		);
 
 		$manticoreClient = new HTTPClient(new ManticoreResponse(), $serverUrl);
-		$executor = new Executor($request);
-		$executor->setManticoreClient($manticoreClient);
+		$handler = new Handler($payload);
+		$handler->setManticoreClient($manticoreClient);
 		ob_flush();
 		$runtime = Task::createRuntime();
-		$task = $executor->run($runtime);
+		$task = $handler->run($runtime);
 		$task->wait();
 
 		$this->assertEquals(true, $task->isSucceed());
@@ -74,7 +74,7 @@ class InsertQueryExecutorTest extends TestCase {
 		echo "\nTesting the execution of a task with INSERT query request\n";
 		$resp = '[{"total":1,"error":"","warning":""}]';
 		$mockServerUrl = self::setUpMockManticoreServer(false);
-		$request = NetRequest::fromArray(
+		$request = Request::fromArray(
 			[
 				'version' => 1,
 				'error' => "table 'test' absent, or does not support INSERT",

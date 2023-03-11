@@ -9,10 +9,10 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\BuddyRequestError;
-use Manticoresearch\Buddy\Exception\GenericError;
-use Manticoresearch\Buddy\Network\Response;
+use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\Network\Response;
+use Manticoresearch\BuddyTest\Lib\BuddyRequestError;
 use PHPUnit\Framework\TestCase;
 
 class ResponseTest extends TestCase {

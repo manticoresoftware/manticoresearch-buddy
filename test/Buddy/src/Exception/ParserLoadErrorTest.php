@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Exception\ParserLoadError;
+use Manticoresearch\Buddy\Plugin\Insert\Error\ParserLoadError;
 use PHPUnit\Framework\TestCase;
 
 class ParserLoadErrorTest extends TestCase {

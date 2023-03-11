@@ -9,8 +9,8 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Exception\ManticoreResponseError ;
-use Manticoresearch\Buddy\Network\ManticoreClient\Response;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError ;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -71,7 +71,7 @@ class ManticoreResponseTest extends TestCase {
 
 	public function testManticoreResponseFail(): void {
 		echo "\nTesting the fail on the creation of Manticore response\n";
-		$this->expectException(ManticoreResponseError::class);
+		$this->expectException(ManticoreSearchResponseError::class);
 		$this->expectExceptionMessage('Invalid JSON found');
 		new Response('{"some unvalid json"}');
 	}
@@ -115,7 +115,7 @@ class ManticoreResponseTest extends TestCase {
 		$processor = function ($body, $data, $columns) {
 			return isset($body, $data, $columns) ? 'some unvalid json' : null;
 		};
-		$this->expectException(ManticoreResponseError::class);
+		$this->expectException(ManticoreSearchResponseError::class);
 		$this->expectExceptionMessage('Invalid JSON found');
 		$this->response->postprocess($processor);
 	}

@@ -9,14 +9,16 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Lib\CliArgsProcessor;
-use Manticoresearch\Buddy\Lib\CrashDetector;
-use Manticoresearch\Buddy\Lib\MetricThread;
-use Manticoresearch\Buddy\Lib\QueryProcessor;
-use Manticoresearch\Buddy\Lib\Task\TaskPool;
-use Manticoresearch\Buddy\Network\EventHandler;
-use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
-use Manticoresearch\Buddy\Network\Server;
+use Manticoresearch\Buddy\Base\Lib\CliArgsProcessor;
+use Manticoresearch\Buddy\Base\Lib\CrashDetector;
+use Manticoresearch\Buddy\Base\Lib\MetricThread;
+use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Base\Network\EventHandler;
+use Manticoresearch\Buddy\Base\Network\Server;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\Task\TaskPool;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\Process;
 use Symfony\Component\DependencyInjection\ContainerBuilder as Container;
 
 // Init autoload first
@@ -66,21 +68,21 @@ $server = Server::create()
 		static function () {
 			$memory = memory_get_usage() / 1024;
 			$formatted = number_format($memory, 3).'K';
-			debug("memory usage: {$formatted}");
+			Buddy::debug("memory usage: {$formatted}");
 		}, 60
 	)
 	->addTicker(
 		static function () {
 			$taskCount = TaskPool::getCount();
-			debug("running {$taskCount} tasks");
+			Buddy::debug("running {$taskCount} tasks");
 		}, 60
 	)
-	->addTicker(EventHandler::clientCheckTickerFn(get_parent_pid()), 5, 'server');
+	->addTicker(EventHandler::clientCheckTickerFn(Process::getParentPid()), 5, 'server');
 
 if (is_telemetry_enabled()) {
 	$server->addTicker(
 		static function () {
-			debug('running metric snapshot');
+			Buddy::debug('running metric snapshot');
 			MetricThread::instance()->execute(
 				'checkAndSnapshot',
 				[(int)(getenv('TELEMETRY_PERIOD', true) ?: 300)]

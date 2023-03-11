@@ -9,9 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\Datatype;
-use Manticoresearch\Buddy\Exception\QueryParserError;
-use Manticoresearch\Buddy\QueryParser\JSONInsertParser;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Datatype;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\JSONInsertParser;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -69,7 +69,7 @@ class JSONInsertParserTest extends TestCase {
 		$this->assertEquals(['col1', 'col2'], $parserCls->getProperty('cols')->getValue(self::$parser));
 
 		$row = ['update' => ['index' => 'test', 'id' => 1, 'doc' => ['col1' => 10, 'col2' => 'a']]];
-		$this->expectException(QueryParserError::class);
+		$this->expectException(QueryParseError::class);
 		//$this->expectExceptionMessage("Operation name 'insert' is missing");
 		$this->expectExceptionMessage("Mandatory request field 'index' is missing");
 		$this->assertEquals([], self::$parser->parseJSONRow($row));
@@ -120,13 +120,12 @@ class JSONInsertParserTest extends TestCase {
 			. '{ "insert" : { "index" : "test", "id" : 2, "doc": { "col1" : "c", "col2": "b" } } }';
 
 		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
-		$this->assertEquals(QueryParserError::class, $exCls);
+		$this->assertEquals(QueryParseError::class, $exCls);
 		$this->assertEquals("Incompatible types in 'col1': 'text int',", $exMsg);
 
 		$query = '{ "update" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }';
 		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
-		$this->assertEquals(QueryParserError::class, $exCls);
+		$this->assertEquals(QueryParseError::class, $exCls);
 		$this->assertEquals("Operation name 'insert' is missing", $exMsg);
 	}
-
 }

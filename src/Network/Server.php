@@ -9,9 +9,11 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Network;
+namespace Manticoresearch\Buddy\Base\Network;
 
 use Exception;
+use Manticoresearch\Buddy\Core\Network\Response;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use React\EventLoop\Loop;
 use React\Http\HttpServer;
 use React\Http\Middleware\RequestBodyBufferMiddleware;
@@ -120,7 +122,7 @@ final class Server {
 	 */
 	public function start(): static {
 		// This is must be first! Because its important
-		echo 'Buddy v' . buddy_version()
+		echo 'Buddy v' . Buddy::getVersion()
 			. ' started ' . str_replace('tcp://', '', (string)$this->socket->getAddress())
 			. PHP_EOL;
 		usleep(200000); // <-- TODO: remove it when we will have fix on manticore side
@@ -150,7 +152,7 @@ final class Server {
 
 		$this->socket->on(
 			'connection', function (ConnectionInterface $connection) {
-				debug('New connection from ' . $connection->getRemoteAddress());
+				Buddy::debug('New connection from ' . $connection->getRemoteAddress());
 
 				// First add all ticks to run periodically
 				foreach ($this->ticks['client'] as [$fn, $period]) {

@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\BuddyTest\Trait;
 
-use Manticoresearch\Buddy\Exception\GenericError;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 
 trait TestProtectedTrait {
 

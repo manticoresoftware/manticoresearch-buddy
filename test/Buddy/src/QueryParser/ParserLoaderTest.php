@@ -9,32 +9,32 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Interface\InsertQueryParserInterface;
-use Manticoresearch\Buddy\QueryParser\ElasticJSONInsertParser;
-use Manticoresearch\Buddy\QueryParser\JSONInsertParser;
-use Manticoresearch\Buddy\QueryParser\Loader;
-use Manticoresearch\Buddy\QueryParser\SQLInsertParser;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\ElasticJSONInsertParser;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\InsertQueryParserInterface;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\JSONInsertParser;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Loader;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\SQLInsertParser;
 use PHPUnit\Framework\TestCase;
 
 class ParserLoaderTest extends TestCase {
 
 	public function testParserLoader(): void {
 		echo "\nGetting SQLInsertParser instance\n";
-		$parser = Loader::getInsertQueryParser('test', ManticoreEndpoint::Sql);
+		$parser = Loader::getInsertQueryParser('test', Endpoint::Sql);
 		$this->assertInstanceOf(SQLInsertParser::class, $parser);
 		$this->assertInstanceOf(InsertQueryParserInterface::class, $parser);
-		$parser = Loader::getInsertQueryParser('test', ManticoreEndpoint::Cli);
+		$parser = Loader::getInsertQueryParser('test', Endpoint::Cli);
 		$this->assertInstanceOf(SQLInsertParser::class, $parser);
 		echo "\nGetting JSONInsertParser instance\n";
-		$parser = Loader::getInsertQueryParser('insert', ManticoreEndpoint::Insert);
+		$parser = Loader::getInsertQueryParser('insert', Endpoint::Insert);
 		$this->assertInstanceOf(JSONInsertParser::class, $parser);
 		try {
 			$this->assertInstanceOf(ElasticJSONInsertParser::class, $parser);
 			$this->fail();
 		} catch (Exception) {
 		}
-		$parser = Loader::getInsertQueryParser('test/_doc/', ManticoreEndpoint::Bulk);
+		$parser = Loader::getInsertQueryParser('test/_doc/', Endpoint::Bulk);
 		$this->assertInstanceOf(ElasticJSONInsertParser::class, $parser);
 	}
 

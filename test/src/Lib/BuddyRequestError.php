@@ -9,7 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Exception;
+namespace Manticoresearch\BuddyTest\Lib;
 
-class InvalidRequestError extends GenericError {
+use Manticoresearch\Buddy\Core\Error\GenericError;
+
+final class BuddyRequestError extends GenericError {
 }

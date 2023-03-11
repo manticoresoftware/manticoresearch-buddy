@@ -12,7 +12,7 @@
 /**
  * This file contains various global functions that are useful in some cases
  */
-use Manticoresearch\Buddy\Lib\MetricThread;
+use Manticoresearch\Buddy\Base\Lib\MetricThread;
 
 /**
  * Emit metric into the separate thread
@@ -39,116 +39,6 @@ function is_telemetry_enabled(): bool {
 }
 
 /**
- * Little helper to get current version of buddy
- *
- * @return string
- */
-function buddy_version(): string {
-	return trim((string)file_get_contents(__DIR__ . '/../APP_VERSION'));
-}
-
-/**
- * Single iteration implementation of camelcase to underscore
- *
- * @param string $string
- * @return string
- */
-function camelcase_to_underscore(string $string): string {
-	$result = '';
-	$prevHigh = false;
-	for ($i = 0, $max = strlen($string); $i < $max; $i++) {
-		$curHigh = $string[$i] >= 'A' && $string[$i] <= 'Z';
-		if ($result && !$prevHigh && $curHigh) {
-			$result .= '_';
-		}
-
-		$result .= $curHigh ? strtolower($string[$i]) : $string[$i];
-		$prevHigh = $curHigh;
-	}
-
-	return $result;
-}
-
-/**
- * Single iteration implementation of camelcase to underscore
- *
- * @param string $string
- * @return string
- */
-function underscore_to_camelcase(string $string): string {
-	return lcfirst(str_replace('_', '', ucwords($string, '_')));
-}
-
-/**
- * This is helper to display debug info in debug mode
- *
- * @param string $message
- * @param string $eol
- * @return void
- */
-function debug(string $message, string $eol = PHP_EOL): void {
-	if (!getenv('DEBUG')) {
-		return;
-	}
-
-	echo $message . $eol;
-}
-
-/**
- * Cross-platform function to get parent pid of manticore process
- *
- * @return int
- */
-function get_parent_pid(): int {
-	if (PHP_OS_FAMILY === 'Windows') {
-		$pid = getmypid();  // child process ID
-		$parentPid = (string)shell_exec("wmic process where (processid=$pid) get parentprocessid");
-		$parentPid = explode("\n", $parentPid);
-		$parentPid = (int)$parentPid[1];
-
-		return $parentPid;
-	}
-
-	return posix_getppid();
-}
-
-/**
- * Check wether process is running or not
- *
- * @param int $pid
- * @return bool
- */
-function process_exists(int $pid): bool {
-	$isRunning = false;
-	if (PHP_OS_FAMILY === 'Windows') {
-		$out = [];
-		exec("TASKLIST /FO LIST /FI \"PID eq $pid\"", $out);
-		if (sizeof($out) > 1) {
-			$isRunning = true;
-		}
-	} elseif (posix_kill($pid, 0)) {
-		$isRunning = true;
-	}
-	return $isRunning;
-}
-
-/**
- * @param int $errno
- * @param string $errstr
- * @param string $errfile
- * @param int $errline
- * @return void
- */
-function buddy_error_handler(int $errno, string $errstr, string $errfile, int $errline): void {
-	if (!(error_reporting() & $errno)) {
-	  // This error code is not included in error_reporting
-		return;
-	}
-
-	throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
-}
-
-/**
  * Little helper to convert config into int
  * @param string $val
  * @return int
@@ -162,4 +52,21 @@ function return_bytes(string $val): int {
 		'k' => 1024,
 		default => 1,
 	};
+}
+
+
+/**
+ * @param int $errno
+ * @param string $errstr
+ * @param string $errfile
+ * @param int $errline
+ * @return void
+ */
+function buddy_error_handler(int $errno, string $errstr, string $errfile, int $errline): void {
+	if (!(error_reporting() & $errno)) {
+		// This error code is not included in error_reporting
+		return;
+	}
+
+	throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 }

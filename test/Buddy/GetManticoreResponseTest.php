@@ -9,10 +9,10 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
-use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
-use Manticoresearch\Buddy\Network\ManticoreClient\Response;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
@@ -70,7 +70,7 @@ class GetManticoreResponseTest extends TestCase {
 		$this->assertEquals($mntResp, $this->httpClient->sendRequest($query));
 
 		$query = 'SELECT connid AS ID FROM @@system.sessions';
-		$this->expectException(ManticoreHTTPClientError::class);
+		$this->expectException(ManticoreSearchClientError::class);
 		$this->expectExceptionMessage('No response passed from server');
 		$this->httpClient->sendRequest($query);
 	}

@@ -9,10 +9,10 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\InvalidRequestError;
-use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -57,40 +57,40 @@ class RequestTest extends TestCase {
 		];
 
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
-		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals(InvalidNetworkRequestError::class, $exCls);
 		$this->assertEquals("Do not know how to handle 'error request' type", $exMsg);
 
 		$payload['request_type'] = 'trololo';
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
-		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals(InvalidNetworkRequestError::class, $exCls);
 		$this->assertEquals("Do not know how to handle 'error request' type", $exMsg);
 
 		$payload['message']['path_query'] = '/test';
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
-		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals(InvalidNetworkRequestError::class, $exCls);
 		$this->assertEquals("Do not know how to handle '/test' path_query", $exMsg);
 
 		unset($payload['error']);
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
-		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals(InvalidNetworkRequestError::class, $exCls);
 		$this->assertEquals("Mandatory field 'error' is missing", $exMsg);
 
 		$payload['error'] = 123;
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
-		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals(InvalidNetworkRequestError::class, $exCls);
 		$this->assertEquals("Field 'error' must be a string", $exMsg);
 
 		$payload['error'] = 'some error';
 		$payload['message']['body'] = 123;
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromPayload', [$payload]);
-		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals(InvalidNetworkRequestError::class, $exCls);
 		$this->assertEquals("Field 'body' must be a string", $exMsg);
 	}
 
 	public function testManticoreQueryValidationOk(): void {
 		$query = '{"error":"some error","type":"unknown json request",'
 		. '"message":{"path_query":"/cli","body":"some query"},"version":1}';
-		$id = mt_rand(0, 1000000);
+		$id = random_int(0, 1000000);
 		$request = Request::fromString($query, $id);
 		$this->assertInstanceOf(Request::class, $request);
 		$this->assertEquals($id, $request->id);
@@ -100,17 +100,17 @@ class RequestTest extends TestCase {
 		echo "\nTesting the validation of an incorrect request query from Manticore\n";
 		$query = '';
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromString', [$query]);
-		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals(InvalidNetworkRequestError::class, $exCls);
 		$this->assertEquals('The payload is missing', $exMsg);
 
 		$query = "Invalid query\nis passed\nagain";
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromString', [$query]);
-		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals(InvalidNetworkRequestError::class, $exCls);
 		$this->assertEquals('Invalid request payload is passed', $exMsg);
 
 		$query = 'Query\nwith unvalid\n\n{"request_body"}';
 		[$exCls, $exMsg] = self::getExceptionInfo(Request::class, 'fromString', [$query]);
-		$this->assertEquals(InvalidRequestError::class, $exCls);
+		$this->assertEquals(InvalidNetworkRequestError::class, $exCls);
 		$this->assertEquals('Invalid request payload is passed', $exMsg);
 	}
 }

@@ -9,17 +9,20 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Network;
+namespace Manticoresearch\Buddy\Base\Network;
 
 use Exception;
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\CommandNotAllowed;
-use Manticoresearch\Buddy\Exception\GenericError;
-use Manticoresearch\Buddy\Exception\InvalidRequestError;
-use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\Lib\QueryProcessor;
-use Manticoresearch\Buddy\Lib\Task\Task;
-use Manticoresearch\Buddy\Lib\Task\TaskPool;
+use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
+use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Network\Response;
+use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Core\Task\TaskPool;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\Process;
 use Psr\Http\Message\ServerRequestInterface;
 use React\EventLoop\Loop;
 use React\EventLoop\TimerInterface;
@@ -88,8 +91,8 @@ final class EventHandler {
 	 */
 	protected static function shouldProxyError(Throwable $e): bool {
 		return is_a($e, SQLQueryCommandNotSupported::class)
-			|| is_a($e, CommandNotAllowed::class)
-			|| is_a($e, InvalidRequestError::class);
+			|| is_a($e, InvalidNetworkRequestError::class)
+			|| ($e instanceof GenericError && $e->getProxyOriginalError());
 	}
 
 	/**
@@ -102,7 +105,7 @@ final class EventHandler {
 	protected static function data(ServerRequestInterface $serverRequest, string $data): PromiseInterface {
 		$deferred = new Deferred;
 		$id = static::getRequestId($serverRequest);
-		debug("[$id] request data: $data");
+		Buddy::debug("[$id] request data: $data");
 
 		// Get extra properties to identified connectio and host
 		// and set it for the task first
@@ -158,7 +161,7 @@ final class EventHandler {
 				$ts = $now;
 				$taskId = $task->getId();
 				$taskStatus = $task->getStatus()->name;
-				debug("[$request->id] Task $taskId is $taskStatus");
+				Buddy::debug("[$request->id] Task $taskId is $taskStatus");
 			}
 			if ($task->isRunning()) {
 				return;
@@ -221,9 +224,9 @@ final class EventHandler {
 						[$request, $response] = $payload;
 						$result = (string)$response;
 						$id = static::getRequestId($serverRequest);
-						debug("[$id] response data: $result");
+						Buddy::debug("[$id] response data: $result");
 						$time = (int)((microtime(true) - $request->time) * 1000000);
-						debug("[$id] process time: {$time}µs");
+						Buddy::debug("[$id] process time: {$time}µs");
 						return $resolve(new HttpResponse(200, $headers, $result));
 					}
 				);
@@ -238,7 +241,7 @@ final class EventHandler {
 	 * @return Response
 	 */
 	public static function error(Exception $e): Response {
-		debug('Error: ' . $e->getMessage());
+		Buddy::debug('Error: ' . $e->getMessage());
 		return Response::none();
 	}
 
@@ -250,12 +253,12 @@ final class EventHandler {
 	 */
 	public static function clientCheckTickerFn(int $pid): callable {
 		return function () use ($pid) {
-			$curPid = get_parent_pid();
-			if ($curPid === $pid && process_exists($pid)) {
+			$curPid = Process::getParentPid();
+			if ($curPid === $pid && Process::exists($pid)) {
 				return;
 			}
 
-			debug('Parrent proccess died, exiting…');
+			Buddy::debug('Parrent proccess died, exiting…');
 			if (function_exists('posix_kill')) {
 				posix_kill((int)getmypid(), 1);
 			}
@@ -318,7 +321,7 @@ final class EventHandler {
 		?TimerInterface $timer,
 		?array $runtimeStruct
 	): PromiseInterface {
-		debug("[$id] data parse error: {$e->getMessage()}");
+		Buddy::debug("[$id] data parse error: {$e->getMessage()}");
 
 		// If we pop runtime, return back in case of error
 		if ($runtimeStruct) {

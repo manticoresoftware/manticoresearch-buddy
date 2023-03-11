@@ -176,16 +176,16 @@ class MysqlDumpTest extends TestCase {
 				"INSERT INTO b (id, v1, v2, v3) VALUES (%d, '%s', %d, '%s')",
 				$id,
 				uniqid(),
-				$i * mt_rand(0, 1000),
-				json_encode(['key' => mt_rand(0, 1000), 'value' => uniqid()]),
+				$i * random_int(0, 1000),
+				json_encode(['key' => random_int(0, 1000), 'value' => uniqid()]),
 			);
 
 			$data[] = sprintf(
 				"INSERT INTO c (id, v1, v2, v3) VALUES (%d, '%s', %d, '%s')",
 				$id,
 				uniqid(),
-				$i * mt_rand(0, 1000),
-				json_encode(['key' => mt_rand(0, 1000), 'value' => uniqid()]),
+				$i * random_int(0, 1000),
+				json_encode(['key' => random_int(0, 1000), 'value' => uniqid()]),
 			);
 		}
 

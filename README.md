@@ -39,7 +39,7 @@ Once you execute this command, all the necessary structures for the `NameOfTheCo
 Let's take a closer look at an example of how to create an abstract RESTORE command:
 
 1. Start by creating a directory with our command namespace `src/Restore` and implementing the Request and Executor classes.
-2. Then, write code that implements the `fromNetworkRequest` method in the `Request` class. This method should parse the input network request and return a new Request instance with all the necessary data loaded and ready to be used in the `Executor`.
+2. Then, write code that implements the `fromRequest` method in the `Request` class. This method should parse the input network request and return a new Request instance with all the necessary data loaded and ready to be used in the `Executor`.
 3. In the `Executor`, write code that implements the run method and contains all the logic for the command. This method should return an instance of the `Task` class.
 4. With the `Task` instance, you can check the status, get the result, and have full control over the asynchronous execution of the command.
 5.Finally, add a case for our new command to the `extractCommandFromRequest` method of the `QueryProcessor` class. This ensures that the `QueryProcessor` can recognize and handle requests for the `RESTORE` command.

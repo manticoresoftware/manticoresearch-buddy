@@ -9,12 +9,14 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Lib\MetricThread;
-use Manticoresearch\Buddy\Lib\QueryProcessor;
-use Manticoresearch\Buddy\Lib\TableFormatter;
-use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
-use Manticoresearch\Buddy\Network\ManticoreClient\Response;
-use Manticoresearch\Buddy\QueryParser\Loader;
+use Manticoresearch\Buddy\Base\Lib\MetricThread;
+use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
+use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Loader;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -26,8 +28,11 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 ;
 
 set_error_handler(buddy_error_handler(...)); // @phpstan-ignore-line
+Buddy::setVersionFile(__DIR__ . '/../APP_VERSION');
 
 // Build container dependencies
+// TODO: probably it's a good idea to get rid out of this container at all
+// TODO: And at least think about extraction of plugin dependencies
 $container = new ContainerBuilder();
 $container->register('ManticoreResponseBuilder', Response::class);
 $container->register('QueryParserLoader', Loader::class);
@@ -39,5 +44,7 @@ $container->register('tableFormatter', TableFormatter::class);
 
 QueryProcessor::setContainer($container);
 MetricThread::setContainer($container);
+
+Task::init(__DIR__ . DIRECTORY_SEPARATOR . 'runtime.php');
 
 return $container;

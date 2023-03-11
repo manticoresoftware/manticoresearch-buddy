@@ -9,16 +9,16 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\InsertQuery\Request;
-use Manticoresearch\Buddy\Network\Request as NetRequest;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Plugin\Insert\Payload;
 use PHPUnit\Framework\TestCase;
 
-class InsertQueryRequestTest extends TestCase {
+class InsertQueryPayloadTest extends TestCase {
 	public function testCreationFromNetworkRequest(): void {
 		echo "\nTesting the creation of InsertQuery\Request from manticore request data struct\n";
-		$request = NetRequest::fromArray(
+		$request = Request::fromArray(
 			[
 				'version' => 1,
 				'error' => '',
@@ -28,18 +28,18 @@ class InsertQueryRequestTest extends TestCase {
 				'path' => 'sql?mode=raw',
 			]
 		);
-		$request = Request::fromNetworkRequest($request);
-		$this->assertInstanceOf(Request::class, $request);
+		$payload = Payload::fromRequest($request);
+		$this->assertInstanceOf(Payload::class, $payload);
 
 		echo "\nTesting the prepared quries after creating request are correct\n";
 
-		$this->assertIsArray($request->queries);
-		$this->assertEquals(2, sizeof($request->queries));
+		$this->assertIsArray($payload->queries);
+		$this->assertEquals(2, sizeof($payload->queries));
 		$this->assertEquals(
 			[
 				'CREATE TABLE IF NOT EXISTS test (int_col int,string_col text,float_col float)',
 				'INSERT INTO test(int_col, string_col, float_col) VALUES(1, \'string\', 2.22)',
-			], $request->queries
+			], $payload->queries
 		);
 	}
 }

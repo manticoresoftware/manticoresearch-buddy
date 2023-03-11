@@ -9,15 +9,15 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\TableFormatter;
-use Manticoresearch\Buddy\Lib\Task\Task;
-use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
-use Manticoresearch\Buddy\Network\ManticoreClient\Response;
-use Manticoresearch\Buddy\Network\Request as NetRequest;
-use Manticoresearch\Buddy\ShowQueries\Executor;
-use Manticoresearch\Buddy\ShowQueries\Request;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\Network\Request as NetRequest;
+use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
+use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Plugin\ShowQueries\Handler;
+use Manticoresearch\Buddy\Plugin\ShowQueries\Payload;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -54,12 +54,12 @@ class ExecutorTest extends TestCase {
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);
 		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
-		$request = Request::fromNetworkRequest($request);
+		$payload = Payload::fromRequest($request);
 
-		$executor = new Executor($request);
-		$executor->setManticoreClient($manticoreClient);
-		$executor->setTableFormatter(new TableFormatter());
-		$task = $executor->run(Task::createRuntime());
+		$handler = new Handler($payload);
+		$handler->setManticoreClient($manticoreClient);
+		$handler->setTableFormatter(new TableFormatter());
+		$task = $handler->run(Task::createRuntime());
 		$task->wait();
 		$this->assertEquals(true, $task->isSucceed());
 		$result = $task->getResult()->getMessage();

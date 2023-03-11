@@ -9,7 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Base\Lib;
+
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class CliArgsProcessor {
 
@@ -51,7 +53,7 @@ final class CliArgsProcessor {
 	 * @return string
 	 */
 	private static function version(): string {
-		return 'Manticore Buddy v' . buddy_version() . "\n"
+		return 'Manticore Buddy v' . Buddy::getVersion() . "\n"
 			. "Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)\n"
 		;
 	}
