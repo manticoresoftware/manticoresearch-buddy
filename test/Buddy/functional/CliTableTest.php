@@ -94,7 +94,7 @@ class CliTableTest extends TestCase {
 			"/\+-+\+-+\+-+\+-+\+\n"
 			. "\| id \| query\s+\| protocol \| host\s+\|\n"
 			. "\+-+\+-+\+-+\+-+\+\n"
-			. "\| \d+ | select \| http\s+\| 127\.0\.0\.1:\d+ \|\n"
+			. "\| \d+ | SHOW QUERIES \| http\s+\| 127\.0\.0\.1:\d+ \|\n"
 			. "\+-+\+-+\+-+\+-+\+\n"
 			. "1 row in set \(\d\.\d{3} sec\)\n/s",
 			$out[0]['columns']

@@ -9,9 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Base\Lib;
 
-use Manticoresearch\Buddy\Network\ManticoreClient\Settings;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
 
 class CrashDetector {
 	// Chunk size we use to read for one

@@ -9,14 +9,14 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Backup\Request as BackupRequest;
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
-use Manticoresearch\Buddy\Network\Request;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Plugin\Backup\Payload as BackupPayload;
 use PHPUnit\Framework\TestCase;
 
-class BackupRequestTest extends TestCase {
+class BackupPayloadTest extends TestCase {
 	const PARSING_SETS = [
 		[ #1
 			'args' => [
@@ -128,14 +128,14 @@ class BackupRequestTest extends TestCase {
 	public function testSQLQueryParsing(): void {
 		echo 'Testing queries:' . PHP_EOL;
 		foreach (static::PARSING_SETS as ['args' => $args, 'checks' => $checks]) {
-			$request = BackupRequest::fromNetworkRequest(
+			$payload = BackupPayload::fromRequest(
 				Request::fromArray(static::buildSQLQuery($args))
 			);
-			$this->assertEquals(true, is_a($request, BackupRequest::class));
+			$this->assertEquals(true, is_a($payload, BackupPayload::class));
 
 			$checks = array_replace($args, $checks);
 			foreach ($checks as $key => $val) {
-				$this->assertEquals($val, $request->{$key});
+				$this->assertEquals($val, $payload->{$key});
 			}
 		}
 	}
@@ -164,7 +164,7 @@ class BackupRequestTest extends TestCase {
 
 		foreach ($testingSet as $query) {
 			try {
-				BackupRequest::fromNetworkRequest(
+				BackupPayload::fromRequest(
 					Request::fromArray(
 						[
 							'version' => 1,
@@ -176,7 +176,7 @@ class BackupRequestTest extends TestCase {
 						]
 					)
 				);
-			} catch (SQLQueryParsingError $e) {
+			} catch (QueryParseError $e) {
 				$this->assertEquals(true, false, "Correct syntax parse failed: $query");
 			}
 			$this->assertEquals(true, true);
@@ -201,7 +201,7 @@ class BackupRequestTest extends TestCase {
 
 		foreach ($testingSet as $query) {
 			try {
-				BackupRequest::fromNetworkRequest(
+				BackupPayload::fromRequest(
 					Request::fromArray(
 						[
 							'version' => 1,
@@ -213,7 +213,7 @@ class BackupRequestTest extends TestCase {
 						]
 					)
 				);
-			} catch (SQLQueryParsingError $e) {
+			} catch (QueryParseError $e) {
 				$this->assertEquals(
 					'You have an error in your query. Please, double check it.',
 					$e->getResponseError()

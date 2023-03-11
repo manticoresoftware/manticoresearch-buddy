@@ -17,3 +17,4 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 ;
 
 set_error_handler(buddy_error_handler(...)); // @phpstan-ignore-line
+Manticoresearch\Buddy\Core\Tool\Buddy::setVersionFile(__DIR__ . '/../APP_VERSION');

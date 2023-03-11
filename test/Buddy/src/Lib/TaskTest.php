@@ -12,11 +12,11 @@
 namespace Manticoresearch\BuddyUnitTest\Lib;
 
 use Exception;
-use Manticoresearch\Buddy\Exception\BuddyRequestError;
-use Manticoresearch\Buddy\Exception\GenericError;
-use Manticoresearch\Buddy\Lib\Task\Task;
-use Manticoresearch\Buddy\Lib\Task\TaskResult;
-use Manticoresearch\Buddy\Lib\Task\TaskStatus;
+use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Task\TaskStatus;
+use Manticoresearch\BuddyTest\Lib\BuddyRequestError;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 

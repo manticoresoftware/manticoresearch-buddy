@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Lib\CliArgsProcessor;
+use Manticoresearch\Buddy\Base\Lib\CliArgsProcessor;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -75,7 +75,7 @@ class CliArgsProcessorTest extends TestCase {
 	}
 
 	public function testTelemetryPeriodArgProcessOk(): void {
-		$period = mt_rand(5, 180);
+		$period = random_int(5, 180);
 		CliArgsProcessor::run(['telemetry-period' => $period]);
 
 		echo "\nTesting the processing of the `telemetry-period` argument\n";

@@ -9,7 +9,9 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Exception;
+namespace Manticoresearch\Buddy\Base\Exception;
+
+use Manticoresearch\Buddy\Core\Error\GenericError;
 
 class SQLQueryCommandMissing extends GenericError {
 }

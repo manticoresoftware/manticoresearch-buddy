@@ -11,9 +11,9 @@
 
 namespace Manticoresearch\BuddyTest\Trait;
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Exception\SocketError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
+use Manticoresearch\BuddyTest\Lib\SocketError;
 use ReflectionClass;
 use RuntimeException;
 

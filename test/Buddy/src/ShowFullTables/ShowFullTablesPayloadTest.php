@@ -9,14 +9,14 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\SQLQueryParsingError;
-use Manticoresearch\Buddy\Network\Request;
-use Manticoresearch\Buddy\ShowFullTables\Request as ShowFullTablesRequest;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Plugin\ShowFullTables\Payload as ShowFullTablesPayload;
 use PHPUnit\Framework\TestCase;
 
-class ShowFullTablesRequestTest extends TestCase {
+class ShowFullTablesPayloadTest extends TestCase {
 	const PARSING_SETS = [
 		[ #1
 			'args' => [
@@ -58,14 +58,14 @@ class ShowFullTablesRequestTest extends TestCase {
 	public function testSQLQueryParsing(): void {
 		echo 'Testing queries:' . PHP_EOL;
 		foreach (static::PARSING_SETS as ['args' => $args, 'checks' => $checks]) {
-			$request = ShowFullTablesRequest::fromNetworkRequest(
+			$payload = ShowFullTablesPayload::fromRequest(
 				Request::fromArray(static::buildSQLQuery($args))
 			);
-			$this->assertEquals(true, is_a($request, ShowFullTablesRequest::class));
+			$this->assertEquals(true, is_a($payload, ShowFullTablesPayload::class));
 
 			$checks = array_replace($args, $checks);
 			foreach ($checks as $key => $val) {
-				$this->assertEquals($val, $request->{$key});
+				$this->assertEquals($val, $payload->{$key});
 			}
 		}
 	}
@@ -83,7 +83,7 @@ class ShowFullTablesRequestTest extends TestCase {
 
 		foreach ($testingSet as $query) {
 			try {
-				ShowFullTablesRequest::fromNetworkRequest(
+				ShowFullTablesPayload::fromRequest(
 					Request::fromArray(
 						[
 							'version' => 1,
@@ -95,8 +95,7 @@ class ShowFullTablesRequestTest extends TestCase {
 						]
 					)
 				);
-			} catch (SQLQueryParsingError $e) {
-				var_dump($e->getMessage());
+			} catch (QueryParseError $e) {
 				$this->assertEquals(true, false, "Correct syntax parse failed: $query");
 			}
 			$this->assertEquals(true, true);
@@ -117,7 +116,7 @@ class ShowFullTablesRequestTest extends TestCase {
 
 		foreach ($testingSet as $query) {
 			try {
-				ShowFullTablesRequest::fromNetworkRequest(
+				ShowFullTablesPayload::fromRequest(
 					Request::fromArray(
 						[
 							'version' => 1,
@@ -129,7 +128,7 @@ class ShowFullTablesRequestTest extends TestCase {
 						]
 					)
 				);
-			} catch (SQLQueryParsingError $e) {
+			} catch (QueryParseError $e) {
 				$this->assertEquals(
 					'You have an error in your query. Please, double-check it.',
 					$e->getResponseError()

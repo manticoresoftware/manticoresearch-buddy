@@ -9,19 +9,19 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Lib\TableFormatter;
-use Manticoresearch\Buddy\Lib\Task\Task;
-use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
-use Manticoresearch\Buddy\Network\ManticoreClient\Response;
-use Manticoresearch\Buddy\Network\Request as NetRequest;
-use Manticoresearch\Buddy\ShowQueries\Executor;
-use Manticoresearch\Buddy\ShowQueries\Request;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
+use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Plugin\ShowQueries\Handler;
+use Manticoresearch\Buddy\Plugin\ShowQueries\Payload;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
-class CliTableExecutorTest extends TestCase {
+class CliTableHandlerTest extends TestCase {
 
 	use TestHTTPServerTrait;
 
@@ -39,7 +39,7 @@ class CliTableExecutorTest extends TestCase {
 			. "\n"
 			. '1 row in set';
 
-		$request = NetRequest::fromArray(
+		$request = Request::fromArray(
 			[
 				'error' => '',
 				'payload' => 'SHOW QUERIES',
@@ -52,13 +52,13 @@ class CliTableExecutorTest extends TestCase {
 		$serverUrl = self::setUpMockManticoreServer(false);
 		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
 		$tableFormatter = new TableFormatter();
-		$request = Request::fromNetworkRequest($request);
+		$payload = Payload::fromRequest($request);
 
-		$executor = new Executor($request);
-		$refCls = new ReflectionClass($executor);
-		$refCls->getProperty('manticoreClient')->setValue($executor, $manticoreClient);
-		$refCls->getProperty('tableFormatter')->setValue($executor, $tableFormatter);
-		$task = $executor->run(Task::createRuntime());
+		$handler = new Handler($payload);
+		$refCls = new ReflectionClass($handler);
+		$refCls->getProperty('manticoreClient')->setValue($handler, $manticoreClient);
+		$refCls->getProperty('tableFormatter')->setValue($handler, $tableFormatter);
+		$task = $handler->run(Task::createRuntime());
 		$task->wait();
 		$this->assertEquals(true, $task->isSucceed());
 		$result = $task->getResult()->getMessage();

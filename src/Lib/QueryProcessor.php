@@ -9,33 +9,41 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Base\Lib;
 
 use Exception;
-use Manticoresearch\Buddy\Enum\Command;
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Exception\CommandNotAllowed;
-use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
-use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\Interface\CommandExecutorInterface;
-use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
-use Manticoresearch\Buddy\Network\ManticoreClient\Settings as ManticoreSettings;
-use Manticoresearch\Buddy\Network\Request;
-use Psr\Container\ContainerExceptionInterface;
+use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
+use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\Strings;
 use Psr\Container\ContainerInterface;
-use Psr\Container\NotFoundExceptionInterface;
-use RuntimeException;
 
 class QueryProcessor {
   /** @var string */
-	protected const NAMESPACE_PREFIX = 'Manticoresearch\\Buddy\\';
+	protected const NAMESPACE_PREFIX = 'Manticoresearch\\Buddy\\Plugin\\';
 
   /** @var ContainerInterface */
   // We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
 
+	/** @var bool */
+	protected static bool $isInited = false;
+
+	/** @var bool */
+	protected static bool $plugged = false;
+
 	/** @var ManticoreSettings */
 	protected static ManticoreSettings $settings;
+
+	/** @var string[] */
+	protected static array $corePlugins = [];
+
+	/** @var string[] */
+	protected static array $extraPlugins = [];
 
   /**
    * Setter for container property
@@ -54,33 +62,28 @@ class QueryProcessor {
    *
    * @param Request $request
    *  The request struct to process
-   * @return CommandExecutorInterface
-   *  The CommandExecutorInterface to execute to process the final query
-   * @throws CommandNotAllowed
+   * @return BaseHandler
+   *  The BaseHandler to execute to process the final query
    */
-	public static function process(Request $request): CommandExecutorInterface {
-		if (!isset(static::$settings)) {
+	public static function process(Request $request): BaseHandler {
+		if (!static::$isInited) {
 			static::init();
 		}
-		$command = static::extractCommandFromRequest($request);
-		if (!self::isCommandAllowed($command)) {
-			throw new CommandNotAllowed("Request handling is disabled: $request->payload");
+		$pluginPrefix = static::detectPluginPrefixFromRequest($request);
+		$pluginName = str_replace(static::NAMESPACE_PREFIX, '', $pluginPrefix);
+		Buddy::debug("[$request->id] Plugin: $pluginName");
+		buddy_metric(Strings::camelcaseToUnderscore($pluginName), 1);
+		$payloadClassName = "{$pluginPrefix}\\Payload";
+		$pluginPayload = $payloadClassName::fromRequest($request);
+		$pluginPayload->setSettings(static::$settings);
+		Buddy::debug("[$request->id] $pluginName payload: " . json_encode($pluginPayload));
+		$handlerClassName = "{$pluginPrefix}\\Handler";
+	  /** @var BaseHandler */
+		$handler = new $handlerClassName($pluginPayload);
+		foreach ($handler->getProps() as $prop) {
+			$handler->{'set' . ucfirst($prop)}(static::getObjFromContainer($prop));
 		}
-		$commandPrefix = $command->value;
-		debug("[$request->id] Executor: $commandPrefix");
-		buddy_metric(camelcase_to_underscore($commandPrefix), 1);
-		$requestClassName = static::NAMESPACE_PREFIX . "{$commandPrefix}\\Request";
-		$commandRequest = $requestClassName::fromNetworkRequest($request);
-		$commandRequest->setManticoreSettings(static::$settings);
-		debug("[$request->id] Command request: {$commandPrefix}\\Request " . json_encode($commandRequest));
-		$executorClassName = static::NAMESPACE_PREFIX . "{$commandPrefix}\\Executor";
-	  /** @var \Manticoresearch\Buddy\Interface\CommandExecutorInterface */
-		$executor = new $executorClassName($commandRequest);
-		foreach ($executor->getProps() as $prop) {
-			$executor->{'set' . ucfirst($prop)}(static::getObjFromContainer($prop));
-		}
-	  /** @var CommandExecutorInterface */
-		return $executor;
+		return $handler;
 	}
 
 	/**
@@ -89,17 +92,22 @@ class QueryProcessor {
 	 * @return void
 	 */
 	public static function init(): void {
-		static::$settings = static::fetchManticoreSettings();
+		// We have tests that going into private properties and change it
+		// This is very bad but to not edit it all we will do hack here
+		// TODO: Fix it later
+		if (!isset(static::$settings)) {
+			static::$settings = static::fetchManticoreSettings();
+		}
+
+		static::$corePlugins = static::fetchCorePlugins();
+		static::$extraPlugins = static::fetchExtraPlugins();
+
+		static::$isInited = true;
 	}
 
 	/**
 	 * Extractd logic to fetch manticore settings and store it in class property
 	 * @return ManticoreSettings
-	 * @throws Exception
-	 * @throws NotFoundExceptionInterface
-	 * @throws ContainerExceptionInterface
-	 * @throws RuntimeException
-	 * @throws ManticoreHTTPClientError
 	 */
 	protected static function fetchManticoreSettings(): ManticoreSettings {
 		/** @var HTTPClient */
@@ -114,7 +122,7 @@ class QueryProcessor {
 				continue;
 			}
 
-			debug("using config file = '$value'");
+			Buddy::debug("using config file = '$value'");
 			putenv("SEARCHD_CONFIG={$value}");
 		}
 
@@ -155,64 +163,67 @@ class QueryProcessor {
 	}
 
   /**
-   * Check if a command is currently supported by Buddy and daemon
-   *
-   * @param Command $command
-   * @return bool
-   */
-	protected static function isCommandAllowed(Command $command): bool {
-		return match (true) {
-			($command === Command::Insert && !self::$settings->searchdAutoSchema) => false,
-			default => true,
-		};
-	}
-
-  /**
    * This method extracts all supported prefixes from input query
    * that buddy able to handle
    *
    * @param Request $request
-   * @return Command
+   * @return string
    * @throws SQLQueryCommandNotSupported
    */
-	public static function extractCommandFromRequest(Request $request): Command {
-		$queryLowercase = strtolower($request->payload);
-		// Making a bit of extra preprocessing to simplify following detection of the bulk insert query
-		if ($request->endpointBundle === ManticoreEndpoint::Bulk) {
-			$queryLowercase = ltrim(substr($queryLowercase, 1));
+	public static function detectPluginPrefixFromRequest(Request $request): string {
+		// Try to match plugin to handle and return prefix
+		foreach ([...static::$corePlugins, ...static::$extraPlugins] as $plugin) {
+			$pluginPrefix = static::NAMESPACE_PREFIX . ucfirst(Strings::camelcaseBySeparator($plugin, '-'));
+			$pluginPayloadClass = "$pluginPrefix\\Payload";
+			if ($pluginPayloadClass::hasMatch($request)) {
+				return $pluginPrefix;
+			}
 		}
 
-		$isInsertSQLQuery = match ($request->endpointBundle) {
-			ManticoreEndpoint::Sql, ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson => str_starts_with(
-				$queryLowercase, 'insert into'
-			),
-			default => false,
-		};
-		$isInsertHTTPQuery = match ($request->endpointBundle) {
-			ManticoreEndpoint::Insert => true,
-			ManticoreEndpoint::Bulk => str_starts_with($queryLowercase, '"insert"')
-			|| str_starts_with($queryLowercase, '"index"'),
-			default => false,
-		};
-		$isInsertError = str_contains($request->error, 'no such index')
-		|| (str_contains($request->error, 'table ') && str_contains($request->error, ' absent'));
+		// No match found? throw the error
+		throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload");
+	}
 
-		return match (true) {
-			($request->endpointBundle === ManticoreEndpoint::Elastic) => Command::EmulateElastic,
-			$queryLowercase === '',
-				str_starts_with($queryLowercase, 'set'),
-				str_starts_with($queryLowercase, 'create database') => Command::EmptyQuery,
-			($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery)) => Command::Insert,
-			str_starts_with($queryLowercase, 'show queries') => Command::ShowQueries,
-			str_starts_with($queryLowercase, 'backup') => Command::Backup,
-			str_starts_with($queryLowercase, 'show full tables') => Command::ShowFullTables,
-			str_starts_with($queryLowercase, 'test') => Command::Test,
-			($request->endpointBundle === ManticoreEndpoint::Cli) => Command::CliTable,
-			str_starts_with($queryLowercase, 'lock tables') => Command::LockTables,
-			str_starts_with($queryLowercase, 'unlock tables') => Command::UnlockTables,
-			str_starts_with($queryLowercase, 'select') => Command::Select,
-			str_starts_with($queryLowercase, 'show fields') => Command::ShowFields,
-			default => throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload"),
-		};
+	/**
+	 * Get list of core plugin names
+	 * @return array<string>
+	 * @throws Exception
+	 */
+	protected static function fetchCorePlugins(): array {
+		$projectRoot = realpath(
+			__DIR__ . DIRECTORY_SEPARATOR
+			. '..' . DIRECTORY_SEPARATOR
+			. '..'
+		);
+		if ($projectRoot === false) {
+			throw new Exception('Failed to find project root');
+		}
+		return static::fetchPlugins($projectRoot);
+	}
+
+	/**
+	 * Get list of external plugin names
+	 * @return array<string>
+	 * @throws Exception
+	 */
+	protected static function fetchExtraPlugins(): array {
+		return static::fetchPlugins();
+	}
+
+	/**
+	 * Helper function to get external or core plugins
+	 * @param string $path
+	 * @return array<string>
+	 * @throws Exception
+	 */
+	protected static function fetchPlugins(string $path = ''): array {
+		$pluggable = new Pluggable(static::$settings);
+		if ($path) {
+			$pluggable->setPluginDir($path);
+		} elseif (!static::$plugged) { // Lazy register autoload
+			static::$plugged = true;
+			$pluggable->registerAutoload();
+		}
+		return $pluggable->getList();
 	}
 }

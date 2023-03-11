@@ -9,9 +9,10 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Base\Lib;
 
-use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Psr\Container\ContainerInterface;
 use parallel\Channel;
 
@@ -123,7 +124,7 @@ final class MetricThread {
 	 */
 	public function execute(string $method, array $args = []): static {
 		$argsJson = json_encode($args);
-		debug("metric: $method $argsJson");
+		Buddy::debug("metric: $method $argsJson");
 		$this->task->transmit([$method, $args]);
 		return $this;
 	}

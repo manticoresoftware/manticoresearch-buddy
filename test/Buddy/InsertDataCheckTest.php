@@ -9,11 +9,11 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\Datatype;
-use Manticoresearch\Buddy\Exception\QueryParserError;
-use Manticoresearch\Buddy\QueryParser\JSONInsertParser;
-use Manticoresearch\Buddy\QueryParser\SQLInsertParser;
-use Manticoresearch\Buddy\Trait\CheckInsertDataTrait;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\CheckInsertDataTrait;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Datatype;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\JSONInsertParser;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\SQLInsertParser;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -49,7 +49,7 @@ class InsertDataCheckTest extends TestCase {
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),
 			$types,
 			['col1', 'col2'],
-			QueryParserError::class
+			QueryParseError::class
 		);
 		$this->assertTrue(true);
 
@@ -60,7 +60,7 @@ class InsertDataCheckTest extends TestCase {
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),
 			$types,
 			['col1', 'col2'],
-			QueryParserError::class
+			QueryParseError::class
 		);
 		$this->assertTrue(true);
 	}
@@ -71,14 +71,14 @@ class InsertDataCheckTest extends TestCase {
 		$parser = $this->sqlParser;
 		$types = [Datatype::Int, Datatype::Json];
 		$row = "1, 'a'";
-		$this->expectException(QueryParserError::class);
+		$this->expectException(QueryParseError::class);
 		$this->expectExceptionMessage("Incompatible types in 'col2': 'text json',");
 		$parser->checkColTypesError(
 			[$parser, 'detectValType'],
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),
 			$types,
 			['col1', 'col2'],
-			QueryParserError::class
+			QueryParseError::class
 		);
 	}
 
@@ -88,14 +88,14 @@ class InsertDataCheckTest extends TestCase {
 		$parser = $this->jsonParser;
 		$types = [Datatype::Int, Datatype::Json];
 		$row = ['col1' => 1, 'col2' => 'a'];
-		$this->expectException(QueryParserError::class);
+		$this->expectException(QueryParseError::class);
 		$this->expectExceptionMessage("Incompatible types in 'col2': 'text json',");
 		$parser->checkColTypesError(
 			[$parser, 'detectValType'],
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),
 			$types,
 			['col1', 'col2'],
-			QueryParserError::class
+			QueryParseError::class
 		);
 	}
 
@@ -105,14 +105,14 @@ class InsertDataCheckTest extends TestCase {
 		$parser = $this->sqlParser;
 		$row = '1';
 		$types = [Datatype::Int, Datatype::Text];
-		$this->expectException(QueryParserError::class);
+		$this->expectException(QueryParseError::class);
 		$this->expectExceptionMessage('Column count mismatch in INSERT statement');
 		$parser->checkColTypesError(
 			[$parser, 'detectValType'],
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),
 			$types,
 			['col1', 'col2'],
-			QueryParserError::class
+			QueryParseError::class
 		);
 	}
 
@@ -122,14 +122,14 @@ class InsertDataCheckTest extends TestCase {
 		$parser = $this->jsonParser;
 		$row = ['col1' => 1];
 		$types = [Datatype::Int, Datatype::Text];
-		$this->expectException(QueryParserError::class);
+		$this->expectException(QueryParseError::class);
 		$this->expectExceptionMessage('Column count mismatch in INSERT statement');
 		$parser->checkColTypesError(
 			[$parser, 'detectValType'],
 			(array)self::invokeMethod($parser, 'parseInsertValues', [$row]),
 			$types,
 			['col1', 'col2'],
-			QueryParserError::class
+			QueryParseError::class
 		);
 	}
 }

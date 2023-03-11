@@ -18,9 +18,9 @@ define('STDOUT', fopen('/dev/stdout', 'wb+'));
 define('STDERR', fopen('/dev/stderr', 'wb+'));
 include_once __DIR__ . '/src/init.php';
 
-use Manticoresearch\Buddy\Lib\QueryProcessor;
-use Manticoresearch\Buddy\Network\Request;
-use Manticoresearch\Buddy\Lib\Task\Task;
+use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Task\Task;
 echo 'Running query: $query' . PHP_EOL. PHP_EOL;
 try {
   \$request = Request::fromPayload([

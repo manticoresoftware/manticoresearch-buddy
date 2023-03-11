@@ -9,19 +9,20 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Backup\Executor as BackupExecutor;
-use Manticoresearch\Buddy\Backup\Request as BackupRequest;
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-use Manticoresearch\Buddy\Enum\RequestFormat;
-use Manticoresearch\Buddy\Exception\CommandNotAllowed;
-use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\InsertQuery\Executor as InsertQueryExecutor;
-use Manticoresearch\Buddy\InsertQuery\Request as InsertQueryRequest;
-use Manticoresearch\Buddy\Lib\QueryProcessor;
-use Manticoresearch\Buddy\Network\ManticoreClient\Settings as ManticoreSettings;
-use Manticoresearch\Buddy\Network\Request;
-use Manticoresearch\Buddy\ShowQueries\Executor as ShowQueriesExecutor;
-use Manticoresearch\Buddy\ShowQueries\Request as ShowQueriesRequest;
+use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
+use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Plugin\Backup\Handler as BackupHandler;
+use Manticoresearch\Buddy\Plugin\Backup\Payload as BackupPayload;
+use Manticoresearch\Buddy\Plugin\Insert\Error\AutoSchemaDisabledError;
+use Manticoresearch\Buddy\Plugin\Insert\Handler as InsertQueryHandler;
+use Manticoresearch\Buddy\Plugin\Insert\Payload as InsertQueryPayload;
+use Manticoresearch\Buddy\Plugin\ShowQueries\Handler as ShowQueriesHandler;
+use Manticoresearch\Buddy\Plugin\ShowQueries\Payload as ShowQueriesPayload;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -41,12 +42,12 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('settings', static::getManticoreSettings());
+		$refCls->setStaticPropertyValue('settings', static::getSettings());
 		$executor = QueryProcessor::process($request);
-		$this->assertInstanceOf(BackupExecutor::class, $executor);
+		$this->assertInstanceOf(BackupHandler::class, $executor);
 		$refCls = new ReflectionClass($executor);
-		$request = $refCls->getProperty('request')->getValue($executor);
-		$this->assertInstanceOf(BackupRequest::class, $request);
+		$payload = $refCls->getProperty('payload')->getValue($executor);
+		$this->assertInstanceOf(BackupPayload::class, $payload);
 
 		$request = Request::fromArray(
 			[
@@ -58,11 +59,11 @@ class QueryProcessorTest extends TestCase {
 				'path' => '',
 			]
 		);
-		$executor = QueryProcessor::process($request);
-		$this->assertInstanceOf(ShowQueriesExecutor::class, $executor);
-		$refCls = new ReflectionClass($executor);
-		$request = $refCls->getProperty('request')->getValue($executor);
-		$this->assertInstanceOf(ShowQueriesRequest::class, $request);
+		$handler = QueryProcessor::process($request);
+		$this->assertInstanceOf(ShowQueriesHandler::class, $handler);
+		$refCls = new ReflectionClass($handler);
+		$payload = $refCls->getProperty('payload')->getValue($handler);
+		$this->assertInstanceOf(ShowQueriesPayload::class, $payload);
 	}
 
 	public function testUnsupportedCommandProcessFail(): void {
@@ -80,14 +81,14 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('settings', static::getManticoreSettings());
+		$refCls->setStaticPropertyValue('settings', static::getSettings());
 		QueryProcessor::process($request);
 	}
 
 	public function testNotAllowedCommandProcessFail(): void {
 		echo "\nTesting the processing of not allowed execution command\n";
 
-		$netRequest = Request::fromArray(
+		$request = Request::fromArray(
 			[
 				'version' => 1,
 				'error' => "table 'test' absent, or does not support INSERT",
@@ -98,25 +99,24 @@ class QueryProcessorTest extends TestCase {
 			]
 		);
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('settings', static::getManticoreSettings(['searchd.auto_schema' => '1']));
-		$executor = QueryProcessor::process($netRequest);
-		$this->assertInstanceOf(InsertQueryExecutor::class, $executor);
-		$refCls = new ReflectionClass($executor);
-		$request = $refCls->getProperty('request')->getValue($executor);
-		$this->assertInstanceOf(InsertQueryRequest::class, $request);
+		$refCls->setStaticPropertyValue('settings', static::getSettings(['searchd.auto_schema' => '1']));
+		$handler = QueryProcessor::process($request);
+		$this->assertInstanceOf(InsertQueryHandler::class, $handler);
+		$refCls = new ReflectionClass($handler);
+		$payload = $refCls->getProperty('payload')->getValue($handler);
+		$this->assertInstanceOf(InsertQueryPayload::class, $payload);
 
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('settings', static::getManticoreSettings(['searchd.auto_schema' => '0']));
-		$this->expectException(CommandNotAllowed::class);
-		$this->expectExceptionMessage('Request handling is disabled: INSERT INTO test(col1) VALUES("test")');
-		QueryProcessor::process($netRequest);
+		$refCls->setStaticPropertyValue('settings', static::getSettings(['searchd.auto_schema' => '0']));
+		$this->expectException(AutoSchemaDisabledError::class);
+		QueryProcessor::process($request)->run(Task::createRuntime());
 	}
 
 	/**
 	 * @param array<string,int|string> $settings
 	 * @return ManticoreSettings
 	 */
-	protected static function getManticoreSettings(array $settings = []): ManticoreSettings {
+	protected static function getSettings(array $settings = []): ManticoreSettings {
 		/**
 		 * @var array{
 		 * 'configuration_file'?:string,

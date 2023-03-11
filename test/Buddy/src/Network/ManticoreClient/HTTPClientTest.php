@@ -9,10 +9,10 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\ManticoreEndpoint;
-//use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
-use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
-use Manticoresearch\Buddy\Network\ManticoreClient\Response;
+//use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -58,7 +58,7 @@ class HTTPClientTest extends TestCase {
 
 	// public function testResponseUrlSetFail(): void {
 	// 	$url = 'some_unvalid_url';
-	// 	$this->expectException(ManticoreHTTPClientError::class);
+	// 	$this->expectException(ManticoreSearchClientError::class);
 	// 	$this->expectExceptionMessage("Manticore request error: Malformed request url '$url' passed");
 	// 	$this->client->setServerUrl($url);
 	// }

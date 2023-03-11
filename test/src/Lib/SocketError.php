@@ -9,13 +9,19 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Enum;
+namespace Manticoresearch\BuddyTest\Lib;
 
-enum ManticoreEndpoint: string {
-	case Cli = 'cli';
-	case CliJson = 'cli_json';
-	case Insert = 'insert';
-	case Sql = 'sql?mode=raw';
-	case Bulk = 'bulk';
-	case Elastic = 'elastic';
+use Exception;
+use Throwable;
+
+final class SocketError extends Exception {
+
+	public function __construct(string $message = null, int $code = 0, ?Throwable $previous = null) {
+		if (isset($message)) {
+			$message .= ': ';
+		}
+		$message .= socket_strerror(socket_last_error());
+		parent::__construct($message, $code, $previous);
+	}
+
 }

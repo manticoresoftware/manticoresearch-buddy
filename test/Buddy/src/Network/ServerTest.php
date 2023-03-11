@@ -9,10 +9,11 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Lib\Task\Task;
-use Manticoresearch\Buddy\Lib\Task\TaskResult;
-use Manticoresearch\Buddy\Network\EventHandler;
-use Manticoresearch\Buddy\Network\Server;
+use Manticoresearch\Buddy\Base\Network\EventHandler;
+use Manticoresearch\Buddy\Base\Network\Server;
+use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use PHPUnit\Framework\TestCase;
 use React\EventLoop\Loop;
 use React\Socket\SocketServer;
@@ -88,7 +89,7 @@ class ServerTest extends TestCase {
 			$this->fail();
 		}
 		$addr = trim($addr, 'tcp://');
-		$version = buddy_version();
+		$version = Buddy::getVersion();
 		$this->expectOutputString("Buddy v{$version} started {$addr}\n");
 		try {
 			self::$server->start();
@@ -98,23 +99,26 @@ class ServerTest extends TestCase {
 
 	public function testServerTicker(): void {
 		echo "\nTesting the execution of server tickers\n";
-		$testFilepath = getcwd() . DIRECTORY_SEPARATOR . 'test.log';
-		$fn = function () use ($testFilepath) {
-			file_put_contents($testFilepath, 'Ok');
-			Loop::stop();
-		};
+		$testFilepath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test.log';
 		$task = Task::create(
-			function () use ($fn): void {
+			static function () use ($testFilepath) {
 				$server = Server::create();
-				$server->addTicker($fn, 1);
+				$server->addTicker(
+					static function () use ($testFilepath) {
+						file_put_contents($testFilepath, 'Ok');
+						Loop::stop();
+					}, 1
+				);
+
 				try {
 					$server->start();
-				} catch (Exception $e) {
+				} catch (Exception) {
 				}
 			}
 		);
 		$task->run();
-		sleep(1);
+		sleep(2);
+
 		$refCls = new ReflectionClass($task);
 		$runtime = $refCls->getProperty('runtime')->getValue($task);
 		if (!is_object($runtime)  || !is_a($runtime, Runtime::class)) {

@@ -9,9 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Enum\Datatype;
-use Manticoresearch\Buddy\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\QueryParser\SQLInsertParser;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Datatype;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\SQLInsertParser;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -128,7 +128,7 @@ class SQLInsertParserTest extends TestCase {
 		$parser = new SQLInsertParser();
 		$query = "INSERT INTO test VALUES ('val1')";
 		[$exCls, $exMsg] = self::getExceptionInfo($parser, 'parse', [$query]);
-		$this->assertEquals(SQLQueryCommandNotSupported::class, $exCls);
+		$this->assertEquals(QueryParseError::class, $exCls);
 		$this->assertEquals(
 			"Cannot create table with column names missing in query: INSERT INTO test VALUES ('val1')",
 			$exMsg
@@ -137,7 +137,7 @@ class SQLInsertParserTest extends TestCase {
 		$parser = new SQLInsertParser();
 		$query = 'INSERT INTO test(col1) VALUES';
 		[$exCls, $exMsg] = self::getExceptionInfo($parser, 'parse', [$query]);
-		$this->assertEquals(SQLQueryCommandNotSupported::class, $exCls);
+		$this->assertEquals(QueryParseError::class, $exCls);
 		$this->assertEquals('Invalid query passed: INSERT INTO test(col1) VALUES', $exMsg);
 	}
 }

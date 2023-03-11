@@ -9,11 +9,12 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Lib;
+namespace Manticoresearch\Buddy\Base\Lib;
 
 use Exception;
-use Manticoresearch\Buddy\Exception\ManticoreHTTPClientError;
-use Manticoresearch\Buddy\Network\ManticoreClient\HTTPClient;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresoftware\Telemetry\Metric as TelemetryMetric;
 use OpenMetrics\Exposition\Text\Exceptions\InvalidArgumentException;
 use Psr\Container\ContainerExceptionInterface;
@@ -69,7 +70,7 @@ final class Metric {
 		}
 
 		$enabled = is_telemetry_enabled();
-		debug(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
+		Buddy::debug(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
 
 		// 1. Get versions
 		$labels = static::getVersions();
@@ -82,7 +83,7 @@ final class Metric {
 		// in different services, we collect already it in backup in addition
 		$labels['collector'] = 'buddy';
 
-		debug(sprintf('labels: %s', json_encode($labels)));
+		Buddy::debug(sprintf('labels: %s', json_encode($labels)));
 		static::$instance = new static($labels, $enabled);
 
 		return static::$instance;
@@ -156,7 +157,7 @@ final class Metric {
 	 * @throws NotFoundExceptionInterface
 	 * @throws ContainerExceptionInterface
 	 * @throws RuntimeException
-	 * @throws ManticoreHTTPClientError
+	 * @throws ManticoreSearchClientError
 	 * @throws InvalidArgumentException
 	 * @throws Exception
 	 */
@@ -207,7 +208,7 @@ final class Metric {
 
 		// 2. Get snapshot of tables metrics
 		$metrics = array_merge($metrics, static::getTablesMetrics());
-		debug(sprintf('metrics: %s', json_encode($metrics)));
+		Buddy::debug(sprintf('metrics: %s', json_encode($metrics)));
 
 		// 3. Finally send it
 		foreach ($metrics as $name => $value) {
