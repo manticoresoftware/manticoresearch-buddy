@@ -40,7 +40,6 @@ class Executor extends FormattableClientQueryExecutor {
 	 * @throws RuntimeException
 	 */
 	public function run(Runtime $runtime): Task {
-		$this->manticoreClient->setPath($this->request->path);
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = static function (
@@ -49,7 +48,7 @@ class Executor extends FormattableClientQueryExecutor {
 			?TableFormatter $tableFormatter
 		): TaskResult {
 			$time0 = hrtime(true);
-			$resp = $manticoreClient->sendRequest($request->query, null, true);
+			$resp = $manticoreClient->sendRequest($request->query, $request->path, true, false);
 			$data = null;
 			$total = -1;
 			$respBody = $resp->getBody();
