@@ -62,7 +62,7 @@ class ExecutorTest extends TestCase {
 		$task = $handler->run(Task::createRuntime());
 		$task->wait();
 		$this->assertEquals(true, $task->isSucceed());
-		$result = $task->getResult()->getMessage();
+		$result = $task->getResult()->getStruct();
 		$this->assertIsArray($result);
 		$this->assertEquals($respBody, $result);
 		self::finishMockManticoreServer();

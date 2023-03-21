@@ -173,7 +173,7 @@ final class EventHandler {
 				$result = $task->getResult();
 				if (!$task->isDeferred()) {
 					return $deferred->resolve(
-						[$request, Response::fromMessage($result->getMessage(), $request->format)]
+						[$request, Response::fromMessage($result->getStruct(), $request->format)]
 					);
 				}
 			}

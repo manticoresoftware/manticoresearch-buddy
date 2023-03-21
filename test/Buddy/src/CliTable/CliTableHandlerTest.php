@@ -61,7 +61,7 @@ class CliTableHandlerTest extends TestCase {
 		$task = $handler->run(Task::createRuntime());
 		$task->wait();
 		$this->assertEquals(true, $task->isSucceed());
-		$result = $task->getResult()->getMessage();
+		$result = $task->getResult()->getStruct();
 		$this->assertIsString($result);
 		$this->assertStringContainsString($respBody, $result);
 		self::finishMockManticoreServer();
