@@ -172,27 +172,27 @@ class ServerTest extends TestCase {
 				$refCls = new ReflectionClass($server);
 				$socket = $refCls->getProperty('socket')->getValue($server);
 				if (!is_object($socket) || !is_a($socket, SocketServer::class)) {
-					return new TaskResult('error');
+					return TaskResult::raw('error');
 				}
 				$addr = $socket->getAddress();
 				if ($addr === null) {
-					return new TaskResult('error');
+					return TaskResult::raw('error');
 				}
 				$addr = trim($addr, 'tcp://');
 				[$host, $port] = explode(':', $addr);
 				$clientSocket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 				if ($clientSocket === false) {
-					return new TaskResult('error');
+					return TaskResult::raw('error');
 				}
 				socket_connect($clientSocket, $host, (int)$port);
 				socket_close($clientSocket);
-				return new TaskResult('ok');
+				return TaskResult::raw('ok');
 			}
 		);
 		$task->run();
 		sleep(1);
 		$this->assertEquals(true, $task->isSucceed());
-		$this->assertEquals('ok', $task->getResult()->getMessage());
+		$this->assertEquals('ok', $task->getResult()->getStruct());
 
 		// Workaround to get response from server before the current unit test finishes
 		self::$onTearDown = function () use ($testFilepath) {

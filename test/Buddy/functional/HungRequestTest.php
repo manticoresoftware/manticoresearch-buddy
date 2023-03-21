@@ -51,10 +51,12 @@ class HungRequestTest extends TestCase {
 
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
 		$this->assertEquals(true, $task1->isSucceed());
-		$res1 = $task1->getResult()->getMessage();
+		/** @var array<mixed> $res1 */
+		$res1 = $task1->getResult()->getStruct();
 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		$this->assertEquals(true, $task2->isSucceed());
-		$res2 = $task2->getResult()->getMessage();
+		/** @var array<mixed> $res2 */
+		$res2 = $task2->getResult()->getStruct();
 		// Making sure that the id of the last running query is the id of the hung request task
 		if (!is_array($res1[0]) || !is_array($res2[0])) {
 			$this->fail();
@@ -88,7 +90,7 @@ class HungRequestTest extends TestCase {
 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		sleep(4);
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
-		$this->assertEquals([[]], $task1->getResult()->getMessage());
+		$this->assertEquals([['total' => 0, 'error' => '', 'warning' => '']], $task1->getResult()->getStruct());
 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		$this->assertEquals(true, $task2->isSucceed());
 	}
@@ -104,7 +106,7 @@ class HungRequestTest extends TestCase {
 				exec("curl -s 127.0.0.1:$port/cli_json -d '$query' 2>&1", $output);
 				/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 				$result = (array)json_decode($output[0] ?? '{}', true);
-				return new TaskResult($result);
+				return TaskResult::raw($result);
 			},
 			$taskFnArgs,
 		];

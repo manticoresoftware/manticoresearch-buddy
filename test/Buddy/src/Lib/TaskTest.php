@@ -26,7 +26,7 @@ class TaskTest extends TestCase {
 		$task = Task::create(
 			function (): TaskResult {
 				usleep(2000000);
-				return new TaskResult('ok');
+				return TaskResult::raw('ok');
 			}
 		);
 		$this->assertEquals(false, $task->isDeferred());
@@ -36,7 +36,7 @@ class TaskTest extends TestCase {
 		usleep(2500000);
 		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
 		$this->assertEquals(true, $task->isSucceed());
-		$this->assertEquals('ok', $task->getResult()->getMessage());
+		$this->assertEquals('ok', $task->getResult()->getStruct());
 	}
 
 	public function testTaskParallelRunWithArgumentsSucceed(): void {
@@ -48,7 +48,7 @@ class TaskTest extends TestCase {
 		$task = Task::create(
 			function (stdClass $arg): TaskResult {
 				usleep(2000000);
-				return new TaskResult((array)$arg);
+				return TaskResult::raw((array)$arg);
 			},
 			[$arg]
 		);
@@ -59,7 +59,7 @@ class TaskTest extends TestCase {
 		usleep(2500000);
 		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
 		$this->assertEquals(true, $task->isSucceed());
-		$this->assertEquals((array)$arg, $task->getResult()->getMessage());
+		$this->assertEquals((array)$arg, $task->getResult()->getStruct());
 	}
 
 	public function testTaskReturnsGenericErrorOnException(): void {
@@ -107,7 +107,7 @@ class TaskTest extends TestCase {
 		$task = Task::defer(
 			function (): TaskResult {
 				usleep(2000000);
-				return new TaskResult('ok');
+				return TaskResult::raw('ok');
 			}
 		);
 		$this->assertEquals(true, $task->isDeferred());
@@ -117,6 +117,6 @@ class TaskTest extends TestCase {
 		usleep(2500000);
 		$this->assertEquals(TaskStatus::Finished, $task->getStatus());
 		$this->assertEquals(true, $task->isSucceed());
-		$this->assertEquals('ok', $task->getResult()->getMessage());
+		$this->assertEquals('ok', $task->getResult()->getStruct());
 	}
 }
