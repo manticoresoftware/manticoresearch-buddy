@@ -6,4 +6,4 @@ build/**
 .ptp-sync-folder
 phar_builder
 /plugins/*
-!/plugins
+!/plugins/.gitkeep
