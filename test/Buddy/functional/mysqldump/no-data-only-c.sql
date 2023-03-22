@@ -18,9 +18,9 @@ DROP TABLE IF EXISTS `c`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE c (
 id bigint,
+v1 text,
 v2 integer engine='columnar',
-v3 json,
-v1 text
+v3 json
 );
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
