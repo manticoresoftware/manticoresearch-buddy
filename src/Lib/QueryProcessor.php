@@ -147,6 +147,30 @@ class QueryProcessor {
 		return static::$settings;
 	}
 
+	/**
+	 * Get core plugins and exclude local one that does not start with our prefix
+	 * @return array<string>
+	 */
+	public static function getCorePlugins(): array {
+		return array_filter(static::$corePlugins, fn ($v) => !str_starts_with($v, 'manticoresearch/'));
+	}
+
+	/**
+	 * Get local plugins by getting diff
+	 * @return array<string>
+	 */
+	public static function getLocalPlugins(): array {
+		return array_diff(static::$corePlugins, static::getCorePlugins());
+	}
+
+	/**
+	 * Get list of external plugins that was installed by using CREATE PLUGIN instruction
+	 * @return array<string>
+	 */
+	public static function getExtraPlugins(): array {
+		return static::$extraPlugins;
+	}
+
   /**
    * Retrieve object from the DI container
    *
