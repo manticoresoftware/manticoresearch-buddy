@@ -39,7 +39,18 @@ $manticoreClient->setServerUrl($opts['listen']);
 EventHandler::init();
 
 $server = Server::create()
-	->onStart(QueryProcessor::init(...))
+	->onStart(
+		function () {
+			QueryProcessor::init();
+
+		// Dispay all loaded plugins
+			echo 'Loaded plugins:' . PHP_EOL
+			. '  core: ' . implode(', ', QueryProcessor::getCorePlugins()) . PHP_EOL
+			. '  local: ' . implode(', ', QueryProcessor::getLocalPlugins()) . PHP_EOL
+			. '  extra: ' . implode(', ', QueryProcessor::getExtraPlugins()) . PHP_EOL
+			;
+		}
+	)
 	->onStart(
 		static function () {
 			buddy_metric('invocation', 1);
