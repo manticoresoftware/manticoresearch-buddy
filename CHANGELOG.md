@@ -6,6 +6,10 @@
 
 * Pluggable architecture (#107)
 
+### Minor changes
+
+* [382e](https://github.com/manticoresoftware/manticoresearch-buddy/commit/382ed1d36b4cb080238487628bd68dcc0d36aa21) Display loaded plugins on Buddy start: core, local and extra
+
 ## Version 0.4.2
 
 ### Bugfixes
