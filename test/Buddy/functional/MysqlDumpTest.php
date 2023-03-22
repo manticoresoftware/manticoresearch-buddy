@@ -65,19 +65,11 @@ class MysqlDumpTest extends TestCase {
 	use TestFunctionalTrait;
 
 	public function testMysqldumpWorksFine(): void {
-		$dropTablesFn = static function () {
-			static::runSqlQuery('DROP TABLE IF EXISTS a');
-			static::runSqlQuery('DROP TABLE IF EXISTS b');
-			static::runSqlQuery('DROP TABLE IF EXISTS c');
-		};
+		echo 'Testing mysql dump works fine' . PHP_EOL;
 
-		$dropTablesFn();
+		static::dropTables();
 		// Prepare simple tables and little data to test the backup
-		static::runSqlQuery('CREATE TABLE a');
-		static::runSqlQuery(
-			'CREATE TABLE b (id bigint, v1 text, v2 int, v3 json engine=\'rowwise\') engine = \'columnar\''
-		);
-		static::runSqlQuery('CREATE TABLE c (id bigint, v1 text, v2 int engine=\'columnar\', v3 json)');
+		static::createTables();
 
 		$queries = file(__DIR__ . '/mysqldump/data.sql') ?: [];
 		foreach ($queries as $query) {
@@ -96,15 +88,19 @@ class MysqlDumpTest extends TestCase {
 		}
 
 		// Tear down
-		$dropTablesFn();
+		static::dropTables();
 	}
 
 	public function testMysqlRestoreFromDump(): void {
+		echo 'Testing restore from dump works fine' . PHP_EOL;
+
 		$files = glob(__DIR__ . '/mysqldump/*') ?: [];
 		foreach ($files as $file) {
-			// We skip data.sql because it contains input data for dataset
+			echo $file . PHP_EOL;
+			// In case we just testing our raw data we need to prepare it
 			if (basename($file) === 'data.sql') {
-				continue;
+				static::dropTables();
+				static::createTables();
 			}
 			exec("mysql -h0 -P8306 < '$file'", $output, $code);
 			// We check exit code only just becaues it's enough
@@ -128,7 +124,7 @@ class MysqlDumpTest extends TestCase {
 	 * @return void
 	 */
 	public static function writeTestsData(array $data): void {
-		file_put_contents(__DIR__ . '/mysqldump/data.sql', implode(PHP_EOL, $data));
+		file_put_contents(__DIR__ . '/mysqldump/data.sql', implode(';' . PHP_EOL, $data) . ';');
 	}
 
   /**
@@ -190,5 +186,27 @@ class MysqlDumpTest extends TestCase {
 		}
 
 		return $data;
+	}
+
+	/**
+	 * Helper to drop testing tables if they exist
+	 * @return void
+	 */
+	protected static function dropTables(): void {
+		static::runSqlQuery('DROP TABLE IF EXISTS a');
+		static::runSqlQuery('DROP TABLE IF EXISTS b');
+		static::runSqlQuery('DROP TABLE IF EXISTS c');
+	}
+
+	/**
+	 * Helper to create required tables for testing
+	 * @return void
+	 */
+	protected static function createTables(): void {
+		static::runSqlQuery('CREATE TABLE a');
+		static::runSqlQuery(
+			'CREATE TABLE b (id bigint, v1 text, v2 int, v3 json engine=\'rowwise\') engine = \'columnar\''
+		);
+		static::runSqlQuery('CREATE TABLE c (id bigint, v1 text, v2 int engine=\'columnar\', v3 json)');
 	}
 }
