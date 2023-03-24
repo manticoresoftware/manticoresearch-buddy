@@ -152,7 +152,7 @@ class QueryProcessor {
 	 * @return array<string>
 	 */
 	public static function getCorePlugins(): array {
-		return array_filter(static::$corePlugins, fn ($v) => !str_starts_with($v, 'manticoresearch/'));
+		return array_filter(static::$corePlugins, fn ($v) => !str_starts_with($v, 'manticoresoftware/'));
 	}
 
 	/**
@@ -244,10 +244,32 @@ class QueryProcessor {
 		$pluggable = new Pluggable(static::$settings);
 		if ($path) {
 			$pluggable->setPluginDir($path);
+			// Register all predefined hooks for core plugins only for now
+			static::registerHooks($pluggable);
 		} elseif (!static::$plugged) { // Lazy register autoload
 			static::$plugged = true;
 			$pluggable->registerAutoload();
 		}
-		return $pluggable->getList();
+		return array_column($pluggable->getList(), 'short');
+	}
+
+	/**
+	 * Register all hooks to known core plugins
+	 * It's called on init phase once and keep updated on event emited from the plugin
+	 * @return void
+	 */
+	protected static function registerHooks(Pluggable $pluggable): void {
+		$hooks = [
+			'manticoresoftware/buddy-plugin-create-plugin' => [
+				'installed',
+				fn () => static::$extraPlugins = static::fetchExtraPlugins(),
+			],
+		];
+
+		foreach ($hooks as $plugin => $args) {
+			$prefix = $pluggable->getClassNamespaceByFullName($plugin);
+			$className = $prefix . 'Handler';
+			$className::registerHook(...$args);
+		}
 	}
 }
