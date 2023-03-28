@@ -44,7 +44,8 @@
 		"manticoresoftware/buddy-plugin-show-queries": "dev-main",
 		"manticoresoftware/buddy-plugin-cli-table": "dev-main",
 		"manticoresoftware/buddy-plugin-create-plugin": "dev-main",
-		"manticoresoftware/buddy-plugin-test": "dev-main"
+		"manticoresoftware/buddy-plugin-test": "dev-main",
+		"manticoresoftware/buddy-plugin-insert-mva": "dev-main"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^1.8",
