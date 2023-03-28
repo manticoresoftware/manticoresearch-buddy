@@ -95,7 +95,7 @@ class MultipleQueriesTest extends TestCase {
 			. "INSERT into {$this->testTable2}(col1,col2) VALUES(1)";
 		$out = static::runSqlQuery($query);
 		$result = [
-			"ERROR 1064 (42000) at line 1: sphinxql: wrong number of values here near ')'",
+			"ERROR 1064 (42000) at line 1: P01: wrong number of values here near ')'",
 		];
 		$this->assertEquals($result, $out);
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
@@ -108,7 +108,7 @@ class MultipleQueriesTest extends TestCase {
 		$query = "INSERT into {$this->testTable1}(col1,col2) VALUES(1,2);"
 			. "INSERT into {$this->testTable1}(col1,col2) VALUES(1)";
 		$out = static::runSqlQuery($query);
-		$result = ["ERROR 1064 (42000) at line 1: sphinxql: wrong number of values here near ')'"];
+		$result = ["ERROR 1064 (42000) at line 1: P01: wrong number of values here near ')'"];
 		$this->assertEquals($result, $out);
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
 		$selectResult = [
@@ -119,7 +119,7 @@ class MultipleQueriesTest extends TestCase {
 
 		$query = "INSERT into {$this->testTable2}(col1,col2) VALUES(1,2);SHOW QUERIES 123";
 		$out = static::runSqlQuery($query);
-		$result = 'ERROR 1064 (42000) at line 1: sphinxql: syntax error, unexpected identifier, '
+		$result = 'ERROR 1064 (42000) at line 1: P01: syntax error, unexpected identifier, '
 			. "expecting VARIABLES near 'QUERIES 123'";
 		$this->assertEquals($result, $out[0]);
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable2}");

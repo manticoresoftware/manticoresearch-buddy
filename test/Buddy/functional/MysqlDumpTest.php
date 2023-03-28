@@ -203,10 +203,10 @@ class MysqlDumpTest extends TestCase {
 	 * @return void
 	 */
 	protected static function createTables(): void {
-		static::runSqlQuery('CREATE TABLE a');
+		static::runSqlQuery('CREATE TABLE `a`');
 		static::runSqlQuery(
-			'CREATE TABLE b (id bigint, v1 text, v2 int, v3 json engine=\'rowwise\') engine = \'columnar\''
+			'CREATE TABLE `b` (`id` bigint, `v1` text, v2 int, `v3` json engine=\'rowwise\') engine = \'columnar\''
 		);
-		static::runSqlQuery('CREATE TABLE c (id bigint, v1 text, v2 int engine=\'columnar\', v3 json)');
+		static::runSqlQuery('CREATE TABLE `c` (`id` bigint, `v1` text, v2 int engine=\'columnar\', `v3` json)');
 	}
 }
