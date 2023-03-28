@@ -38,7 +38,7 @@ class InsertQueryTest extends TestCase {
 		echo "\nTesting the fail on the execution of SQL insert query to a non-existing table\n";
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1,2) ";
 		$out = static::runSqlQuery($query);
-		$result = ["ERROR 1064 (42000) at line 1: sphinxql: wrong number of values here near ')'"];
+		$result = ["ERROR 1064 (42000) at line 1: P01: wrong number of values here near ')'"];
 		$this->assertEquals($result, $out);
 	}
 
@@ -54,7 +54,7 @@ class InsertQueryTest extends TestCase {
 		echo "\nTesting the fail on the execution of HTTP insert query to a non-existing table\n";
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1,2) ";
 		$out = static::runHttpQuery($query);
-		$result = [['total' => 0,'error' => "sphinxql: wrong number of values here near ') '",'warning' => '']];
+		$result = [['total' => 0,'error' => "P01: wrong number of values here near ') '",'warning' => '']];
 		$this->assertEquals($result, $out);
 	}
 

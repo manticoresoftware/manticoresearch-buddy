@@ -16,8 +16,8 @@
 DROP TABLE IF EXISTS `a`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE a (
-id bigint
+CREATE TABLE `a` (
+`id` bigint
 );
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -39,11 +39,11 @@ UNLOCK TABLES;
 DROP TABLE IF EXISTS `b`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE b (
-id bigint,
-v1 text,
-v2 integer,
-v3 json engine='rowwise'
+CREATE TABLE `b` (
+`id` bigint,
+`v1` text,
+`v2` integer,
+`v3` json engine='rowwise'
 ) engine='columnar';
 /*!40101 SET character_set_client = @saved_cs_client */;
 

@@ -37,7 +37,7 @@ class ShowQueriesTest extends TestCase {
 		$query = 'SHOW QUERIES 123';
 		$out = static::runSqlQuery($query);
 		$result = [
-			'ERROR 1064 (42000) at line 1: sphinxql: syntax error, unexpected identifier, '
+			'ERROR 1064 (42000) at line 1: P01: syntax error, unexpected identifier, '
 			. "expecting VARIABLES near 'QUERIES 123'",
 		];
 		$this->assertEquals($result, $out);
@@ -74,7 +74,7 @@ class ShowQueriesTest extends TestCase {
 		$result = [
 			[
 				'total' => 0,
-				'error' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES 123'",
+				'error' => "P01: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES 123'",
 				'warning' => '',
 			],
 		];

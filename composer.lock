@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ee14e565835c387a351209015a39a639",
+    "content-hash": "cefbe6485b9c03165c37911c491f8bf9",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -1092,6 +1092,53 @@
                 "source": "https://github.com/manticoresoftware/buddy-plugin-insert/tree/main"
             },
             "time": "2023-04-04T10:05:58+00:00"
+        },
+        {
+            "name": "manticoresoftware/buddy-plugin-insert-mva",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/manticoresoftware/buddy-plugin-insert-mva.git",
+                "reference": "65d42c438e1c7e5a5ebadd309d468f7eb38b77c9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert-mva/zipball/65d42c438e1c7e5a5ebadd309d468f7eb38b77c9",
+                "reference": "65d42c438e1c7e5a5ebadd309d468f7eb38b77c9",
+                "shasum": ""
+            },
+            "require": {
+                "manticoresoftware/buddy-core": "dev-main"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^1.8",
+                "phpunit/phpunit": "^9.5",
+                "slevomat/coding-standard": "^8.5",
+                "squizlabs/php_codesniffer": "^3.7"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Manticoresearch\\Buddy\\Plugin\\InsertMva\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Manticore Software Co. Ltd",
+                    "email": "contact@manticoresearch.com"
+                }
+            ],
+            "description": "The Buddy to support insert MVA as a string for mysqldump",
+            "support": {
+                "issues": "https://github.com/manticoresoftware/buddy-plugin-insert-mva/issues",
+                "source": "https://github.com/manticoresoftware/buddy-plugin-insert-mva/tree/main"
+            },
+            "time": "2023-03-28T08:01:39+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-lock-tables",
@@ -5784,16 +5831,16 @@
         },
         {
             "name": "slevomat/coding-standard",
-            "version": "8.12.0",
+            "version": "8.12.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/slevomat/coding-standard.git",
-                "reference": "cc04334ed0ce5a251389112fbd2dbe1dbc931ae8"
+                "reference": "f69e2524e8770efb9b3e5ac4a0ebc0d54eb446d7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/slevomat/coding-standard/zipball/cc04334ed0ce5a251389112fbd2dbe1dbc931ae8",
-                "reference": "cc04334ed0ce5a251389112fbd2dbe1dbc931ae8",
+                "url": "https://api.github.com/repos/slevomat/coding-standard/zipball/f69e2524e8770efb9b3e5ac4a0ebc0d54eb446d7",
+                "reference": "f69e2524e8770efb9b3e5ac4a0ebc0d54eb446d7",
                 "shasum": ""
             },
             "require": {
@@ -5833,7 +5880,7 @@
             ],
             "support": {
                 "issues": "https://github.com/slevomat/coding-standard/issues",
-                "source": "https://github.com/slevomat/coding-standard/tree/8.12.0"
+                "source": "https://github.com/slevomat/coding-standard/tree/8.12.1"
             },
             "funding": [
                 {
@@ -5845,7 +5892,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-05-14T20:06:01+00:00"
+            "time": "2023-05-15T21:42:25+00:00"
         },
         {
             "name": "squizlabs/php_codesniffer",
@@ -5971,7 +6018,8 @@
         "manticoresoftware/buddy-plugin-show-queries": 20,
         "manticoresoftware/buddy-plugin-cli-table": 20,
         "manticoresoftware/buddy-plugin-plugin": 20,
-        "manticoresoftware/buddy-plugin-test": 20
+        "manticoresoftware/buddy-plugin-test": 20,
+        "manticoresoftware/buddy-plugin-insert-mva": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,

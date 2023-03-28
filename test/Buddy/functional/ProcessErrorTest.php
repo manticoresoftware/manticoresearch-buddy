@@ -19,15 +19,15 @@ final class ProcessErrorTest extends TestCase {
 	public function testCorrectErrorOnFailedToParseRequest(): void {
 		$this->assertQueryResultContainsError(
 			'tratatata',
-			"sphinxql: syntax error, unexpected identifier near 'tratatata'"
+			"P02: syntax error, unexpected identifier near 'tratatata'"
 		);
 		$this->assertQueryResultContainsError(
 			'hello how are you?',
-			"sphinxql: syntax error, unexpected identifier near 'hello how are you?'"
+			"P02: syntax error, unexpected identifier near 'hello how are you?'"
 		);
 		$this->assertQueryResultContainsError(
 			'showf tables',
-			"sphinxql: syntax error, unexpected identifier near 'showf tables'"
+			"P02: syntax error, unexpected identifier near 'showf tables'"
 		);
 	}
 

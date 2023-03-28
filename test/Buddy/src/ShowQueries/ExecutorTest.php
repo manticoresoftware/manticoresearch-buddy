@@ -44,7 +44,7 @@ class ExecutorTest extends TestCase {
 
 		$request = NetRequest::fromArray(
 			[
-				'error' => "sphinxql: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
+				'error' => "P01: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
 				'payload' => 'SHOW QUERIES',
 				'version' => 1,
 				'format' => RequestFormat::SQL,
