@@ -214,12 +214,8 @@ class QueryProcessor {
 	 * @throws Exception
 	 */
 	protected static function fetchCorePlugins(): array {
-		$projectRoot = realpath(
-			__DIR__ . DIRECTORY_SEPARATOR
-			. '..' . DIRECTORY_SEPARATOR
-			. '..'
-		);
-		if ($projectRoot === false) {
+		$projectRoot = buddy_project_root();
+		if (!is_string($projectRoot)) {
 			throw new Exception('Failed to find project root');
 		}
 		return static::fetchPlugins($projectRoot);

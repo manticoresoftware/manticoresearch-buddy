@@ -116,12 +116,12 @@ final class MockManticoreServer {
 		$this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 		if ($this->socket === false) {
 			throw new SocketError('Cannot create a socket');
-		} else {
-			if (!socket_bind($this->socket, $connInfo['host'], $connInfo['port']) || !socket_listen($this->socket)) {
-				throw new SocketError('Cannot connect to the socket');
-			}
-			socket_set_nonblock($this->socket);
 		}
+
+		if (!socket_bind($this->socket, $connInfo['host'], $connInfo['port']) || !socket_listen($this->socket)) {
+			throw new SocketError('Cannot connect to the socket');
+		}
+		socket_set_nonblock($this->socket);
 
 		echo "<Mock Manticore server started at {$this->addrPort}>";
 		$this->checkParentProc();
