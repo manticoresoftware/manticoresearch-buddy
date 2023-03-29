@@ -70,3 +70,22 @@ function buddy_error_handler(int $errno, string $errstr, string $errfile, int $e
 
 	throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 }
+
+/**
+ * Crossplatform absolute path to project root of the Buddy sources
+ * when running as Phar and not as Phar
+ * @return string|bool
+ */
+function buddy_project_root(): string|bool {
+	$projectRoot = Phar::running(false);
+	if ($projectRoot) {
+		$projectRoot = "phar://$projectRoot";
+	} else {
+		$projectRoot = realpath(
+			__DIR__ . DIRECTORY_SEPARATOR
+			. '..'
+		);
+	}
+
+	return $projectRoot;
+}
