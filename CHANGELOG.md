@@ -2,13 +2,24 @@
 
 ## Upcoming version
 
+### Bugfixes
+
+* [7920](https://github.com/manticoresoftware/manticoresearch-buddy/commit/7920d9ac9ebaf956b372b40381352bb1b7bb9538) Fix issue with getting project root directory when we run as Phar archive
+
 ### Major new features
 
 * Pluggable architecture (#107)
 
 ### Minor changes
 
+* [a154](https://github.com/manticoresoftware/manticoresearch-buddy/commit/a154fc6f4321b0ee41af3aa8fa22cb53f3ba07a1) Implement automatic composer autload reload on new plugin install via hooks
 * [382e](https://github.com/manticoresoftware/manticoresearch-buddy/commit/382ed1d36b4cb080238487628bd68dcc0d36aa21) Display loaded plugins on Buddy start: core, local and extra
+* [c522](https://github.com/manticoresoftware/buddy-core/commit/c52246a1cd9889a82e7c8f8e43fb9b0a7730f95f) [Core] Improve TaskResult to be struct built with chaining
+* [5743](https://github.com/manticoresoftware/buddy-core/commit/57438ea9a64e66d77afbbbf8543eb676ec60b8e8) [Core] Add Docs generation with Doctum
+* [4389](https://github.com/manticoresoftware/buddy-core/commit/4389a6ff6dcc0eb3998dff2e5b8e96311d581534) [Core] Updated the handling of the Request-id header
+* [c5b4](https://github.com/manticoresoftware/buddy-core/commit/c5b446e7f219025f0e96c48f1c3e6dffb120374d) [Core] Use urlencode for all requests sending to the Manticore daemon
+
+
 
 ## Version 0.4.2
 
