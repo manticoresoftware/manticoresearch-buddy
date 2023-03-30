@@ -270,10 +270,10 @@ final class EventHandler {
 	 * Get identifier for current request from headers
 	 *
 	 * @param ServerRequestInterface $serverRequest
-	 * @return int
+	 * @return string
 	 */
-	protected static function getRequestId(ServerRequestInterface $serverRequest): int {
-		return (int)($serverRequest->getHeader('Request-ID')[0] ?? 0);
+	protected static function getRequestId(ServerRequestInterface $serverRequest): string {
+		return $serverRequest->getHeader('Request-ID')[0] ?? '0';
 	}
 
 	protected static function handleDeferredTask(Request $request, Deferred $deferred, Task $task): PromiseInterface {
@@ -303,7 +303,7 @@ final class EventHandler {
 	/**
 	 *
 	 * @param Throwable $e
-	 * @param int $id
+	 * @param string $id
 	 * @param ?Request $request
 	 * @param string $data
 	 * @param Deferred $deferred
@@ -314,7 +314,7 @@ final class EventHandler {
 	 */
 	protected static function handleExceptionWhileDataProcessing(
 		Throwable $e,
-		int $id,
+		string $id,
 		?Request $request,
 		string $data,
 		Deferred $deferred,
@@ -356,7 +356,15 @@ final class EventHandler {
 		return $deferred->promise();
 	}
 
-	public static function handleTaskFinished(?Task $task, ?TimerInterface $timer, int $requestId): void {
+	/**
+	 *
+	 * @param null|Task $task
+	 * @param null|TimerInterface $timer
+	 * @param string $requestId
+	 * @return void
+	 * @throws RuntimeException
+	 */
+	public static function handleTaskFinished(?Task $task, ?TimerInterface $timer, string $requestId): void {
 		// task is finished, we can remove it from the pool
 		if (isset($task)) {
 			TaskPool::remove($task);
