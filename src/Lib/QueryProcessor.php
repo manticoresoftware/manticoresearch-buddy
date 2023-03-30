@@ -244,21 +244,22 @@ class QueryProcessor {
 			static::registerHooks($pluggable);
 		} elseif (!static::$plugged) { // Lazy register autoload
 			static::$plugged = true;
-			$pluggable->registerAutoload();
 		}
+		$pluggable->reload();
 		return array_column($pluggable->getList(), 'short');
 	}
 
 	/**
 	 * Register all hooks to known core plugins
 	 * It's called on init phase once and keep updated on event emited from the plugin
+	 * @param Pluggable $pluggable
 	 * @return void
 	 */
 	protected static function registerHooks(Pluggable $pluggable): void {
 		$hooks = [
 			'manticoresoftware/buddy-plugin-create-plugin' => [
 				'installed',
-				fn () => static::$extraPlugins = static::fetchExtraPlugins(),
+				fn() => static::$extraPlugins = static::fetchExtraPlugins(),
 			],
 		];
 

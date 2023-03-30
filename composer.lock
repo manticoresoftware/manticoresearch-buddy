@@ -814,12 +814,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "204d18bc4cfc18b776871505bfd89e3086f72043"
+                "reference": "4bc5aaf756d318d8f7de42ff32ca6f58b2a2b1a4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/204d18bc4cfc18b776871505bfd89e3086f72043",
-                "reference": "204d18bc4cfc18b776871505bfd89e3086f72043",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/4bc5aaf756d318d8f7de42ff32ca6f58b2a2b1a4",
+                "reference": "4bc5aaf756d318d8f7de42ff32ca6f58b2a2b1a4",
                 "shasum": ""
             },
             "require": {
@@ -855,7 +855,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2023-03-30T08:24:05+00:00"
+            "time": "2023-03-30T09:40:08+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-backup",
