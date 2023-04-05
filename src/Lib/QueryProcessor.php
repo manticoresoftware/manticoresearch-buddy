@@ -257,16 +257,22 @@ class QueryProcessor {
 	 */
 	protected static function registerHooks(Pluggable $pluggable): void {
 		$hooks = [
-			'manticoresoftware/buddy-plugin-create-plugin' => [
+			[
+				'manticoresoftware/buddy-plugin-plugin',
 				'installed',
+				fn() => static::$extraPlugins = static::fetchExtraPlugins(),
+			],
+			[
+				'manticoresoftware/buddy-plugin-plugin',
+				'deleted',
 				fn() => static::$extraPlugins = static::fetchExtraPlugins(),
 			],
 		];
 
-		foreach ($hooks as $plugin => $args) {
+		foreach ($hooks as [$plugin, $hook, $fn]) {
 			$prefix = $pluggable->getClassNamespaceByFullName($plugin);
 			$className = $prefix . 'Handler';
-			$className::registerHook(...$args);
+			$className::registerHook($hook, $fn);
 		}
 	}
 }
