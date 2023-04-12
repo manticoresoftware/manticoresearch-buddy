@@ -21,7 +21,7 @@ class BackupTest extends TestCase {
 		$this->assertQueryResultContainsError('backup to /tmp', 'You have no tables to backup.');
 		$this->assertQueryResultContainsError(
 			'backup tables a to /unexisting/dir',
-			'Failed to find the realpath of dir: /unexisting/dir'
+			'Backup directory is not writable'
 		);
 		$this->assertQueryResultContainsError('backup table c to /tmp', "Can't find some of the tables: c");
 	}
