@@ -193,11 +193,7 @@ final class Metric {
 						return true;
 					}
 
-					if ($key === 'uptime' || $key === 'workers_total') {
-						return true;
-					}
-
-					if (str_contains($key, 'cluster')) {
+					if ($key === 'uptime' || $key === 'workers_total' || $key === 'command_cluster') {
 						return true;
 					}
 
