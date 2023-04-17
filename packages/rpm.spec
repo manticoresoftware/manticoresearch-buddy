@@ -24,7 +24,7 @@ rm -rf %{buildroot}
 
 %install
 mkdir -p %{buildroot}/usr/share/manticore/modules
-cp -p usr/share/manticore/modules/{{ NAME }} %{buildroot}/usr/share/manticore/modules/{{ NAME }}
+cp -rp usr/share/manticore/modules/{{ NAME }} %{buildroot}/usr/share/manticore/modules/{{ NAME }}
 
 %clean
 rm -rf %{buildroot}
@@ -34,7 +34,13 @@ rm -rf %{buildroot}
 %postun
 
 %files
-%defattr(1755, root, root)
-/usr/share/manticore/modules/{{ NAME }}
+%dir /usr/share/manticore/modules/{{ NAME }}
+%dir /usr/share/manticore/modules/{{ NAME }}/bin
+/usr/share/manticore/modules/{{ NAME }}/src/*
+/usr/share/manticore/modules/{{ NAME }}/vendor/*
+/usr/share/manticore/modules/{{ NAME }}/APP_VERSION
+/usr/share/manticore/modules/{{ NAME }}/composer.json
+/usr/share/manticore/modules/{{ NAME }}/composer.lock
+%attr(1755, root, root) /usr/share/manticore/modules/{{ NAME }}/bin/{{ NAME }}
 
 %changelog
