@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 final class BuildTest extends TestCase {
 	public function testBuildIsOk(): void {
 		static::buildBinary();
-		$this->assertEquals(true, file_exists('build/manticore-buddy.phar'));
+		$this->assertEquals(true, file_exists('build/share/modules/manticore-buddy/src/main.php'));
 		$this->assertEquals(true, file_exists('build/manticore-buddy'));
 	}
 
@@ -27,24 +27,22 @@ final class BuildTest extends TestCase {
 		$composer = json_decode((string)file_get_contents('/workdir/composer.json'), true);
 		$include = array_keys($composer['require']);
 		$exclude = array_keys($composer['require-dev']);
+		$vendorPath = 'build/share/modules/manticore-buddy/vendor';
 		/** @var array{dev:bool,dev-package-names:array<string,string>} $installed */
 		$installed = json_decode(
-			(string)file_get_contents('phar:///workdir/build/manticore-buddy.phar/vendor/composer/installed.json'),
+			(string)file_get_contents("$vendorPath/composer/installed.json"),
 			true
 		);
 		$this->assertEquals(false, $installed['dev']);
 		$this->assertEquals([], $installed['dev-package-names']);
 
-		$phar = new Phar('build/manticore-buddy.phar', 0);
+
+		$vendorPathIterator = new RecursiveDirectoryIterator($vendorPath);
+		$vendorPathLen = strlen($vendorPath);
 		$packages = [];
 		/** @var SplFileInfo $file */
-		foreach (new RecursiveIteratorIterator($phar) as $file) {
-			$pos = strpos((string)$file, 'manticore-buddy.phar/vendor/');
-			if ($pos === false) {
-				continue;
-			}
-
-			$ns = strtok(substr((string)$file, $pos + 28), '/');
+		foreach (new RecursiveIteratorIterator($vendorPathIterator) as $file) {
+			$ns = strtok(substr((string)$file, $vendorPathLen), '/');
 			$name = strtok('/');
 			$packages["$ns/$name"] = true;
 		}
@@ -55,6 +53,6 @@ final class BuildTest extends TestCase {
 	}
 
 	protected static function buildBinary(): void {
-		system('phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"');
+		system('phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy"');
 	}
 }

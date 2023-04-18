@@ -121,7 +121,7 @@ Ensure you are in the directory where the Buddy repository is cloned. And follow
 
 ```bash
  git clone https://github.com/manticoresoftware/phar_builder.git
-docker run -rm --entrypoint bash -v $(pwd):/workdir --workdir /workdir --entrypoint bash -it manticoresearch/manticore-executor-kit:0.6.6 -c './phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy" --index="src/main.php"'
+docker run -rm --entrypoint bash -v $(pwd):/workdir --workdir /workdir --entrypoint bash -it manticoresearch/manticore-executor-kit:0.6.6 -c './phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy"
 ```
 
 Check the build directory and get the built version of Buddy from there and replace it in your another OS in the "modules" directory.
