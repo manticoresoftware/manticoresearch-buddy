@@ -37,6 +37,7 @@ jobs:
           tar czf "$name.tar.gz" build/share/modules/${{ env.APP_NAME }}
           cd build
           zip -r "$name.zip" share/modules
+          mv "$name.zip" ..
           cd ..
         shell: bash
       - uses: actions/upload-artifact@v3
