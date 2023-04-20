@@ -35,7 +35,9 @@ jobs:
           name="${{ env.APP_NAME }}_${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.rpm_suffix }}"
           echo "$name"
           tar czf "$name.tar.gz" build/share/modules/${{ env.APP_NAME }}
-          zip -r "$name.zip" build/share/modules
+          cd build
+          zip -r "$name.zip" share/modules
+          cd ..
         shell: bash
       - uses: actions/upload-artifact@v3
         with:
