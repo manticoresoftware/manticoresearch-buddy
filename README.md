@@ -120,7 +120,7 @@ If you want to test Buddy somewhere else (not just Alpine), the easiest way to b
 Ensure you are in the directory where the Buddy repository is cloned. And follow the instructions:
 
 ```bash
- git clone https://github.com/manticoresoftware/phar_builder.git
+git clone https://github.com/manticoresoftware/phar_builder.git
 docker run -rm --entrypoint bash -v $(pwd):/workdir --workdir /workdir --entrypoint bash -it manticoresearch/manticore-executor-kit:0.6.6 -c './phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy"
 ```
 
