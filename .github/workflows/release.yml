@@ -9,7 +9,6 @@ on:
 
 env:
   APP_NAME: 'manticore-buddy'
-  PHP_VERSION: '8.1.11'
   MAINTAINER: 'Manticore'
   DESC: 'Manticore Buddy'
   LIBCURL_NAME: 'libcurl'
@@ -23,7 +22,7 @@ jobs:
       - name: Prepare release directory
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
-          ./phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy"
+          ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
       - id: vars
         run: |
           echo "app_version=$(<APP_VERSION)" >> $GITHUB_OUTPUT
@@ -34,7 +33,9 @@ jobs:
         run: |
           name="${{ env.APP_NAME }}_${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.rpm_suffix }}"
           echo "$name"
-          tar czf "$name.tar.gz" build/share/modules/${{ env.APP_NAME }}
+          mkdir build/bin
+          cp build/${{ env.APP_NAME }} build/bin/${{ env.APP_NAME }}
+          tar czf "$name.tar.gz" -C build bin/${{ env.APP_NAME }} share
           cd build
           zip -r "$name.zip" share/modules
           mv "$name.zip" ..
@@ -54,7 +55,7 @@ jobs:
       - name: Build binary
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
-          ./phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy"
+          ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
       - id: vars
         run: |
           echo "app_version=$(<APP_VERSION)" >> $GITHUB_OUTPUT
