@@ -224,10 +224,17 @@ final class EventHandler {
 						[$request, $response] = $payload;
 						$result = (string)$response;
 						$id = static::getRequestId($serverRequest);
-						Buddy::debug("[$id] response data: $result");
+						if ($response->hasError()) {
+							$respStatus = 400;
+							$debugMsgPrefix = 'error';
+						} else {
+							$respStatus = 200;
+							$debugMsgPrefix = '';
+						}
+						Buddy::debug("[$id] $debugMsgPrefix response data: $result");
 						$time = (int)((microtime(true) - $request->time) * 1000000);
 						Buddy::debug("[$id] process time: {$time}µs");
-						return $resolve(new HttpResponse(200, $headers, $result));
+						return $resolve(new HttpResponse($respStatus, $headers, $result));
 					}
 				);
 			}
