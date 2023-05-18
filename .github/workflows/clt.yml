@@ -1,0 +1,21 @@
+name: tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  clt:
+    uses: manticoresoftware/clt/.github/workflows/clt-template.yml@v1
+    with:
+      docker_images: |
+        [
+          {"image": "ghcr.io/manticoresoftware/manticoresearch:clt-dev"},
+          {"image": "manticoresearch/manticore-executor-kit:0.6.9"}
+        ]
+      init_code: |
+        git clone https://github.com/manticoresoftware/phar_builder.git
+        ./phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy"
+      run_args: '-v $PWD/build/manticore-buddy:/usr/bin/manticore-buddy -v $PWD/build/share/modules/manticore-buddy:/usr/local/share/manticore/modules/manticore-buddy'

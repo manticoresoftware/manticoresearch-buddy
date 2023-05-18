@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "cefbe6485b9c03165c37911c491f8bf9",
+    "content-hash": "ae78679728f2deb7fb0ccb48fcb950b3",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -1099,12 +1099,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-insert-mva.git",
-                "reference": "65d42c438e1c7e5a5ebadd309d468f7eb38b77c9"
+                "reference": "f09f93df79d0d529e515dca5872044c8ea7ebb92"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert-mva/zipball/65d42c438e1c7e5a5ebadd309d468f7eb38b77c9",
-                "reference": "65d42c438e1c7e5a5ebadd309d468f7eb38b77c9",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert-mva/zipball/f09f93df79d0d529e515dca5872044c8ea7ebb92",
+                "reference": "f09f93df79d0d529e515dca5872044c8ea7ebb92",
                 "shasum": ""
             },
             "require": {
@@ -1138,7 +1138,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-insert-mva/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-insert-mva/tree/main"
             },
-            "time": "2023-03-28T08:01:39+00:00"
+            "time": "2023-05-17T15:34:05+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-lock-tables",
@@ -1280,53 +1280,6 @@
                 "source": "https://github.com/manticoresoftware/buddy-plugin-select/tree/main"
             },
             "time": "2023-04-04T10:05:24+00:00"
-        },
-        {
-            "name": "manticoresoftware/buddy-plugin-show-fields",
-            "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/manticoresoftware/buddy-plugin-show-fields.git",
-                "reference": "a60e21aa00ed12c421801e645e50c727dd383506"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-show-fields/zipball/a60e21aa00ed12c421801e645e50c727dd383506",
-                "reference": "a60e21aa00ed12c421801e645e50c727dd383506",
-                "shasum": ""
-            },
-            "require": {
-                "manticoresoftware/buddy-core": "dev-main"
-            },
-            "require-dev": {
-                "phpstan/phpstan": "^1.8",
-                "phpunit/phpunit": "^9.5",
-                "slevomat/coding-standard": "^8.5",
-                "squizlabs/php_codesniffer": "^3.7"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Manticoresearch\\Buddy\\Plugin\\ShowFields\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "GPL-2.0-or-later"
-            ],
-            "authors": [
-                {
-                    "name": "Manticore Software Co. Ltd",
-                    "email": "contact@manticoresearch.com"
-                }
-            ],
-            "description": "The Buddy SHOW FIELDS … plugin",
-            "support": {
-                "issues": "https://github.com/manticoresoftware/buddy-plugin-show-fields/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-show-fields/tree/main"
-            },
-            "time": "2023-04-04T10:05:14+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-show-full-tables",
@@ -6014,7 +5967,6 @@
         "manticoresoftware/buddy-plugin-unlock-tables": 20,
         "manticoresoftware/buddy-plugin-select": 20,
         "manticoresoftware/buddy-plugin-show-full-tables": 20,
-        "manticoresoftware/buddy-plugin-show-fields": 20,
         "manticoresoftware/buddy-plugin-show-queries": 20,
         "manticoresoftware/buddy-plugin-cli-table": 20,
         "manticoresoftware/buddy-plugin-plugin": 20,

@@ -40,7 +40,6 @@
 		"manticoresoftware/buddy-plugin-unlock-tables": "dev-main",
 		"manticoresoftware/buddy-plugin-select": "dev-main",
 		"manticoresoftware/buddy-plugin-show-full-tables": "dev-main",
-		"manticoresoftware/buddy-plugin-show-fields": "dev-main",
 		"manticoresoftware/buddy-plugin-show-queries": "dev-main",
 		"manticoresoftware/buddy-plugin-cli-table": "dev-main",
 		"manticoresoftware/buddy-plugin-plugin": "dev-main",

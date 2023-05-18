@@ -7,3 +7,5 @@ build/**
 phar_builder
 /plugins/*
 !/plugins/.gitkeep
+clt
+tests/*.rep
