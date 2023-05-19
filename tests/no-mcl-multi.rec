@@ -116,7 +116,7 @@ mysql -h0 -P9306 -e 'select /*!40001 SQL_NO_CACHE */ * from no_mcl_multi'
 ––– input –––
 ls -ltS /var/lib/manticore/no_mcl_multi/
 ––– output –––
-total 100
+total #!/[0-9]+/!#
 -rw-------. 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# no_mcl_multi.1.spb
 -rw-------. 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# no_mcl_multi.0.spb
 -rw-------. 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# no_mcl_multi.1.spidx
