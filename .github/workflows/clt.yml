@@ -18,4 +18,5 @@ jobs:
       init_code: |
         git clone https://github.com/manticoresoftware/phar_builder.git
         ./phar_builder/bin/build --name="Manticore Buddy" --package="manticore-buddy"
+        cd tests/dumps && gunzip 1m.sql.gz && cd ../..
       run_args: '-v $PWD/build/manticore-buddy:/usr/bin/manticore-buddy -v $PWD/build/share/modules/manticore-buddy:/usr/local/share/manticore/modules/manticore-buddy'
