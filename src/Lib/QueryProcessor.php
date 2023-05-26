@@ -77,7 +77,7 @@ class QueryProcessor {
 		$pluginPayload = $payloadClassName::fromRequest($request);
 		$pluginPayload->setSettings(static::$settings);
 		Buddy::debug("[$request->id] $pluginName payload: " . json_encode($pluginPayload));
-		$handlerClassName = "{$pluginPrefix}\\Handler";
+		$handlerClassName = $pluginPayload->getHandlerClassName();
 	  /** @var BaseHandler */
 		$handler = new $handlerClassName($pluginPayload);
 		foreach ($handler->getProps() as $prop) {

@@ -13,7 +13,7 @@ use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
-use Manticoresearch\Buddy\Plugin\ShowFullTables\Payload as ShowFullTablesPayload;
+use Manticoresearch\Buddy\Plugin\Show\Payload as ShowFullTablesPayload;
 use PHPUnit\Framework\TestCase;
 
 class ShowFullTablesPayloadTest extends TestCase {
@@ -57,6 +57,7 @@ class ShowFullTablesPayloadTest extends TestCase {
 
 	public function testSQLQueryParsing(): void {
 		echo 'Testing queries:' . PHP_EOL;
+		ShowFullTablesPayload::$type = 'full tables';
 		foreach (static::PARSING_SETS as ['args' => $args, 'checks' => $checks]) {
 			$payload = ShowFullTablesPayload::fromRequest(
 				Request::fromArray(static::buildSQLQuery($args))
