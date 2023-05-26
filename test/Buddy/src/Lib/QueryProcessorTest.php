@@ -21,8 +21,8 @@ use Manticoresearch\Buddy\Plugin\Backup\Payload as BackupPayload;
 use Manticoresearch\Buddy\Plugin\Insert\Error\AutoSchemaDisabledError;
 use Manticoresearch\Buddy\Plugin\Insert\Handler as InsertQueryHandler;
 use Manticoresearch\Buddy\Plugin\Insert\Payload as InsertQueryPayload;
-use Manticoresearch\Buddy\Plugin\ShowQueries\Handler as ShowQueriesHandler;
-use Manticoresearch\Buddy\Plugin\ShowQueries\Payload as ShowQueriesPayload;
+use Manticoresearch\Buddy\Plugin\Show\Payload as ShowQueriesPayload;
+use Manticoresearch\Buddy\Plugin\Show\QueriesHandler as ShowQueriesHandler;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 

@@ -16,8 +16,8 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Task\Task;
-use Manticoresearch\Buddy\Plugin\ShowQueries\Handler;
-use Manticoresearch\Buddy\Plugin\ShowQueries\Payload;
+use Manticoresearch\Buddy\Plugin\Show\Payload;
+use Manticoresearch\Buddy\Plugin\Show\QueriesHandler as Handler;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -49,11 +49,12 @@ class CliTableHandlerTest extends TestCase {
 				'path' => 'cli',
 			]
 		);
+
 		$serverUrl = self::setUpMockManticoreServer(false);
 		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
 		$tableFormatter = new TableFormatter();
+		Payload::$type = 'queries';
 		$payload = Payload::fromRequest($request);
-
 		$handler = new Handler($payload);
 		$refCls = new ReflectionClass($handler);
 		$refCls->getProperty('manticoreClient')->setValue($handler, $manticoreClient);

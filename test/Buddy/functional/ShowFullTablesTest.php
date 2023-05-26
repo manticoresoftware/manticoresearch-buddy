@@ -38,10 +38,10 @@ class ShowFullTablesTest extends TestCase {
 	public function testShowFullTablesWithNoArgsIsOk(): void {
 		$this->assertQueryResult(
 			'SHOW FULL TABLES', [
-				'Index: a',
-				'Index: b',
-				'Index: test123',
-				'Index: hello',
+				'Tables_in_Manticore: a',
+				'Tables_in_Manticore: b',
+				'Tables_in_Manticore: test123',
+				'Tables_in_Manticore: hello',
 			]
 		);
 	}
@@ -49,40 +49,40 @@ class ShowFullTablesTest extends TestCase {
 	public function testShowFullTablesFiltersLikeInAProperWay(): void {
 		$this->assertQueryResult(
 			"SHOW FULL TABLES LIKE 'a'", [
-				'Index: a',
+				'Tables_in_Manticore: a',
 			], [
-				'Index: b',
-				'Index: test123',
-				'Index: hello',
+				'Tables_in_Manticore: b',
+				'Tables_in_Manticore: test123',
+				'Tables_in_Manticore: hello',
 			]
 		);
 
 		$this->assertQueryResult(
 			"SHOW FULL TABLES LIKE '%'", [
-				'Index: a',
-				'Index: b',
-				'Index: test123',
-				'Index: hello',
+				'Tables_in_Manticore: a',
+				'Tables_in_Manticore: b',
+				'Tables_in_Manticore: test123',
+				'Tables_in_Manticore: hello',
 			]
 		);
 
 		$this->assertQueryResult(
 			"SHOW FULL TABLES LIKE 't%'", [
-				'Index: test123',
+				'Tables_in_Manticore: test123',
 			], [
-				'Index: a',
-				'Index: b',
-				'Index: hello',
+				'Tables_in_Manticore: a',
+				'Tables_in_Manticore: b',
+				'Tables_in_Manticore: hello',
 			]
 		);
 
 		$this->assertQueryResult(
 			"SHOW FULL TABLES LIKE '_'", [
-				'Index: a',
-				'Index: b',
+				'Tables_in_Manticore: a',
+				'Tables_in_Manticore: b',
 			], [
-				'Index: test123',
-				'Index: hello',
+				'Tables_in_Manticore: test123',
+				'Tables_in_Manticore: hello',
 			]
 		);
 
@@ -90,10 +90,10 @@ class ShowFullTablesTest extends TestCase {
 			"SHOW FULL TABLES LIKE 'doesnotexist'", [
 
 			], [
-				'Index: a',
-				'Index: b',
-				'Index: test123',
-				'Index: hello',
+				'Tables_in_Manticore: a',
+				'Tables_in_Manticore: b',
+				'Tables_in_Manticore: test123',
+				'Tables_in_Manticore: hello',
 			]
 		);
 	}
