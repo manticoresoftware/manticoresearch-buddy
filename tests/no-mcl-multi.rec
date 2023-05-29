@@ -15,6 +15,9 @@ listening on all interfaces for sphinx and http(s), port=9308
 mysql -h0 -P9306 < tests/dumps/no-mcl/multi.sql
 ––– output –––
 ––– input –––
+mysql -h0 -P9306 -e 'select * from no_mcl_multi limit -1'
+––– output –––
+––– input –––
 mysql -h0 -P9306 < tests/dumps/no-mcl/multi-batch-1.sql
 ––– output –––
 ––– input –––
