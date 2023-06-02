@@ -137,7 +137,7 @@ class InsertQueryTest extends TestCase {
 			. "\n"
 			. '{ "title" : "Yellow Bag", "price": 12 }'
 			. "\n"
-			. '{ "create" : { "_index" : "' . $this->testTable . '", "_id": "3"} }'
+			. '{ "create" : { "_index" : "' . $this->testTable . '", "_id": "2"} }'
 			. "\n"
 			. '{ "title" : "Red Bag", "price": 12.5, "id": 3 }'
 			. "\n";
