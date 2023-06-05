@@ -9,7 +9,7 @@ Copyright (c) 2017-#!/[0-9]{4}/!#, Manticore Software LTD (https://manticoresear
 starting daemon version '#!/[0-9]\.[0-9]\.[0-9]/!# #!/[a-z0-9]{9}@[0-9]{6}/!# dev (columnar #!/[0-9]\.[0-9]\.[0-9]/!# #!/[a-z0-9]{7}@[0-9]{6}/!#) (secondary #!/[0-9]\.[0-9]\.[0-9]/!# #!/[a-z0-9]{7}@[0-9]{6}/!#)' ...
 listening on all interfaces for mysql, port=9306
 listening on UNIX socket /var/run/mysqld/mysqld.sock
-listening on #!/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:9312|all interfaces/!# for sphinx and http(s), port=9312
+listening on all interfaces for sphinx and http(s), port=9312
 listening on all interfaces for sphinx and http(s), port=9308
 ––– input –––
 mysql -h0 -P9306 < tests/dumps/mcl-only/multi.sql
@@ -120,29 +120,29 @@ mysql -h0 -P9306 -e 'select /*!40001 SQL_NO_CACHE */ * from mcl_only_multi'
 ls -ltS /var/lib/manticore/mcl_only_multi/
 ––– output –––
 total #!/[0-9]+/!#
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spidx
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spc
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spc
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spidx
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.meta
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.sph
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.sph
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.sphi
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.sphi
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.ram
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spa
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spa
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spt
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spt
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spm
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spm
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.settings
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spd
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spe
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spi
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spp
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spd
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spe
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spi
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spp
--rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.lock
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spidx
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spc
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spc
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spidx
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.meta
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.sph
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.sph
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.sphi
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.sphi
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.ram
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spa
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spa
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spt
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spt
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spm
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spm
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.settings
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spd
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spe
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spi
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.0.spp
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spd
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spe
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spi
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.1.spp
+-rw------- 1 root root #!/\s*[0-9]+/!# #!/[A-Za-z]{3}\s+[0-9]{1,2} [0-9]{2}:[0-9]{2}/!# mcl_only_multi.lock
