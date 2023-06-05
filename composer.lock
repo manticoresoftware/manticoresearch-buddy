@@ -1240,12 +1240,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-select.git",
-                "reference": "87a6b05431d695f404cda00fe0795d2ba648a144"
+                "reference": "a833c6211ac559db8c3dfdd9fc4b51318264425f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/87a6b05431d695f404cda00fe0795d2ba648a144",
-                "reference": "87a6b05431d695f404cda00fe0795d2ba648a144",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/a833c6211ac559db8c3dfdd9fc4b51318264425f",
+                "reference": "a833c6211ac559db8c3dfdd9fc4b51318264425f",
                 "shasum": ""
             },
             "require": {
@@ -1279,7 +1279,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-select/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-select/tree/main"
             },
-            "time": "2023-06-05T06:26:02+00:00"
+            "time": "2023-06-05T08:29:48+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-show",
@@ -4271,16 +4271,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.15",
+            "version": "1.10.16",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "762c4dac4da6f8756eebb80e528c3a47855da9bd"
+                "reference": "352bdbb960bb523e3d71b834862589f910921c23"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/762c4dac4da6f8756eebb80e528c3a47855da9bd",
-                "reference": "762c4dac4da6f8756eebb80e528c3a47855da9bd",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/352bdbb960bb523e3d71b834862589f910921c23",
+                "reference": "352bdbb960bb523e3d71b834862589f910921c23",
                 "shasum": ""
             },
             "require": {
@@ -4329,7 +4329,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-05-09T15:28:01+00:00"
+            "time": "2023-06-05T08:21:46+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
