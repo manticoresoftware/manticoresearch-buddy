@@ -9,7 +9,7 @@ Copyright (c) 2017-#!/[0-9]{4}/!#, Manticore Software LTD (https://manticoresear
 starting daemon version '#!/[0-9]\.[0-9]\.[0-9]/!# #!/[a-z0-9]{9}@[0-9]{6}/!# dev (columnar #!/[0-9]\.[0-9]\.[0-9]/!# #!/[a-z0-9]{7}@[0-9]{6}/!#) (secondary #!/[0-9]\.[0-9]\.[0-9]/!# #!/[a-z0-9]{7}@[0-9]{6}/!#)' ...
 listening on all interfaces for mysql, port=9306
 listening on UNIX socket /var/run/mysqld/mysqld.sock
-listening on #!/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:9312|all interfaces/!# for sphinx and http(s)
+listening on #!/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:9312|all interfaces/!# for sphinx and http(s), port=9312
 listening on all interfaces for sphinx and http(s), port=9308
 ––– input –––
 mysql -h0 -P9306 < tests/dumps/mcl-all/multi64.sql
