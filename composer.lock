@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "800c3821bc8c463da3a5c4f80c5c9ddc",
+    "content-hash": "66c422afb66a764dc45f905258058b72",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -1237,16 +1237,16 @@
         },
         {
             "name": "manticoresoftware/buddy-plugin-select",
-            "version": "dev-main",
+            "version": "dev-fix/keep-alive",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-select.git",
-                "reference": "3c102e5bef14d283844e38286bf22b28a5ba9115"
+                "reference": "2bdc38ea1c9a460c49dd2006b6876c04e28cc244"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/3c102e5bef14d283844e38286bf22b28a5ba9115",
-                "reference": "3c102e5bef14d283844e38286bf22b28a5ba9115",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/2bdc38ea1c9a460c49dd2006b6876c04e28cc244",
+                "reference": "2bdc38ea1c9a460c49dd2006b6876c04e28cc244",
                 "shasum": ""
             },
             "require": {
@@ -1258,7 +1258,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -1278,9 +1277,9 @@
             "description": "The Buddy failed SELECT statement handler plugin",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-select/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-select/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-select/tree/fix/keep-alive"
             },
-            "time": "2023-06-09T13:25:35+00:00"
+            "time": "2023-06-29T06:30:56+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-show",
