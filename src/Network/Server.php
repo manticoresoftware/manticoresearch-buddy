@@ -12,6 +12,8 @@
 namespace Manticoresearch\Buddy\Base\Network;
 
 use Exception;
+use Manticoresearch\Buddy\Base\Lib\MetricThread;
+use Manticoresearch\Buddy\Base\Network\EventHandler;
 use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use React\EventLoop\Loop;
@@ -125,7 +127,10 @@ final class Server {
 		echo 'Buddy v' . Buddy::getVersion()
 			. ' started ' . str_replace('tcp://', '', (string)$this->socket->getAddress())
 			. PHP_EOL;
-		usleep(200000); // <-- TODO: remove it when we will have fix on manticore side
+
+		// Initialize runtimes that we will use for request handling
+		EventHandler::init();
+
 		// Process first functions to run on start
 		foreach ($this->onstart as $fn) {
 			$fn();
@@ -139,7 +144,7 @@ final class Server {
 		// Handle connections and subscribe to all events in handlers
 		// Create the socket for future use
 		if (!isset($this->handlers['request'])) {
-			throw new Exception('You are missing "request" handler to handle requeests');
+			throw new Exception('You are missing "request" handler to handle requests');
 		}
 		$http = new HttpServer(
 			new StreamingRequestMiddleware(),
@@ -166,6 +171,25 @@ final class Server {
 		);
 
 		$http->listen($this->socket);
+		return $this;
+	}
+
+	/**
+	 * Stop running server
+	 *
+	 * @param bool $exit
+	 * @return static
+	 */
+	public function stop($exit = true): static {
+		if (is_telemetry_enabled()) {
+			MetricThread::destroy();
+		}
+		EventHandler::destroy();
+		$this->socket->close();
+		Loop::stop();
+		if ($exit) {
+			exit(0);
+		}
 		return $this;
 	}
 

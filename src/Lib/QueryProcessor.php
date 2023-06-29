@@ -13,8 +13,10 @@ namespace Manticoresearch\Buddy\Base\Lib;
 
 use Exception;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
+use Manticoresearch\Buddy\Base\Network\EventHandler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
@@ -33,29 +35,17 @@ class QueryProcessor {
 	/** @var bool */
 	protected static bool $isInited = false;
 
-	/** @var bool */
-	protected static bool $plugged = false;
-
 	/** @var ManticoreSettings */
 	protected static ManticoreSettings $settings;
+
+	/** @var Pluggable */
+	protected static Pluggable $pluggable;
 
 	/** @var string[] */
 	protected static array $corePlugins = [];
 
 	/** @var string[] */
 	protected static array $extraPlugins = [];
-
-  /**
-   * Setter for container property
-   *
-   * @param ContainerInterface $container
-   *  The container object to resolve the executor's dependencies in case such exist
-   * @return void
-   *  The CommandExecutorInterface to execute to process the final query
-   */
-	public static function setContainer(ContainerInterface $container): void {
-		self::$container = $container;
-	}
 
   /**
    * This is the main entry point to start parsing and processing query
@@ -95,14 +85,33 @@ class QueryProcessor {
 		// We have tests that going into private properties and change it
 		// This is very bad but to not edit it all we will do hack here
 		// TODO: Fix it later
+
+		// Get container from Pluggable class to reduce code modifications
+		if (!isset(static::$container)) {
+			static::$container = Pluggable::getContainer();
+		}
+
 		if (!isset(static::$settings)) {
 			static::$settings = static::fetchManticoreSettings();
 		}
 
-		static::$corePlugins = static::fetchCorePlugins();
-		static::$extraPlugins = static::fetchExtraPlugins();
+		static::$pluggable = new Pluggable(
+			static::$settings,
+			static::getHooks(),
+		);
+		static::$corePlugins = static::$pluggable->fetchCorePlugins();
+		static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
 
 		static::$isInited = true;
+	}
+
+	/**
+	 * Helper to set settings when we need it before calling to init
+	 * @param Settings $settings
+	 * @return void
+	 */
+	public static function setSettings(Settings $settings): void {
+		static::$settings = $settings;
 	}
 
 	/**
@@ -209,70 +218,27 @@ class QueryProcessor {
 	}
 
 	/**
-	 * Get list of core plugin names
-	 * @return array<string>
-	 * @throws Exception
+	 * Get hooks to register for Pluggable system
+	 * @return array<array{0:string,1:string,2:callable}>
 	 */
-	protected static function fetchCorePlugins(): array {
-		$projectRoot = buddy_project_root();
-		if (!is_string($projectRoot)) {
-			throw new Exception('Failed to find project root');
-		}
-		return static::fetchPlugins($projectRoot);
-	}
-
-	/**
-	 * Get list of external plugin names
-	 * @return array<string>
-	 * @throws Exception
-	 */
-	protected static function fetchExtraPlugins(): array {
-		return static::fetchPlugins();
-	}
-
-	/**
-	 * Helper function to get external or core plugins
-	 * @param string $path
-	 * @return array<string>
-	 * @throws Exception
-	 */
-	protected static function fetchPlugins(string $path = ''): array {
-		$pluggable = new Pluggable(static::$settings);
-		if ($path) {
-			$pluggable->setPluginDir($path);
-			// Register all predefined hooks for core plugins only for now
-			static::registerHooks($pluggable);
-		} elseif (!static::$plugged) { // Lazy register autoload
-			static::$plugged = true;
-		}
-		$pluggable->reload();
-		return array_column($pluggable->getList(), 'short');
-	}
-
-	/**
-	 * Register all hooks to known core plugins
-	 * It's called on init phase once and keep updated on event emited from the plugin
-	 * @param Pluggable $pluggable
-	 * @return void
-	 */
-	protected static function registerHooks(Pluggable $pluggable): void {
-		$hooks = [
+	protected static function getHooks(): array {
+		return [
 			[
 				'manticoresoftware/buddy-plugin-plugin',
 				'installed',
-				fn() => static::$extraPlugins = static::fetchExtraPlugins(),
+				function () {
+					static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
+					EventHandler::setShouldExit(true);
+				},
 			],
 			[
 				'manticoresoftware/buddy-plugin-plugin',
 				'deleted',
-				fn() => static::$extraPlugins = static::fetchExtraPlugins(),
+				function () {
+					static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
+					EventHandler::setShouldExit(true);
+				},
 			],
 		];
-
-		foreach ($hooks as [$plugin, $hook, $fn]) {
-			$prefix = $pluggable->getClassNamespaceByFullName($plugin);
-			$className = $prefix . 'Handler';
-			$className::registerHook($hook, $fn);
-		}
 	}
 }

@@ -51,6 +51,9 @@ final class EventHandler {
 	/** @var int */
 	public static int $maxRuntimeIndex;
 
+	/** @var bool */
+	protected static bool $shouldExit = false;
+
 	/**
 	 * This fucntion must be called before using any request processing to initizalize runtimes for threading
 	 *
@@ -271,6 +274,23 @@ final class EventHandler {
 			}
 			exit(0);
 		};
+	}
+
+	/**
+	 * Set flag that will notify our server that we need to stop
+	 * @param bool $shouldExit
+	 * @return void
+	 */
+	public static function setShouldExit(bool $shouldExit): void {
+		static::$shouldExit = $shouldExit;
+	}
+
+	/**
+	 * Get the flag that will notify if we should exit
+	 * @return bool
+	 */
+	public static function shouldExit(): bool {
+		return static::$shouldExit;
 	}
 
 	/**
