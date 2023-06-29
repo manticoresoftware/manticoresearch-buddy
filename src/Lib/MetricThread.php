@@ -61,7 +61,11 @@ final class MetricThread {
 	 * @return void
 	 */
 	public static function destroy(): void {
-		static::$instance->destroy();
+		if (!isset(static::$instance)) {
+			return;
+		}
+
+		static::$instance->task->destroy();
 	}
 
 	/**
@@ -85,7 +89,9 @@ final class MetricThread {
 	public static function start(): self {
 		$task = Task::loopInRuntime(
 			Task::createRuntime(),
-			static function (Channel $ch, ContainerInterface $container) {
+			static function (Channel $ch, string $container) {
+				/** @var ContainerInterface $container */
+				$container = unserialize($container);
 				// This fix issue when we get "sh: 1: cd: can't cd to" error
 				// while running buddy inside directory that are not allowed for us
 				chdir(sys_get_temp_dir());
@@ -99,7 +105,7 @@ final class MetricThread {
 					[$method, $args] = $msg;
 					$metric->$method(...$args);
 				}
-			}, [static::$container]
+			}, [serialize(static::$container)]
 		);
 
 		return (new self($task))->run();
