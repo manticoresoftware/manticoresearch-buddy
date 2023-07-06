@@ -814,12 +814,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "264430a415eca5fe549910fcff36f98e98f557ed"
+                "reference": "1862735de15560b7739b9663ec2b74ef34a984e7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/264430a415eca5fe549910fcff36f98e98f557ed",
-                "reference": "264430a415eca5fe549910fcff36f98e98f557ed",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/1862735de15560b7739b9663ec2b74ef34a984e7",
+                "reference": "1862735de15560b7739b9663ec2b74ef34a984e7",
                 "shasum": ""
             },
             "require": {
@@ -838,7 +838,8 @@
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "Manticoresearch\\Buddy\\Core\\": "src/"
+                    "Manticoresearch\\Buddy\\Core\\": "src/",
+                    "Manticoresearch\\Buddy\\CoreTest\\": "test/src/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -856,7 +857,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2023-06-22T07:06:56+00:00"
+            "time": "2023-07-05T14:26:33+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-backup",
@@ -864,12 +865,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-backup.git",
-                "reference": "65c7ee1b57d06c57759cbce1a3481fd717fdded9"
+                "reference": "2d3d882d566bf20b674f0e879af44a387f9ed4d1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-backup/zipball/65c7ee1b57d06c57759cbce1a3481fd717fdded9",
-                "reference": "65c7ee1b57d06c57759cbce1a3481fd717fdded9",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-backup/zipball/2d3d882d566bf20b674f0e879af44a387f9ed4d1",
+                "reference": "2d3d882d566bf20b674f0e879af44a387f9ed4d1",
                 "shasum": ""
             },
             "require": {
@@ -904,7 +905,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-backup/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-backup/tree/main"
             },
-            "time": "2023-04-04T10:02:41+00:00"
+            "time": "2023-07-06T07:37:06+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-cli-table",
@@ -912,16 +913,17 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-cli-table.git",
-                "reference": "507ec8a007658d8b1a4c5f0f68ec0e74e2fbac7f"
+                "reference": "4ffade5788a66f547df7a9a2851428493434188f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-cli-table/zipball/507ec8a007658d8b1a4c5f0f68ec0e74e2fbac7f",
-                "reference": "507ec8a007658d8b1a4c5f0f68ec0e74e2fbac7f",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-cli-table/zipball/4ffade5788a66f547df7a9a2851428493434188f",
+                "reference": "4ffade5788a66f547df7a9a2851428493434188f",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main"
+                "manticoresoftware/buddy-core": "dev-main",
+                "manticoresoftware/buddy-plugin-show": "dev-main"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -951,7 +953,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-cli-table/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-cli-table/tree/main"
             },
-            "time": "2023-04-04T10:06:47+00:00"
+            "time": "2023-07-06T07:31:51+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-empty-string",
@@ -1053,12 +1055,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-insert.git",
-                "reference": "c32fb5ab7fbc2bfab2ab2849097e506a402e4532"
+                "reference": "625a7fb76f7014a5bb0ef813e11b1ff9d905599f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert/zipball/c32fb5ab7fbc2bfab2ab2849097e506a402e4532",
-                "reference": "c32fb5ab7fbc2bfab2ab2849097e506a402e4532",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert/zipball/625a7fb76f7014a5bb0ef813e11b1ff9d905599f",
+                "reference": "625a7fb76f7014a5bb0ef813e11b1ff9d905599f",
                 "shasum": ""
             },
             "require": {
@@ -1092,7 +1094,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-insert/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-insert/tree/main"
             },
-            "time": "2023-06-30T17:50:02+00:00"
+            "time": "2023-07-05T15:23:02+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-insert-mva",
@@ -1288,12 +1290,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-show.git",
-                "reference": "44dfa3dcb00846c25ee148249b0c3f473d2b024e"
+                "reference": "4b40d13a4e5cf7c42640ef4d5ba6e6e9acdd9449"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-show/zipball/44dfa3dcb00846c25ee148249b0c3f473d2b024e",
-                "reference": "44dfa3dcb00846c25ee148249b0c3f473d2b024e",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-show/zipball/4b40d13a4e5cf7c42640ef4d5ba6e6e9acdd9449",
+                "reference": "4b40d13a4e5cf7c42640ef4d5ba6e6e9acdd9449",
                 "shasum": ""
             },
             "require": {
@@ -1327,7 +1329,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-show/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-show/tree/main"
             },
-            "time": "2023-05-25T08:25:54+00:00"
+            "time": "2023-07-06T07:04:01+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-test",
@@ -4136,16 +4138,16 @@
         },
         {
             "name": "phpstan/phpdoc-parser",
-            "version": "1.22.0",
+            "version": "1.22.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpdoc-parser.git",
-                "reference": "ec58baf7b3c7f1c81b3b00617c953249fb8cf30c"
+                "reference": "65c39594fbd8c67abfc68bb323f86447bab79cc0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/ec58baf7b3c7f1c81b3b00617c953249fb8cf30c",
-                "reference": "ec58baf7b3c7f1c81b3b00617c953249fb8cf30c",
+                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/65c39594fbd8c67abfc68bb323f86447bab79cc0",
+                "reference": "65c39594fbd8c67abfc68bb323f86447bab79cc0",
                 "shasum": ""
             },
             "require": {
@@ -4177,22 +4179,22 @@
             "description": "PHPDoc parser with support for nullable, intersection and generic types",
             "support": {
                 "issues": "https://github.com/phpstan/phpdoc-parser/issues",
-                "source": "https://github.com/phpstan/phpdoc-parser/tree/1.22.0"
+                "source": "https://github.com/phpstan/phpdoc-parser/tree/1.22.1"
             },
-            "time": "2023-06-01T12:35:21+00:00"
+            "time": "2023-06-29T20:46:06+00:00"
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.21",
+            "version": "1.10.24",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "b2a30186be2e4d97dce754ae4e65eb0ec2f04eb5"
+                "reference": "360ecc90569e9a60c2954ee209ec04fa0d958e14"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/b2a30186be2e4d97dce754ae4e65eb0ec2f04eb5",
-                "reference": "b2a30186be2e4d97dce754ae4e65eb0ec2f04eb5",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/360ecc90569e9a60c2954ee209ec04fa0d958e14",
+                "reference": "360ecc90569e9a60c2954ee209ec04fa0d958e14",
                 "shasum": ""
             },
             "require": {
@@ -4241,7 +4243,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-06-21T20:07:58+00:00"
+            "time": "2023-07-05T12:32:13+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
