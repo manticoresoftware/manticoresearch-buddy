@@ -36,8 +36,6 @@
 		"manticoresoftware/buddy-plugin-backup": "dev-main",
 		"manticoresoftware/buddy-plugin-emulate-elastic": "dev-main",
 		"manticoresoftware/buddy-plugin-insert": "dev-main",
-		"manticoresoftware/buddy-plugin-lock-tables": "dev-main",
-		"manticoresoftware/buddy-plugin-unlock-tables": "dev-main",
 		"manticoresoftware/buddy-plugin-select": "dev-main",
 		"manticoresoftware/buddy-plugin-show": "dev-main",
 		"manticoresoftware/buddy-plugin-cli-table": "dev-main",
