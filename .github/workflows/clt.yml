@@ -12,7 +12,7 @@ jobs:
     with:
       docker_images: |
         [
-          {"image": "ghcr.io/manticoresoftware/manticoresearch:clt-dev"},
+          {"image": "ghcr.io/manticoresoftware/manticoresearch:clt-tmp-47146bd"},
           {"image": "manticoresearch/manticore-executor-kit:0.6.9"}
         ]
       init_code: |
