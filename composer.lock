@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "800c3821bc8c463da3a5c4f80c5c9ddc",
+    "content-hash": "925a67659b3e1b09792833f0e9e8ecc8",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -961,12 +961,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-empty-string.git",
-                "reference": "f401733a9098246786f7a768796c1771b04eb078"
+                "reference": "740e6e1cac7ba1991d64bbc090e2784be5075608"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-empty-string/zipball/f401733a9098246786f7a768796c1771b04eb078",
-                "reference": "f401733a9098246786f7a768796c1771b04eb078",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-empty-string/zipball/740e6e1cac7ba1991d64bbc090e2784be5075608",
+                "reference": "740e6e1cac7ba1991d64bbc090e2784be5075608",
                 "shasum": ""
             },
             "require": {
@@ -1000,7 +1000,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-empty-string/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-empty-string/tree/main"
             },
-            "time": "2023-05-09T13:35:22+00:00"
+            "time": "2023-07-12T08:40:48+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-emulate-elastic",
@@ -1142,53 +1142,6 @@
                 "source": "https://github.com/manticoresoftware/buddy-plugin-insert-mva/tree/main"
             },
             "time": "2023-05-17T15:34:05+00:00"
-        },
-        {
-            "name": "manticoresoftware/buddy-plugin-lock-tables",
-            "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/manticoresoftware/buddy-plugin-lock-tables.git",
-                "reference": "589e334114735b91cd9fc80684f6a707a58e800e"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-lock-tables/zipball/589e334114735b91cd9fc80684f6a707a58e800e",
-                "reference": "589e334114735b91cd9fc80684f6a707a58e800e",
-                "shasum": ""
-            },
-            "require": {
-                "manticoresoftware/buddy-core": "dev-main"
-            },
-            "require-dev": {
-                "phpstan/phpstan": "^1.8",
-                "phpunit/phpunit": "^9.5",
-                "slevomat/coding-standard": "^8.5",
-                "squizlabs/php_codesniffer": "^3.7"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Manticoresearch\\Buddy\\Plugin\\LockTables\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "GPL-2.0-or-later"
-            ],
-            "authors": [
-                {
-                    "name": "Manticore Software Co. Ltd",
-                    "email": "contact@manticoresearch.com"
-                }
-            ],
-            "description": "The Buddy LOCK TABLES statement handler plugin",
-            "support": {
-                "issues": "https://github.com/manticoresoftware/buddy-plugin-lock-tables/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-lock-tables/tree/main"
-            },
-            "time": "2023-04-04T10:05:32+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-plugin",
@@ -1377,53 +1330,6 @@
                 "source": "https://github.com/manticoresoftware/buddy-plugin-test/tree/main"
             },
             "time": "2023-04-04T10:02:53+00:00"
-        },
-        {
-            "name": "manticoresoftware/buddy-plugin-unlock-tables",
-            "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/manticoresoftware/buddy-plugin-unlock-tables.git",
-                "reference": "ea75cb41b36fdfe6d24168d8bd14f8604cbf758d"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-unlock-tables/zipball/ea75cb41b36fdfe6d24168d8bd14f8604cbf758d",
-                "reference": "ea75cb41b36fdfe6d24168d8bd14f8604cbf758d",
-                "shasum": ""
-            },
-            "require": {
-                "manticoresoftware/buddy-core": "dev-main"
-            },
-            "require-dev": {
-                "phpstan/phpstan": "^1.8",
-                "phpunit/phpunit": "^9.5",
-                "slevomat/coding-standard": "^8.5",
-                "squizlabs/php_codesniffer": "^3.7"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Manticoresearch\\Buddy\\Plugin\\UnlockTables\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "GPL-2.0-or-later"
-            ],
-            "authors": [
-                {
-                    "name": "Manticore Software Co. Ltd",
-                    "email": "contact@manticoresearch.com"
-                }
-            ],
-            "description": "The Buddy UNLOCK TABLES statement handler plugin",
-            "support": {
-                "issues": "https://github.com/manticoresoftware/buddy-plugin-unlock-tables/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-unlock-tables/tree/main"
-            },
-            "time": "2023-04-04T10:05:48+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -4185,16 +4091,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.24",
+            "version": "1.10.25",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "360ecc90569e9a60c2954ee209ec04fa0d958e14"
+                "reference": "578f4e70d117f9a90699324c555922800ac38d8c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/360ecc90569e9a60c2954ee209ec04fa0d958e14",
-                "reference": "360ecc90569e9a60c2954ee209ec04fa0d958e14",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/578f4e70d117f9a90699324c555922800ac38d8c",
+                "reference": "578f4e70d117f9a90699324c555922800ac38d8c",
                 "shasum": ""
             },
             "require": {
@@ -4243,7 +4149,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-07-05T12:32:13+00:00"
+            "time": "2023-07-06T12:11:37+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
@@ -4565,16 +4471,16 @@
         },
         {
             "name": "phpunit/phpunit",
-            "version": "9.6.9",
+            "version": "9.6.10",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "a9aceaf20a682aeacf28d582654a1670d8826778"
+                "reference": "a6d351645c3fe5a30f5e86be6577d946af65a328"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/a9aceaf20a682aeacf28d582654a1670d8826778",
-                "reference": "a9aceaf20a682aeacf28d582654a1670d8826778",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/a6d351645c3fe5a30f5e86be6577d946af65a328",
+                "reference": "a6d351645c3fe5a30f5e86be6577d946af65a328",
                 "shasum": ""
             },
             "require": {
@@ -4648,7 +4554,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/phpunit/issues",
                 "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
-                "source": "https://github.com/sebastianbergmann/phpunit/tree/9.6.9"
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/9.6.10"
             },
             "funding": [
                 {
@@ -4664,7 +4570,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-06-11T06:13:56+00:00"
+            "time": "2023-07-10T04:04:23+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -5811,8 +5717,6 @@
         "manticoresoftware/buddy-plugin-backup": 20,
         "manticoresoftware/buddy-plugin-emulate-elastic": 20,
         "manticoresoftware/buddy-plugin-insert": 20,
-        "manticoresoftware/buddy-plugin-lock-tables": 20,
-        "manticoresoftware/buddy-plugin-unlock-tables": 20,
         "manticoresoftware/buddy-plugin-select": 20,
         "manticoresoftware/buddy-plugin-show": 20,
         "manticoresoftware/buddy-plugin-cli-table": 20,
