@@ -8,7 +8,7 @@ on:
 
 jobs:
   clt:
-    uses: manticoresoftware/clt/.github/workflows/clt-template.yml@v1
+    uses: manticoresoftware/clt/.github/workflows/clt-template.yml@v2
     with:
       docker_images: |
         [
@@ -21,3 +21,4 @@ jobs:
       run_args: |
         -v $PWD/build/share/modules/manticore-buddy:/usr/local/share/manticore/modules/manticore-buddy
         -v $PWD/build/manticore-buddy:/usr/local/share/manticore/modules/manticore-buddy/bin/manticore-buddy
+      version: 'v2'
