@@ -15,23 +15,48 @@ env:
   LIBCURL_VERSION: '7.29.0'
 
 jobs:
+  vars:
+    runs-on: ubuntu-22.04
+    outputs:
+      app_version: ${{ steps.vars.outputs.app_version }}
+      app_date: ${{ steps.vars.outputs.app_date }}
+      app_commit: ${{ steps.vars.outputs.app_commit }}
+      rpm_suffix: ${{ steps.vars.outputs.rpm_suffix }}
+      deb_suffix: ${{ steps.vars.outputs.deb_suffix }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - id: vars
+        run: |
+          version=$(<APP_VERSION)
+          date=$( date +%y%m%d%H )
+          commit=${GITHUB_SHA:0:7}
+
+          echo "app_version=$version" >> $GITHUB_OUTPUT
+          echo "app_date=$date" >> $GITHUB_OUTPUT
+          echo "app_commit=$commit" >> $GITHUB_OUTPUT
+          echo "rpm_suffix=_${date}.$commit" >> $GITHUB_OUTPUT
+          echo "deb_suffix=-${date}-$commit" >> $GITHUB_OUTPUT
+
   build-artifact:
     runs-on: ubuntu-22.04
+    needs:
+      - vars
     steps:
       - uses: actions/checkout@v3
       - name: Prepare release directory
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
           ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
-      - id: vars
-        run: |
-          echo "app_version=$(<APP_VERSION)" >> $GITHUB_OUTPUT
-          echo "rpm_suffix=_$( date +%y%m%d%H ).${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
-          echo "deb_suffix=-$( date +%y%m%d%H )-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: version
+          path: ${{ github.workspace }}
 
       - name: Create artifact
         run: |
-          name="${{ env.APP_NAME }}_${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.rpm_suffix }}"
+          name="${{ env.APP_NAME }}_${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.rpm_suffix }}"
           echo "$name"
           mkdir build/bin
           cp build/${{ env.APP_NAME }} build/bin/${{ env.APP_NAME }}
@@ -50,17 +75,14 @@ jobs:
 
   build-linux-packages:
     runs-on: ubuntu-22.04
+    needs:
+      - vars
     steps:
       - uses: actions/checkout@v3
       - name: Build binary
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
           ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
-      - id: vars
-        run: |
-          echo "app_version=$(<APP_VERSION)" >> $GITHUB_OUTPUT
-          echo "rpm_suffix=_$( date +%y%m%d%H ).${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
-          echo "deb_suffix=-$( date +%y%m%d%H )-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
       - name: Prepare packages structure
         run: |
           mkdir -p .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin
@@ -75,7 +97,7 @@ jobs:
           package: ${{ env.APP_NAME }}
           package_root: .debpkg
           maintainer: ${{ env.MAINTAINER }}
-          version: ${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.deb_suffix }}
+          version: ${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.deb_suffix }}
           arch: 'all'
           desc: '${{ env.DESC }}'
           depends: '${{ env.LIBCURL_NAME }}4 (>= ${{ env.LIBCURL_VERSION}})'
@@ -98,7 +120,7 @@ jobs:
 
           # Prepare spec file for RPM
           sed -i 's/{{ NAME }}/${{ env.APP_NAME }}/g' $spec_file
-          sed -i 's/{{ VERSION }}/${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.rpm_suffix }}/g' $spec_file
+          sed -i 's/{{ VERSION }}/${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.rpm_suffix }}/g' $spec_file
           sed -i 's/{{ MAINTAINER }}/${{ env.MAINTAINER }}/g' $spec_file
           sed -i 's/{{ DESC }}/${{ env.DESC }}/g' $spec_file
           sed -i 's/{{ LIBCURL_NAME }}/${{ env.LIBCURL_NAME }}/g' $spec_file
@@ -116,14 +138,14 @@ jobs:
       - name: Rename packages to proper name
         run: |
           ls -la ./*.rpm
-          version=${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.rpm_suffix }}
+          version=${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.rpm_suffix }}
           rpm_path="./${{ env.APP_NAME }}-${version}-1.noarch.rpm"
           cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el7.noarch.rpm"
           cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el8.noarch.rpm"
           cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el9.noarch.rpm"
 
           ls -la ./*.deb
-          version=${{ steps.vars.outputs.app_version }}${{ steps.vars.outputs.deb_version }}
+          version=${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.deb_version }}
 
       - uses: actions/upload-artifact@v3
         with:
@@ -248,3 +270,34 @@ jobs:
           chmod +x ${{ matrix.script }}
           DISTRO=${{ matrix.distro }} DIGIT_DELIMITER2="${{ matrix.delimiter }}" FILE_MASK="${{ matrix.mask }}" ./${{ matrix.script }}
         shell: bash
+
+  update-manticoresearch-deps:
+    needs:
+      - vars
+      - deploy
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: "manticoresoftware/manticoresearch"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update deps.txt
+        id: deps
+        run: |
+          version=${{ needs.vars.outputs.app_version }}
+          date=${{ needs.vars.outputs.app_date }}
+          commit=${{ needs.vars.outputs.app_commit }}
+
+          version_string="$version $date $commit"
+          echo "version_string=${version_string// /-}" >> $GITHUB_OUTPUT
+          sed -i '/^buddy\s/c\buddy '"$version_string" deps.txt
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.PR_TOKEN }}
+          commit-message: "Bump buddy version to: ${{ steps.deps.outputs.version_string }}"
+          title: "Update buddy version to: ${{ steps.deps.outputs.version_string }}"
+          body: "Updating buddy version to ${{ steps.deps.outputs.version_string }}"
+          branch: "update-buddy-version-${{ steps.deps.outputs.version_string }}"
