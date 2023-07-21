@@ -298,6 +298,7 @@ jobs:
         with:
           token: ${{ secrets.PR_TOKEN }}
           commit-message: "Bump buddy version to: ${{ steps.deps.outputs.version_string }}"
-          title: "Update buddy version to: ${{ steps.deps.outputs.version_string }}"
+          title: "Update buddy version"
           body: "Updating buddy version to ${{ steps.deps.outputs.version_string }}"
-          branch: "update-buddy-version-${{ steps.deps.outputs.version_string }}"
+          branch: "update-buddy-version"
+          draft: false
