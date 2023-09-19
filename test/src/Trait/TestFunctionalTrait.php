@@ -81,7 +81,7 @@ trait TestFunctionalTrait {
 			array_shift($output);
 			foreach ($output as $line) {
 				$table = trim(str_replace(['rt','plain', 'distributed', 'percolate'], '', $line), ' |+-');
-				if (!$table) {
+				if (!$table || strpos($table, '|')) {
 					continue;
 				}
 
