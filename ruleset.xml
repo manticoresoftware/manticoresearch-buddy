@@ -64,33 +64,28 @@
 			<property name="requiredSpacesBeforeClose" value="0"/>
 		</properties>
 	</rule>
-	<rule ref="Generic.Arrays.ArrayIndent">
-		<properties>
-			<property name="tabIdent" value="true"/>
-		</properties>
-	</rule>
 
 	<rule ref="Generic.WhiteSpace.ScopeIndent">
 		<properties>
-			<property name="tabIdent" value="true"/>
+			<property name="tabIndent" value="true"/>
 		</properties>
 	</rule>
 
 	<rule ref="PSR2.Classes.ClassDeclaration">
 		<properties>
-			<property name="tabIdent" value="true"/>
+			<property name="tabIndent" value="true"/>
 		</properties>
 	</rule>
 
 	<rule ref="PSR2.ControlStructures.SwitchDeclaration">
 		<properties>
-			<property name="tabIdent" value="true"/>
+			<property name="tabIndent" value="true"/>
 		</properties>
 	</rule>
 
 	<rule ref="PSR2.Methods.FunctionCallSignature">
 		<properties>
-			<property name="tabIdent" value="true"/>
+			<property name="tabIndent" value="true"/>
 			<property name="requiredSpacesAfterOpen" value="1"/>
 			<property name="requiredSpacesBeforeClose" value="1"/>
 		</properties>

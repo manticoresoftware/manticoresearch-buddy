@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Lib;
 use Exception;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Base\Network\EventHandler;
+use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
@@ -121,31 +122,7 @@ class QueryProcessor {
 	protected static function fetchManticoreSettings(): ManticoreSettings {
 		/** @var HTTPClient */
 		$manticoreClient = static::getObjFromContainer('manticoreClient');
-		$resp = $manticoreClient->sendRequest('SHOW SETTINGS');
-	  /** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
-		$data = (array)json_decode($resp->getBody(), true);
-		$settings = [];
-		foreach ($data[0]['data'] as ['Setting_name' => $key, 'Value' => $value]) {
-			$settings[$key] = $value;
-			if ($key !== 'configuration_file') {
-				continue;
-			}
-
-			Buddy::debug("using config file = '$value'");
-			putenv("SEARCHD_CONFIG={$value}");
-		}
-
-		// Gather variables also
-		$resp = $manticoreClient->sendRequest('SHOW VARIABLES');
-		/** @var array{0:array{columns:array<mixed>,data:array{Setting_name:string,Value:string}}} */
-		$data = (array)json_decode($resp->getBody(), true);
-		$variables = [];
-		foreach ($data[0]['data'] as ['Variable_name' => $key, 'Value' => $value]) {
-			$variables[$key] = $value;
-		}
-
-		// Finally build the settings
-		return ManticoreSettings::fromArray($settings, $variables);
+		return $manticoreClient->getSettings();
 	}
 
 	/**
@@ -223,6 +200,7 @@ class QueryProcessor {
 	 */
 	protected static function getHooks(): array {
 		return [
+			// Happens when we installed the external plugin
 			[
 				'manticoresoftware/buddy-plugin-plugin',
 				'installed',
@@ -231,12 +209,21 @@ class QueryProcessor {
 					EventHandler::setShouldExit(true);
 				},
 			],
+			// Happens when we remove the plugin
 			[
 				'manticoresoftware/buddy-plugin-plugin',
 				'deleted',
 				function () {
 					static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
 					EventHandler::setShouldExit(true);
+				},
+			],
+			// Happens when we run create table with shards in options
+			[
+				'manticoresoftware/buddy-plugin-create-table',
+				'shard',
+				function (array $args) {
+					ShardingThread::instance()->execute('shard', $args);
 				},
 			],
 		];

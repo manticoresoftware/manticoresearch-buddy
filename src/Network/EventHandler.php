@@ -42,7 +42,7 @@ final class EventHandler {
 	// How many request we handle in single runtime after we destroy and create new one
 	const RUNTIME_LIFETIME = 100;
 
-	/** @var array{available:array<array{0:int,1:Runtime}>,blocked:array<array{0:int,1:Runtime}>} $runtimes */
+	/** @var array{available:array<array{0:int,1:Runtime}>,blocked:array<array{0:int,1:\parallel\Runtime}>} $runtimes */
 	public static array $runtimes = [
 		'available' => [],
 		'blocked' => [],
@@ -103,7 +103,7 @@ final class EventHandler {
 	 *
 	 * @param ServerRequestInterface $serverRequest
 	 * @param string $data
-	 * @return PromiseInterface
+	 * @return PromiseInterface<mixed>
 	 */
 	protected static function data(ServerRequestInterface $serverRequest, string $data): PromiseInterface {
 		$deferred = new Deferred;
@@ -175,19 +175,21 @@ final class EventHandler {
 			if ($task->isSucceed()) {
 				$result = $task->getResult();
 				if (!$task->isDeferred()) {
-					return $deferred->resolve(
+					$deferred->resolve(
 						[$request, Response::fromMessage($result->getStruct(), $request->format)]
 					);
+					return $deferred;
 				}
 			}
 
 			if (!$task->isDeferred()) {
-				return $deferred->resolve(
+				$deferred->resolve(
 					[
 						$request,
 						Response::fromError($task->getError(), $request->format),
 					]
 				);
+				return $deferred;
 			}
 		};
 
@@ -203,7 +205,7 @@ final class EventHandler {
 	 * Main handler for HTTP request that returns HttpResponse
 	 *
 	 * @param ServerRequestInterface $serverRequest
-	 * @return Promise
+	 * @return Promise<mixed>
 	 */
 	public static function request(ServerRequestInterface $serverRequest): Promise {
 		return new Promise(
@@ -222,8 +224,8 @@ final class EventHandler {
 				}
 
 				$promise->then(
-					/** @param array{0:Request,1:Response} $payload */
-					function (array $payload) use ($headers, $resolve, $serverRequest) {
+					function (mixed $payload) use ($headers, $resolve, $serverRequest): mixed {
+						/** @var array{0:Request,1:Response} $payload */
 						[$request, $response] = $payload;
 						$result = (string)$response;
 						$id = static::getRequestId($serverRequest);
@@ -303,6 +305,12 @@ final class EventHandler {
 		return $serverRequest->getHeader('Request-ID')[0] ?? '0';
 	}
 
+	/**
+	 * @param  Request  $request
+	 * @param  Deferred<mixed> $deferred
+	 * @param  Task     $task
+	 * @return PromiseInterface<mixed>
+	 */
 	protected static function handleDeferredTask(Request $request, Deferred $deferred, Task $task): PromiseInterface {
 		// TODO: extract it somewhere for better code
 		$response = [[
@@ -333,10 +341,10 @@ final class EventHandler {
 	 * @param string $id
 	 * @param ?Request $request
 	 * @param string $data
-	 * @param Deferred $deferred
+	 * @param Deferred<mixed> $deferred
 	 * @param ?TimerInterface $timer
 	 * @param ?array{0:int,1:Runtime} $runtimeStruct
-	 * @return PromiseInterface
+	 * @return PromiseInterface<mixed>
 	 * @throws RuntimeException
 	 */
 	protected static function handleExceptionWhileDataProcessing(

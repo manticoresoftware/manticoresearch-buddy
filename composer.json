@@ -41,7 +41,9 @@
 		"manticoresoftware/buddy-plugin-cli-table": "dev-main",
 		"manticoresoftware/buddy-plugin-plugin": "dev-main",
 		"manticoresoftware/buddy-plugin-test": "dev-main",
-		"manticoresoftware/buddy-plugin-insert-mva": "dev-main"
+		"manticoresoftware/buddy-plugin-insert-mva": "dev-main",
+		"php-ds/php-ds": "^1.4",
+		"manticoresoftware/buddy-plugin-create-table": "dev-main"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^1.8",
@@ -53,6 +55,10 @@
 		{
 			"type": "path",
 			"url": "./plugins/*"
+		},
+		{
+			"type": "vcs",
+			"url": "https://github.com/manticoresoftware/buddy-plugin-create-table"
 		}
 	],
 	"bin": ["manticore-buddy"]

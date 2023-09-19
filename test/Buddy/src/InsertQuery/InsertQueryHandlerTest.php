@@ -9,6 +9,8 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Ds\Map;
+use Ds\Vector;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
@@ -36,24 +38,104 @@ class InsertQueryHandlerTest extends TestCase {
 	 * @param string $resp
 	 */
 	protected function runTask(Request $networkRequest, string $serverUrl, string $resp): void {
-		$payload = Payload::fromRequest($networkRequest);
-		$payload->setSettings(
-			ManticoreSettings::fromArray(
+		$vector = new Vector();
+		$vector->push(
+			new Map(
 				[
-					'configuration_file' => '/etc/manticoresearch/manticore.conf',
-					'worker_pid' => 7718,
-					'searchd.auto_schema' => '1',
-					'searchd.listen' => '0.0.0:9308:http',
-					'searchd.log' => '/var/log/manticore/searchd.log',
-					'searchd.query_log' => '/var/log/manticore/query.log',
-					'searchd.pid_file' => '/var/run/manticore/searchd.pid',
-					'searchd.data_dir' => '/var/lib/manticore',
-					'searchd.query_log_format' => 'sphinxql',
-					'searchd.buddy_path' => 'manticore-executor /workdir/src/main.php --debug',
-					'common.plugin_dir' => '/usr/local/lib/manticore',
-					'common.lemmatizer_base' => '/usr/share/manticore/morph/',
+				'key' => 'configuration_file',
+				'value' => '/etc/manticoresearch/manticore.conf',
 				]
 			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'worker_pid',
+				'value' => 7718,
+				]
+			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'searchd.auto_schema',
+				'value' => '1',
+				]
+			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'searchd.listen',
+				'value' => '0.0.0:9308:http',
+				]
+			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'searchd.log',
+				'value' => '/var/log/manticore/searchd.log',
+				]
+			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'searchd.query_log',
+				'value' => '/var/log/manticore/query.log',
+				]
+			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'searchd.pid_file',
+				'value' => '/var/run/manticore/searchd.pid',
+				]
+			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'searchd.data_dir',
+				'value' => '/var/lib/manticore',
+				]
+			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'searchd.query_log_format',
+				'value' => 'sphinxql',
+				]
+			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'searchd.buddy_path',
+				'value' => 'manticore-executor /workdir/src/main.php --debug',
+				]
+			)
+		);
+		$vector->push(
+			new Map(
+				[
+				'key' => 'common.plugin_dir',
+				'value' => '/usr/local/lib/manticore',
+				]
+			)
+		);
+		$vector->push(
+			[
+			'key' => 'common.lemmatizer_base',
+			'value' => '/usr/share/manticore/morph/',
+			]
+		);
+		$payload = Payload::fromRequest($networkRequest);
+		$payload->setSettings(
+			ManticoreSettings::fromVector($vector)
 		);
 
 		$manticoreClient = new HTTPClient(new ManticoreResponse(), $serverUrl);

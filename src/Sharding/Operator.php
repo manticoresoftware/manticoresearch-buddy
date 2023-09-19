@@ -1,0 +1,286 @@
+<?php declare(strict_types=1);
+
+namespace Manticoresearch\Buddy\Base\Sharding;
+
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
+use RuntimeException;
+
+final class Operator {
+	public ?Cluster $cluster;
+	public Node $node;
+	public State $state;
+	public ?Queue $queue;
+
+	/**
+	 * Create operator instance with current node and state
+	 * @param Client $client
+	 * @param string $clusterName
+	 * @erturn void
+	 */
+	public function __construct(
+		public readonly Client $client,
+		public readonly string $clusterName
+	) {
+		$this->state = new State($this->client);
+		$this->node = new Node($this->state, Node::findId($this->client));
+	}
+
+	/**
+	 * Just extra function that is requried to run once all setup
+	 * This function sets additional cluster and queue property
+	 * that we cannot set on other stages and can do only after
+	 * we know which cluster we run or not at all
+	 * @return static
+	 */
+	protected function init(): static {
+		/** @var string */
+		$clusterName = $this->state->get('cluster');
+		$this->cluster = new Cluster(
+			$this->client,
+			$clusterName,
+			Node::findId($this->client),
+		);
+		$this->queue = new Queue($this->cluster, $this->client);
+		$this->state->setCluster($this->cluster);
+		return $this;
+	}
+
+	/**
+	 * This method just update last seen_at for node
+	 * @return static
+	 */
+	public function heartbeat(): static {
+		$this->node->update(['seen_at' => time()]);
+		return $this;
+	}
+
+	/**
+	 * Check if master has allowed gap and if not just take over it
+	 * @return static
+	 */
+	public function checkMaster(): static {
+		/** @var string */
+		$master = $this->state->get('master');
+		$nodeId = $this->node->id;
+		// We do nothing in case we validate master on the current master node
+		// because in that case we are 100% alive
+		if ($master === $nodeId) {
+			return $this;
+		}
+
+		// If the master node is incative, we are taking it over
+		$cluster = $this->getCluster();
+		$inactiveNodes = $cluster->getInactiveNodes();
+		$isMasterInactive = $inactiveNodes->contains($master);
+
+		// If master is inactive validate gap and select next node
+		// that will become a new master
+		if ($isMasterInactive) {
+			Buddy::info("The master is inactive: {$master}");
+			$now = time();
+			$masterNode = new Node($this->state, $master);
+			$gap = $now - $masterNode->seenAt;
+			$candidates = $cluster->getNodes()->diff($inactiveNodes);
+			if ($nodeId === $candidates->sorted()->first() && $gap >= 5) {
+				$this->becomeMaster();
+			}
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Validate the balance of replication and rebalance it when required
+	 * This method should be called on master node only
+	 * @return static
+	 */
+	public function checkBalance(): static {
+		$cluster = $this->getCluster();
+		$queue = $this->getQueue();
+		$inactiveNodes = $cluster->getInactiveNodes();
+		// Do rebalance in case we have inactive nodes
+		if ($inactiveNodes->isEmpty()) {
+			return $this;
+		}
+
+		// Do exclude repeated rebalancing we take hash of active nodes
+		// and if the same, we do nothing, otherwise, it shows the change
+		// and we try to process the rebalance
+		$activeNodes = $cluster->getNodes()->diff($inactiveNodes);
+		$clusterHash = Cluster::getNodesHash($activeNodes);
+		$currentHash = $this->state->get('cluster_hash');
+		if ($clusterHash === $currentHash) {
+			return $this;
+		}
+		Buddy::info("Rebalancing due to inactive nodes: {$inactiveNodes->join(', ')}");
+
+		// Get all tables from the state we have
+		$list = $this->state->listRegex('table:.+');
+		foreach ($list as $row) {
+			/** @var array{key:string,value:array{name:string,structure:string,extra:string}} $row */
+			[, $name]  = explode(':', $row['key']);
+			Buddy::info(" table: $name");
+			$structure = $row['value']['structure'];
+			$extra = $row['value']['extra'];
+			$table = new Table(
+				$this->client,
+				$cluster,
+				$name,
+				$structure,
+				$extra
+			);
+
+			$table->rebalance($queue);
+		}
+
+		// Update nodes state and remove inactive once to secure logic
+		$this->state->set('cluster_hash', $clusterHash);
+
+		return $this;
+	}
+
+	/**
+	 * Make current node as master node
+	 * @return static
+	 */
+	protected function becomeMaster(): static {
+		Buddy::info('becoming master');
+		$this->state->set('master', $this->node->id);
+		return $this;
+	}
+
+	/**
+	 * Check if the sharding is active
+	 * This method also does a bit trick and initialize queue and cluster
+	 * That we could not initialize before
+	 * @return bool
+	 */
+	public function hasSharding(): bool {
+		$hasSharding = !!$this->state->get('master');
+		// If sharding is active and still no cluster
+		// Detect and set it from the state
+		if ($hasSharding && !isset($this->cluster)) {
+			$this->init();
+		}
+		return $hasSharding;
+	}
+
+	/**
+	 * Process choose event received from external world to thread
+	 * @param array{cluster:string,name:string,structure:string,extra:string} $table
+	 * @param int $shardCount
+	 * @param int $replicationFactor
+	 * @return void
+	 */
+	public function shard(
+		array $table,
+		int $shardCount,
+		int $replicationFactor
+	): void {
+		$cluster = new Cluster(
+			$this->client,
+			$table['cluster'],
+			Node::findId($this->client),
+		);
+		unset($table['cluster']);
+		$table = new Table($this->client, $cluster, ...$table);
+		$shouldSetup = !$this->state->get('master');
+		if ($shouldSetup) {
+			$this->state->setCluster($cluster);
+			$this->state->setup();
+			$this->becomeMaster();
+			$table->setup();
+
+			// Set initial cluster we used
+			$this->state->set('cluster', $cluster->name);
+			$this->state->set('cluster_hash', Cluster::getNodesHash($cluster->getNodes()));
+			$this->init();
+			$this->getQueue()->setup();
+		}
+
+		if (!isset($this->cluster)) {
+			$this->init(); // Initialize if no cluster set
+		}
+
+		$result = $table->shard(
+			$this->getQueue(),
+			$shardCount,
+			$replicationFactor,
+		);
+
+		// Set state and run detached process to poll
+		$this->state->set("table:{$table->name}", $result);
+	}
+
+	/**
+	 * Helper to run table status checker on pings
+	 * @param  string $table
+	 * @return bool
+	 */
+	public function checkTableStatus(string $table): bool {
+		$stateKey = "table:{$table}";
+		/** @var array{}|array{queue_ids:array<int>,status:string} */
+		$result = $this->state->get($stateKey);
+		if (!$result) {
+			return false;
+		}
+
+		$queueSize = sizeof($result['queue_ids']);
+		$processed = 0;
+		foreach ($result['queue_ids'] as $id) {
+			$row = $this->getQueue()->getById($id);
+			if (!$row || $row['status'] === 'created') {
+				continue;
+			}
+
+			++$processed;
+		}
+
+		$isProcessed = $processed === $queueSize;
+		// Update the state
+		if ($isProcessed) {
+			$result['status'] = 'done';
+			$result['result'] = getenv('DEBUG')
+				? $this->client->sendRequest("SHOW CREATE TABLE {$table}")->getResult()
+				: TaskResult::none()->getStruct();
+			$this->state->set($stateKey, $result);
+		}
+
+		return $isProcessed;
+	}
+	/**
+	 * Wrapper around process queue with current node
+	 * @return static
+	 */
+	public function processQueue(): static {
+		if (!isset($this->queue)) {
+			throw new RuntimeException('Queue is not initialized');
+		}
+		$this->queue->process($this->node);
+		return $this;
+	}
+
+	/**
+	 * @return Queue
+	 */
+	public function getQueue(): Queue {
+		if (!isset($this->queue)) {
+			throw new RuntimeException('Queue not initialized');
+		}
+
+		return $this->queue;
+	}
+
+	/**
+	 * @return Cluster
+	 */
+	public function getCluster(): Cluster {
+		if (!isset($this->cluster)) {
+			throw new RuntimeException('Cluster not initialized');
+		}
+
+		return $this->cluster;
+	}
+}

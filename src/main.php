@@ -14,6 +14,7 @@ use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Base\Network\EventHandler;
 use Manticoresearch\Buddy\Base\Network\Server;
+use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -68,8 +69,14 @@ $server->onStart(
 			ini_set('post_max_size', $settings->maxAllowedPacket);
 		}
 	)
+	->onStart(ShardingThread::instance(...))
 	->addHandler('request', EventHandler::request(...))
 	->addHandler('error', EventHandler::error(...))
+	->addTicker(
+		static function () {
+			ShardingThread::instance()->execute('ping', []);
+		}, 1, 'server'
+	)
 	->addTicker(
 		static function () {
 			$memory = memory_get_usage() / 1024;
@@ -106,6 +113,8 @@ if (is_telemetry_enabled()) {
 	);
 	register_shutdown_function(MetricThread::destroy(...));
 }
+
+register_shutdown_function(ShardingThread::destroy(...));
 
 // Shutdown functions MUST be registered here only
 register_shutdown_function(EventHandler::destroy(...));
