@@ -59,7 +59,7 @@ trait TestFunctionalTrait {
 	 */
 	public static function setUpBeforeClass(): void {
 		// Setting the absolute path to the Manticore config file
-		if (self::$manticoreConfigFilePath === '') {
+		if (static::$manticoreConf === '' || static::$manticoreConfigFilePath === '') {
 			self::setManticoreConfigFile(static::$configFileName);
 		}
 
@@ -67,7 +67,7 @@ trait TestFunctionalTrait {
 		self::checkManticorePathes();
 		system('rm -f /var/log/manticore-test/searchd.pid');
 		system('rm -f /var/log/manticore-test/searchd.log');
-		system('searchd --config ' . self::$manticoreConfigFilePath);
+		system('searchd --config ' . static::$manticoreConfigFilePath);
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
 		sleep(5); // <- give 5 secs to protect from any kind of lags
 		self::loadBuddyPid();
@@ -141,7 +141,7 @@ trait TestFunctionalTrait {
 	public static function setListenDefaultPort(int $port): void {
 		self::$listenDefaultPort = $port;
 		$replRegex = '/(listen = [^:]+:?)(\d+)(\r|\n)/';
-		$conf = preg_replace_callback($replRegex, fn($m) => $m[1] . (string)$port . $m[3], self::$manticoreConf);
+		$conf = preg_replace_callback($replRegex, fn($m) => $m[1] . (string)$port . $m[3], static::$manticoreConf);
 		self::updateManticoreConf((string)$conf);
 	}
 
@@ -154,12 +154,14 @@ trait TestFunctionalTrait {
 	 */
 	protected static function setManticoreConfigFile(string $configTplFileName): void {
 		$refCls = new \ReflectionClass(static::class);
+		$random = bin2hex(random_bytes(8));
 		$configTplFilePath = dirname((string)$refCls->getFileName()) . "/config/$configTplFileName";
-		self::$manticoreConfigFilePath = \sys_get_temp_dir() . "/config-$configTplFileName";
-		system("cp -r $configTplFilePath " . self::$manticoreConfigFilePath, $res);
+		static::$manticoreConfigFilePath = \sys_get_temp_dir() . "/config-$random-$configTplFileName";
+		system("cp -r $configTplFilePath " . static::$manticoreConfigFilePath, $res);
 		if ($res !== 0) {
-			throw new Exception('Cannot create Manticore config file at `' . self::$manticoreConfigFilePath . '`');
+			throw new Exception('Cannot create Manticore config file at `' . static::$manticoreConfigFilePath . '`');
 		}
+		static::$manticoreConf = (string)file_get_contents(static::$manticoreConfigFilePath);
 	}
 
 	/**
@@ -179,7 +181,7 @@ trait TestFunctionalTrait {
 		}
 		$matches = [];
 		// Getting the port value from the corresponding config line
-		preg_match("/listen = ([^:]*?):?([^:]+?)$portDiscriminator(\r|\n)/", self::$manticoreConf, $matches);
+		preg_match("/listen = ([^:]*?):?([^:]+?)$portDiscriminator(\r|\n)/", static::$manticoreConf, $matches);
 		if (!isset($matches[2])) {
 			throw new Exception("$portType is not set in Manticore config");
 		}
@@ -374,7 +376,7 @@ trait TestFunctionalTrait {
 		$propNames = ['log', 'query_log', 'pid_file', 'data_dir'];
 		foreach ($propNames as $prop) {
 			// Getting the value of the option being checked from the corresponding config line
-			preg_match("/$prop = (.*?)(\/[^\/\r\n]*|)(\r|\n)/", self::$manticoreConf, $matches);
+			preg_match("/$prop = (.*?)(\/[^\/\r\n]*|)(\r|\n)/", static::$manticoreConf, $matches);
 			if (!isset($matches[1], $matches[2])) {
 				continue;
 			}
@@ -397,7 +399,7 @@ trait TestFunctionalTrait {
 	 */
 	protected static function setConfWithBuddyPath(): void {
 		$buddyPath = __DIR__ . '/../../..';
-		$configFile = self::$manticoreConfigFilePath;
+		$configFile = static::$manticoreConfigFilePath;
 		$conf = file_get_contents($configFile);
 		if ($conf === false) {
 			throw new Exception("Invalid Manticore config found at $configFile");
@@ -413,11 +415,11 @@ trait TestFunctionalTrait {
 	 * @throws Exception
 	 */
 	protected static function updateManticoreConf($conf): void {
-		$isConfUpdated = file_put_contents(self::$manticoreConfigFilePath, $conf);
+		$isConfUpdated = file_put_contents(static::$manticoreConfigFilePath, $conf);
 		if ($isConfUpdated === false) {
-			throw new Exception('Cannot update Manticore config at ' . self::$manticoreConfigFilePath);
+			throw new Exception('Cannot update Manticore config at ' . static::$manticoreConfigFilePath);
 		}
-		self::$manticoreConf = $conf;
+		static::$manticoreConf = $conf;
 	}
 
 	/**

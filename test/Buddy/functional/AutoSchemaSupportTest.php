@@ -19,69 +19,55 @@ class AutoSchemaSupportTest extends TestCase {
 	/**
 	 * @var string $testTable
 	 */
-	protected string $testTable;
-
-	/**
-	 * @var int $checkAutoSchema
-	 */
-	protected int $checkAutoSchema = -1;
+	protected string $testTable = 'test';
 
 	protected function setUp(): void {
-		$this->testTable = 'test';
-		static::runSqlQuery("drop table if exists {$this->testTable}", true);
-		if ($this->checkAutoSchema === -1) {
-			// Shutting down searchd started with default config
-			self::tearDownAfterClass();
-			sleep(5); // <- give 5 secs to protect from any kind of lags
-			// Adding the auto schema option to manticore config
-			$conf = str_replace(
-				'searchd {' . PHP_EOL,
-				'searchd {' . PHP_EOL . '    auto_schema = 0' . PHP_EOL,
-				self::$manticoreConf
-			);
-			self::updateManticoreConf($conf);
-			$this->checkAutoSchema = 1;
-			echo 'updated';
-		}
-		self::setUpBeforeClass();
+		static::runSqlQuery("DROP TABLE IF EXISTS {$this->testTable}");
 	}
 
 	protected function tearDown(): void {
-		self::tearDownAfterClass();
-		switch ($this->checkAutoSchema) {
-			case 1:
-				return;
-			case 0:
-				// Updating the auto schema option in manticore config
-				$conf = str_replace(
-					'    auto_schema = 0' . PHP_EOL,
-					'    auto_schema = 1' . PHP_EOL,
-					self::$manticoreConf
-				);
-				break;
-			default:
-				// Removing the auto schema option from manticore config
-				$conf = str_replace('    auto_schema = 1' . PHP_EOL, '', self::$manticoreConf);
-				break;
-		}
-		self::updateManticoreConf($conf);
+		static::$manticoreConf = '';
+	}
+
+	/**
+	 * Helper to setup auto schema
+	 * @param int $value can be 0 or 1
+	 * @return void
+	 */
+	protected function setUpAutoSchema(int $value): void {
+		// Adding the auto schema option to manticore config
+		$conf = str_replace(
+			'searchd {' . PHP_EOL,
+			'searchd {' . PHP_EOL . "    auto_schema = $value" . PHP_EOL,
+			static::$manticoreConf
+		);
+
+		// Reset first
+		static::setManticoreConfigFile(static::$configFileName);
+		static::updateManticoreConf($conf);
+		echo 'updated';
+
+		// Restart manticore
+		static::tearDownAfterClass();
+		sleep(5); // <- give 5 secs to protect from any kind of lags
+		static::setUpBeforeClass();
 	}
 
 	public function testAutoSchemaOptionDisabled(): void {
 		echo "\nTesting the fail on the execution of HTTP insert query with searchd auto_schema=0\n";
+		$this->setUpAutoSchema(0);
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 0,'error' => "table 'test' absent, or does not support INSERT",'warning' => '']];
-		$this->checkAutoSchema = 0;
 		$this->assertEquals($result, $out);
 	}
 
 	public function testAutoSchemaOptionEnabled(): void {
 		echo "\nTesting the fail on the execution of HTTP insert query with searchd auto_schema=1\n";
+		$this->setUpAutoSchema(1);
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 1, 'error' => '','warning' => '']];
-		$this->checkAutoSchema = -1;
 		$this->assertEquals($result, $out);
 	}
 
@@ -89,7 +75,7 @@ class AutoSchemaSupportTest extends TestCase {
 		echo "\nTesting the fail on the execution of HTTP insert query without searchd auto_schema set\n";
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
 		$out = static::runHttpQuery($query);
-		$result = [['total' => 0,'error' => "table 'test' absent, or does not support INSERT",'warning' => '']];
+		$result = [['total' => 1,'error' => '','warning' => '']];
 		$this->assertEquals($result, $out);
 	}
 }
