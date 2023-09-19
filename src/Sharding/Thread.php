@@ -9,34 +9,27 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Lib;
+namespace Manticoresearch\Buddy\Base\Sharding;
 
+use Ds\Map;
+use Ds\Vector;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Psr\Container\ContainerInterface;
+use Throwable;
 use parallel\Channel;
 
-// This is class that allows us to run separate thread for telemetry collection
 /**
- * You should check Metric component to find out which methods are available
- *
  * <code>
- * 	$thread = MetricThread::start();
- * 	$thread->execute("add", ["hello", 34]);
- * 	# your code goes here
- * 	$thread->execute("add", ["hello", 34]);
- * 	# some code and finally we can send it
- * 	$thread->execute("send");
+ * 	$thread = ShardingThread::start();
  * </code>
  */
-final class MetricThread {
+final class Thread {
 	/** @var static */
 	protected static self $instance;
 
 	/** @var ContainerInterface */
-	// We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
-
 
 	/**
 	 * @param Task $task
@@ -75,7 +68,13 @@ final class MetricThread {
 	 */
 	public static function instance(): static {
 		if (!isset(static::$instance)) {
-			static::$instance = static::start();
+			try {
+				static::$instance = static::start();
+			} catch (Throwable $e) {
+				$msg = $e->getMessage();
+				Buddy::debug("Failed to initialize sharding thread: $msg");
+				throw $e;
+			}
 		}
 
 		return static::$instance;
@@ -86,28 +85,71 @@ final class MetricThread {
 	 *
 	 * @return self
 	 */
-	public static function start(): self {
+	// phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
+	protected static function start(): self {
 		$task = Task::loopInRuntime(
 			Task::createRuntime(),
+			// phpcs:disable Generic.CodeAnalysis.UnusedFunctionParameter
+			// phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
 			static function (Channel $ch, string $container) {
 				$container = unserialize($container);
 				/** @var ContainerInterface $container */
+
 				// This fix issue when we get "sh: 1: cd: can't cd to" error
 				// while running buddy inside directory that are not allowed for us
 				chdir(sys_get_temp_dir());
 
-				Metric::setContainer($container);
-				$metric = Metric::instance();
-				while ($msg = $ch->recv()) {
-					if (!is_array($msg)) {
-						throw new \Exception('Incorrect data received');
+				Process::setContainer($container);
+				$ticks = new Vector;
+				try {
+					start: while ($msg = $ch->recv()) {
+						if (!is_array($msg)) {
+							throw new \Exception('Incorrect data received');
+						}
+						[$method, $args] = $msg;
+						Process::$method(...$args);
+						if ($method === 'shard') {
+							$ticks->push(
+								new Map(
+									[
+									'fn' => Process::status(...),
+									'args' => [$args['table']['name']],
+									]
+								)
+							);
+						}
+
+						// Run ticks after ping execution
+						if ($method !== 'ping') {
+							continue;
+						}
+
+						foreach ($ticks as $n => $tick) {
+							try {
+								$result = $tick['fn'](...$tick['args']);
+							} catch (Throwable $e) {
+								Buddy::debug("Error while processing tick: {$e->getMessage()}");
+								continue;
+							}
+
+							if (!$result) {
+								continue;
+							}
+
+							$ticks->remove($n);
+						}
 					}
-					[$method, $args] = $msg;
-					$metric->$method(...$args);
+				} catch (Throwable $e) {
+					Buddy::debug(
+						"Error while processing sharding: {$e->getMessage()}."
+							. ' Restarting after 5s'
+					);
+					Buddy::debug($e->getTraceAsString());
+					sleep(5); // <-- add extra protection delay
+					goto start;
 				}
 			}, [serialize(static::$container)]
 		);
-
 		return (new self($task))->run();
 	}
 
@@ -120,18 +162,15 @@ final class MetricThread {
 	}
 
 	/**
-	 * Executor of the Metric component in separate thread
-	 *
-	 * @param string $method
-	 *  Which method we want to execute
+	 * Send event to the sharding thread
+	 * @param string $event
 	 * @param mixed[] $args
-	 *  Arguments that will be expanded to pass to the method
 	 * @return static
 	 */
-	public function execute(string $method, array $args = []): static {
+	public function execute(string $event, array $args = []): static {
 		$argsJson = json_encode($args);
-		Buddy::debug("metric: $method $argsJson");
-		$this->task->transmit([$method, $args]);
+		Buddy::debug("Sharding Event: $event $argsJson");
+		$this->task->transmit([$event, $args]);
 		return $this;
 	}
 }

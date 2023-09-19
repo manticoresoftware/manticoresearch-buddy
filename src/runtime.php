@@ -16,13 +16,19 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 	. 'autoload.php'
 ;
 
+use Ds\Vector;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 
 set_error_handler(buddy_error_handler(...)); // @phpstan-ignore-line
 Manticoresearch\Buddy\Core\Tool\Buddy::setVersionFile(__DIR__ . '/../APP_VERSION');
 
-$pluggable = new Pluggable(
-	Settings::fromArray(['common.plugin_dir' => getenv('PLUGIN_DIR') ?: '/usr/lib/manticore'])
+/** @var Vector<array{key:string,value:mixed}> $vector*/
+$vector = new Vector(
+	[[
+		'key' => 'common.plugin_dir',
+		'value' => getenv('PLUGIN_DIR') ?: '/usr/lib/manticore',
+	]]
 );
+$pluggable = new Pluggable(Settings::fromVector($vector));
 $pluggable->reload();

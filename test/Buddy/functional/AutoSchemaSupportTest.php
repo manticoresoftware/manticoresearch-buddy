@@ -24,13 +24,12 @@ class AutoSchemaSupportTest extends TestCase {
 	/**
 	 * @var int $checkAutoSchema
 	 */
-	protected static int $checkAutoSchema = -1;
+	protected int $checkAutoSchema = -1;
 
-	public function setUp(): void {
+	protected function setUp(): void {
 		$this->testTable = 'test';
-		static::runSqlQuery("drop table if exists {$this->testTable}", false);
-
-		if (self::$checkAutoSchema === -1) {
+		static::runSqlQuery("drop table if exists {$this->testTable}", true);
+		if ($this->checkAutoSchema === -1) {
 			// Shutting down searchd started with default config
 			self::tearDownAfterClass();
 			sleep(5); // <- give 5 secs to protect from any kind of lags
@@ -41,15 +40,15 @@ class AutoSchemaSupportTest extends TestCase {
 				self::$manticoreConf
 			);
 			self::updateManticoreConf($conf);
-			self::$checkAutoSchema = 1;
+			$this->checkAutoSchema = 1;
 			echo 'updated';
 		}
 		self::setUpBeforeClass();
 	}
 
-	public function tearDown(): void {
+	protected function tearDown(): void {
 		self::tearDownAfterClass();
-		switch (self::$checkAutoSchema) {
+		switch ($this->checkAutoSchema) {
 			case 1:
 				return;
 			case 0:
@@ -66,7 +65,6 @@ class AutoSchemaSupportTest extends TestCase {
 				break;
 		}
 		self::updateManticoreConf($conf);
-		self::$checkAutoSchema = 1;
 	}
 
 	public function testAutoSchemaOptionDisabled(): void {
@@ -74,7 +72,7 @@ class AutoSchemaSupportTest extends TestCase {
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 0,'error' => "table 'test' absent, or does not support INSERT",'warning' => '']];
-		self::$checkAutoSchema = 0;
+		$this->checkAutoSchema = 0;
 		$this->assertEquals($result, $out);
 	}
 
@@ -83,7 +81,7 @@ class AutoSchemaSupportTest extends TestCase {
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 1, 'error' => '','warning' => '']];
-		self::$checkAutoSchema = -1;
+		$this->checkAutoSchema = -1;
 		$this->assertEquals($result, $out);
 	}
 
@@ -91,7 +89,7 @@ class AutoSchemaSupportTest extends TestCase {
 		echo "\nTesting the fail on the execution of HTTP insert query without searchd auto_schema set\n";
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
 		$out = static::runHttpQuery($query);
-		$result = [['total' => 1,'error' => '','warning' => '']];
+		$result = [['total' => 0,'error' => "table 'test' absent, or does not support INSERT",'warning' => '']];
 		$this->assertEquals($result, $out);
 	}
 }

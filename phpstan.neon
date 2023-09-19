@@ -4,3 +4,4 @@ parameters:
     - test
   level: 9
   inferPrivatePropertyTypeFromConstructor: true
+  checkGenericClassInNonGenericObjectType: true

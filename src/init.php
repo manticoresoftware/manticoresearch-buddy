@@ -11,6 +11,7 @@
 
 use Manticoresearch\Buddy\Base\Lib\CliArgsProcessor;
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
+use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
@@ -48,6 +49,7 @@ $container->register('tableFormatter', TableFormatter::class);
 putenv("LISTEN={$opts['listen']}");
 Pluggable::setContainer($container);
 MetricThread::setContainer($container);
+ShardingThread::setContainer($container);
 
 Task::init(__DIR__ . DIRECTORY_SEPARATOR . 'runtime.php');
 return $container;
