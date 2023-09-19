@@ -80,7 +80,11 @@ trait TestFunctionalTrait {
 		if (sizeof($output) > 1) {
 			array_shift($output);
 			foreach ($output as $line) {
-				$table = trim(str_replace(['rt','plain', 'distributed', 'percolate'], '', $line));
+				$table = trim(str_replace(['rt','plain', 'distributed', 'percolate'], '', $line), ' |+-');
+				if (!$table) {
+					continue;
+				}
+
 				static::runSqlQuery("DROP TABLE $table");
 			}
 		}

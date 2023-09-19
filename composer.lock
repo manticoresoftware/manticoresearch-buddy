@@ -866,12 +866,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-backup.git",
-                "reference": "e34b2171d33b5b5dc3dc833be688d1d357a6184c"
+                "reference": "53a36ded273205f38239019aa3ae195079da2faf"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-backup/zipball/e34b2171d33b5b5dc3dc833be688d1d357a6184c",
-                "reference": "e34b2171d33b5b5dc3dc833be688d1d357a6184c",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-backup/zipball/53a36ded273205f38239019aa3ae195079da2faf",
+                "reference": "53a36ded273205f38239019aa3ae195079da2faf",
                 "shasum": ""
             },
             "require": {
@@ -906,7 +906,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-backup/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-backup/tree/main"
             },
-            "time": "2023-09-19T07:53:09+00:00"
+            "time": "2023-09-19T10:37:41+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-cli-table",
@@ -1102,12 +1102,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-insert.git",
-                "reference": "625a7fb76f7014a5bb0ef813e11b1ff9d905599f"
+                "reference": "6c3ebfc61588e153738ad3e5d0468fb18b785183"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert/zipball/625a7fb76f7014a5bb0ef813e11b1ff9d905599f",
-                "reference": "625a7fb76f7014a5bb0ef813e11b1ff9d905599f",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert/zipball/6c3ebfc61588e153738ad3e5d0468fb18b785183",
+                "reference": "6c3ebfc61588e153738ad3e5d0468fb18b785183",
                 "shasum": ""
             },
             "require": {
@@ -1141,7 +1141,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-insert/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-insert/tree/main"
             },
-            "time": "2023-07-05T15:23:02+00:00"
+            "time": "2023-09-19T10:22:56+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-insert-mva",

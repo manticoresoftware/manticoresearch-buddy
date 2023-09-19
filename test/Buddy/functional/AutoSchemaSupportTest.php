@@ -45,7 +45,7 @@ class AutoSchemaSupportTest extends TestCase {
 		// Reset first
 		static::setManticoreConfigFile(static::$configFileName);
 		static::updateManticoreConf($conf);
-		echo 'updated';
+		echo $conf . PHP_EOL;
 
 		// Restart manticore
 		static::tearDownAfterClass();
