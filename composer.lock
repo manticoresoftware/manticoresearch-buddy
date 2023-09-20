@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f539ad358f9245b1bb4daf93173cef6a",
+    "content-hash": "bbe09220f0865b1827a1ac9b0bf9689c",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -955,52 +955,6 @@
                 "source": "https://github.com/manticoresoftware/buddy-plugin-cli-table/tree/main"
             },
             "time": "2023-09-19T11:02:57+00:00"
-        },
-        {
-            "name": "manticoresoftware/buddy-plugin-create-table",
-            "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/manticoresoftware/buddy-plugin-create-table.git",
-                "reference": "c102ea3ce9b93399d5b3f976b22ab1bf38c8e695"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-create-table/zipball/c102ea3ce9b93399d5b3f976b22ab1bf38c8e695",
-                "reference": "c102ea3ce9b93399d5b3f976b22ab1bf38c8e695",
-                "shasum": ""
-            },
-            "require": {
-                "manticoresoftware/buddy-core": "dev-main"
-            },
-            "require-dev": {
-                "phpstan/phpstan": "^1.8",
-                "phpunit/phpunit": "^9.5",
-                "slevomat/coding-standard": "^8.5",
-                "squizlabs/php_codesniffer": "^3.7"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Manticoresearch\\Buddy\\Plugin\\CreateTable\\": "src/"
-                }
-            },
-            "license": [
-                "GPL-2.0-or-later"
-            ],
-            "authors": [
-                {
-                    "name": "Manticore Software Co. Ltd",
-                    "email": "contact@manticoresearch.com"
-                }
-            ],
-            "description": "The Buddy create sharded table plugin",
-            "support": {
-                "source": "https://github.com/manticoresoftware/buddy-plugin-create-table/tree/main",
-                "issues": "https://github.com/manticoresoftware/buddy-plugin-create-table/issues"
-            },
-            "time": "2023-09-20T08:49:27+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-empty-string",
@@ -5826,8 +5780,7 @@
         "manticoresoftware/buddy-plugin-cli-table": 20,
         "manticoresoftware/buddy-plugin-plugin": 20,
         "manticoresoftware/buddy-plugin-test": 20,
-        "manticoresoftware/buddy-plugin-insert-mva": 20,
-        "manticoresoftware/buddy-plugin-create-table": 20
+        "manticoresoftware/buddy-plugin-insert-mva": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
