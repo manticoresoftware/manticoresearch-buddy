@@ -41,8 +41,11 @@ class MultipleQueriesTest extends TestCase {
 		$result = [];
 		$this->assertEquals($result, $out);
 		$selectResult = [
-			'col1	col2',
-			'1	2',
+			'+------+------+',
+			'| col1 | col2 |',
+			'+------+------+',
+			'|    1 |    2 |',
+			'+------+------+',
 		];
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
 		$this->assertEquals($selectResult, $out);
@@ -50,14 +53,19 @@ class MultipleQueriesTest extends TestCase {
 		$this->assertEquals($selectResult, $out);
 
 		$selectResult = [
-			'col1	col2',
-			'1	2',
-			'1	2',
+			'+------+------+',
+			'| col1 | col2 |',
+			'+------+------+',
+			'|    1 |    2 |',
+			'|    1 |    2 |',
+			'+------+------+',
 		];
 		$query = "INSERT into {$this->testTable2}(col1,col2) VALUES(1,2);SHOW QUERIES";
 		$out = static::runSqlQuery($query);
-		$result = 'id	query	protocol	host';
-		$this->assertEquals($result, $out[0]);
+		$first = '+------+--------------+----------+-----------------+';
+		$second = '| id   | query        | protocol | host            |';
+		$this->assertEquals($first, $out[0]);
+		$this->assertEquals($second, $out[1]);
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable2}");
 		$this->assertEquals($selectResult, $out);
 	}
@@ -71,8 +79,11 @@ class MultipleQueriesTest extends TestCase {
 		$out = static::runSqlQuery($query);
 		$this->assertCount(0, $out);
 		$selectResult = [
-			'col1	col2',
-			'1	2',
+			'+------+------+',
+			'| col1 | col2 |',
+			'+------+------+',
+			'|    1 |    2 |',
+			'+------+------+',
 		];
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable2}");
 		$this->assertEquals($selectResult, $out);
@@ -80,10 +91,13 @@ class MultipleQueriesTest extends TestCase {
 		$query = 'TEST 3/deferred;'
 			. "INSERT into {$this->testTable1}(col1,col2) VALUES(1,2)";
 		$out = static::runSqlQuery($query);
-		$this->assertCount(2, $out);
+		$this->assertCount(5, $out);
 		$selectResult = [
-			'col1	col2',
-			'1	2',
+			'+------+------+',
+			'| col1 | col2 |',
+			'+------+------+',
+			'|    1 |    2 |',
+			'+------+------+',
 		];
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
 		$this->assertEquals($selectResult, $out);
@@ -112,8 +126,11 @@ class MultipleQueriesTest extends TestCase {
 		$this->assertEquals($result, $out);
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
 		$selectResult = [
-			'col1	col2',
-			'1	2',
+			'+------+------+',
+			'| col1 | col2 |',
+			'+------+------+',
+			'|    1 |    2 |',
+			'+------+------+',
 		];
 		$this->assertEquals($selectResult, $out);
 
@@ -124,8 +141,11 @@ class MultipleQueriesTest extends TestCase {
 		$this->assertEquals($result, $out[0]);
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable2}");
 		$selectResult = [
-			'col1	col2',
-			'1	2',
+			'+------+------+',
+			'| col1 | col2 |',
+			'+------+------+',
+			'|    1 |    2 |',
+			'+------+------+',
 		];
 		$this->assertEquals($selectResult, $out);
 	}
@@ -138,22 +158,29 @@ class MultipleQueriesTest extends TestCase {
 		$result = [];
 		$this->assertEquals($result, $out);
 		$selectResult = [
-			'col1	col2',
-			'1	2',
-			'1	2',
+			'+------+------+',
+			'| col1 | col2 |',
+			'+------+------+',
+			'|    1 |    2 |',
+			'|    1 |    2 |',
+			'+------+------+',
 		];
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
 		$this->assertEquals($selectResult, $out);
 
 		$query = "INSERT into {$this->testTable1}(col1,col2) VALUES(1,2);SHOW QUERIES";
 		$out = static::runSqlQuery($query);
-		$result = 'id	query	protocol	host';
-		$this->assertEquals($result, $out[0]);
+		$expectedFields = ['id', 'query', 'protocol', 'host'];
+		$realFields = array_values(array_filter(array_map('trim', explode('|', $out[1]))));
+		$this->assertEquals($expectedFields, $realFields);
 		$selectResult = [
-			'col1	col2',
-			'1	2',
-			'1	2',
-			'1	2',
+			'+------+------+',
+			'| col1 | col2 |',
+			'+------+------+',
+			'|    1 |    2 |',
+			'|    1 |    2 |',
+			'|    1 |    2 |',
+			'+------+------+',
 		];
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
 		$this->assertEquals($selectResult, $out);
