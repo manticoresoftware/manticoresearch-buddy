@@ -14,7 +14,6 @@ namespace Manticoresearch\Buddy\Base\Lib;
 use Exception;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Base\Network\EventHandler;
-use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
@@ -219,13 +218,14 @@ class QueryProcessor {
 				},
 			],
 			// Happens when we run create table with shards in options
-			[
-				'manticoresoftware/buddy-plugin-create-table',
-				'shard',
-				function (array $args) {
-					ShardingThread::instance()->execute('shard', $args);
-				},
-			],
+			// TODO: uncomment and add plugin to composer.json
+			// [
+			// 	'manticoresoftware/buddy-plugin-create-table',
+			// 	'shard',
+			// 	function (array $args) {
+			// 		ShardingThread::instance()->execute('shard', $args);
+			// 	},
+			// ],
 		];
 	}
 }
