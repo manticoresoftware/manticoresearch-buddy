@@ -25,11 +25,15 @@ class ShowQueriesTest extends TestCase {
 		echo "\nTesting the execution of SQL SHOW QUERIES statement\n";
 		$query = 'SHOW QUERIES';
 		$out = static::runSqlQuery($query);
-		$result = 'id	query	protocol	host';
-		$this->assertEquals($result, $out[0]);
+		$expectedFields = ['id', 'query', 'protocol', 'host'];
+
+		$realFields = array_values(array_filter(array_map('trim', explode('|', $out[1]))));
+		$this->assertEquals($expectedFields, $realFields);
 		$query = ' show queries ';
 		$out = static::runSqlQuery($query);
-		$this->assertEquals($result, $out[0]);
+
+		$realFields = array_values(array_filter(array_map('trim', explode('|', $out[1]))));
+		$this->assertEquals($expectedFields, $realFields);
 	}
 
 	public function testSQLShowQueriesFail(): void {

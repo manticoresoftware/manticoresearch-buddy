@@ -170,11 +170,14 @@ class InsertQueryTest extends TestCase {
 		$this->assertEquals(3, sizeof($outData['items']));
 		$out = static::runSqlQuery("describe {$this->testTable}");
 		$res = [
-			'Field	Type	Properties',
-			'id	bigint',
-			'title	text	indexed stored',
-			'price	uint',
-			'new_price	float',
+			'+-----------+--------+----------------+',
+			'| Field     | Type   | Properties     |',
+			'+-----------+--------+----------------+',
+			'| id        | bigint |                |',
+			'| title     | text   | indexed stored |',
+			'| price     | uint   |                |',
+			'| new_price | float  |                |',
+			'+-----------+--------+----------------+',
 		];
 		$this->assertEquals($res, $out);
 	}
