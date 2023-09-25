@@ -962,12 +962,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-empty-string.git",
-                "reference": "740e6e1cac7ba1991d64bbc090e2784be5075608"
+                "reference": "25c66eeb99300f36c08ae42d44abb15af73d1179"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-empty-string/zipball/740e6e1cac7ba1991d64bbc090e2784be5075608",
-                "reference": "740e6e1cac7ba1991d64bbc090e2784be5075608",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-empty-string/zipball/25c66eeb99300f36c08ae42d44abb15af73d1179",
+                "reference": "25c66eeb99300f36c08ae42d44abb15af73d1179",
                 "shasum": ""
             },
             "require": {
@@ -1001,7 +1001,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-empty-string/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-empty-string/tree/main"
             },
-            "time": "2023-07-12T08:40:48+00:00"
+            "time": "2023-09-25T07:32:57+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-emulate-elastic",
@@ -1197,12 +1197,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-select.git",
-                "reference": "f494eadb474ed758bcd4a4a2bf5cf537a15b54d8"
+                "reference": "dd6bc6279690076b602a71367cfe66b58ef6fc86"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/f494eadb474ed758bcd4a4a2bf5cf537a15b54d8",
-                "reference": "f494eadb474ed758bcd4a4a2bf5cf537a15b54d8",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/dd6bc6279690076b602a71367cfe66b58ef6fc86",
+                "reference": "dd6bc6279690076b602a71367cfe66b58ef6fc86",
                 "shasum": ""
             },
             "require": {
@@ -1236,7 +1236,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-select/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-select/tree/main"
             },
-            "time": "2023-09-20T08:51:09+00:00"
+            "time": "2023-09-25T07:43:23+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-show",
