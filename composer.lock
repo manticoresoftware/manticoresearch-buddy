@@ -1009,12 +1009,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-emulate-elastic.git",
-                "reference": "1d1c60d276ffdff1fbdd0317972c303c8d226c85"
+                "reference": "54bec89b1a038810fbb86b629a9568345bec7734"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-emulate-elastic/zipball/1d1c60d276ffdff1fbdd0317972c303c8d226c85",
-                "reference": "1d1c60d276ffdff1fbdd0317972c303c8d226c85",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-emulate-elastic/zipball/54bec89b1a038810fbb86b629a9568345bec7734",
+                "reference": "54bec89b1a038810fbb86b629a9568345bec7734",
                 "shasum": ""
             },
             "require": {
@@ -1048,7 +1048,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-emulate-elastic/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-emulate-elastic/tree/main"
             },
-            "time": "2023-04-04T10:06:08+00:00"
+            "time": "2023-09-26T09:48:29+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-insert",
@@ -1334,16 +1334,16 @@
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
-            "version": "v1.0.8",
+            "version": "v1.0.9",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/manticoresearch-backup.git",
-                "reference": "f7638f99850ec15623ab738f20a5a852b73b3d4e"
+                "reference": "3cf2d9362bc3769b46cce4c713394ba78364d193"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/f7638f99850ec15623ab738f20a5a852b73b3d4e",
-                "reference": "f7638f99850ec15623ab738f20a5a852b73b3d4e",
+                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/3cf2d9362bc3769b46cce4c713394ba78364d193",
+                "reference": "3cf2d9362bc3769b46cce4c713394ba78364d193",
                 "shasum": ""
             },
             "require": {
@@ -1383,9 +1383,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/manticoresearch-backup/issues",
-                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/v1.0.8"
+                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/v1.0.9"
             },
-            "time": "2023-08-02T09:04:56+00:00"
+            "time": "2023-09-26T06:30:49+00:00"
         },
         {
             "name": "manticoresoftware/openmetrics",
@@ -4101,16 +4101,16 @@
         },
         {
             "name": "phpstan/phpdoc-parser",
-            "version": "1.24.1",
+            "version": "1.24.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpdoc-parser.git",
-                "reference": "9f854d275c2dbf84915a5c0ec9a2d17d2cd86b01"
+                "reference": "bcad8d995980440892759db0c32acae7c8e79442"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/9f854d275c2dbf84915a5c0ec9a2d17d2cd86b01",
-                "reference": "9f854d275c2dbf84915a5c0ec9a2d17d2cd86b01",
+                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/bcad8d995980440892759db0c32acae7c8e79442",
+                "reference": "bcad8d995980440892759db0c32acae7c8e79442",
                 "shasum": ""
             },
             "require": {
@@ -4142,9 +4142,9 @@
             "description": "PHPDoc parser with support for nullable, intersection and generic types",
             "support": {
                 "issues": "https://github.com/phpstan/phpdoc-parser/issues",
-                "source": "https://github.com/phpstan/phpdoc-parser/tree/1.24.1"
+                "source": "https://github.com/phpstan/phpdoc-parser/tree/1.24.2"
             },
-            "time": "2023-09-18T12:18:02+00:00"
+            "time": "2023-09-26T12:28:12+00:00"
         },
         {
             "name": "phpstan/phpstan",
@@ -5786,5 +5786,5 @@
     "prefer-lowest": false,
     "platform": [],
     "platform-dev": [],
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.2.0"
 }
