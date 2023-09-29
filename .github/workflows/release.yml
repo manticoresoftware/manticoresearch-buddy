@@ -195,7 +195,7 @@ jobs:
     needs:
       - build-artifact
       - build-linux-packages
-    runs-on: self-hosted
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         include:
