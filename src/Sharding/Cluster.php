@@ -168,7 +168,7 @@ final class Cluster {
 			->sendRequest("SHOW STATUS LIKE 'cluster_{$this->name}_status'")
 			->getResult();
 		/** @var array{0:array{data:array{0?:array{Value:string}}}} $res */
-		$status = $res[0]['data'][0]['Value'] ?? '';
+		$status = $res[0]['data'][0]['Value'] ?? 'primary';
 		return $status === 'primary';
 	}
 
