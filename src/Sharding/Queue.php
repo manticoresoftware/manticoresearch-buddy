@@ -159,7 +159,7 @@ final class Queue {
 	protected function updateStatus(int $id, string $status, int $tries): static {
 		$table = $this->cluster->getSystemTableName($this->table);
 		$this->client->sendRequest(
-			"UPDATE {$table} SET `status` = '{$status}', `tries` = '{$tries}' WHERE `id` = {$id}"
+			"UPDATE {$table} SET `status` = '{$status}', `tries` = {$tries} WHERE `id` = {$id}"
 		);
 		return $this;
 	}
