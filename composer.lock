@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "014e1de1782c66db4a7c55e107b2ea4d",
+    "content-hash": "ffb9634af4f3a8710aea0658882f0aca",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -815,12 +815,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "a4517a3e5514bfcba1fb4ee36a55baa01dd0c290"
+                "reference": "d620f21276c900ffdffa7cc95358d8fbc95595c7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/a4517a3e5514bfcba1fb4ee36a55baa01dd0c290",
-                "reference": "a4517a3e5514bfcba1fb4ee36a55baa01dd0c290",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/d620f21276c900ffdffa7cc95358d8fbc95595c7",
+                "reference": "d620f21276c900ffdffa7cc95358d8fbc95595c7",
                 "shasum": ""
             },
             "require": {
@@ -858,7 +858,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2024-01-19T12:18:18+00:00"
+            "time": "2024-01-23T10:08:46+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -3683,16 +3683,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.56",
+            "version": "1.10.57",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "27816a01aea996191ee14d010f325434c0ee76fa"
+                "reference": "1627b1d03446904aaa77593f370c5201d2ecc34e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/27816a01aea996191ee14d010f325434c0ee76fa",
-                "reference": "27816a01aea996191ee14d010f325434c0ee76fa",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/1627b1d03446904aaa77593f370c5201d2ecc34e",
+                "reference": "1627b1d03446904aaa77593f370c5201d2ecc34e",
                 "shasum": ""
             },
             "require": {
@@ -3741,7 +3741,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-01-15T10:43:00+00:00"
+            "time": "2024-01-24T11:51:34+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
