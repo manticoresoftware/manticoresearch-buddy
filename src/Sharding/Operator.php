@@ -158,7 +158,7 @@ final class Operator {
 	 * @return bool
 	 */
 	public function hasSharding(): bool {
-		$hasSharding = !!$this->state->get('master');
+		$hasSharding = $this->state->isActive();
 		// If sharding is active and still no cluster
 		// Detect and set it from the state
 		if ($hasSharding && !isset($this->cluster)) {
