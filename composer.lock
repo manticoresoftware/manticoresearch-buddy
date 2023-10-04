@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fd3900dc2c25c7e0ddeb1286a53f3fa8",
+    "content-hash": "683a5c59a16b0f0ecfa2bca223543b25",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -1002,6 +1002,52 @@
                 "source": "https://github.com/manticoresoftware/buddy-plugin-create-table/tree/main"
             },
             "time": "2023-10-18T08:04:00+00:00"
+        },
+        {
+            "name": "manticoresoftware/buddy-plugin-distributed-insert",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert.git",
+                "reference": "23f7a6dcb0409f4605271da92ab55b8a0b36f4df"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-distributed-insert/zipball/23f7a6dcb0409f4605271da92ab55b8a0b36f4df",
+                "reference": "23f7a6dcb0409f4605271da92ab55b8a0b36f4df",
+                "shasum": ""
+            },
+            "require": {
+                "manticoresoftware/buddy-core": "dev-main"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^1.8",
+                "phpunit/phpunit": "^9.5",
+                "slevomat/coding-standard": "^8.5",
+                "squizlabs/php_codesniffer": "^3.7"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Manticoresearch\\Buddy\\Plugin\\DistributedInsert\\": "src/"
+                }
+            },
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Manticore Software Co. Ltd",
+                    "email": "contact@manticoresearch.com"
+                }
+            ],
+            "description": "The Buddy distributed insert",
+            "support": {
+                "source": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert/tree/main",
+                "issues": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert/issues"
+            },
+            "time": "2023-10-04T11:04:11+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-empty-string",
@@ -5821,6 +5867,7 @@
         "manticoresoftware/buddy-plugin-empty-string": 20,
         "manticoresoftware/buddy-plugin-backup": 20,
         "manticoresoftware/buddy-plugin-emulate-elastic": 20,
+        "manticoresoftware/buddy-plugin-distributed-insert": 20,
         "manticoresoftware/buddy-plugin-insert": 20,
         "manticoresoftware/buddy-plugin-select": 20,
         "manticoresoftware/buddy-plugin-show": 20,
