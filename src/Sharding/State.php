@@ -146,4 +146,12 @@ final class State {
 		$this->client->sendRequest($query);
 		$this->cluster->attachTable($this->table);
 	}
+
+	/**
+	 * Check if we activated state so we started to shard
+	 * @return bool
+	 */
+	public function isActive(): bool {
+		return $this->client->hasTable($this->table);
+	}
 }
