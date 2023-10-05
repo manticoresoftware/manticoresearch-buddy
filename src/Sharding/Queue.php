@@ -60,7 +60,7 @@ final class Queue {
 		$this->client->sendRequest(
 			"
 			INSERT INTO {$table}
-				(`id`, `node`, `query`, `wait_for_id`, `tries`, `status`, `created_at`, `updated_at`, `processed_at`)
+				(`id`, `node`, `query`, `wait_for_id`, `tries`, `status`, `created_at`, `updated_at`, `duration`)
 			VALUES
 				($id, '{$nodeId}', '{$query}', $this->waitForId, 0,'created', {$mt}, {$mt}, 0)
 			"
@@ -105,11 +105,12 @@ final class Queue {
 			Buddy::debug("Queue query: {$query['query']}");
 			// TODO: this is a temporary hack, remove when job is done on searchd
 			$this->runMkdir($query['query']);
-
+			$mt = microtime(true);
 			$res = $this->client->sendRequest($query['query'])->getResult();
+			$duration = (int)((microtime(true) - $mt) * 1000);
 			Buddy::debug('Queue result: ' . json_encode($res));
 			$status = empty($res['error']) ? 'processed' : 'error';
-			$this->updateStatus($query['id'], $status, $query['tries'] + 1);
+			$this->updateStatus($query['id'], $status, $query['tries'] + 1, $duration);
 			// When we have error, we stop iterating
 			if ($status === 'error') {
 				Buddy::info("[$node->id] Query error: {$query['query']}");
@@ -156,18 +157,16 @@ final class Queue {
 	 * @param int $tries
 	 * @return static
 	 */
-	protected function updateStatus(int $id, string $status, int $tries): static {
+	protected function updateStatus(int $id, string $status, int $tries, int $duration = 0): static {
 		$table = $this->cluster->getSystemTableName($this->table);
 		$mt = (int)(microtime(true) * 1000);
 		$update = [
 			"`status` = '{$status}'",
 			"`tries` = {$tries}",
 			"`updated_at` = {$mt}",
+			"`duration` = {$duration}",
 		];
 
-		if ($status === 'processed') {
-			$update[] = "`processed_at` = {$mt}";
-		}
 		$rows = implode(', ', $update);
 		$q = "UPDATE {$table} SET {$rows} WHERE `id` = {$id}";
 		$this->client->sendRequest($q);
@@ -192,8 +191,8 @@ final class Queue {
 			`tries` int,
 			`status` string,
 			`created_at` bigint,
-			`processed_at` bigint,
-			`updated_at` bigint
+			`updated_at` bigint,
+			`duration` int
 		)";
 		$this->client->sendRequest($query);
 		$this->cluster->attachTable($this->table);
