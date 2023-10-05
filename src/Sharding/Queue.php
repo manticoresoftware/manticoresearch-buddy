@@ -54,15 +54,15 @@ final class Queue {
 	 */
 	public function add(string $nodeId, string $query): int {
 		$table = $this->cluster->getSystemTableName($this->table);
-		$ts = time();
+		$mt = (int)(microtime(true) * 1000);
 		$query = addcslashes($query, "'");
 		$id = hrtime(true);
 		$this->client->sendRequest(
 			"
 			INSERT INTO {$table}
-				(`id`, `node`, `query`, `wait_for_id`, `tries`, `status`, `updated_at`)
+				(`id`, `node`, `query`, `wait_for_id`, `tries`, `status`, `created_at`, `updated_at`, `processed_at`)
 			VALUES
-				($id, '{$nodeId}', '{$query}', $this->waitForId, 0,'created', {$ts})
+				($id, '{$nodeId}', '{$query}', $this->waitForId, 0,'created', {$mt}, {$mt}, 0)
 			"
 		);
 		return $id;
@@ -158,9 +158,19 @@ final class Queue {
 	 */
 	protected function updateStatus(int $id, string $status, int $tries): static {
 		$table = $this->cluster->getSystemTableName($this->table);
-		$this->client->sendRequest(
-			"UPDATE {$table} SET `status` = '{$status}', `tries` = {$tries} WHERE `id` = {$id}"
-		);
+		$mt = (int)(microtime(true) * 1000);
+		$update = [
+			"`status` = '{$status}'",
+			"`tries` = {$tries}",
+			"`updated_at` = {$mt}",
+		];
+
+		if ($status === 'processed') {
+			$update[] = "`processed_at` = {$mt}";
+		}
+		$rows = implode(', ', $update);
+		$q = "UPDATE {$table} SET {$rows} WHERE `id` = {$id}";
+		$this->client->sendRequest($q);
 		return $this;
 	}
 
@@ -181,7 +191,9 @@ final class Queue {
 			`wait_for_id` bigint,
 			`tries` int,
 			`status` string,
-			`updated_at` timestamp
+			`created_at` bigint,
+			`processed_at` bigint,
+			`updated_at` bigint
 		)";
 		$this->client->sendRequest($query);
 		$this->cluster->attachTable($this->table);
