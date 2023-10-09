@@ -11,6 +11,9 @@
 
 namespace Manticoresearch\Buddy\Base\Network;
 
+use Ds\Map;
+use Ds\Pair;
+use Ds\Vector;
 use Exception;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
@@ -42,11 +45,10 @@ final class EventHandler {
 	// How many request we handle in single runtime after we destroy and create new one
 	const RUNTIME_LIFETIME = 100;
 
-	/** @var array{available:array<array{0:int,1:Runtime}>,blocked:array<array{0:int,1:\parallel\Runtime}>} $runtimes */
-	public static array $runtimes = [
-		'available' => [],
-		'blocked' => [],
-	];
+	/** @var Vector<Pair<Runtime,int>> */
+	public static Vector $availableRuntimes;
+	/** @var Map<string,Pair<Runtime,int>> */
+	public static Map $blockedRuntimes;
 
 	/** @var int */
 	public static int $maxRuntimeIndex;
@@ -60,9 +62,13 @@ final class EventHandler {
 	 * @return void
 	 */
 	public static function init(): void {
+		static::$availableRuntimes = new Vector;
+		static::$blockedRuntimes = new Map;
 		$threads = (int)(getenv('THREADS', true) ?: 4);
 		for ($i = 0; $i < $threads; $i++) {
-			static::$runtimes['available'][] = [0, Task::createRuntime()];
+			static::$availableRuntimes->push(
+				new Pair(Task::createRuntime(), 0)
+			);
 		}
 		static::$maxRuntimeIndex = $threads - 1;
 	}
@@ -72,16 +78,16 @@ final class EventHandler {
 	 */
 	public static function destroy(): void {
 		try {
-			foreach (static::$runtimes['available'] as [, $runtime]) {
-				$runtime->kill();
+			/** @var Pair<Runtime,int> $pair */
+			foreach (static::$availableRuntimes as $pair) {
+				$pair->key->kill();
 			}
-			foreach (static::$runtimes['blocked'] as [, $runtime]) {
-				$runtime->kill();
+			/** @var Pair<Runtime,int> $pair */
+			foreach (static::$blockedRuntimes->values() as $pair) {
+				$pair->key->kill();
 			}
-			static::$runtimes = [
-				'available' => [],
-				'blocked' => [],
-			];
+			static::$availableRuntimes->clear();
+			static::$blockedRuntimes->clear();
 		} catch (Throwable) {
 		}
 	}
@@ -126,19 +132,20 @@ final class EventHandler {
 			if (!isset($task)) {
 				try {
 					// we try to pop runtime and when we have some, process, otherwise just queue
-					if (!static::$runtimes['available']) {
+					if (!static::$availableRuntimes->count()) {
 						return;
 					}
-					/** @var array{0:int,1:Runtime} */
-					$runtimeStruct = array_pop(static::$runtimes['available']);
-					[$usageCount, $runtime] = $runtimeStruct;
-					static::$runtimes['blocked'][$id] = [++$usageCount, $runtime];
+					/** @var Pair<Runtime,int> */
+					$pair = static::$availableRuntimes->pop();
+					$runtime = $pair->key;
+					++$pair->value;
+					static::$blockedRuntimes->put($id, $pair);
 					$request = Request::fromString($data, $id);
 					$executor = QueryProcessor::process($request);
 					$task = $executor->run($runtime);
 				} catch (Throwable $e) {
 					return static::handleExceptionWhileDataProcessing(
-						$e, $id, $request ?? null, $data, $deferred, $timer, $runtimeStruct ?? null
+						$e, $id, $request ?? null, $data, $deferred, $timer
 					);
 				}
 
@@ -302,7 +309,7 @@ final class EventHandler {
 	 * @return string
 	 */
 	protected static function getRequestId(ServerRequestInterface $serverRequest): string {
-		return $serverRequest->getHeader('Request-ID')[0] ?? '0';
+		return $serverRequest->getHeader('Request-ID')[0] ?? uniqid();
 	}
 
 	/**
@@ -343,7 +350,6 @@ final class EventHandler {
 	 * @param string $data
 	 * @param Deferred<mixed> $deferred
 	 * @param ?TimerInterface $timer
-	 * @param ?array{0:int,1:Runtime} $runtimeStruct
 	 * @return PromiseInterface<mixed>
 	 * @throws RuntimeException
 	 */
@@ -353,16 +359,9 @@ final class EventHandler {
 		?Request $request,
 		string $data,
 		Deferred $deferred,
-		?TimerInterface $timer,
-		?array $runtimeStruct
+		?TimerInterface $timer
 	): PromiseInterface {
 		Buddy::debug("[$id] data parse error: {$e->getMessage()}");
-
-		// If we pop runtime, return back in case of error
-		if ($runtimeStruct) {
-			[$usageCount, $runtime] = $runtimeStruct;
-			array_unshift(static::$runtimes['available'], [++$usageCount, $runtime]);
-		}
 
 		// Create special generic error in case we have system exception
 		// And shadowing $e with it
@@ -414,12 +413,22 @@ final class EventHandler {
 		// When after many request of one type of query we switch to another one
 		// that makes instant memory overflow
 		// Return runtime back to pool
-		if (static::$runtimes['blocked'][$requestId][0] > static::RUNTIME_LIFETIME) {
-			static::$runtimes['blocked'][$requestId][1]->kill();
-			unset(static::$runtimes['blocked'][$requestId]);
-			static::$runtimes['blocked'][$requestId] = [0, Task::createRuntime()];
+		if (static::$blockedRuntimes->get($requestId)->value > static::RUNTIME_LIFETIME) {
+			try {
+				static::$blockedRuntimes->get($requestId)->key->kill();
+			} catch (\parallel\Runtime\Error\Closed) {
+			}
+			static::$blockedRuntimes->remove($requestId);
+			static::$blockedRuntimes->put(
+				$requestId, new Pair(
+					Task::createRuntime(),
+					0
+				)
+			);
 		}
-		array_unshift(static::$runtimes['available'], static::$runtimes['blocked'][$requestId]);
-		unset(static::$runtimes['blocked'][$requestId]);
+		static::$availableRuntimes->unshift(
+			static::$blockedRuntimes->get($requestId)
+		);
+		static::$blockedRuntimes->remove($requestId);
 	}
 }
