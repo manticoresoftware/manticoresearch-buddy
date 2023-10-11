@@ -39,7 +39,7 @@ final class Node {
 		$listen = $settings->searchdListen->copy();
 		$listen->sort();
 		foreach ($listen as $line) {
-			if (!preg_match('/^([0-255]\.[0-255]\.[0-255]\.[0-255]:)?([0-9]+)$/ius', $line)) {
+			if (!preg_match('/^([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\:)?([0-9]+)$/ius', $line)) {
 				continue;
 			}
 
