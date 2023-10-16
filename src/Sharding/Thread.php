@@ -13,11 +13,10 @@ namespace Manticoresearch\Buddy\Base\Sharding;
 
 use Ds\Map;
 use Ds\Vector;
-use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Psr\Container\ContainerInterface;
+use Swoole\Process as SwooleProcess;
 use Throwable;
-use parallel\Channel;
 
 /**
  * <code>
@@ -32,10 +31,10 @@ final class Thread {
 	protected static ContainerInterface $container;
 
 	/**
-	 * @param Task $task
+	 * @param SwooleProcess $process
 	 * @return void
 	 */
-	public function __construct(protected Task $task) {
+	public function __construct(public readonly SwooleProcess $process) {
 	}
 
 	/**
@@ -58,7 +57,7 @@ final class Thread {
 			return;
 		}
 
-		static::$instance->task->destroy();
+		static::$instance->process->exit();
 	}
 
 	/**
@@ -86,26 +85,23 @@ final class Thread {
 	 * @return self
 	 */
 	// phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
-	protected static function start(): self {
-		$task = Task::loopInRuntime(
-			Task::createRuntime(),
-			// phpcs:disable Generic.CodeAnalysis.UnusedFunctionParameter
-			// phpcs:disable SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
-			static function (Channel $ch, string $container) {
-				$container = unserialize($container);
-				/** @var ContainerInterface $container */
-
-				// This fix issue when we get "sh: 1: cd: can't cd to" error
-				// while running buddy inside directory that are not allowed for us
+	public static function start(): self {
+		$process = new SwooleProcess(
+			static function (SwooleProcess $worker) {
 				chdir(sys_get_temp_dir());
 
-				Process::setContainer($container);
+				Process::setContainer(static::$container);
 				$ticks = new Vector;
 				try {
-					start: while ($msg = $ch->recv()) {
+					start: while ($msg = $worker->read()) {
+						if (!is_string($msg)) {
+							throw new \Exception('Incorrect data received');
+						}
+						$msg = unserialize($msg);
 						if (!is_array($msg)) {
 							throw new \Exception('Incorrect data received');
 						}
+
 						[$method, $args] = $msg;
 						Process::$method(...$args);
 						if ($method === 'shard') {
@@ -119,9 +115,9 @@ final class Thread {
 							);
 						}
 
-						// Run ticks after ping execution
+				  // Run ticks after ping execution
 						if ($method !== 'ping') {
-							continue;
+							  continue;
 						}
 
 						foreach ($ticks as $n => $tick) {
@@ -142,23 +138,16 @@ final class Thread {
 				} catch (Throwable $e) {
 					Buddy::debug(
 						"Error while processing sharding: {$e->getMessage()}."
-							. ' Restarting after 5s'
+						. ' Restarting after 5s'
 					);
 					Buddy::debug($e->getTraceAsString());
 					sleep(5); // <-- add extra protection delay
 					goto start;
 				}
-			}, [serialize(static::$container)]
+			}, false, 2
 		);
-		return (new self($task))->run();
-	}
-
-	/**
-	 * @return self
-	 */
-	public function run(): self {
-		$this->task->run();
-		return $this;
+		$process->start();
+		return new self($process);
 	}
 
 	/**
@@ -170,7 +159,7 @@ final class Thread {
 	public function execute(string $event, array $args = []): static {
 		$argsJson = json_encode($args);
 		Buddy::debug("Sharding Event: $event $argsJson");
-		$this->task->transmit([$event, $args]);
+		$this->process->write(serialize([$event, $args]));
 		return $this;
 	}
 }

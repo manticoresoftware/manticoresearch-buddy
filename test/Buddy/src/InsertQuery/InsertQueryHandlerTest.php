@@ -18,7 +18,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Response as ManticoreResponse;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Response;
-use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Plugin\Insert\Handler;
 use Manticoresearch\Buddy\Plugin\Insert\Payload;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
@@ -142,8 +141,7 @@ class InsertQueryHandlerTest extends TestCase {
 		$handler = new Handler($payload);
 		$handler->setManticoreClient($manticoreClient);
 		ob_flush();
-		$runtime = Task::createRuntime();
-		$task = $handler->run($runtime);
+		$task = $handler->run();
 		$task->wait();
 
 		$this->assertEquals(true, $task->isSucceed());

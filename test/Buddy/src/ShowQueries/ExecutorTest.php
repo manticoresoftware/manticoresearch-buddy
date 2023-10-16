@@ -15,7 +15,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Request as NetRequest;
 use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
-use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Plugin\Show\Payload;
 use Manticoresearch\Buddy\Plugin\Show\QueriesHandler as Handler;
 use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
@@ -60,7 +59,7 @@ class ExecutorTest extends TestCase {
 		$handler = new Handler($payload);
 		$handler->setManticoreClient($manticoreClient);
 		$handler->setTableFormatter(new TableFormatter());
-		$task = $handler->run(Task::createRuntime());
+		$task = $handler->run();
 		$task->wait();
 		$this->assertEquals(true, $task->isSucceed());
 		$result = $task->getResult()->getStruct();

@@ -48,7 +48,8 @@ final class ProcessKillTest extends TestCase {
 		system('kill -9 ' . self::$manticorePid);
 		sleep(1);
 		$this->assertEquals(false, Process::exists(self::$manticorePid));
-		sleep(5); // We have 5 sec tick when we check that no parrent for buddy
+		// We use more, cuz it takes time to shut down all threads
+		sleep(10); // We have 5 sec tick when we check that no parrent for buddy
 		$this->assertEquals(false, Process::exists(self::$buddyPid));
 	}
 

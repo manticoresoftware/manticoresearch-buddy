@@ -28,7 +28,8 @@ class MetricThreadTest extends TestCase {
 	public function testMetricThreadPrintDebugMessages(): void {
 		sleep(11);
 		system('echo "127.0.0.1 telemetry.manticoresearch.com" >> /etc/hosts');
-		$labels = (string)system('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep labels:');
+		echo  static::SEARCHD_LOG_PATH;
+		$labels = (string)system('grep labels: ' . static::SEARCHD_LOG_PATH);
 		$this->assertStringContainsString('"collector":"buddy"', $labels);
 		$this->assertStringContainsString('"buddy_version"', $labels);
 		$this->assertStringContainsString('"manticore_version"', $labels);
@@ -36,7 +37,7 @@ class MetricThreadTest extends TestCase {
 		$this->assertStringContainsString('"manticore_binlog_enabled"', $labels);
 		$this->assertStringContainsString('"manticore_secondary_indexes_enabled"', $labels);
 
-		$metrics = (string)system('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep metrics:');
+		$metrics = (string)system('grep metrics: ' . static::SEARCHD_LOG_PATH);
 		$this->assertStringContainsString('"uptime"', $metrics);
 		$this->assertStringContainsString('"command_search"', $metrics);
 		$this->assertStringContainsString('"command_excerpt"', $metrics);
@@ -59,7 +60,7 @@ class MetricThreadTest extends TestCase {
 		$this->assertStringContainsString('"workers_total"', $metrics);
 
 		$output = [];
-		exec('tail -n 100 ' . static::SEARCHD_LOG_PATH . ' | grep metric:', $output);
+		exec('grep metric: ' . static::SEARCHD_LOG_PATH, $output);
 		$executes = implode(PHP_EOL, $output);
 		$this->assertStringContainsString('metric: add ["invocation",1]', $executes);
 		$this->assertStringContainsString('metric: checkAndSnapshot', $executes);

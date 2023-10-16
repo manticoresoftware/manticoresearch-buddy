@@ -104,7 +104,7 @@ class ServerTest extends TestCase {
 	// 		->addTicker(
 	// 			static function () use ($testFilepath) {
 	// 				file_put_contents($testFilepath, 'Ok');
-	// 			}, 1, 'server'
+	// 			}, 1
 	// 		);
 
 	// 	try {
@@ -146,7 +146,7 @@ class ServerTest extends TestCase {
 		$server->addHandler('request', EventHandler::request(...));
 		switch ($testTarget) {
 			case 'ticker':
-				$server->addTicker($fn, 1, 'client');
+				$server->addTicker($fn, 1);
 				break;
 			case 'handler':
 				$server->addHandler('close', $fn);

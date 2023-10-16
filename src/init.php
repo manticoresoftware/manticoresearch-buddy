@@ -16,7 +16,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
-use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Loader;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -51,5 +50,4 @@ Pluggable::setContainer($container);
 MetricThread::setContainer($container);
 ShardingThread::setContainer($container);
 
-Task::init(__DIR__ . DIRECTORY_SEPARATOR . 'runtime.php');
 return $container;

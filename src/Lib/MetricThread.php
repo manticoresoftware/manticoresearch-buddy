@@ -11,10 +11,9 @@
 
 namespace Manticoresearch\Buddy\Base\Lib;
 
-use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Psr\Container\ContainerInterface;
-use parallel\Channel;
+use Swoole\Process;
 
 // This is class that allows us to run separate thread for telemetry collection
 /**
@@ -37,12 +36,7 @@ final class MetricThread {
 	// We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
 
-
-	/**
-	 * @param Task $task
-	 * @return void
-	 */
-	public function __construct(protected Task $task) {
+	public function __construct(public readonly Process $process) {
 	}
 
 	/**
@@ -65,7 +59,7 @@ final class MetricThread {
 			return;
 		}
 
-		static::$instance->task->destroy();
+		static::$instance->process->exit();
 	}
 
 	/**
@@ -87,36 +81,28 @@ final class MetricThread {
 	 * @return self
 	 */
 	public static function start(): self {
-		$task = Task::loopInRuntime(
-			Task::createRuntime(),
-			static function (Channel $ch, string $container) {
-				$container = unserialize($container);
-				/** @var ContainerInterface $container */
-				// This fix issue when we get "sh: 1: cd: can't cd to" error
-				// while running buddy inside directory that are not allowed for us
+		$process = new Process(
+			static function (Process $worker) {
 				chdir(sys_get_temp_dir());
 
-				Metric::setContainer($container);
+				Metric::setContainer(static::$container);
 				$metric = Metric::instance();
-				while ($msg = $ch->recv()) {
+
+				while ($msg = $worker->read()) {
+					if (!is_string($msg)) {
+						throw new \Exception('Incorrect data received');
+					}
+					$msg = unserialize($msg);
 					if (!is_array($msg)) {
 						throw new \Exception('Incorrect data received');
 					}
 					[$method, $args] = $msg;
 					$metric->$method(...$args);
 				}
-			}, [serialize(static::$container)]
+			}, true, 2
 		);
-
-		return (new self($task))->run();
-	}
-
-	/**
-	 * @return self
-	 */
-	public function run(): self {
-		$this->task->run();
-		return $this;
+		$process->start();
+		return new self($process);
 	}
 
 	/**
@@ -129,9 +115,8 @@ final class MetricThread {
 	 * @return static
 	 */
 	public function execute(string $method, array $args = []): static {
-		$argsJson = json_encode($args);
-		Buddy::debug("metric: $method $argsJson");
-		$this->task->transmit([$method, $args]);
+		Buddy::debug("metric: $method " . json_encode($args));
+		$this->process->write(serialize([$method, $args]));
 		return $this;
 	}
 }

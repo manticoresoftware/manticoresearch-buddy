@@ -17,7 +17,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\Network\Request;
-use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Plugin\Backup\Handler as BackupHandler;
 use Manticoresearch\Buddy\Plugin\Backup\Payload as BackupPayload;
 use Manticoresearch\Buddy\Plugin\Insert\Error\AutoSchemaDisabledError;
@@ -111,7 +110,7 @@ class QueryProcessorTest extends TestCase {
 		$refCls = new ReflectionClass(QueryProcessor::class);
 		$refCls->setStaticPropertyValue('settings', static::getSettings(['searchd.auto_schema' => '0']));
 		$this->expectException(AutoSchemaDisabledError::class);
-		QueryProcessor::process($request)->run(Task::createRuntime());
+		QueryProcessor::process($request)->run();
 	}
 
 	/**

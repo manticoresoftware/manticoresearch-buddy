@@ -1009,12 +1009,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert.git",
-                "reference": "23f7a6dcb0409f4605271da92ab55b8a0b36f4df"
+                "reference": "ddc418f1ed5ea2b786e96f2e4d97ba108432081a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-distributed-insert/zipball/23f7a6dcb0409f4605271da92ab55b8a0b36f4df",
-                "reference": "23f7a6dcb0409f4605271da92ab55b8a0b36f4df",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-distributed-insert/zipball/ddc418f1ed5ea2b786e96f2e4d97ba108432081a",
+                "reference": "ddc418f1ed5ea2b786e96f2e4d97ba108432081a",
                 "shasum": ""
             },
             "require": {
@@ -1047,7 +1047,7 @@
                 "source": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert/tree/main",
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert/issues"
             },
-            "time": "2023-10-04T11:04:11+00:00"
+            "time": "2023-10-18T08:05:09+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-empty-string",
