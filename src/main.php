@@ -33,8 +33,42 @@ $settings = QueryProcessor::getSettings();
 $initBuffer = ob_get_clean();
 putenv("PLUGIN_DIR={$settings->commonPluginDir}");
 
-$server = Server::create();
-$server->onStart(
+$threads = getenv('THREADS', true) ?: swoole_cpu_num();
+$server = Server::create(
+	[
+	'daemonize' => 0,
+	'max_request' => 0,
+	'enable_coroutine' => true,
+	'task_enable_coroutine' => true,
+	'task_max_request' => 0,
+	'task_worker_num' => $threads,
+	'reactor_num' => $threads,
+	'worker_num' => $threads,
+	'enable_reuse_port' => true,
+	'input_buffer_size' => 2097152,
+	'buffer_output_size' => 32 * 1024 * 1024, // byte in unit
+	'tcp_fastopen' => true,
+	'max_conn' => 8192,
+	'backlog' => 8192,
+	'tcp_defer_accept' => 3,
+	'open_tcp_keepalive' => true,
+	'open_tcp_nodelay' => true,
+	'open_http_protocol' => true,
+	'open_http2_protocol' => false,
+	'open_websocket_protocol' => false,
+	'open_mqtt_protocol' => false,
+	'reload_async' => false,
+	'http_parse_post' => false,
+	'http_parse_cookie' => false,
+	'upload_tmp_dir' => '/tmp',
+	'http_compression' => true,
+	'http_compression_level' => 5,
+	'compression_min_length' => 20,
+	'open_cpu_affinity' => false,
+	'max_wait_time' => 5,
+	]
+);
+$server->beforeStart(
 	static function () use ($initBuffer) {
 		echo $initBuffer;
 		$settings = QueryProcessor::getSettings();
@@ -51,6 +85,8 @@ $server->onStart(
 )
 	->onStart(
 		static function () {
+			// Hack to fix issue with cut the output from manticore daemon
+			usleep(20000);
 			buddy_metric('invocation', 1);
 			$settings = QueryProcessor::getSettings();
 			$crashDetector = new CrashDetector($settings);
@@ -69,13 +105,30 @@ $server->onStart(
 			ini_set('post_max_size', $settings->maxAllowedPacket);
 		}
 	)
-	->onStart(ShardingThread::instance(...))
-	->addHandler('request', EventHandler::request(...))
-	->addHandler('error', EventHandler::error(...))
+	->beforeStart(
+		static function () use ($server) {
+			$process = ShardingThread::instance()->process;
+			$server->addProcess($process);
+		}
+	)
+	->beforeStart(
+		static function () use ($server) {
+			$process = MetricThread::instance()->process;
+			$server->addProcess($process);
+		}
+	)
+	->addHandler(
+		'request', static function (...$args) use ($server) {
+			array_unshift($args, $server);
+			EventHandler::request(...$args);
+		}
+	)
+	->addHandler('task', EventHandler::task(...))
+	->addHandler('finish', EventHandler::finish(...))
 	->addTicker(
 		static function () {
 			ShardingThread::instance()->execute('ping', []);
-		}, 1, 'server'
+		}, 1
 	)
 	->addTicker(
 		static function () {
@@ -89,17 +142,7 @@ $server->onStart(
 			$taskCount = TaskPool::getCount();
 			Buddy::debug("running {$taskCount} tasks");
 		}, 60
-	)
-	->addTicker(
-		static function () use ($server) {
-			if (!EventHandler::shouldExit()) {
-				return;
-			}
-
-			$server->stop();
-		}, 1
-	)
-	->addTicker(EventHandler::clientCheckTickerFn(Process::getParentPid()), 5, 'server');
+	)->addTicker(EventHandler::clientCheckTickerFn($server->pid, Process::getParentPid()), 5);
 
 if (is_telemetry_enabled()) {
 	$server->addTicker(
@@ -109,14 +152,8 @@ if (is_telemetry_enabled()) {
 				'checkAndSnapshot',
 				[(int)(getenv('TELEMETRY_PERIOD', true) ?: 300)]
 			);
-		}, 10, 'server'
+		}, 10
 	);
-	register_shutdown_function(MetricThread::destroy(...));
 }
-
-register_shutdown_function(ShardingThread::destroy(...));
-
-// Shutdown functions MUST be registered here only
-register_shutdown_function(EventHandler::destroy(...));
 
 $server->start();

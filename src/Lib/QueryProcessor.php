@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Lib;
 
 use Exception;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\Base\Network\EventHandler;
 use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
@@ -206,7 +205,6 @@ class QueryProcessor {
 				'installed',
 				function () {
 					static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
-					EventHandler::setShouldExit(true);
 				},
 			],
 			// Happens when we remove the plugin
@@ -215,7 +213,6 @@ class QueryProcessor {
 				'deleted',
 				function () {
 					static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
-					EventHandler::setShouldExit(true);
 				},
 			],
 			// Happens when we run create table with shards in options

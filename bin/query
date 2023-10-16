@@ -32,7 +32,7 @@ try {
       'body' => '$query',
     ]
   ]);
-  \$task = QueryProcessor::process(\$request)->run(Task::createRuntime());
+  \$task = QueryProcessor::process(\$request)->run();
   \$status = \$task->wait(true);
   printf('Status code: %s' . PHP_EOL, \$status->name);
   printf('Result: ' . PHP_EOL . '%s', \$task->getResult()->getStruct());

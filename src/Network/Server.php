@@ -12,59 +12,43 @@
 namespace Manticoresearch\Buddy\Base\Network;
 
 use Exception;
-use Manticoresearch\Buddy\Base\Lib\MetricThread;
-use Manticoresearch\Buddy\Base\Network\EventHandler;
 use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use React\EventLoop\Loop;
-use React\Http\HttpServer;
-use React\Http\Middleware\RequestBodyBufferMiddleware;
-use React\Http\Middleware\RequestBodyParserMiddleware;
-use React\Http\Middleware\StreamingRequestMiddleware;
-use React\Socket\ConnectionInterface;
-use React\Socket\SocketServer;
+use Swoole\Http\Server as SwooleServer;
+use Swoole\Process;
+use Swoole\Timer;
+use Throwable;
 
 final class Server {
-	/**
-	 * Default config for initializing the socket
-	 */
-	const SOCKET_CONFIG = [
-		'tcp' => [
-			'backlog' => 200,
-			'so_reuseport' => true,
-			'ipv4_v4only' => true,
-			// 'local_cert' => 'server.pem',
-		],
-	];
-
-	/** @var SocketServer */
-	protected SocketServer $socket;
+	/** @var SwooleServer */
+	protected SwooleServer $socket;
 
 	/** @var array<string,callable> */
 	protected array $handlers = [];
 
-	/** @var array{server:array<array{0:callable,1:int}>,client:array<array{0:callable,1:int}>} */
-	protected array $ticks = [
-		'server' => [],
-		'client' => [],
-	];
+	/** @var array<array{0:callable,1:int}> */
+	protected array $ticks = [];
 
 	/** @var array<callable> */
 	protected array $onstart = [];
 
+	/** @var array<callable> */
+	protected array $beforeStart = [];
+
 	/** @var string $ip */
 	protected string $ip;
 
+	/** @var int $pid */
+	public readonly int $pid;
+
 	/**
 	 * @param array<string,mixed> $config
+	 * @return void
 	 */
-	public function __construct(
-		array $config = [],
-	) {
-		$this->socket = new SocketServer(
-			'127.0.0.1:0',
-			array_replace(static::SOCKET_CONFIG, $config)
-		);
+	public function __construct(array $config = []) {
+		$this->socket = new SwooleServer('127.0.0.1', 0);
+		$this->socket->set($config);
+		$this->pid = $this->socket->master_pid;
 	}
 
 	/**
@@ -95,15 +79,11 @@ final class Server {
 	 *
 	 * @param callable $fn
 	 * @param int $period
-	 * @param string $type
 	 *  One of server or client, todo: move to enum implementation
 	 * @return static
 	 */
-	public function addTicker(callable $fn, int $period = 5, string $type = 'server'): static {
-		// We should enum, but for now string is ok
-		assert($type === 'server' || $type === 'client');
-
-		$this->ticks[$type][] = [$fn, $period];
+	public function addTicker(callable $fn, int $period = 5): static {
+		$this->ticks[] = [$fn, $period];
 		return $this;
 	}
 
@@ -118,60 +98,105 @@ final class Server {
 	}
 
 	/**
+	 * Add function to be called before we starting server
+	 * @param  callable $fn
+	 * @return static
+	 */
+	public function beforeStart(callable $fn): static {
+		$this->beforeStart[] = $fn;
+		return $this;
+	}
+
+	/**
+	 * Add process to the server loop
+	 * @param Process $process
+	 * @return static
+	 */
+	public function addProcess(Process $process): static {
+		$this->socket->addProcess($process);
+
+		$this->onStart(
+			static function () use ($process) {
+				swoole_event_add(
+					$process->pipe, function ($pipe) use ($process) {
+						try {
+							$output = $process->read();
+							if (!$output) {
+								swoole_event_del($pipe);
+								$process->wait();
+							}
+
+							if (is_string($output)) {
+								echo $output;
+							}
+						} catch (Throwable) {
+						}
+					}
+				);
+			}
+		);
+		return $this;
+	}
+
+	/**
 	 * Finally start the server and accept connections
 	 *
 	 * @return static
 	 */
 	public function start(): static {
 		// This is must be first! Because its important
-		echo 'Buddy v' . Buddy::getVersion()
-			. ' started ' . str_replace('tcp://', '', (string)$this->socket->getAddress())
-			. PHP_EOL;
-
-		// Initialize runtimes that we will use for request handling
-		EventHandler::init();
-
-		// Process first functions to run on start
-		foreach ($this->onstart as $fn) {
-			$fn();
-		}
-
-		// First add all ticks to run periodically
-		foreach ($this->ticks['server'] as [$fn, $period]) {
-			Loop::addPeriodicTimer($period, $this->wrapFn($fn));
-		}
+		$version = Buddy::getVersion();
+		$listen = "{$this->socket->host}:{$this->socket->port}";
+		echo "Buddy v{$version} started {$listen}" . PHP_EOL;
 
 		// Handle connections and subscribe to all events in handlers
 		// Create the socket for future use
 		if (!isset($this->handlers['request'])) {
 			throw new Exception('You are missing "request" handler to handle requests');
 		}
-		$http = new HttpServer(
-			new StreamingRequestMiddleware(),
-			// new LimitConcurrentRequestsMiddleware(128), // 128 concurrent buffering handlers
-			new RequestBodyBufferMiddleware(return_bytes(ini_get('post_max_size') ?: '64k')), // 8 MiB per request
-			new RequestBodyParserMiddleware(),
-			$this->handlers['request']
-		);
-		unset($this->handlers['request']);
 
+		foreach ($this->beforeStart as $fn) {
+			$fn();
+		}
+
+		// Do custom initialization on start
 		$this->socket->on(
-			'connection', function (ConnectionInterface $connection) {
-				Buddy::debug('New connection from ' . $connection->getRemoteAddress());
-
-				// First add all ticks to run periodically
-				foreach ($this->ticks['client'] as [$fn, $period]) {
-					Loop::addPeriodicTimer($period, $this->wrapFn($fn, $connection));
+			'start', function () {
+			// Process first functions to run on start
+				foreach ($this->onstart as $fn) {
+					$fn();
 				}
 
-				foreach ($this->handlers as $event => $fn) {
-					$connection->on($event, $this->wrapFn($fn, $connection));
+			// First add all ticks to run periodically
+				foreach ($this->ticks as [$fn, $period]) {
+					Timer::tick(
+						$period * 1000, static function (/*int $timerId*/) use ($fn) {
+							go($fn);
+						}
+					);
 				}
 			}
 		);
 
-		$http->listen($this->socket);
+		// Add all other handlers
+		foreach ($this->handlers as $event => $fn) {
+			$this->socket->on($event, $fn);
+		}
+
+		$this->socket->start();
 		return $this;
+	}
+
+	/**
+	 * Run task in worker, we do blocking here, but actually we detect
+	 * async mode on the level of our Task
+	 * @param string $requestId
+	 * @param  string $payload
+	 * @return Response
+	 */
+	public function process(string $requestId, string $payload): Response {
+		// @phpstan-ignore-next-line
+		return $this->socket->taskwait([$requestId, $payload], 0);
 	}
 
 	/**
@@ -181,49 +206,12 @@ final class Server {
 	 * @return static
 	 */
 	public function stop($exit = true): static {
-		if (is_telemetry_enabled()) {
-			MetricThread::destroy();
-		}
-		EventHandler::destroy();
-		$this->socket->close();
-		Loop::stop();
+		echo 'stop';
+		Timer::clearAll();
+		$this->socket->stop();
 		if ($exit) {
 			exit(0);
 		}
 		return $this;
-	}
-
-	/**
-	 * Little helper to help us to wrap event handler into function
-	 * that will do responses to current connectsion whe we have it
-	 * and also support multiple responses at once
-	 *
-	 * @param callable $fn
-	 * @param ?ConnectionInterface $connection
-	 * @return callable
-	 */
-	protected function wrapFn(callable $fn, ?ConnectionInterface $connection = null): callable {
-		return function (...$args) use ($fn, $connection) {
-			$result = $fn(...$args);
-
-			if (!$connection) {
-				return;
-			}
-
-			if (is_a($result, Response::class)) {
-				return $connection->write((string)$result);
-			}
-
-			if (!is_array($result)) {
-				return;
-			}
-
-			foreach ($result as $response) {
-				if (!is_a($response, Response::class)) {
-					continue;
-				}
-				$connection->write((string)$response);
-			}
-		};
 	}
 }
