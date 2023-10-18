@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bbe09220f0865b1827a1ac9b0bf9689c",
+    "content-hash": "3c8d5f6bfe9a94b5417139b9e69767da",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -811,7 +811,7 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
@@ -835,7 +835,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -856,26 +855,26 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/v0.1.0"
             },
             "time": "2023-09-19T08:31:13+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-backup",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-backup.git",
-                "reference": "ba0de9964db0f2ae3a6479f5e5f6fb9d1a12d580"
+                "reference": "2b58863b6fa995f43e4041a1773619ede95fcfbe"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-backup/zipball/ba0de9964db0f2ae3a6479f5e5f6fb9d1a12d580",
-                "reference": "ba0de9964db0f2ae3a6479f5e5f6fb9d1a12d580",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-backup/zipball/2b58863b6fa995f43e4041a1773619ede95fcfbe",
+                "reference": "2b58863b6fa995f43e4041a1773619ede95fcfbe",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main",
+                "manticoresoftware/buddy-core": "v0.1.0",
                 "manticoresoftware/manticoresearch-backup": "^1.0.7"
             },
             "require-dev": {
@@ -884,7 +883,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -904,27 +902,27 @@
             "description": "The Buddy Backup plugin",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-backup/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-backup/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-backup/tree/v0.1.0"
             },
-            "time": "2023-10-17T06:54:27+00:00"
+            "time": "2023-10-18T07:39:38+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-cli-table",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-cli-table.git",
-                "reference": "ec8c5f7f8515c1b005697dc9a72f265b7db24cf4"
+                "reference": "b9bde915803a9c2effceb47dfd6dc4937b1aa1aa"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-cli-table/zipball/ec8c5f7f8515c1b005697dc9a72f265b7db24cf4",
-                "reference": "ec8c5f7f8515c1b005697dc9a72f265b7db24cf4",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-cli-table/zipball/b9bde915803a9c2effceb47dfd6dc4937b1aa1aa",
+                "reference": "b9bde915803a9c2effceb47dfd6dc4937b1aa1aa",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main",
-                "manticoresoftware/buddy-plugin-show": "dev-main"
+                "manticoresoftware/buddy-core": "v0.1.0",
+                "manticoresoftware/buddy-plugin-show": "v0.1.0"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -932,7 +930,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -952,26 +949,26 @@
             "description": "The Buddy CLI table plugin",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-cli-table/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-cli-table/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-cli-table/tree/v0.1.0"
             },
-            "time": "2023-09-19T11:02:57+00:00"
+            "time": "2023-10-18T07:42:54+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-empty-string",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-empty-string.git",
-                "reference": "25c66eeb99300f36c08ae42d44abb15af73d1179"
+                "reference": "8168f352624de3d7a14a3522ae565722393c021e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-empty-string/zipball/25c66eeb99300f36c08ae42d44abb15af73d1179",
-                "reference": "25c66eeb99300f36c08ae42d44abb15af73d1179",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-empty-string/zipball/8168f352624de3d7a14a3522ae565722393c021e",
+                "reference": "8168f352624de3d7a14a3522ae565722393c021e",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main"
+                "manticoresoftware/buddy-core": "v0.1.0"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -979,7 +976,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -999,26 +995,26 @@
             "description": "The Buddy Empty string in query handler plugin",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-empty-string/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-empty-string/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-empty-string/tree/v0.1.0"
             },
-            "time": "2023-09-25T07:32:57+00:00"
+            "time": "2023-10-18T07:39:55+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-emulate-elastic",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-emulate-elastic.git",
-                "reference": "54bec89b1a038810fbb86b629a9568345bec7734"
+                "reference": "c57e879d47abbacfdea356fa8515c9abbf4aa411"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-emulate-elastic/zipball/54bec89b1a038810fbb86b629a9568345bec7734",
-                "reference": "54bec89b1a038810fbb86b629a9568345bec7734",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-emulate-elastic/zipball/c57e879d47abbacfdea356fa8515c9abbf4aa411",
+                "reference": "c57e879d47abbacfdea356fa8515c9abbf4aa411",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main"
+                "manticoresoftware/buddy-core": "v0.1.0"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -1026,7 +1022,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -1046,26 +1041,26 @@
             "description": "The Buddy elastic endpoints emulator plugin",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-emulate-elastic/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-emulate-elastic/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-emulate-elastic/tree/v0.1.0"
             },
-            "time": "2023-09-26T09:48:29+00:00"
+            "time": "2023-10-18T07:40:03+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-insert",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-insert.git",
-                "reference": "6c3ebfc61588e153738ad3e5d0468fb18b785183"
+                "reference": "c0a0a9d26f4c6c496279160f76f1392f0dc23dec"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert/zipball/6c3ebfc61588e153738ad3e5d0468fb18b785183",
-                "reference": "6c3ebfc61588e153738ad3e5d0468fb18b785183",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert/zipball/c0a0a9d26f4c6c496279160f76f1392f0dc23dec",
+                "reference": "c0a0a9d26f4c6c496279160f76f1392f0dc23dec",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main"
+                "manticoresoftware/buddy-core": "v0.1.0"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -1073,7 +1068,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -1093,26 +1087,26 @@
             "description": "The Buddy INSERT auto schema plugin",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-insert/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-insert/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-insert/tree/v0.1.0"
             },
-            "time": "2023-09-19T10:22:56+00:00"
+            "time": "2023-10-18T07:40:12+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-insert-mva",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-insert-mva.git",
-                "reference": "7f0d497f1ac8658739f24bd7bf2caf90e416315a"
+                "reference": "b2534c57b0d959579be406f96c9907448188ee29"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert-mva/zipball/7f0d497f1ac8658739f24bd7bf2caf90e416315a",
-                "reference": "7f0d497f1ac8658739f24bd7bf2caf90e416315a",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-insert-mva/zipball/b2534c57b0d959579be406f96c9907448188ee29",
+                "reference": "b2534c57b0d959579be406f96c9907448188ee29",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main"
+                "manticoresoftware/buddy-core": "v0.1.0"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -1120,7 +1114,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -1140,26 +1133,26 @@
             "description": "The Buddy to support insert MVA as a string for mysqldump",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-insert-mva/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-insert-mva/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-insert-mva/tree/v0.1.0"
             },
-            "time": "2023-10-11T08:32:47+00:00"
+            "time": "2023-10-18T07:40:21+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-plugin",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-plugin.git",
-                "reference": "d1f852bf752e37b060ea66680519a53377c8422c"
+                "reference": "245d5d7538889a4cdf3221d8c6497f7ff7e0153b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-plugin/zipball/d1f852bf752e37b060ea66680519a53377c8422c",
-                "reference": "d1f852bf752e37b060ea66680519a53377c8422c",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-plugin/zipball/245d5d7538889a4cdf3221d8c6497f7ff7e0153b",
+                "reference": "245d5d7538889a4cdf3221d8c6497f7ff7e0153b",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main"
+                "manticoresoftware/buddy-core": "v0.1.0"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -1167,7 +1160,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -1187,26 +1179,26 @@
             "description": "The Buddy Plugin to manage plugins",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-plugin/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-plugin/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-plugin/tree/v0.1.0"
             },
-            "time": "2023-09-20T08:50:27+00:00"
+            "time": "2023-10-18T07:40:29+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-select",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-select.git",
-                "reference": "dd6bc6279690076b602a71367cfe66b58ef6fc86"
+                "reference": "a9b2187fa48349358c89d93741bc05b418f32e58"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/dd6bc6279690076b602a71367cfe66b58ef6fc86",
-                "reference": "dd6bc6279690076b602a71367cfe66b58ef6fc86",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/a9b2187fa48349358c89d93741bc05b418f32e58",
+                "reference": "a9b2187fa48349358c89d93741bc05b418f32e58",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main"
+                "manticoresoftware/buddy-core": "v0.1.0"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -1214,7 +1206,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -1234,26 +1225,26 @@
             "description": "The Buddy failed SELECT statement handler plugin",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-select/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-select/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-select/tree/v0.1.0"
             },
-            "time": "2023-09-25T07:43:23+00:00"
+            "time": "2023-10-18T07:40:38+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-show",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-show.git",
-                "reference": "bfbea7226da7cefe501687ee4771e48849c8b047"
+                "reference": "d1c5c0b0966de876d8adae0ab4fa3400bdbd5038"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-show/zipball/bfbea7226da7cefe501687ee4771e48849c8b047",
-                "reference": "bfbea7226da7cefe501687ee4771e48849c8b047",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-show/zipball/d1c5c0b0966de876d8adae0ab4fa3400bdbd5038",
+                "reference": "d1c5c0b0966de876d8adae0ab4fa3400bdbd5038",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main"
+                "manticoresoftware/buddy-core": "v0.1.0"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -1261,7 +1252,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -1281,26 +1271,26 @@
             "description": "The Buddy SHOW plugin",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-show/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-show/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-show/tree/v0.1.0"
             },
-            "time": "2023-10-10T15:30:18+00:00"
+            "time": "2023-10-18T07:40:46+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-test",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-test.git",
-                "reference": "5cf0d9041de4bd66c7e921fe0a581b55a592a554"
+                "reference": "288c7b929e570028684e0fe3298f08506f57c6dc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-test/zipball/5cf0d9041de4bd66c7e921fe0a581b55a592a554",
-                "reference": "5cf0d9041de4bd66c7e921fe0a581b55a592a554",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-test/zipball/288c7b929e570028684e0fe3298f08506f57c6dc",
+                "reference": "288c7b929e570028684e0fe3298f08506f57c6dc",
                 "shasum": ""
             },
             "require": {
-                "manticoresoftware/buddy-core": "dev-main"
+                "manticoresoftware/buddy-core": "v0.1.0"
             },
             "require-dev": {
                 "phpstan/phpstan": "^1.8",
@@ -1308,7 +1298,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -1328,9 +1317,9 @@
             "description": "The Buddy test command plugin",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-test/issues",
-                "source": "https://github.com/manticoresoftware/buddy-plugin-test/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-plugin-test/tree/v0.1.0"
             },
-            "time": "2023-04-04T10:02:53+00:00"
+            "time": "2023-10-18T07:40:55+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -4148,16 +4137,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.38",
+            "version": "1.10.39",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "5302bb402c57f00fb3c2c015bac86e0827e4b691"
+                "reference": "d9dedb0413f678b4d03cbc2279a48f91592c97c4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/5302bb402c57f00fb3c2c015bac86e0827e4b691",
-                "reference": "5302bb402c57f00fb3c2c015bac86e0827e4b691",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/d9dedb0413f678b4d03cbc2279a48f91592c97c4",
+                "reference": "d9dedb0413f678b4d03cbc2279a48f91592c97c4",
                 "shasum": ""
             },
             "require": {
@@ -4206,7 +4195,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-10-06T14:19:14+00:00"
+            "time": "2023-10-17T15:46:26+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
@@ -5769,19 +5758,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "manticoresoftware/buddy-core": 20,
-        "manticoresoftware/buddy-plugin-empty-string": 20,
-        "manticoresoftware/buddy-plugin-backup": 20,
-        "manticoresoftware/buddy-plugin-emulate-elastic": 20,
-        "manticoresoftware/buddy-plugin-insert": 20,
-        "manticoresoftware/buddy-plugin-select": 20,
-        "manticoresoftware/buddy-plugin-show": 20,
-        "manticoresoftware/buddy-plugin-cli-table": 20,
-        "manticoresoftware/buddy-plugin-plugin": 20,
-        "manticoresoftware/buddy-plugin-test": 20,
-        "manticoresoftware/buddy-plugin-insert-mva": 20
-    },
+    "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": [],
