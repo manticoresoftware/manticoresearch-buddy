@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "683a5c59a16b0f0ecfa2bca223543b25",
+    "content-hash": "fd3900dc2c25c7e0ddeb1286a53f3fa8",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -815,12 +815,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "822d7c4710aa2dc8bbf8bfba43ac42d61955092c"
+                "reference": "33173cbaee98d79d77979bc7b7b0ee6066de1139"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/822d7c4710aa2dc8bbf8bfba43ac42d61955092c",
-                "reference": "822d7c4710aa2dc8bbf8bfba43ac42d61955092c",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/33173cbaee98d79d77979bc7b7b0ee6066de1139",
+                "reference": "33173cbaee98d79d77979bc7b7b0ee6066de1139",
                 "shasum": ""
             },
             "require": {
@@ -858,7 +858,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2023-10-18T07:51:34+00:00"
+            "time": "2023-10-19T07:25:53+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-backup",
@@ -1002,52 +1002,6 @@
                 "source": "https://github.com/manticoresoftware/buddy-plugin-create-table/tree/main"
             },
             "time": "2023-10-18T08:04:00+00:00"
-        },
-        {
-            "name": "manticoresoftware/buddy-plugin-distributed-insert",
-            "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert.git",
-                "reference": "ddc418f1ed5ea2b786e96f2e4d97ba108432081a"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-distributed-insert/zipball/ddc418f1ed5ea2b786e96f2e4d97ba108432081a",
-                "reference": "ddc418f1ed5ea2b786e96f2e4d97ba108432081a",
-                "shasum": ""
-            },
-            "require": {
-                "manticoresoftware/buddy-core": "dev-main"
-            },
-            "require-dev": {
-                "phpstan/phpstan": "^1.8",
-                "phpunit/phpunit": "^9.5",
-                "slevomat/coding-standard": "^8.5",
-                "squizlabs/php_codesniffer": "^3.7"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Manticoresearch\\Buddy\\Plugin\\DistributedInsert\\": "src/"
-                }
-            },
-            "license": [
-                "GPL-2.0-or-later"
-            ],
-            "authors": [
-                {
-                    "name": "Manticore Software Co. Ltd",
-                    "email": "contact@manticoresearch.com"
-                }
-            ],
-            "description": "The Buddy distributed insert",
-            "support": {
-                "source": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert/tree/main",
-                "issues": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert/issues"
-            },
-            "time": "2023-10-18T08:05:09+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-empty-string",
@@ -5867,7 +5821,6 @@
         "manticoresoftware/buddy-plugin-empty-string": 20,
         "manticoresoftware/buddy-plugin-backup": 20,
         "manticoresoftware/buddy-plugin-emulate-elastic": 20,
-        "manticoresoftware/buddy-plugin-distributed-insert": 20,
         "manticoresoftware/buddy-plugin-insert": 20,
         "manticoresoftware/buddy-plugin-select": 20,
         "manticoresoftware/buddy-plugin-show": 20,
