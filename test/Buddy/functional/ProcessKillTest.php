@@ -9,11 +9,11 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Core\Tool\Process;
 use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
 use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\RecursionContext\InvalidArgumentException;
+use Swoole\Process;
 
 final class ProcessKillTest extends TestCase {
 
@@ -42,15 +42,15 @@ final class ProcessKillTest extends TestCase {
 	 * @throws ExpectationFailedException
 	 */
 	public function testBuddyStopsOnManticoreSigKill(): void {
-		$this->assertEquals(true, Process::exists(self::$manticorePid));
-		$this->assertEquals(true, Process::exists(self::$buddyPid));
+		$this->assertEquals(true, Process::kill(self::$manticorePid, 0));
+		$this->assertEquals(true, Process::kill(self::$buddyPid, 0));
 
 		system('kill -9 ' . self::$manticorePid);
 		sleep(1);
-		$this->assertEquals(false, Process::exists(self::$manticorePid));
+		$this->assertEquals(false, Process::kill(self::$manticorePid, 0));
 		// We use more, cuz it takes time to shut down all threads
 		sleep(10); // We have 5 sec tick when we check that no parrent for buddy
-		$this->assertEquals(false, Process::exists(self::$buddyPid));
+		$this->assertEquals(false, Process::kill(self::$buddyPid, 0));
 	}
 
 	/**
@@ -60,14 +60,14 @@ final class ProcessKillTest extends TestCase {
 	 * @throws ExpectationFailedException
 	 */
 	public function testBuddyStopsOnManticoreSigInt(): void {
-		$this->assertEquals(true, Process::exists(self::$manticorePid));
-		$this->assertEquals(true, Process::exists(self::$buddyPid));
+		$this->assertEquals(true, Process::kill(self::$manticorePid, 0));
+		$this->assertEquals(true, Process::kill(self::$buddyPid, 0));
 
 		system('kill -s INT ' . self::$manticorePid);
 		sleep(6); // Give some delay to finish jobs and flush to disk
 
-		$this->assertEquals(false, Process::exists(self::$manticorePid));
-		$this->assertEquals(false, Process::exists(self::$buddyPid));
+		$this->assertEquals(false, Process::kill(self::$manticorePid, 0));
+		$this->assertEquals(false, Process::kill(self::$buddyPid, 0));
 	}
 
 	/**
@@ -77,14 +77,14 @@ final class ProcessKillTest extends TestCase {
 	 * @throws ExpectationFailedException
 	 */
 	public function testBuddyStopsOnManticoreSigTerm(): void {
-		$this->assertEquals(true, Process::exists(self::$manticorePid));
-		$this->assertEquals(true, Process::exists(self::$buddyPid));
+		$this->assertEquals(true, Process::kill(self::$manticorePid, 0));
+		$this->assertEquals(true, Process::kill(self::$buddyPid, 0));
 
 		system('kill -s TERM ' . self::$manticorePid);
 		sleep(5); // Give some delay to finish jobs and flush to disk
 
-		$this->assertEquals(false, Process::exists(self::$manticorePid));
-		$this->assertEquals(false, Process::exists(self::$buddyPid));
+		$this->assertEquals(false, Process::kill(self::$manticorePid, 0));
+		$this->assertEquals(false, Process::kill(self::$buddyPid, 0));
 	}
 
 	/**
@@ -94,18 +94,18 @@ final class ProcessKillTest extends TestCase {
 	 * @throws ExpectationFailedException
 	 */
 	public function testbuddyRestartedByManticoreOnKill(): void {
-		$this->assertEquals(true, Process::exists(self::$manticorePid));
-		$this->assertEquals(true, Process::exists(self::$buddyPid));
+		$this->assertEquals(true, Process::kill(self::$manticorePid, 0));
+		$this->assertEquals(true, Process::kill(self::$buddyPid, 0));
 
 		// Kill buddy and check that its dead
 		system('kill -9 ' . self::$buddyPid);
 		sleep(1); // Slight delay
-		$this->assertEquals(false, Process::exists(self::$buddyPid));
+		$this->assertEquals(false, Process::kill(self::$buddyPid, 0));
 
 		// Wait a bit and check that manticore relaunched buddy with new pid
 		sleep(2); // Wait a bit again and parse new pids
 		$this->loadBuddyPid();
-		$this->assertEquals(true, Process::exists(self::$buddyPid));
+		$this->assertEquals(true, Process::kill(self::$buddyPid, 0));
 	}
 
 }

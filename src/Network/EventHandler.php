@@ -20,8 +20,6 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Manticoresearch\Buddy\Core\Tool\Process;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
 use Throwable;
@@ -109,23 +107,5 @@ final class EventHandler {
 			$response = Response::fromError($e, $request->format ?? RequestFormat::JSON);
 		}
 		return $response;
-	}
-
-	/**
-	 * Ticker to validate that client is alive or not
-	 *
-	 * @param int $swoolePid main process pid
-	 * @param int $manticorePid parent pid
-	 * @return callable
-	 */
-	public static function clientCheckTickerFn(int $swoolePid, int $manticorePid): callable {
-		return function () use ($swoolePid, $manticorePid) {
-			if (Process::exists($manticorePid)) {
-				return;
-			}
-
-			Buddy::debug('Parrent proccess died, exiting…');
-			\Swoole\Process::kill($swoolePid, 15);
-		};
 	}
 }
