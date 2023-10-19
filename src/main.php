@@ -16,7 +16,6 @@ use Manticoresearch\Buddy\Base\Network\EventHandler;
 use Manticoresearch\Buddy\Base\Network\Server;
 use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\Task\Task;
-use Manticoresearch\Buddy\Core\Task\TaskPool;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\Process;
 
@@ -33,17 +32,19 @@ $settings = QueryProcessor::getSettings();
 $initBuffer = ob_get_clean();
 putenv("PLUGIN_DIR={$settings->commonPluginDir}");
 
-$threads = getenv('THREADS', true) ?: swoole_cpu_num();
+/** @var int $threads */
+$threads = (int)(getenv('THREADS', true) ?: swoole_cpu_num());
 $server = Server::create(
 	[
 	'daemonize' => 0,
 	'max_request' => 0,
+	'dispatch_mode' => 3,
 	'enable_coroutine' => true,
-	'task_enable_coroutine' => true,
+	'task_enable_coroutine' => false,
 	'task_max_request' => 0,
-	'task_worker_num' => $threads,
+	'task_worker_num' => 0,
 	'reactor_num' => $threads,
-	'worker_num' => $threads,
+	'worker_num' => max(1, (int)($threads / 4)),
 	'enable_reuse_port' => true,
 	'input_buffer_size' => 2097152,
 	'buffer_output_size' => 32 * 1024 * 1024, // byte in unit
@@ -51,7 +52,7 @@ $server = Server::create(
 	'max_conn' => 8192,
 	'backlog' => 8192,
 	'tcp_defer_accept' => 3,
-	'open_tcp_keepalive' => true,
+	'open_tcp_keepalive' => false,
 	'open_tcp_nodelay' => true,
 	'open_http_protocol' => true,
 	'open_http2_protocol' => false,
@@ -117,14 +118,7 @@ $server->beforeStart(
 			$server->addProcess($process);
 		}
 	)
-	->addHandler(
-		'request', static function (...$args) use ($server) {
-			array_unshift($args, $server);
-			EventHandler::request(...$args);
-		}
-	)
-	->addHandler('task', EventHandler::task(...))
-	->addHandler('finish', EventHandler::finish(...))
+	->addHandler('request', EventHandler::request(...))
 	->addTicker(
 		static function () {
 			ShardingThread::instance()->execute('ping', []);
@@ -137,12 +131,7 @@ $server->beforeStart(
 			Buddy::debug("memory usage: {$formatted}");
 		}, 60
 	)
-	->addTicker(
-		static function () {
-			$taskCount = TaskPool::getCount();
-			Buddy::debug("running {$taskCount} tasks");
-		}, 60
-	)->addTicker(EventHandler::clientCheckTickerFn($server->pid, Process::getParentPid()), 5);
+	->addTicker(EventHandler::clientCheckTickerFn($server->pid, Process::getParentPid()), 5);
 
 if (is_telemetry_enabled()) {
 	$server->addTicker(

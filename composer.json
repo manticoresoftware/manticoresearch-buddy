@@ -35,7 +35,6 @@
 		"manticoresoftware/buddy-plugin-empty-string": "dev-main",
 		"manticoresoftware/buddy-plugin-backup": "dev-main",
 		"manticoresoftware/buddy-plugin-emulate-elastic": "dev-main",
-		"manticoresoftware/buddy-plugin-distributed-insert": "dev-main",
 		"manticoresoftware/buddy-plugin-insert": "dev-main",
 		"manticoresoftware/buddy-plugin-select": "dev-main",
 		"manticoresoftware/buddy-plugin-show": "dev-main",
@@ -56,10 +55,6 @@
 		{
 			"type": "path",
 			"url": "./plugins/*"
-		},
-		{
-			"type": "vcs",
-			"url": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert.git"
 		}
 	],
 	"bin": ["manticore-buddy"]

@@ -24,8 +24,6 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\Process;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
-use Swoole\Http\Server as SwooleServer;
-use Swoole\Server\Task as SwooleTask;
 use Throwable;
 
 /**
@@ -50,12 +48,11 @@ final class EventHandler {
 	/**
 	 * Main handler for HTTP request that returns HttpResponse
 	 *
-	 * @param Server $server
 	 * @param SwooleRequest $request
 	 * @param SwooleResponse $response
 	 * @return void
 	 */
-	public static function request(Server $server, SwooleRequest $request, SwooleResponse $response): void {
+	public static function request(SwooleRequest $request, SwooleResponse $response): void {
 		// Allow only post and otherwise send bad request
 		if ($request->server['request_method'] !== 'POST') {
 			$response->status(400);
@@ -64,7 +61,7 @@ final class EventHandler {
 		}
 
 		$requestId = $request->header['Request-ID'] ?? '0';
-		$result = $server->process($requestId, $request->rawContent() ?: '');
+		$result = static::process($requestId, $request->rawContent() ?: '');
 		// Send response
 		$response->header('Content-Type', 'application/json');
 		$response->status(200);
@@ -72,15 +69,13 @@ final class EventHandler {
 	}
 
 	/**
-	 * The event happens when we receive new task to process in async mode
-	 * @param  SwooleServer $server
-	 * @param  SwooleTask   $task
-	 * @return void
+	 * Process the main request
+	 * @param  string $id
+	 * @param  string $payload
+	 * @return Response
 	 */
-	// phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter, Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed
-	public static function task(SwooleServer $server, SwooleTask $task): void {
+	public static function process(string $id, string $payload): Response {
 		try {
-			[$id, $payload] = $task->data;
 			$request = Request::fromString($payload, $id);
 			$handler = QueryProcessor::process($request)->run();
 			// In case deferred we return the ID of the task not the request
@@ -94,6 +89,8 @@ final class EventHandler {
 
 			$response = Response::fromMessage($result->getStruct(), $request->format);
 		} catch (Throwable $e) {
+			var_dump($e->getMessage());
+			var_dump($e->getTraceAsString());
 			/** @var string $originalError */
 			$originalError = match (true) {
 				isset($request) => $request->error,
@@ -111,21 +108,7 @@ final class EventHandler {
 
 			$response = Response::fromError($e, $request->format ?? RequestFormat::JSON);
 		}
-		$task->finish($response);
-	}
-
-	/**
-	 * This method is used for async tasks, we can safely ignore it
-	 * @param  SwooleServer $server
-	 * @param  int          $fd
-	 * @param  Response   $result
-	 * @return void
-	 */
-	// phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
-	public static function finish(SwooleServer $server, int $fd, Response $result): void {
-		// $server
-		// $fd
-		// $result
+		return $response;
 	}
 
 	/**
