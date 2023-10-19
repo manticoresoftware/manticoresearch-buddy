@@ -70,10 +70,9 @@ trait TestFunctionalTrait {
 		system('searchd --config ' . static::$manticoreConfigFilePath);
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
 		sleep(5); // <- give 5 secs to protect from any kind of lags
-		self::loadBuddyPid();
 
-		$buddyPid = self::$buddyPid;
-		static::$listenBuddyPort = (int)system("ss -nlp | grep 'pid={$buddyPid},' | cut -d: -f2 | cut -d' ' -f1");
+		static::$listenBuddyPort = (int)system("ss -nlp | grep 'manticore-execu' | cut -d: -f2 | cut -d' ' -f1");
+		static::loadBuddyPid();
 
 		// Clean up all tables and run fresh instance
 		$output = static::runSqlQuery('show tables');
@@ -97,16 +96,9 @@ trait TestFunctionalTrait {
 	 */
 	public static function tearDownAfterClass(): void {
 		system('pgrep -f searchd | xargs kill -9');
-		// echo "Waiting searchd to stop…\n";
-		// while(shell_exec('pgrep -f searchd')) {
-		// 	echo '.';
-		// 	sleep(1);
-		// }
-		// echo "\n";
-
-		// To be sure run again kills for each pid
-		system('kill -9 ' . self::$manticorePid . ' 2> /dev/null');
-		system('kill -9 ' . self::$buddyPid . ' 2> /dev/null');
+		system('pgrep -f manticore-executor | xargs kill -9 2> /dev/null');
+		// system('kill -9 ' . self::$manticorePid . ' 2> /dev/null');
+		// system('kill -9 ' . self::$buddyPid . ' 2> /dev/null');
 	}
 
 	/**
@@ -427,15 +419,10 @@ trait TestFunctionalTrait {
 	}
 
 	/**
-	 * Helper that allows us to reload fresh pid for relaunched
-	 * Buddy process by the Manticore
+	 * Helper to load Buddy pid
 	 * @return void
 	 */
 	protected static function loadBuddyPid(): void {
-		$buddyPid = (int)trim(system('pgrep -P ' . self::$manticorePid) ?: '');
-		if (!$buddyPid) {
-			throw new Exception('Failed to find Buddy pid for ' . self::$manticorePid);
-		}
-		self::$buddyPid = $buddyPid;
+		static::$buddyPid = (int)shell_exec('pgrep -f manticore-executor | sort | head -n1');
 	}
 }

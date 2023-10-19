@@ -39,7 +39,10 @@ final class Server {
 	protected string $ip;
 
 	/** @var int $pid */
-	public readonly int $pid;
+	protected int $pid;
+
+	/** @var int $ppid */
+	protected int $ppid;
 
 	/**
 	 * @param array<string,mixed> $config
@@ -48,7 +51,7 @@ final class Server {
 	public function __construct(array $config = []) {
 		$this->socket = new SwooleServer('127.0.0.1', 0);
 		$this->socket->set($config);
-		$this->pid = $this->socket->master_pid;
+		$this->ppid = posix_getppid();
 	}
 
 	/**
@@ -162,10 +165,37 @@ final class Server {
 		// Do custom initialization on start
 		$this->socket->on(
 			'start', function () {
-			// Process first functions to run on start
+				$this->pid = $this->socket->master_pid;
+				file_put_contents('/tmp/pid', $this->ppid);
+				pcntl_async_signals(true);
+				pcntl_signal(SIGTERM, $this->stop(...));
+				pcntl_signal(SIGINT, $this->stop(...));
+				pcntl_signal(SIGKILL, $this->stop(...));
+
+				// Process first functions to run on start
 				foreach ($this->onstart as $fn) {
 					$fn();
 				}
+			}
+		);
+
+
+		$this->socket->on(
+			// @phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed, SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
+			'WorkerStart', function (SwooleServer $server, int $workerId) {
+				if ($workerId !== 0) {
+					return;
+				}
+				Timer::tick(
+					5000, function () {
+						if (Process::kill($this->ppid, 0)) {
+							return;
+						}
+
+						Buddy::debug('Parrent proccess died, exiting…');
+						$this->stop();
+					}
+				);
 
 			// First add all ticks to run periodically
 				foreach ($this->ticks as [$fn, $period]) {

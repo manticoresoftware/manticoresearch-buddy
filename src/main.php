@@ -17,7 +17,6 @@ use Manticoresearch\Buddy\Base\Network\Server;
 use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Manticoresearch\Buddy\Core\Tool\Process;
 
 // Init autoload first
 include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
@@ -130,8 +129,7 @@ $server->beforeStart(
 			$formatted = number_format($memory, 3).'K';
 			Buddy::debug("memory usage: {$formatted}");
 		}, 60
-	)
-	->addTicker(EventHandler::clientCheckTickerFn($server->pid, Process::getParentPid()), 5);
+	);
 
 if (is_telemetry_enabled()) {
 	$server->addTicker(
