@@ -166,11 +166,9 @@ final class Server {
 		$this->socket->on(
 			'start', function () {
 				$this->pid = $this->socket->master_pid;
-				file_put_contents('/tmp/pid', $this->ppid);
 				pcntl_async_signals(true);
 				pcntl_signal(SIGTERM, $this->stop(...));
 				pcntl_signal(SIGINT, $this->stop(...));
-				pcntl_signal(SIGKILL, $this->stop(...));
 
 				// Process first functions to run on start
 				foreach ($this->onstart as $fn) {
