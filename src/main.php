@@ -48,7 +48,8 @@ $server = Server::create(
 	'input_buffer_size' => 2097152,
 	'buffer_output_size' => 32 * 1024 * 1024, // byte in unit
 	'tcp_fastopen' => true,
-	'max_conn' => $threads * 2,
+	// better not change, different oses different behaviour
+	// 'max_conn' => $threads * 2,
 	'backlog' => 8192,
 	'tcp_defer_accept' => 3,
 	'open_tcp_keepalive' => false,
