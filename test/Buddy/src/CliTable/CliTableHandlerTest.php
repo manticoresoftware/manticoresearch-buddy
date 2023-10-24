@@ -71,5 +71,6 @@ class CliTableHandlerTest extends TestCase {
 				self::finishMockManticoreServer();
 			}
 		);
+		Swoole\Event::wait();
 	}
 }

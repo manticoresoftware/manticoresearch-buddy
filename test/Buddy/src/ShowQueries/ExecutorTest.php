@@ -70,5 +70,6 @@ class ExecutorTest extends TestCase {
 				self::finishMockManticoreServer();
 			}
 		);
+		Swoole\Event::wait();
 	}
 }

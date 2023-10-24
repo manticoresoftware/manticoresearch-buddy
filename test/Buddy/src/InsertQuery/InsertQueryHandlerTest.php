@@ -152,6 +152,7 @@ class InsertQueryHandlerTest extends TestCase {
 				$this->assertEquals($resp, json_encode($result));
 			}
 		);
+		Swoole\Event::wait();
 	}
 
 	public function testInsertQueryExecutesProperly(): void {
