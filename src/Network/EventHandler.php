@@ -19,6 +19,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Task\Column;
+use Manticoresearch\Buddy\Core\Task\TaskPool;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
@@ -58,8 +59,9 @@ final class EventHandler {
 			return;
 		}
 
-		$requestId = $request->header['Request-ID'] ?? '0';
-		$result = static::process($requestId, $request->rawContent() ?: '');
+		$requestId = $request->header['Request-ID'] ?? uniqid(more_entropy: true);
+		$body = $request->rawContent() ?: '';
+		$result = static::process($requestId, $body);
 		// Send response
 		$response->header('Content-Type', 'application/json');
 		$response->status(200);
@@ -76,10 +78,13 @@ final class EventHandler {
 		try {
 			$request = Request::fromString($payload, $id);
 			$handler = QueryProcessor::process($request)->run();
+
 			// In case deferred we return the ID of the task not the request
 			if ($handler->isDeferred()) {
-				$result = TaskResult::withData([['id' => $handler->getId()]])
-					->column('id', Column::Long);
+				$doneFn = TaskPool::add($id, $request->payload);
+				$handler->on('failure', $doneFn)->on('success', $doneFn);
+				$result = TaskResult::withData([['id' => $id]])
+					->column('id', Column::String);
 			} else {
 				$handler->wait(true);
 				$result = $handler->getResult();

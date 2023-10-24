@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Network;
 
+use Ds\Set;
 use Exception;
 use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -44,6 +45,9 @@ final class Server {
 	/** @var int $ppid */
 	protected int $ppid;
 
+	/** @var Set<int> $workerIds */
+	protected Set $workerIds;
+
 	/**
 	 * @param array<string,mixed> $config
 	 * @return void
@@ -52,6 +56,16 @@ final class Server {
 		$this->socket = new SwooleServer('127.0.0.1', 0);
 		$this->socket->set($config);
 		$this->ppid = posix_getppid();
+
+		$this->addTicker(
+			function () {
+				if (Process::kill($this->ppid, 0)) {
+					return;
+				}
+				Buddy::debug('Parrent proccess died, exiting…');
+				$this->stop();
+			}, 5
+		);
 	}
 
 	/**
@@ -182,23 +196,19 @@ final class Server {
 			// @phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed, SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
 			'WorkerStart', function (SwooleServer $server, int $workerId) {
 				if ($workerId !== 0) {
+					if (!isset($this->workerIds)) {
+						$this->workerIds = new Set;
+					}
+
+					$this->workerIds->add($workerId);
 					return;
 				}
-				Timer::tick(
-					5000, function () {
-						if (Process::kill($this->ppid, 0)) {
-							return;
-						}
 
-						Buddy::debug('Parrent proccess died, exiting…');
-						$this->stop();
-					}
-				);
-
-			// First add all ticks to run periodically
+				// First add all ticks to run periodically
 				foreach ($this->ticks as [$fn, $period]) {
 					Timer::tick(
-						$period * 1000, static function (/*int $timerId*/) use ($fn) {
+						$period * 1000,
+						static function (/*int $timerId*/) use ($fn) {
 							go($fn);
 						}
 					);
@@ -234,12 +244,19 @@ final class Server {
 	 * @return static
 	 */
 	public function stop($exit = true): static {
-		echo 'stop';
 		Timer::clearAll();
 		$this->socket->stop();
+		if (isset($this->workerIds)) {
+			foreach ($this->workerIds as $workerId) {
+				$this->socket->stop($workerId);
+			}
+		}
+		$this->socket->shutdown();
 		if ($exit) {
+			// exec('pgrep -f executor | xargs kill -9');
 			exit(0);
 		}
+
 		return $this;
 	}
 }

@@ -42,12 +42,8 @@ class HungRequestTest extends TestCase {
 
 	public function testDeferredHungRequestHandling(): void {
 		$port = static::getListenHttpPort();
-		$task1 = Task::create(...$this->generateTaskArgs([$port, 'test 4/deferred']));
-		$task2 = Task::create(...$this->generateTaskArgs([$port, 'show queries']));
-		$task1->run();
-		usleep(1000000);
-		$task2->run();
-		usleep(1000000);
+		$task1 = Task::create(...$this->generateTaskArgs([$port, 'test 4/deferred']))->run();
+		$task2 = Task::create(...$this->generateTaskArgs([$port, 'show queries']))->run();
 
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
 		$this->assertEquals(true, $task1->isSucceed());
@@ -79,17 +75,14 @@ class HungRequestTest extends TestCase {
 	 */
 	public function testHungRequestHandling(): void {
 		$port = static::getListenHttpPort();
-		$task1 = Task::create(...$this->generateTaskArgs([$port, 'test 3']));
-		$task2 = Task::create(...$this->generateTaskArgs([$port, 'show queries']));
-		$task1->run();
-		usleep(500000);
-		$task2->run();
-		usleep(500000);
-
-		$this->assertEquals(TaskStatus::Running, $task1->getStatus());
-		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
-		sleep(4);
+		$t = time();
+		$task1 = Task::create(...$this->generateTaskArgs([$port, 'test 3']))->run();
+		$task2 = Task::create(...$this->generateTaskArgs([$port, 'show queries']))->run();
+		$diff = time() - $t;
+		// We check diff here cuz we usin exec, that is blocking for coroutine
+		$this->assertEquals(3, $diff);
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
+		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		$this->assertEquals([['total' => 0, 'error' => '', 'warning' => '']], $task1->getResult()->getStruct());
 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		$this->assertEquals(true, $task2->isSucceed());

@@ -58,12 +58,18 @@ class CliTableHandlerTest extends TestCase {
 		$refCls = new ReflectionClass($handler);
 		$refCls->getProperty('manticoreClient')->setValue($handler, $manticoreClient);
 		$refCls->getProperty('tableFormatter')->setValue($handler, $tableFormatter);
-		$task = $handler->run();
-		$task->wait();
-		$this->assertEquals(true, $task->isSucceed());
-		$result = $task->getResult()->getStruct();
-		$this->assertIsString($result);
-		$this->assertStringContainsString($respBody, $result);
-		self::finishMockManticoreServer();
+
+		go(
+			function () use ($handler, $respBody) {
+				$task = $handler->run();
+				$task->wait();
+
+				$this->assertEquals(true, $task->isSucceed());
+				$result = $task->getResult()->getStruct();
+				$this->assertIsString($result);
+				$this->assertStringContainsString($respBody, $result);
+				self::finishMockManticoreServer();
+			}
+		);
 	}
 }

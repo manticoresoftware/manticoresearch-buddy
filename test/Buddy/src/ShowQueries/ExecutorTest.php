@@ -59,12 +59,16 @@ class ExecutorTest extends TestCase {
 		$handler = new Handler($payload);
 		$handler->setManticoreClient($manticoreClient);
 		$handler->setTableFormatter(new TableFormatter());
-		$task = $handler->run();
-		$task->wait();
-		$this->assertEquals(true, $task->isSucceed());
-		$result = $task->getResult()->getStruct();
-		$this->assertIsArray($result);
-		$this->assertEquals($respBody, $result);
-		self::finishMockManticoreServer();
+		go(
+			function () use ($handler, $respBody) {
+				$task = $handler->run();
+				$task->wait();
+				$this->assertEquals(true, $task->isSucceed());
+				$result = $task->getResult()->getStruct();
+				$this->assertIsArray($result);
+				$this->assertEquals($respBody, $result);
+				self::finishMockManticoreServer();
+			}
+		);
 	}
 }

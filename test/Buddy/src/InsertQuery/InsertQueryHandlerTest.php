@@ -141,13 +141,17 @@ class InsertQueryHandlerTest extends TestCase {
 		$handler = new Handler($payload);
 		$handler->setManticoreClient($manticoreClient);
 		ob_flush();
-		$task = $handler->run();
-		$task->wait();
+		go(
+			function () use ($handler, $resp) {
+				$task = $handler->run();
+				$task->wait();
 
-		$this->assertEquals(true, $task->isSucceed());
-		/** @var Response */
-		$result = $task->getResult()->getStruct();
-		$this->assertEquals($resp, json_encode($result));
+				$this->assertEquals(true, $task->isSucceed());
+			/** @var Response */
+				$result = $task->getResult()->getStruct();
+				$this->assertEquals($resp, json_encode($result));
+			}
+		);
 	}
 
 	public function testInsertQueryExecutesProperly(): void {

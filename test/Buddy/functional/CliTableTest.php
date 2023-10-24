@@ -92,11 +92,12 @@ class CliTableTest extends TestCase {
 		}
 		$result = preg_match(
 			"/\+-+\+-+\+-+\+-+\+\n"
-			. "\| id \| query\s+\| protocol \| host\s+\|\n"
+			. "\| id\s+\| query\s+\| protocol \| host\s+\|\n"
 			. "\+-+\+-+\+-+\+-+\+\n"
-			. "\| \d+ | SHOW QUERIES \| http\s+\| 127\.0\.0\.1:\d+ \|\n"
+			. "\| \d+ | select \| http\s+\| 127\.0\.0\.1:\d+ \|\n"
+			. "\| [a-z0-9\.]+ | SHOW QUERIES \| http\s+\| 127\.0\.0\.1:\d+ \|\n"
 			. "\+-+\+-+\+-+\+-+\+\n"
-			. "1 row in set \(\d\.\d{3} sec\)\n/s",
+			. "2 rows in set \(\d\.\d{3} sec\)\n/s",
 			$out[0]['columns']
 		);
 		$this->assertEquals(1, $result);
