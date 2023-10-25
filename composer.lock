@@ -1244,12 +1244,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-select.git",
-                "reference": "5c196b724c3493f13c12ebf6961d639a38428788"
+                "reference": "f60a78523b78b2ad6a827f985145a584eb320bf7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/5c196b724c3493f13c12ebf6961d639a38428788",
-                "reference": "5c196b724c3493f13c12ebf6961d639a38428788",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/f60a78523b78b2ad6a827f985145a584eb320bf7",
+                "reference": "f60a78523b78b2ad6a827f985145a584eb320bf7",
                 "shasum": ""
             },
             "require": {
@@ -1283,7 +1283,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-select/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-select/tree/main"
             },
-            "time": "2023-10-24T05:13:01+00:00"
+            "time": "2023-10-25T11:33:30+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-show",
