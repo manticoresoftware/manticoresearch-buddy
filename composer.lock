@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fd3900dc2c25c7e0ddeb1286a53f3fa8",
+    "content-hash": "d918ec3b6ac6e5951a7c4385ec388e75",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -861,6 +861,53 @@
             "time": "2023-10-24T05:06:41+00:00"
         },
         {
+            "name": "manticoresoftware/buddy-plugin-alias",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/manticoresoftware/buddy-plugin-alias.git",
+                "reference": "3e2185e097aa32d1942ed3e3354a93ca290e9982"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-alias/zipball/3e2185e097aa32d1942ed3e3354a93ca290e9982",
+                "reference": "3e2185e097aa32d1942ed3e3354a93ca290e9982",
+                "shasum": ""
+            },
+            "require": {
+                "manticoresoftware/buddy-core": "dev-main"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^1.8",
+                "phpunit/phpunit": "^9.5",
+                "slevomat/coding-standard": "^8.5",
+                "squizlabs/php_codesniffer": "^3.7"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Manticoresearch\\Buddy\\Plugin\\Alias\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Manticore Software Co. Ltd",
+                    "email": "contact@manticoresearch.com"
+                }
+            ],
+            "description": "The Buddy simple alias support for PHPStorm",
+            "support": {
+                "issues": "https://github.com/manticoresoftware/buddy-plugin-alias/issues",
+                "source": "https://github.com/manticoresoftware/buddy-plugin-alias/tree/main"
+            },
+            "time": "2023-10-27T05:15:15+00:00"
+        },
+        {
             "name": "manticoresoftware/buddy-plugin-backup",
             "version": "dev-main",
             "source": {
@@ -1244,12 +1291,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-select.git",
-                "reference": "f60a78523b78b2ad6a827f985145a584eb320bf7"
+                "reference": "9d5a34e2f2e4655a5ba1105939673942db6cf90e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/f60a78523b78b2ad6a827f985145a584eb320bf7",
-                "reference": "f60a78523b78b2ad6a827f985145a584eb320bf7",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-select/zipball/9d5a34e2f2e4655a5ba1105939673942db6cf90e",
+                "reference": "9d5a34e2f2e4655a5ba1105939673942db6cf90e",
                 "shasum": ""
             },
             "require": {
@@ -1283,7 +1330,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-select/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-select/tree/main"
             },
-            "time": "2023-10-25T11:33:30+00:00"
+            "time": "2023-10-27T05:10:19+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-show",
@@ -5822,6 +5869,7 @@
         "manticoresoftware/buddy-plugin-backup": 20,
         "manticoresoftware/buddy-plugin-emulate-elastic": 20,
         "manticoresoftware/buddy-plugin-insert": 20,
+        "manticoresoftware/buddy-plugin-alias": 20,
         "manticoresoftware/buddy-plugin-select": 20,
         "manticoresoftware/buddy-plugin-show": 20,
         "manticoresoftware/buddy-plugin-cli-table": 20,
