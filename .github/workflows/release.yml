@@ -89,6 +89,8 @@ jobs:
           cp -rp build/share/modules/${{ env.APP_NAME }}/* .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/
           cp -r build/${{ env.APP_NAME }} .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
           cp -r build/${{ env.APP_NAME }} .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
+          sudo chown -R root:root .debpkg
+          sudo chown -R root:root .rpmpkg
       - uses: manticoresoftware/actions-build-deb-action@master
         name: Build DEB packages
         with:
