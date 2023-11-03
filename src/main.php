@@ -26,10 +26,18 @@ include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
 // to make parallels work with external plugins
 // this is defintely need to think how we can better, it's very complex now
 ob_start();
-QueryProcessor::init();
-$settings = QueryProcessor::getSettings();
-$initBuffer = ob_get_clean();
-putenv("PLUGIN_DIR={$settings->commonPluginDir}");
+try {
+	QueryProcessor::init();
+	$settings = QueryProcessor::getSettings();
+	$initBuffer = ob_get_clean();
+	putenv("PLUGIN_DIR={$settings->commonPluginDir}");
+} catch (Throwable $t) {
+	fwrite(STDERR, "Error while initialization: {$t->getMessage()}" . PHP_EOL);
+	Buddy::debug($t->getTraceAsString());
+	ob_flush();
+	exit(1);
+}
+
 
 /** @var int $threads */
 $threads = (int)(getenv('THREADS', true) ?: swoole_cpu_num());
@@ -144,4 +152,9 @@ if (is_telemetry_enabled()) {
 	);
 }
 
-$server->start();
+try {
+	$server->start();
+} catch (Throwable $t) {
+	fwrite(STDERR, "Error while starting the server: {$t->getMessage()}" . PHP_EOL);
+	Buddy::debug($t->getTraceAsString());
+}
