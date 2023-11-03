@@ -815,12 +815,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "63b7763b90acf27ab1c0b5460f8fea8cc76bdd28"
+                "reference": "21e17e02ca33d0628d5f27c020f11833c817964a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/63b7763b90acf27ab1c0b5460f8fea8cc76bdd28",
-                "reference": "63b7763b90acf27ab1c0b5460f8fea8cc76bdd28",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/21e17e02ca33d0628d5f27c020f11833c817964a",
+                "reference": "21e17e02ca33d0628d5f27c020f11833c817964a",
                 "shasum": ""
             },
             "require": {
@@ -858,7 +858,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2023-10-24T05:06:41+00:00"
+            "time": "2023-11-03T04:39:45+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-alias",
@@ -1428,16 +1428,16 @@
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
-            "version": "v1.0.11",
+            "version": "v1.1.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/manticoresearch-backup.git",
-                "reference": "02ae7bc5a7daa201395f9c2259fe20da6b962f3b"
+                "reference": "65abf4332f64703d5a539f9617b6d5a4071aa589"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/02ae7bc5a7daa201395f9c2259fe20da6b962f3b",
-                "reference": "02ae7bc5a7daa201395f9c2259fe20da6b962f3b",
+                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/65abf4332f64703d5a539f9617b6d5a4071aa589",
+                "reference": "65abf4332f64703d5a539f9617b6d5a4071aa589",
                 "shasum": ""
             },
             "require": {
@@ -1477,9 +1477,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/manticoresearch-backup/issues",
-                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/v1.0.11"
+                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/v1.1.7"
             },
-            "time": "2023-10-10T08:25:03+00:00"
+            "time": "2023-11-02T11:11:47+00:00"
         },
         {
             "name": "manticoresoftware/openmetrics",
@@ -4242,16 +4242,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.39",
+            "version": "1.10.40",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "d9dedb0413f678b4d03cbc2279a48f91592c97c4"
+                "reference": "93c84b5bf7669920d823631e39904d69b9c7dc5d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/d9dedb0413f678b4d03cbc2279a48f91592c97c4",
-                "reference": "d9dedb0413f678b4d03cbc2279a48f91592c97c4",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/93c84b5bf7669920d823631e39904d69b9c7dc5d",
+                "reference": "93c84b5bf7669920d823631e39904d69b9c7dc5d",
                 "shasum": ""
             },
             "require": {
@@ -4300,7 +4300,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-10-17T15:46:26+00:00"
+            "time": "2023-10-30T14:48:31+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
