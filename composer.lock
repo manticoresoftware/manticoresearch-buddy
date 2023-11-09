@@ -815,12 +815,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "21e17e02ca33d0628d5f27c020f11833c817964a"
+                "reference": "6732245636a032be5ce0686de24462d9b0acddf3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/21e17e02ca33d0628d5f27c020f11833c817964a",
-                "reference": "21e17e02ca33d0628d5f27c020f11833c817964a",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/6732245636a032be5ce0686de24462d9b0acddf3",
+                "reference": "6732245636a032be5ce0686de24462d9b0acddf3",
                 "shasum": ""
             },
             "require": {
@@ -858,7 +858,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2023-11-03T04:39:45+00:00"
+            "time": "2023-11-09T11:36:47+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-alias",
@@ -1009,12 +1009,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-create-table.git",
-                "reference": "a477df9ff9423b886c7d8610d25a8cf5f6a32dae"
+                "reference": "38d7e92dca64ff12ed4a400b88a0a5b2872e4762"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-create-table/zipball/a477df9ff9423b886c7d8610d25a8cf5f6a32dae",
-                "reference": "a477df9ff9423b886c7d8610d25a8cf5f6a32dae",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-create-table/zipball/38d7e92dca64ff12ed4a400b88a0a5b2872e4762",
+                "reference": "38d7e92dca64ff12ed4a400b88a0a5b2872e4762",
                 "shasum": ""
             },
             "require": {
@@ -1048,7 +1048,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-create-table/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-create-table/tree/main"
             },
-            "time": "2023-10-30T05:21:57+00:00"
+            "time": "2023-11-09T07:30:45+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-empty-string",
@@ -4242,16 +4242,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.40",
+            "version": "1.10.41",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "93c84b5bf7669920d823631e39904d69b9c7dc5d"
+                "reference": "c6174523c2a69231df55bdc65b61655e72876d76"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/93c84b5bf7669920d823631e39904d69b9c7dc5d",
-                "reference": "93c84b5bf7669920d823631e39904d69b9c7dc5d",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/c6174523c2a69231df55bdc65b61655e72876d76",
+                "reference": "c6174523c2a69231df55bdc65b61655e72876d76",
                 "shasum": ""
             },
             "require": {
@@ -4300,7 +4300,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-10-30T14:48:31+00:00"
+            "time": "2023-11-05T12:57:57+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
@@ -5882,5 +5882,5 @@
     "prefer-lowest": false,
     "platform": [],
     "platform-dev": [],
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.2.0"
 }
