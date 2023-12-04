@@ -21,6 +21,7 @@ use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
 use Throwable;
@@ -61,6 +62,7 @@ final class EventHandler {
 
 		$requestId = $request->header['Request-ID'] ?? uniqid(more_entropy: true);
 		$body = $request->rawContent() ?: '';
+		Buddy::debug("[$requestId] request data: $body");
 		$result = static::process($requestId, $body);
 		// Send response
 		$response->header('Content-Type', 'application/json');
