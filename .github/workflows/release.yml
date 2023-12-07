@@ -46,7 +46,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: Prepare release directory
         run: |
-          sudo apt-get install -y php8.2
           git clone https://github.com/manticoresoftware/phar_builder.git
           ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
 
