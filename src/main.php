@@ -85,11 +85,7 @@ $server->beforeStart(
 
 		Task::setSettings(QueryProcessor::getSettings());
 		// Dispay all loaded plugins
-		echo 'Loaded plugins:' . PHP_EOL
-			. '  core: ' . implode(', ', QueryProcessor::getCorePlugins()) . PHP_EOL
-			. '  local: ' . implode(', ', QueryProcessor::getLocalPlugins()) . PHP_EOL
-			. '  extra: ' . implode(', ', QueryProcessor::getExtraPlugins()) . PHP_EOL
-		;
+		QueryProcessor::printPluginsInfo();
 	}
 )
 	->onStart(
