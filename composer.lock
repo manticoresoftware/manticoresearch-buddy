@@ -1009,12 +1009,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-create-table.git",
-                "reference": "50f9592d2cc2b5fec5076419f50448ff0285a7d4"
+                "reference": "5be12ffce0d46268d3869b991680fa6100e8e496"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-create-table/zipball/50f9592d2cc2b5fec5076419f50448ff0285a7d4",
-                "reference": "50f9592d2cc2b5fec5076419f50448ff0285a7d4",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-create-table/zipball/5be12ffce0d46268d3869b991680fa6100e8e496",
+                "reference": "5be12ffce0d46268d3869b991680fa6100e8e496",
                 "shasum": ""
             },
             "require": {
@@ -1048,7 +1048,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-create-table/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-create-table/tree/main"
             },
-            "time": "2023-11-10T09:05:19+00:00"
+            "time": "2023-12-12T06:39:20+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-empty-string",
@@ -1428,16 +1428,16 @@
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
-            "version": "v1.1.7",
+            "version": "v1.3.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/manticoresearch-backup.git",
-                "reference": "65abf4332f64703d5a539f9617b6d5a4071aa589"
+                "reference": "6590cf0fcf81677d33b5e6dfbf16deb96b74c156"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/65abf4332f64703d5a539f9617b6d5a4071aa589",
-                "reference": "65abf4332f64703d5a539f9617b6d5a4071aa589",
+                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/6590cf0fcf81677d33b5e6dfbf16deb96b74c156",
+                "reference": "6590cf0fcf81677d33b5e6dfbf16deb96b74c156",
                 "shasum": ""
             },
             "require": {
@@ -1477,9 +1477,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/manticoresearch-backup/issues",
-                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/v1.1.7"
+                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/v1.3.3"
             },
-            "time": "2023-11-02T11:11:47+00:00"
+            "time": "2023-12-07T03:39:32+00:00"
         },
         {
             "name": "manticoresoftware/openmetrics",
