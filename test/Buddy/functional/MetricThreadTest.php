@@ -33,6 +33,9 @@ class MetricThreadTest extends TestCase {
 		$this->assertStringContainsString('"collector":"buddy"', $labels);
 		$this->assertStringContainsString('"buddy_version"', $labels);
 		$this->assertStringContainsString('"manticore_version"', $labels);
+		$this->assertStringContainsString('"columnar_version"', $labels);
+		$this->assertStringContainsString('"secondary_version"', $labels);
+		$this->assertStringContainsString('"knn_version"', $labels);
 		$this->assertStringContainsString('"manticore_binlog_enabled"', $labels);
 		$this->assertStringContainsString('"manticore_binlog_enabled"', $labels);
 		$this->assertStringContainsString('"manticore_secondary_indexes_enabled"', $labels);
