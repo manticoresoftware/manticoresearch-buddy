@@ -133,9 +133,11 @@ final class Metric {
 				. DIRECTORY_SEPARATOR . 'APP_VERSION'
 			)
 		);
-		$verPattern = '(\d+\.\d+\.\d+[^\(\)]+)';
+		$verPattern = '(\d+\.\d+\.\d+[^\(\)]*)';
 		$matchExpr = "/^{$verPattern}(\(columnar\s{$verPattern}\))?"
-			. "([^\(]*\(secondary\s{$verPattern}\))?$/ius"
+			. "([^\(]*\(secondary\s{$verPattern}\))?"
+			. "([^\(]*\(knn\s{$verPattern}\))?"
+			. "([^\(]*\(buddy\s{$verPattern}\))?$/ius"
 		;
 		$version = static::getStatusMap()['version'] ?? '';
 		preg_match($matchExpr, $version, $m);
@@ -146,6 +148,7 @@ final class Metric {
 				'manticore_version' => $m[1] ?? null,
 				'columnar_version' => $m[3] ?? null,
 				'secondary_version' => $m[5] ?? null,
+				'knn_version' => $m[7] ?? null,
 			]
 		);
 	}
