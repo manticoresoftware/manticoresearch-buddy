@@ -133,11 +133,28 @@ class QueryProcessor {
 	}
 
 	/**
+	 * Display installed plugins information to the STDOUT
+	 * @return void
+	 */
+	public static function printPluginsInfo(): void {
+		echo 'Loaded plugins:' . PHP_EOL;
+		foreach (['core', 'local', 'extra'] as $type) {
+			$method = 'get' . ucfirst($type) . 'Plugins';
+			$plugins = array_map(
+				fn ($v) => explode('/', $v)[1],
+				QueryProcessor::$method()
+			);
+			$pluginsLine = implode(', ', $plugins) . PHP_EOL;
+			echo "  {$type}: $pluginsLine";
+		}
+	}
+
+	/**
 	 * Get core plugins and exclude local one that does not start with our prefix
 	 * @return array<string>
 	 */
 	public static function getCorePlugins(): array {
-		return array_filter(static::$corePlugins, fn ($v) => !str_starts_with($v, 'manticoresoftware/'));
+		return array_filter(static::$corePlugins, fn ($v) => str_starts_with($v, 'manticoresoftware/'));
 	}
 
 	/**

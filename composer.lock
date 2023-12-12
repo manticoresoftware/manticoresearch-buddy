@@ -1009,12 +1009,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-plugin-create-table.git",
-                "reference": "50f9592d2cc2b5fec5076419f50448ff0285a7d4"
+                "reference": "5be12ffce0d46268d3869b991680fa6100e8e496"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-create-table/zipball/50f9592d2cc2b5fec5076419f50448ff0285a7d4",
-                "reference": "50f9592d2cc2b5fec5076419f50448ff0285a7d4",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-plugin-create-table/zipball/5be12ffce0d46268d3869b991680fa6100e8e496",
+                "reference": "5be12ffce0d46268d3869b991680fa6100e8e496",
                 "shasum": ""
             },
             "require": {
@@ -1048,7 +1048,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-plugin-create-table/issues",
                 "source": "https://github.com/manticoresoftware/buddy-plugin-create-table/tree/main"
             },
-            "time": "2023-11-10T09:05:19+00:00"
+            "time": "2023-12-12T06:39:20+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-empty-string",
