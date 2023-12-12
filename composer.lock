@@ -815,12 +815,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "2815588217640b8cb14482cd4e103ae117654414"
+                "reference": "a5ebad0e511557b53c547761e638704b8808a37e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/2815588217640b8cb14482cd4e103ae117654414",
-                "reference": "2815588217640b8cb14482cd4e103ae117654414",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/a5ebad0e511557b53c547761e638704b8808a37e",
+                "reference": "a5ebad0e511557b53c547761e638704b8808a37e",
                 "shasum": ""
             },
             "require": {
@@ -858,7 +858,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2023-12-12T11:43:44+00:00"
+            "time": "2023-12-12T12:16:36+00:00"
         },
         {
             "name": "manticoresoftware/buddy-plugin-alias",

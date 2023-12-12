@@ -41,10 +41,10 @@ class QueryProcessor {
 	/** @var Pluggable */
 	protected static Pluggable $pluggable;
 
-	/** @var string[] */
+	/** @var array<array{full:string,short:string,version:string}> */
 	protected static array $corePlugins = [];
 
-	/** @var string[] */
+	/** @var array<array{full:string,short:string,version:string}> */
 	protected static array $extraPlugins = [];
 
   /**
@@ -141,7 +141,7 @@ class QueryProcessor {
 		foreach (['core', 'local', 'extra'] as $type) {
 			$method = 'get' . ucfirst($type) . 'Plugins';
 			$plugins = array_map(
-				fn ($v) => explode('/', $v)[1],
+				fn ($v) => $v['short'],
 				QueryProcessor::$method()
 			);
 			$pluginsLine = implode(', ', $plugins) . PHP_EOL;
@@ -151,15 +151,15 @@ class QueryProcessor {
 
 	/**
 	 * Get core plugins and exclude local one that does not start with our prefix
-	 * @return array<string>
+	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getCorePlugins(): array {
-		return array_filter(static::$corePlugins, fn ($v) => str_starts_with($v, 'manticoresoftware/'));
+		return array_filter(static::$corePlugins, fn ($v) => str_starts_with($v['full'], 'manticoresoftware/'));
 	}
 
 	/**
 	 * Get local plugins by getting diff
-	 * @return array<string>
+	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getLocalPlugins(): array {
 		return array_diff(static::$corePlugins, static::getCorePlugins());
@@ -167,7 +167,7 @@ class QueryProcessor {
 
 	/**
 	 * Get list of external plugins that was installed by using CREATE PLUGIN instruction
-	 * @return array<string>
+	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getExtraPlugins(): array {
 		return static::$extraPlugins;
@@ -199,7 +199,7 @@ class QueryProcessor {
 	public static function detectPluginPrefixFromRequest(Request $request): string {
 		// Try to match plugin to handle and return prefix
 		foreach ([...static::$corePlugins, ...static::$extraPlugins] as $plugin) {
-			$pluginPrefix = static::NAMESPACE_PREFIX . ucfirst(Strings::camelcaseBySeparator($plugin, '-'));
+			$pluginPrefix = static::NAMESPACE_PREFIX . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
 			$pluginPayloadClass = "$pluginPrefix\\Payload";
 			if ($pluginPayloadClass::hasMatch($request)) {
 				return $pluginPrefix;
