@@ -154,7 +154,12 @@ class QueryProcessor {
 	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getCorePlugins(): array {
-		return array_filter(static::$corePlugins, fn ($v) => str_starts_with($v['full'], 'manticoresoftware/'));
+		return array_values(
+			array_filter(
+				static::$corePlugins,
+				fn ($v) => str_starts_with($v['full'], 'manticoresoftware/')
+			)
+		);
 	}
 
 	/**
@@ -162,7 +167,12 @@ class QueryProcessor {
 	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getLocalPlugins(): array {
-		return array_diff(static::$corePlugins, static::getCorePlugins());
+		return array_values(
+			array_filter(
+				static::$corePlugins,
+				fn ($v) => !str_starts_with($v['full'], 'manticoresoftware/')
+			)
+		);
 	}
 
 	/**
