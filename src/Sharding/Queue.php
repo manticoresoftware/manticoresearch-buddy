@@ -2,7 +2,6 @@
 
 namespace Manticoresearch\Buddy\Base\Sharding;
 
-use Ds\Map;
 use Ds\Vector;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -140,11 +139,12 @@ final class Queue {
 	 */
 	protected function attemptToUpdateStatus(array $query, string $status, int $duration): bool {
 		$isOk = $this->updateStatus($query['id'], $status, $query['tries'] + 1, $duration);
-		if (!$isOk) {
-			Buddy::debug("Failed to update queue status for {$query['id']}");
-			return false;
+		if ($isOk) {
+			return true;
 		}
-		return true;
+
+		Buddy::debug("Failed to update queue status for {$query['id']}");
+		return false;
 	}
 
 	/**
@@ -172,7 +172,7 @@ final class Queue {
 		$res = $this->client->sendRequest($query)->getResult();
 		$queries = new Vector;
 		foreach ($res[0]['data'] as $row) {
-			$queries->push(new Map($row));
+			$queries->push($row);
 		}
 
 		return $queries;
@@ -197,8 +197,10 @@ final class Queue {
 
 		$rows = implode(', ', $update);
 		$q = "UPDATE {$table} SET {$rows} WHERE `id` = {$id}";
+		/** @var array{0:array{error:string}}|array{error:string} $result */
 		$result = $this->client->sendRequest($q)->getResult();
-		return !$result['error'];
+		$error = $result[0]['error'] ?? ($result['error'] ?? '');
+		return !$error;
 	}
 
 	/**

@@ -48,10 +48,6 @@
 		{
 			"type": "path",
 			"url": "./plugins/*"
-		},
-		{
-			"type": "vcs",
-			"url": "https://github.com/manticoresoftware/buddy-plugin-distributed-insert.git"
 		}
 	],
 	"bin": ["manticore-buddy"]
