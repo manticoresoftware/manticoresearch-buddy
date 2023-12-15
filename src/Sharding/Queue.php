@@ -101,22 +101,50 @@ final class Queue {
 					return;
 				}
 			}
+			if (!$this->attemptToUpdateStatus($query, 'procesing', 0)) {
+				continue;
+			}
 
-			Buddy::debug("Queue query: {$query['query']}");
-			// TODO: this is a temporary hack, remove when job is done on searchd
-			$this->runMkdir($query['query']);
 			$mt = microtime(true);
-			$res = $this->client->sendRequest($query['query'])->getResult();
+			$status = $this->executeQuery($query);
 			$duration = (int)((microtime(true) - $mt) * 1000);
-			Buddy::debug('Queue result: ' . json_encode($res));
-			$status = empty($res['error']) ? 'processed' : 'error';
-			$this->updateStatus($query['id'], $status, $query['tries'] + 1, $duration);
+			$this->attemptToUpdateStatus($query, $status, $duration);
 			// When we have error, we stop iterating
 			if ($status === 'error') {
 				Buddy::info("[$node->id] Query error: {$query['query']}");
 				break;
 			}
 		}
+	}
+
+	/**
+	 * Execute query and return info
+	 * @param  array{id:int,query:string,tries:int}  $query
+	 * @return string
+	 */
+	protected function executeQuery(array $query): string {
+		Buddy::debug("Queue query: {$query['query']}");
+		// TODO: this is a temporary hack, remove when job is done on searchd
+		$this->runMkdir($query['query']);
+		$res = $this->client->sendRequest($query['query'])->getResult();
+		Buddy::debug('Queue result: ' . json_encode($res));
+		return empty($res['error']) ? 'processed' : 'error';
+	}
+
+	/**
+	 * Try to update status with log to the debug
+	 * @param array{id:int,query:string,tries:int} $query
+	 * @param string $status
+	 * @param int $duration
+	 * @return bool
+	 */
+	protected function attemptToUpdateStatus(array $query, string $status, int $duration): bool {
+		$isOk = $this->updateStatus($query['id'], $status, $query['tries'] + 1, $duration);
+		if (!$isOk) {
+			Buddy::debug("Failed to update queue status for {$query['id']}");
+			return false;
+		}
+		return true;
 	}
 
 	/**
@@ -155,9 +183,9 @@ final class Queue {
 	 * @param int $id
 	 * @param string $status
 	 * @param int $tries
-	 * @return static
+	 * @return bool
 	 */
-	protected function updateStatus(int $id, string $status, int $tries, int $duration = 0): static {
+	protected function updateStatus(int $id, string $status, int $tries, int $duration = 0): bool {
 		$table = $this->cluster->getSystemTableName($this->table);
 		$mt = (int)(microtime(true) * 1000);
 		$update = [
@@ -169,8 +197,8 @@ final class Queue {
 
 		$rows = implode(', ', $update);
 		$q = "UPDATE {$table} SET {$rows} WHERE `id` = {$id}";
-		$this->client->sendRequest($q);
-		return $this;
+		$result = $this->client->sendRequest($q)->getResult();
+		return !$result['error'];
 	}
 
 	/**

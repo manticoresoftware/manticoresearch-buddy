@@ -34,10 +34,7 @@ final class State {
 	 * @return $this
 	 */
 	public function setCluster(Cluster $cluster): static {
-		if (!isset($this->cluster)) {
-			$this->cluster = $cluster;
-		}
-
+		$this->cluster = $cluster;
 		return $this;
 	}
 
