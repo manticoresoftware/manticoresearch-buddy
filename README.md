@@ -86,6 +86,7 @@ To run a Buddy instance from the command line interface (CLI), use the following
   Usage: manticore-executor src/main.php [ARGUMENTS]
 
   Arguments are:
+  --bind                 Which IP to bind, default is 127.0.0.1
   --listen               HTTP endpoint to accept Manticore requests
   --version              display the current version of Buddy
   --help                 display this help message

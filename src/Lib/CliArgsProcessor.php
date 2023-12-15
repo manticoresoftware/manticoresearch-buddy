@@ -16,9 +16,12 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 final class CliArgsProcessor {
 
 	private const LONG_OPTS  = [
-		'threads:', 'telemetry-period:', 'disable-telemetry', 'debug', 'version', 'help', 'listen:',
+		'threads:', 'telemetry-period:', 'disable-telemetry', 'debug', 'version', 'help', 'listen:', 'bind:',
 	];
-	private const DEFAULT_OPTS = ['listen' => '127.0.0.1:9308'];
+	private const DEFAULT_OPTS = [
+		'listen' => '127.0.0.1:9308',
+		'bind' => '127.0.0.1',
+	];
 
 	/**
 	 * Build help message for cli call
@@ -35,6 +38,7 @@ final class CliArgsProcessor {
 		return "Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)\n\n"
 			. "Usage: $script [ARGUMENTS]\n\n"
 			. "Arguments are:\n"
+			. "--bind                 Which IP to bind. Default is 127.0.0.1\n"
 			. "--listen               HTTP endpoint to accept Manticore requests\n"
 			. "--version              display the current version of Buddy\n"
 			. "--help                 display this help message\n"
@@ -68,7 +72,8 @@ final class CliArgsProcessor {
 	 *  debug?:bool,
 	 *  help?:bool,
 	 *  version?:bool,
-	 *  listen?:string
+	 *  listen?:string,
+	 *  bind?:string
 	 * } $opts
 	 * @return array{
 	 *  threads?:int,
@@ -77,7 +82,8 @@ final class CliArgsProcessor {
 	 *  debug?:bool,
 	 *  help?:bool,
 	 *  version?:bool,
-	 *  listen:string
+	 *  listen:string,
+	 *  bind:string
 	 * }
 	 */
 	public static function run(?array $opts = null): array {
@@ -91,7 +97,8 @@ final class CliArgsProcessor {
 		 *  debug?:bool,
 		 *  help?:bool,
 		 *  version?:bool,
-		 *  listen:string
+		 *  listen:string,
+		 *  bind:string
 		 * } $opts
 		 */
 		$opts = array_replace(self::DEFAULT_OPTS, $opts); // @phpstan-ignore-line
@@ -112,6 +119,7 @@ final class CliArgsProcessor {
 		static::parseDebug($opts);
 		static::parseTelemetryPeriod($opts);
 		static::parseListen($opts);
+		static::parseBind($opts);
 
 		return $opts;
 	}
@@ -183,5 +191,13 @@ final class CliArgsProcessor {
 			$opts['listen'] = 'http://127.0.0.1' . substr($opts['listen'], 14);
 		}
 		putenv("LISTEN={$opts['listen']}");
+	}
+
+	/**
+	 * @param array{bind:string} $opts
+	 * @return void
+	 */
+	protected static function parseBind(array $opts): void {
+		putenv("BIND={$opts['bind']}");
 	}
 }
