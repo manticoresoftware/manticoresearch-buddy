@@ -36,8 +36,8 @@ final class Server {
 	/** @var array<callable> */
 	protected array $beforeStart = [];
 
-	/** @var string $ip */
-	protected string $ip;
+	/** @var string $bind */
+	protected string $bind;
 
 	/** @var int $pid */
 	protected int $pid;
@@ -53,7 +53,8 @@ final class Server {
 	 * @return void
 	 */
 	public function __construct(array $config = []) {
-		$this->socket = new SwooleServer(getenv('BIND') ?: '127.0.0.1', 0);
+		$this->bind = getenv('BIND') ?: '127.0.0.1';
+		$this->socket = new SwooleServer($this->bind, 0);
 		$this->socket->set($config);
 		$this->ppid = posix_getppid();
 
@@ -163,7 +164,7 @@ final class Server {
 	public function start(): static {
 		// This is must be first! Because its important
 		$version = Buddy::getVersion();
-		$listen = "{$this->socket->host}:{$this->socket->port}";
+		$listen = "{$this->bind}:{$this->socket->port}";
 		echo "Buddy v{$version} started {$listen}" . PHP_EOL;
 
 		// Handle connections and subscribe to all events in handlers
