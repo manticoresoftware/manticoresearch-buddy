@@ -41,9 +41,6 @@ class AutoSchemaSupportTest extends TestCase {
 			'searchd {' . PHP_EOL . "    auto_schema = $value" . PHP_EOL,
 			static::$manticoreConf
 		);
-
-		// Reset first
-		static::setManticoreConfigFile(static::$configFileName);
 		static::updateManticoreConf($conf);
 		echo $conf . PHP_EOL;
 
@@ -58,7 +55,7 @@ class AutoSchemaSupportTest extends TestCase {
 		$this->setUpAutoSchema(0);
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1) ";
 		$out = static::runHttpQuery($query);
-		$result = ['error' => "table 'test' absent, or does not support INSERT"];
+		$result = [['total' => 0,'error' => "table 'test' absent, or does not support INSERT",'warning' => '']];
 		$this->assertEquals($result, $out);
 	}
 
