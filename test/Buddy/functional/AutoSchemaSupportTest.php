@@ -58,7 +58,7 @@ class AutoSchemaSupportTest extends TestCase {
 		$this->setUpAutoSchema(0);
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1) ";
 		$out = static::runHttpQuery($query);
-		$result = [['total' => 0,'error' => "table 'test' absent, or does not support INSERT",'warning' => '']];
+		$result = ['error' => "table 'test' absent, or does not support INSERT"];
 		$this->assertEquals($result, $out);
 	}
 
