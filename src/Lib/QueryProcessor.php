@@ -244,7 +244,7 @@ class QueryProcessor {
 			],
 			// Happens when we run create table with shards in options
 			[
-				'manticoresoftware/buddy-plugin-create-table',
+				'manticoresoftware/buddy-plugin-modify-table',
 				'shard',
 				function (array $args) {
 					ShardingThread::instance()->execute('shard', $args);

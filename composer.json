@@ -46,7 +46,7 @@
 		"manticoresoftware/buddy-plugin-plugin": "dev-main",
 		"manticoresoftware/buddy-plugin-test": "dev-main",
 		"manticoresoftware/buddy-plugin-insert-mva": "dev-main",
-		"manticoresoftware/buddy-plugin-create-table": "dev-main",
+		"manticoresoftware/buddy-plugin-modify-table": "dev-main",
 		"php-ds/php-ds": "^1.4"
 	},
 	"require-dev": {
