@@ -63,7 +63,8 @@ final class EventHandler {
 		$requestId = $request->header['Request-ID'] ?? uniqid(more_entropy: true);
 		$body = $request->rawContent() ?: '';
 		Buddy::debug("[$requestId] request data: $body");
-		$result = static::process($requestId, $body);
+		$result = (string)static::process($requestId, $body);
+		Buddy::debug("[$requestId] response data: $result");
 		// Send response
 		$response->header('Content-Type', 'application/json');
 		$response->status(200);
