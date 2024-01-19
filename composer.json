@@ -35,19 +35,8 @@
 		"manticoresoftware/telemetry": "^0.1.9",
 		"symfony/dependency-injection": "^6.1",
 		"manticoresoftware/buddy-core": "dev-main",
-		"manticoresoftware/buddy-plugin-empty-string": "dev-main",
-		"manticoresoftware/buddy-plugin-backup": "dev-main",
-		"manticoresoftware/buddy-plugin-emulate-elastic": "dev-main",
-		"manticoresoftware/buddy-plugin-insert": "dev-main",
-		"manticoresoftware/buddy-plugin-alias": "dev-main",
-		"manticoresoftware/buddy-plugin-select": "dev-main",
-		"manticoresoftware/buddy-plugin-show": "dev-main",
-		"manticoresoftware/buddy-plugin-cli-table": "dev-main",
-		"manticoresoftware/buddy-plugin-plugin": "dev-main",
-		"manticoresoftware/buddy-plugin-test": "dev-main",
-		"manticoresoftware/buddy-plugin-insert-mva": "dev-main",
-		"manticoresoftware/buddy-plugin-modify-table": "dev-main",
-		"php-ds/php-ds": "^1.4"
+		"php-ds/php-ds": "^1.4",
+		"manticoresoftware/manticoresearch-backup": "^1.3"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^1.8",

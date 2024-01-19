@@ -11,13 +11,13 @@
 
 use Manticoresearch\Buddy\Base\Lib\CliArgsProcessor;
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
+use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Loader;
 use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Loader;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -47,6 +47,22 @@ $container->register('tableFormatter', TableFormatter::class);
 
 putenv("LISTEN={$opts['listen']}");
 Pluggable::setContainer($container);
+Pluggable::setCorePlugins(
+	[
+	'manticoresoftware/buddy-plugin-empty-string',
+	'manticoresoftware/buddy-plugin-backup',
+	'manticoresoftware/buddy-plugin-emulate-elastic',
+	'manticoresoftware/buddy-plugin-insert',
+	'manticoresoftware/buddy-plugin-alias',
+	'manticoresoftware/buddy-plugin-select',
+	'manticoresoftware/buddy-plugin-show',
+	'manticoresoftware/buddy-plugin-cli-table',
+	'manticoresoftware/buddy-plugin-plugin',
+	'manticoresoftware/buddy-plugin-test',
+	'manticoresoftware/buddy-plugin-insert-mva',
+	'manticoresoftware/buddy-plugin-modify-table',
+	]
+);
 MetricThread::setContainer($container);
 ShardingThread::setContainer($container);
 

@@ -9,9 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\CheckInsertDataTrait;
+use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Datatype;
 use Manticoresearch\Buddy\Core\Error\GenericError;
-use Manticoresearch\Buddy\Plugin\Insert\QueryParser\CheckInsertDataTrait;
-use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Datatype;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
