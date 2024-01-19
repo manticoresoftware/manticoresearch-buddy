@@ -11,12 +11,12 @@
 
 namespace Manticoresearch\BuddyTest\Lib;
 
+use Manticoresearch\Buddy\Base\Plugin\Insert\Error\ParserLoadError;
 use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
-use Manticoresearch\Buddy\Plugin\Insert\Error\ParserLoadError;
 use RuntimeException;
 use Socket;
 

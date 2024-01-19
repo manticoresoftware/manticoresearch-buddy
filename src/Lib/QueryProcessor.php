@@ -26,7 +26,8 @@ use Psr\Container\ContainerInterface;
 
 class QueryProcessor {
   /** @var string */
-	protected const NAMESPACE_PREFIX = 'Manticoresearch\\Buddy\\Plugin\\';
+	protected const CORE_NS_PREFIX = 'Manticoresearch\\Buddy\\Base\\Plugin\\';
+	protected const EXTRA_NS_PREFIX = 'Manticoresearch\\Buddy\\Plugin\\';
 
   /** @var ContainerInterface */
   // We set this on initialization (init.php) so we are sure we have it in class
@@ -60,7 +61,7 @@ class QueryProcessor {
 			static::init();
 		}
 		$pluginPrefix = static::detectPluginPrefixFromRequest($request);
-		$pluginName = str_replace(static::NAMESPACE_PREFIX, '', $pluginPrefix);
+		$pluginName = substr($pluginPrefix, strrpos($pluginPrefix, '\\') + 1);
 		Buddy::debug("[$request->id] Plugin: $pluginName");
 		buddy_metric(Strings::camelcaseToUnderscore($pluginName), 1);
 		$payloadClassName = "{$pluginPrefix}\\Payload";
@@ -207,12 +208,17 @@ class QueryProcessor {
    * @throws SQLQueryCommandNotSupported
    */
 	public static function detectPluginPrefixFromRequest(Request $request): string {
-		// Try to match plugin to handle and return prefix
-		foreach ([...static::$corePlugins, ...static::$extraPlugins] as $plugin) {
-			$pluginPrefix = static::NAMESPACE_PREFIX . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
-			$pluginPayloadClass = "$pluginPrefix\\Payload";
-			if ($pluginPayloadClass::hasMatch($request)) {
-				return $pluginPrefix;
+		$list = [
+			static::CORE_NS_PREFIX => static::$corePlugins,
+			static::EXTRA_NS_PREFIX => static::$extraPlugins,
+		];
+		foreach ($list as $prefix => $plugins) {
+			foreach ($plugins as $plugin) {
+				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
+				$pluginPayloadClass = "$pluginPrefix\\Payload";
+				if ($pluginPayloadClass::hasMatch($request)) {
+					return $pluginPrefix;
+				}
 			}
 		}
 
