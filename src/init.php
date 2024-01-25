@@ -54,6 +54,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-emulate-elastic',
 	'manticoresoftware/buddy-plugin-create',
 	'manticoresoftware/buddy-plugin-drop',
+	'manticoresoftware/buddy-plugin-distributed-insert',
 	'manticoresoftware/buddy-plugin-insert',
 	'manticoresoftware/buddy-plugin-alias',
 	'manticoresoftware/buddy-plugin-select',
