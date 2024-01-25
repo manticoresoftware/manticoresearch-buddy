@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ffb9634af4f3a8710aea0658882f0aca",
+    "content-hash": "014e1de1782c66db4a7c55e107b2ea4d",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -815,12 +815,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "d620f21276c900ffdffa7cc95358d8fbc95595c7"
+                "reference": "b999190ee62f62f70bf9683c46916275ff55753e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/d620f21276c900ffdffa7cc95358d8fbc95595c7",
-                "reference": "d620f21276c900ffdffa7cc95358d8fbc95595c7",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/b999190ee62f62f70bf9683c46916275ff55753e",
+                "reference": "b999190ee62f62f70bf9683c46916275ff55753e",
                 "shasum": ""
             },
             "require": {
@@ -858,7 +858,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2024-01-23T10:08:46+00:00"
+            "time": "2024-01-25T14:58:08+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",

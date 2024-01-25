@@ -116,7 +116,6 @@ final class Payload extends BasePayload {
 			],
 			'replicationFactor' => (int)($this->options['rf'] ?? 1),
 			'shardCount' => (int)($this->options['shards'] ?? 2),
-			'options' => $this->options,
 		];
 	}
 
