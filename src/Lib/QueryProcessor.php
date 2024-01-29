@@ -107,6 +107,50 @@ class QueryProcessor {
 	}
 
 	/**
+	 * Run start method of all plugin handlers
+	 * @return void
+	 */
+	public static function startPlugins(): void {
+		static::iteratePlugins(
+			'Handler', static function (string $className) {
+				$className::start();
+			}
+		);
+	}
+
+	/**
+	 * Run stop method of all plugin handlers
+	 * @return void
+	 */
+	public static function stopPlugins(): void {
+		static::iteratePlugins(
+			'Handler', static function (string $className) {
+				$className::stop();
+			}
+		);
+	}
+
+	/**
+	 * Helper to run some function through the all plugins with passing
+	 * class name of the plugin
+	 * @param  string     $className
+	 * @param  callable $fn
+	 * @return void
+	 */
+	protected static function iteratePlugins(string $className, callable $fn): void {
+		$list = [
+			static::CORE_NS_PREFIX => static::$corePlugins,
+			static::EXTRA_NS_PREFIX => static::$extraPlugins,
+		];
+		foreach ($list as $prefix => $plugins) {
+			foreach ($plugins as $plugin) {
+				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
+				$pluginHandlerClass = "$pluginPrefix\\$className";
+				$fn($pluginHandlerClass);
+			}
+		}
+	}
+	/**
 	 * Helper to set settings when we need it before calling to init
 	 * @param Settings $settings
 	 * @return void

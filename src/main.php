@@ -110,6 +110,16 @@ $server->beforeStart(
 			ini_set('post_max_size', $settings->maxAllowedPacket);
 		}
 	)
+	->onStart(
+		static function () {
+			QueryProcessor::startPlugins();
+		}
+	)
+	->onStop(
+		static function () {
+			QueryProcessor::stopPlugins();
+		}
+	)
 	->beforeStart(
 		static function () use ($server) {
 			$process = ShardingThread::instance()->process;
