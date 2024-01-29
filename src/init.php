@@ -61,8 +61,8 @@ Pluggable::setCorePlugins(
 	'manticoresoftware/buddy-plugin-test',
 	'manticoresoftware/buddy-plugin-insert-mva',
 	'manticoresoftware/buddy-plugin-modify-table',
-		'manticoresoftware/buddy-plugin-knn',
-		'manticoresoftware/buddy-plugin-replace',
+	'manticoresoftware/buddy-plugin-knn',
+	'manticoresoftware/buddy-plugin-replace',
 	]
 );
 MetricThread::setContainer($container);
