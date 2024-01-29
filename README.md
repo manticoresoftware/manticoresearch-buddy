@@ -128,3 +128,48 @@ ghcr.io/manticoresoftware/manticoresearch:test-kit-latest -c './phar_builder/bin
 ```
 
 Check the build directory and get the built version of Buddy from there and replace it in your another OS in the "modules" directory.
+
+### Run custom process inside the Plugin
+
+To run the process that can maintain some logic and communicate you need to create the `Processor` class and add `getProcessors` method to the `Payload`
+
+Here is the example that explain how to do So
+
+Create `Processor` plugin and implement required logic
+
+```php
+<?php declare(strict_types=1);
+
+… your NS and other copywrite here …
+
+use Manticoresearch\Buddy\Core\Process\BaseProcessor;
+use Manticoresearch\Buddy\Core\Process\Process;
+
+final class Processor extends BaseProcessor {
+  public function start(): void {
+    var_dump('starting');
+    parent::start();
+
+    $this->execute('test', ['simple message']);
+  }
+
+  public function stop(): void {
+    var_dump('stopping');
+    parent::stop();
+  }
+
+  public static function test(string $text): void {
+    var_dump($text);
+  }
+}
+```
+
+Add to the `Payload` info that your plugin has processors
+
+```php
+public static function getProcessors(): array {
+  return [
+    new Processor(),
+  ];
+}
+````

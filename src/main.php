@@ -110,12 +110,13 @@ $server->beforeStart(
 			ini_set('post_max_size', $settings->maxAllowedPacket);
 		}
 	)
-	->onStart(
+	// We need to run it outside of couroutine so do it before
+	->beforeStart(
 		static function () {
 			QueryProcessor::startPlugins();
 		}
 	)
-	->onStop(
+	->beforeStop(
 		static function () {
 			QueryProcessor::stopPlugins();
 		}

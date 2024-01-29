@@ -20,6 +20,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\Strings;
 use Psr\Container\ContainerInterface;
@@ -111,9 +112,9 @@ class QueryProcessor {
 	 * @return void
 	 */
 	public static function startPlugins(): void {
-		static::iteratePlugins(
-			'Handler', static function (string $className) {
-				$className::start();
+		static::iteratePluginProcessors(
+			static function (BaseProcessor $processor) {
+				$processor->start();
 			}
 		);
 	}
@@ -123,21 +124,18 @@ class QueryProcessor {
 	 * @return void
 	 */
 	public static function stopPlugins(): void {
-		static::iteratePlugins(
-			'Handler', static function (string $className) {
-				$className::stop();
+		static::iteratePluginProcessors(
+			static function (BaseProcessor $processor) {
+				$processor->stop();
 			}
 		);
 	}
 
 	/**
-	 * Helper to run some function through the all plugins with passing
-	 * class name of the plugin
-	 * @param  string     $className
 	 * @param  callable $fn
 	 * @return void
 	 */
-	protected static function iteratePlugins(string $className, callable $fn): void {
+	protected static function iteratePluginProcessors(callable $fn): void {
 		$list = [
 			static::CORE_NS_PREFIX => static::$corePlugins,
 			static::EXTRA_NS_PREFIX => static::$extraPlugins,
@@ -145,8 +143,8 @@ class QueryProcessor {
 		foreach ($list as $prefix => $plugins) {
 			foreach ($plugins as $plugin) {
 				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
-				$pluginHandlerClass = "$pluginPrefix\\$className";
-				$fn($pluginHandlerClass);
+				$pluginPayloadClass = "$pluginPrefix\\Payload";
+				array_map($fn, $pluginPayloadClass::getProcessors());
 			}
 		}
 	}

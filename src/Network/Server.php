@@ -39,6 +39,9 @@ final class Server {
 	/** @var array<callable> */
 	protected array $onstop = [];
 
+	/** @var array<callable> */
+	protected array $beforeStop = [];
+
 	/** @var string $bind */
 	protected string $bind;
 
@@ -139,6 +142,16 @@ final class Server {
 	}
 
 	/**
+	 * Add function to be colled before the shutdown
+	 * @param callable $fn
+	 * @return static
+	 */
+	public function beforeStop(callable $fn): static {
+		$this->beforeStop[] = $fn;
+		return $this;
+	}
+
+	/**
 	 * Add process to the server loop
 	 * @param Process $process
 	 * @return static
@@ -207,7 +220,7 @@ final class Server {
 
 		// Register shutdown on stop
 		$this->socket->on(
-			'stop', function () {
+			'shutdown', function () {
 				// Process first functions to run on start
 				foreach ($this->onstop as $fn) {
 					$fn();
@@ -268,6 +281,11 @@ final class Server {
 	 */
 	public function stop($exit = true): static {
 		Timer::clearAll();
+		// Process first functions to run on start
+		foreach ($this->beforeStop as $fn) {
+			$fn();
+		}
+
 		$this->socket->stop();
 		if (isset($this->workerIds)) {
 			foreach ($this->workerIds as $workerId) {
