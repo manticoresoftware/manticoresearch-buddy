@@ -137,6 +137,10 @@ final class Payload extends BasePayload {
 	protected static function buildExtra(array $options): string {
 		$extra = '';
 		foreach ($options as $key => $value) {
+			// Skip sharding related info
+			if ($key === 'rf' || $key === 'shards') {
+				continue;
+			}
 			$extra .= "$key = '$value' ";
 		}
 
