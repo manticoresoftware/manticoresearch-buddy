@@ -63,7 +63,7 @@ class QueryProcessor {
 		$pluginPrefix = static::detectPluginPrefixFromRequest($request);
 		$pluginName = substr($pluginPrefix, strrpos($pluginPrefix, '\\') + 1);
 		Buddy::debug("[$request->id] Plugin: $pluginName");
-		buddy_metric(Strings::camelcaseToUnderscore($pluginName), 1);
+		buddy_metric('plugin_' . Strings::camelcaseToUnderscore($pluginName), 1);
 		$payloadClassName = "{$pluginPrefix}\\Payload";
 		$pluginPayload = $payloadClassName::fromRequest($request);
 		$pluginPayload->setSettings(static::$settings);
