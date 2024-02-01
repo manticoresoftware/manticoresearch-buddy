@@ -68,7 +68,7 @@ final class Thread {
 	public static function instance(): static {
 		if (!isset(static::$instance)) {
 			try {
-				static::$instance = static::start();
+				static::$instance = static::create();
 			} catch (Throwable $e) {
 				$msg = $e->getMessage();
 				Buddy::debug("Failed to initialize sharding thread: $msg");
@@ -85,13 +85,12 @@ final class Thread {
 	 * @return self
 	 */
 	// phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
-	public static function start(): self {
+	public static function create(): self {
 		$process = new SwooleProcess(
 			static function (SwooleProcess $worker) {
 				chdir(sys_get_temp_dir());
 
 				Process::setContainer(static::$container);
-				$ticks = new Vector;
 				try {
 					start: while ($msg = $worker->read()) {
 						if (!is_string($msg)) {
@@ -102,6 +101,7 @@ final class Thread {
 							throw new \Exception('Incorrect data received');
 						}
 
+						$ticks = new Vector;
 						[$method, $args] = $msg;
 						Process::$method(...$args);
 						if ($method === 'shard') {
@@ -115,24 +115,19 @@ final class Thread {
 							);
 						}
 
-				  // Run ticks after ping execution
+						// Run ticks after ping execution
 						if ($method !== 'ping') {
-							  continue;
+							continue;
 						}
 
 						foreach ($ticks as $n => $tick) {
 							try {
-								$result = $tick['fn'](...$tick['args']);
+								$tick['fn'](...$tick['args']);
+								$ticks->remove($n);
 							} catch (Throwable $e) {
 								Buddy::debug("Error while processing tick: {$e->getMessage()}");
 								continue;
 							}
-
-							if (!$result) {
-								continue;
-							}
-
-							$ticks->remove($n);
 						}
 					}
 				} catch (Throwable $e) {
@@ -144,9 +139,8 @@ final class Thread {
 					sleep(5); // <-- add extra protection delay
 					goto start;
 				}
-			}, false, 2
+			}, true, 2
 		);
-		$process->start();
 		return new self($process);
 	}
 

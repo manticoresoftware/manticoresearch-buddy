@@ -89,45 +89,64 @@ final class Queue {
 	public function process(Node $node): void {
 		$queries = $this->dequeue($node);
 		foreach ($queries as $query) {
-			if ($query['wait_for_id']) {
-				$waitFor = $this->getById($query['wait_for_id']);
-				if (!$waitFor) {
-					return;
-				}
-				Buddy::debug("Wait for ID: {$query['wait_for_id']} [{$waitFor['status']}]");
-				// Do early return if it's not been processed
-				if ($waitFor['status'] !== 'processed') {
-					return;
-				}
-			}
-			if (!$this->attemptToUpdateStatus($query, 'procesing', 0)) {
-				continue;
+			if ($this->shouldSkipQuery($query)) {
+				return;
 			}
 
-			$mt = microtime(true);
-			$status = $this->executeQuery($query);
-			$duration = (int)((microtime(true) - $mt) * 1000);
-			$this->attemptToUpdateStatus($query, $status, $duration);
-			// When we have error, we stop iterating
-			if ($status === 'error') {
-				Buddy::info("[$node->id] Query error: {$query['query']}");
-				break;
+			$this->handleQuery($node, $query);
+		}
+	}
+
+	/**
+	 * Helper to check if we should skipp query in processing the queue
+	 * @param  array{id:int,query:string,wait_for_id:int,tries:int,status:string} $query
+	 * @return bool
+	 */
+	protected function shouldSkipQuery(array $query): bool {
+		if ($query['wait_for_id']) {
+			$waitFor = $this->getById($query['wait_for_id']);
+			if ($waitFor && $waitFor['status'] !== 'processed') {
+				Buddy::debug("Wait for ID: {$query['wait_for_id']} [{$waitFor['status']}]");
+				return true;
 			}
 		}
+		return !$this->attemptToUpdateStatus($query, 'processing', 0);
+	}
+
+	/**
+	 * Helper to process the query from the queue
+	 * @param  Node   $node
+	 * @param  array{id:int,query:string,wait_for_id:int,tries:int,status:string}  $query
+	 * @return void
+	 */
+	protected function handleQuery(Node $node, array $query): void {
+		$mt = microtime(true);
+		Buddy::debug("[{$node->id}] Queue query: {$query['query']}");
+
+		$res = $this->executeQuery($query);
+		$status = empty($res['error']) ? 'processed' : 'error';
+
+		Buddy::debug("[{$node->id}] Queue query result [$status]: " . json_encode($res));
+
+		$duration = (int)((microtime(true) - $mt) * 1000);
+		$this->attemptToUpdateStatus($query, $status, $duration);
+
+		if ($status !== 'error') {
+			return;
+		}
+
+		Buddy::info("[$node->id] Queue query error: {$query['query']}");
 	}
 
 	/**
 	 * Execute query and return info
 	 * @param  array{id:int,query:string,tries:int}  $query
-	 * @return string
+	 * @return array<mixed>
 	 */
-	protected function executeQuery(array $query): string {
-		Buddy::debug("Queue query: {$query['query']}");
+	protected function executeQuery(array $query): array {
 		// TODO: this is a temporary hack, remove when job is done on searchd
 		$this->runMkdir($query['query']);
-		$res = $this->client->sendRequest($query['query'])->getResult();
-		Buddy::debug('Queue result: ' . json_encode($res));
-		return empty($res['error']) ? 'processed' : 'error';
+		return $this->client->sendRequest($query['query'])->getResult();
 	}
 
 	/**
@@ -152,7 +171,8 @@ final class Queue {
 	 * We use this method for internal use only
 	 * and automatic handle returns of failed queries
 	 * @param  Node   $node
-	 * @return Vector<array{id:int,query:string,wait_for_id:int,tries:int}> list of queries for request node
+	 * @return Vector<array{id:int,query:string,wait_for_id:int,tries:int,status:string}>
+	 *  list of queries for request node
 	 */
 	protected function dequeue(Node $node): Vector {
 		$maxTries = static::MAX_TRIES;

@@ -20,7 +20,7 @@ use Swoole\Process;
  * You should check Metric component to find out which methods are available
  *
  * <code>
- * 	$thread = MetricThread::start();
+ * 	$thread = MetricThread::create();
  * 	$thread->execute("add", ["hello", 34]);
  * 	# your code goes here
  * 	$thread->execute("add", ["hello", 34]);
@@ -69,7 +69,7 @@ final class MetricThread {
 	 */
 	public static function instance(): static {
 		if (!isset(static::$instance)) {
-			static::$instance = static::start();
+			static::$instance = static::create();
 		}
 
 		return static::$instance;
@@ -80,7 +80,7 @@ final class MetricThread {
 	 *
 	 * @return self
 	 */
-	public static function start(): self {
+	public static function create(): self {
 		$process = new Process(
 			static function (Process $worker) {
 				chdir(sys_get_temp_dir());
@@ -101,7 +101,6 @@ final class MetricThread {
 				}
 			}, true, 2
 		);
-		$process->start();
 		return new self($process);
 	}
 
