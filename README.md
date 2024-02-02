@@ -131,27 +131,23 @@ Check the build directory and get the built version of Buddy from there and repl
 
 ### Communication protocol
 
-It may be convenient for Buddy to know about the mysql user whose request was routed to Buddy (e.g. `mysqldump`).
-
-Here's the updated spec. The only change is the addition of "mysql user name", see below.
+Manticore Buddy and Manticore Search communicates with each other in strict accordance with the following protocol:
 
 #### JSON over HTTP, SQL over HTTP
 
 #### C++ sends to PHP on the HTTP request
 
 json of:
-
 - `type`: `unknown json request`
 - `error`: error text which would be returned to the user
 - `message`:
-  - `path_query` One of: `_doc`, `_create`, `_udpate`, `_mapping`, `bulk`, `_bulk`, `cli`, `cli_json`, `search`, `sql?mode=raw`, `sql`, `insert`, `_license`, (empty value) other will return an error due to Buddy does not support it
+  - `path_query`. E.g. in Feb 2024, it's one of: `_doc`, `_create`, `_udpate`, `_mapping`, `bulk`, `_bulk`, `cli`, `cli_json`, `search`, `sql?mode=raw`, `sql`, `insert`, `_license`, (empty value) other will return an error as Buddy does not support it.
   - `body`
 - `version`: max buddy protocol version it can handle (the current one is 1)
 
 #### PHP returns to C++ on the HTTP request
 
 json of:
-
 - `type`: `json response`
 - `message`: the json to return to the user
 - `error`: error to log to searchd log in case the query couldn't be completed in PHP
@@ -176,7 +172,6 @@ Example:
 #### C++ sends to PHP on the MySQL request
 
 json of:
-
 - `type`: `unknown sql request`
 - `user`: mysql user name
 - `error`: error text which would be returned to the user
