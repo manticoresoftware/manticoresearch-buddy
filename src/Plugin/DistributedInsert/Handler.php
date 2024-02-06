@@ -56,7 +56,7 @@ final class Handler extends BaseHandlerWithClient {
 			$locals = array_filter($m['local']);
 			foreach ($locals as $t) {
 				$tables[] = [
-					'name' => $cluster ? "$cluster:$t" : $t,
+					'name' => $t,
 					'url' => '',
 				];
 			}
