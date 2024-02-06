@@ -175,7 +175,8 @@ public static function getProcessors(): array {
 }
 ````
 
-### Communication protocol
+### Communication protocol v1
+>>>>>>> f8fe9d1 (Add info about new protocol to the Readme)
 
 Manticore Buddy and Manticore Search communicates with each other in strict accordance with the following protocol:
 
@@ -236,3 +237,59 @@ json of:
 #### Headers
 
 When daemon sends a request to Buddy it should include header `Request-ID: smth`
+
+### Communication Protocol v2
+
+#### JSON over HTTP, SQL over HTTP v2
+
+#### C++ Sends to PHP via HTTP Request v2
+
+JSON format includes:
+- `type`: "unknown json request"
+- `error`: The error message to be returned to the user
+- `message`:
+  - `path_query`. For example, in February 2024, it can be one of the following: `_doc`, `_create`, `_update`, `_mapping`, `bulk`, `_bulk`, `cli`, `cli_json`, `search`, `sql?mode=raw`, `sql`, `insert`, `_license`, or an (empty value). Any other value will return an error since Buddy does not support it.
+  - `body`
+- `version`: The maximum Buddy protocol version it can handle (currently version 1)
+
+#### PHP Returns to C++ via HTTP Request v2
+
+JSON format includes:
+- `type`: "json response"
+- `message`: The JSON to return to the user. It also includes an `error` message that is displayed to the user. When necessary, Buddy can log the error in standard output.
+- `error_code`: An integer representing the HTTP error code that the daemon should use to respond to the client. If it's `0`, Manticore should return the original error code to the client.
+- `version`: An integer indicating the current protocol version.
+
+Example:
+
+```json
+{
+  "type": "json response",
+  "message": {
+    "a": 123,
+    "b": "abc"
+  },
+  "error_code": 0,
+  "version": 1
+}
+```
+
+#### SQL over MySQL v2
+
+#### C++ Sends to PHP via MySQL Request v2
+
+JSON format includes:
+- `type`: "unknown sql request"
+- `user`: MySQL username
+- `error`: The error message to be returned to the user
+- `message`: Details on the SQL query that failed to execute
+  - `path_query`: `""` (empty)
+  - `body`: The original SQL query
+- `version`: The maximum Buddy protocol version it can handle (currently version 2)
+
+#### PHP Returns to C++ on the MySQL Request
+
+- `type`: "sql response"
+- `message`: The same as `/cli` returns as JSON (i.e., an array)
+- `error_code`: An integer representing the HTTP error code that the daemon should use to respond to the client. If it's `0`, Manticore should return the original error code to the client.
+- `version`: The current protocol version
