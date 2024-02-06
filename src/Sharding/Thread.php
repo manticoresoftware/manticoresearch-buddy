@@ -91,6 +91,7 @@ final class Thread {
 				chdir(sys_get_temp_dir());
 
 				Process::setContainer(static::$container);
+				$ticks = new Vector;
 				try {
 					start: while ($msg = $worker->read()) {
 						if (!is_string($msg)) {
@@ -101,7 +102,6 @@ final class Thread {
 							throw new \Exception('Incorrect data received');
 						}
 
-						$ticks = new Vector;
 						[$method, $args] = $msg;
 						Process::$method(...$args);
 						if ($method === 'shard') {
