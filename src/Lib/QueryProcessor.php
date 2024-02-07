@@ -61,8 +61,7 @@ class QueryProcessor
 	 * @return BaseHandler
 	 *  The BaseHandler to execute to process the final query
 	 */
-	public static function process(Request $request): BaseHandler
-	{
+	public static function process(Request $request): BaseHandler {
 		if (!static::$isInited) {
 			static::init();
 		}

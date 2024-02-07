@@ -42,8 +42,7 @@ final class Payload extends BasePayload
 	 * @param SqlQueryParser|null $sqlQueryParser
 	 * @return static
 	 */
-	public static function fromRequest(Request $request, ?SqlQueryParser $sqlQueryParser = null): static
-	{
+	public static function fromRequest(Request $request, ?SqlQueryParser $sqlQueryParser = null): static {
 		$self = new static();
 
 		$self->endpointBundle = $request->endpointBundle;
@@ -69,11 +68,13 @@ final class Payload extends BasePayload
 			$self->table = $payload['FROM'][0]['table'];
 
 			foreach ($payload['WHERE'] as $condition) {
-				if ($condition['base_expr'] === 'knn') {
-					$self->field = (string)$condition['sub_tree'][0]['base_expr'];
-					$self->k = (string)$condition['sub_tree'][1]['base_expr'];
-					$self->docId = (string)$condition['sub_tree'][2]['base_expr'];
+				if ($condition['base_expr'] !== 'knn') {
+					continue;
 				}
+
+				$self->field = (string)$condition['sub_tree'][0]['base_expr'];
+				$self->k = (string)$condition['sub_tree'][1]['base_expr'];
+				$self->docId = (string)$condition['sub_tree'][2]['base_expr'];
 			}
 		}
 
@@ -85,8 +86,7 @@ final class Payload extends BasePayload
 	 * @param SqlQueryParser|null $sqlQueryParser
 	 * @return bool
 	 */
-	public static function hasMatch(Request $request, ?SqlQueryParser $sqlQueryParser = null): bool
-	{
+	public static function hasMatch(Request $request, ?SqlQueryParser $sqlQueryParser = null): bool {
 		if ($request->endpointBundle === Endpoint::Search) {
 			$payload = json_decode($request->payload, true);
 			if (is_array($payload) && isset($payload['knn']['doc_id'])) {
@@ -97,8 +97,10 @@ final class Payload extends BasePayload
 		$payload = static::$sqlQueryParser::parse($request->payload);
 		if (isset($payload['WHERE'])) {
 			foreach ($payload['WHERE'] as $expression) {
-				if ($expression['expr_type'] === 'function' && $expression['base_expr'] === 'knn' &&
-					isset($expression['sub_tree'][2]) && is_numeric($expression['sub_tree'][2]['base_expr'])
+				if ($expression['expr_type'] === 'function'
+				&& $expression['base_expr'] === 'knn'
+					&& isset($expression['sub_tree'][2])
+					&& is_numeric($expression['sub_tree'][2]['base_expr'])
 				) {
 					return true;
 				}
