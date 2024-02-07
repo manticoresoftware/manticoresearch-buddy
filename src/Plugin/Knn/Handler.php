@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use PHPSQLParser\exceptions\UnsupportedFeatureException;
 use RuntimeException;
 
 final class Handler extends BaseHandlerWithClient
@@ -130,29 +131,14 @@ final class Handler extends BaseHandlerWithClient
 	 * @param Payload $payload
 	 * @param string $queryVector
 	 * @return array <string, string>
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|UnsupportedFeatureException
 	 */
 	private static function knnSqlQuery(Client $manticoreClient, Payload $payload, string $queryVector): array {
-		// Update SQL query
-		$parsedQuery = $payload::$sqlQueryParser::getParsedPayload();
 
-		foreach ($parsedQuery['WHERE'] as $k => $condition) {
-			if ($condition['base_expr'] !== 'knn') {
-				continue;
-			}
-
-			$parsedQuery['WHERE'][$k]['sub_tree'][2] = [
-				'expr_type' => 'const',
-				'base_expr' => "($queryVector)",
-				'sub_tree' => false,
-			];
-		}
-
-		$payload::$sqlQueryParser::setParsedPayload($parsedQuery);
-
-		$result = $manticoreClient
-			->sendRequest($payload::$sqlQueryParser::getCompletedPayload())
-			->getResult();
+		self::substituteParsedQuery($payload, $queryVector);
+			$result = $manticoreClient
+				->sendRequest($payload::$sqlQueryParser::getCompletedPayload())
+				->getResult();
 
 		if (is_array($result[0])) {
 			foreach ($result[0]['data'] as $k => $v) {
@@ -164,6 +150,28 @@ final class Handler extends BaseHandlerWithClient
 			}
 		}
 
+
 		return $result;
+	}
+
+	private static function substituteParsedQuery(Payload $payload, string $queryVector): void {
+
+		$parsedQuery = $payload::$sqlQueryParser::getParsedPayload();
+		if (!is_array($parsedQuery)) {
+			return;
+		}
+
+		foreach ($parsedQuery['WHERE'] as $k => $condition) {
+			if ($condition['base_expr'] !== 'knn') {
+				continue;
+			}
+
+			$parsedQuery['WHERE'][$k]['sub_tree'][2] = [
+			'expr_type' => 'const',
+			'base_expr' => "($queryVector)",
+			'sub_tree' => false,
+			];
+		}
+		$payload::$sqlQueryParser::setParsedPayload($parsedQuery);
 	}
 }
