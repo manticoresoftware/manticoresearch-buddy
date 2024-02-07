@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Knn;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 
 /**
  * This is simple do nothing request that handle empty queries
@@ -31,13 +32,18 @@ final class Payload extends BasePayload
 
 	public ?string $table = null;
 
+	/** @var array<string> */
+	public array $condition = [];
+
 	public Endpoint $endpointBundle;
 
 	/**
-	 * @param  Request  $request
+	 * @param Request $request
+	 * @param SqlQueryParser|null $sqlQueryParser
 	 * @return static
 	 */
-	public static function fromRequest(Request $request): static {
+	public static function fromRequest(Request $request, ?SqlQueryParser $sqlQueryParser = null): static
+	{
 		$self = new static();
 
 		$self->endpointBundle = $request->endpointBundle;
@@ -50,33 +56,37 @@ final class Payload extends BasePayload
 				if (isset($payload['_source'])) {
 					$self->select = $payload['_source'];
 				}
+				if (isset($payload['query'])) {
+					$self->condition = $payload['query'];
+				}
 				$self->table = $payload['index'];
 				$self->field = $payload['knn']['field'];
 				$self->k = (string)$payload['knn']['k'];
 				$self->docId = (string)$payload['knn']['doc_id'];
 			}
 		} else {
-			$matches = $self::getMatches($request);
+			$payload = static::$sqlQueryParser::getParsedPayload();
+			$self->table = $payload['FROM'][0]['table'];
 
-			$self->select = array_map(
-				function ($row) {
-					return trim($row);
-				}, explode(',', $matches[1] ?? '')
-			);
-			$self->table = $matches[2] ?? null;
-			$self->field = $matches[3] ?? null;
-			$self->k = $matches[4] ?? null;
-			$self->docId = $matches[5] ?? null;
+			foreach ($payload['WHERE'] as $condition) {
+				if ($condition['base_expr'] === 'knn') {
+					$self->field = (string)$condition['sub_tree'][0]['base_expr'];
+					$self->k = (string)$condition['sub_tree'][1]['base_expr'];
+					$self->docId = (string)$condition['sub_tree'][2]['base_expr'];
+				}
+			}
 		}
 
 		return $self;
 	}
 
 	/**
-	 * @param  Request  $request
+	 * @param Request $request
+	 * @param SqlQueryParser|null $sqlQueryParser
 	 * @return bool
 	 */
-	public static function hasMatch(Request $request): bool {
+	public static function hasMatch(Request $request, ?SqlQueryParser $sqlQueryParser = null): bool
+	{
 		if ($request->endpointBundle === Endpoint::Search) {
 			$payload = json_decode($request->payload, true);
 			if (is_array($payload) && isset($payload['knn']['doc_id'])) {
@@ -84,24 +94,17 @@ final class Payload extends BasePayload
 			}
 		}
 
-		if (stripos($request->payload, 'knn') !== false && self::getMatches($request)) {
-			return true;
+		$payload = static::$sqlQueryParser::parse($request->payload);
+		if (isset($payload['WHERE'])) {
+			foreach ($payload['WHERE'] as $expression) {
+				if ($expression['expr_type'] === 'function' && $expression['base_expr'] === 'knn' &&
+					isset($expression['sub_tree'][2]) && is_numeric($expression['sub_tree'][2]['base_expr'])
+				) {
+					return true;
+				}
+			}
 		}
 
 		return false;
-	}
-
-	/**
-	 * @param  Request  $request
-	 * @return array<string>|bool
-	 */
-	private static function getMatches(Request $request): array|bool {
-		$pattern = '/^select\s+(.*)from\s+`*([a-z0-9_-]+)`*\s+'.
-			'.*?knn\s+\(\s*(.*)?\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)/usi';
-		if (!preg_match($pattern, $request->payload, $matches)) {
-			return false;
-		}
-
-		return $matches;
 	}
 }
