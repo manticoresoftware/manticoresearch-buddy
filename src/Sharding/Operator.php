@@ -204,6 +204,18 @@ final class Operator {
 			$this->init(); // Initialize if no cluster set
 		}
 
+		// Initialize if we created cluster after local init
+		$currentCluster = $this->getCluster();
+		if (!$currentCluster->name && $cluster->name !== $currentCluster->name) {
+			$this->state->set('cluster', $cluster->name);
+			$this->state->set('cluster_hash', Cluster::getNodesHash($cluster->getNodes()));
+			$this->init();
+			$currentQueue = $this->getQueue();
+			$cluster->attachTable($this->state->table);
+			$cluster->attachTable($currentQueue->table);
+			$cluster->attachTable($table->table);
+		}
+
 		$result = $table->shard(
 			$this->getQueue(),
 			$shardCount,
@@ -258,6 +270,7 @@ final class Operator {
 		if (!isset($this->queue)) {
 			throw new RuntimeException('Queue is not initialized');
 		}
+
 		$this->queue->process($this->node);
 		return $this;
 	}

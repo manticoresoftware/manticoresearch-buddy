@@ -218,6 +218,10 @@ final class Table {
 		/** @var Set<int> */
 		$queueIds = new Set;
 		foreach ($nodeShardsMap as $node => $shards) {
+			// Do nothing when no shards present for this node
+			if (!$shards->count()) {
+				continue;
+			}
 			$sql = $this->getCreateShardedTableSQL($shards);
 			$queueId = $queue->add($node, $sql);
 			$queueIds->add($queueId);
@@ -369,7 +373,10 @@ final class Table {
 				$sql = "DROP TABLE {$this->name}";
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);
-
+				// Do nothing when no shards present for this node
+				if (!$row['shards']->count()) {
+					continue;
+				}
 				$sql = $this->getCreateShardedTableSQL($row['shards']);
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);

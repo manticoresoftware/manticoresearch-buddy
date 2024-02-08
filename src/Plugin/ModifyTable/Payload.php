@@ -116,7 +116,6 @@ final class Payload extends BasePayload {
 			],
 			'replicationFactor' => (int)($this->options['rf'] ?? 1),
 			'shardCount' => (int)($this->options['shards'] ?? 2),
-			'options' => $this->options,
 		];
 	}
 
@@ -138,6 +137,10 @@ final class Payload extends BasePayload {
 	protected static function buildExtra(array $options): string {
 		$extra = '';
 		foreach ($options as $key => $value) {
+			// Skip sharding related info
+			if ($key === 'rf' || $key === 'shards') {
+				continue;
+			}
 			$extra .= "$key = '$value' ";
 		}
 

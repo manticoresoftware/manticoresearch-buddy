@@ -130,6 +130,9 @@ final class Cluster {
 	 * @return Set<string>
 	 */
 	public function getActiveNodes(): Set {
+		if (!$this->name) {
+			return new Set([Node::findId($this->client)]);
+		}
 		$res = $this->client
 			->sendRequest("SHOW STATUS LIKE 'cluster_{$this->name}_nodes_view'")
 			->getResult();
