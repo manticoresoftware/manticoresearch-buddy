@@ -71,8 +71,8 @@ final class Payload extends BasePayload
 		if (isset($payload['_source'])) {
 			$self->select = $payload['_source'];
 		}
-		if (isset($payload['query'])) {
-			$self->condition = $payload['query'];
+		if (isset($payload['knn']['filter'])) {
+			$self->condition = $payload['knn']['filter'];
 		}
 		$self->table = $payload['index'];
 		$self->field = $payload['knn']['field'];

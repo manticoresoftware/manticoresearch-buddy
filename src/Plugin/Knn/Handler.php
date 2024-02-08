@@ -106,7 +106,7 @@ final class Handler extends BaseHandlerWithClient
 		}
 
 		if ($payload->condition) {
-			$query['query'] = $payload->condition;
+			$query['knn']['filter'] = $payload->condition;
 		}
 
 		$result = $manticoreClient
