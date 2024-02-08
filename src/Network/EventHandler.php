@@ -95,8 +95,6 @@ final class EventHandler {
 
 			$response = Response::fromMessage($result->getStruct(), $request->format);
 		} catch (Throwable $e) {
-			Buddy::debug('Exception: ----->>>> '.$e->getLine().':'.$e->getMessage());
-			Buddy::debug('Exception: ----->>>> '.$e->getTraceAsString());
 			/** @var string $originalError */
 			$originalError = match (true) {
 				isset($request) => $request->error,
