@@ -21,6 +21,7 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use Manticoresearch\Buddy\Core\Tool\Strings;
@@ -117,6 +118,47 @@ class QueryProcessor
 		static::$isInited = true;
 	}
 
+	/**
+	 * Run start method of all plugin handlers
+	 * @return void
+	 */
+	public static function startPlugins(): void {
+		static::iteratePluginProcessors(
+			static function (BaseProcessor $processor) {
+				$processor->start();
+			}
+		);
+	}
+
+	/**
+	 * Run stop method of all plugin handlers
+	 * @return void
+	 */
+	public static function stopPlugins(): void {
+		static::iteratePluginProcessors(
+			static function (BaseProcessor $processor) {
+				$processor->stop();
+			}
+		);
+	}
+
+	/**
+	 * @param  callable $fn
+	 * @return void
+	 */
+	protected static function iteratePluginProcessors(callable $fn): void {
+		$list = [
+			static::CORE_NS_PREFIX => static::$corePlugins,
+			static::EXTRA_NS_PREFIX => static::$extraPlugins,
+		];
+		foreach ($list as $prefix => $plugins) {
+			foreach ($plugins as $plugin) {
+				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
+				$pluginPayloadClass = "$pluginPrefix\\Payload";
+				array_map($fn, $pluginPayloadClass::getProcessors());
+			}
+		}
+	}
 	/**
 	 * Helper to set settings when we need it before calling to init
 	 * @param Settings $settings

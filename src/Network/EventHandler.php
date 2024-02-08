@@ -43,8 +43,6 @@ final class EventHandler {
 			|| ($e instanceof GenericError && $e->getProxyOriginalError());
 	}
 
-
-
 	/**
 	 * Main handler for HTTP request that returns HttpResponse
 	 *
