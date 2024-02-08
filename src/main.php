@@ -110,6 +110,17 @@ $server->beforeStart(
 			ini_set('post_max_size', $settings->maxAllowedPacket);
 		}
 	)
+	// We need to run it outside of couroutine so do it before
+	->beforeStart(
+		static function () {
+			QueryProcessor::startPlugins();
+		}
+	)
+	->beforeStop(
+		static function () {
+			QueryProcessor::stopPlugins();
+		}
+	)
 	->beforeStart(
 		static function () use ($server) {
 			$process = ShardingThread::instance()->process;

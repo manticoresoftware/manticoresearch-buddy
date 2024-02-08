@@ -36,6 +36,12 @@ final class Server {
 	/** @var array<callable> */
 	protected array $beforeStart = [];
 
+	/** @var array<callable> */
+	protected array $onstop = [];
+
+	/** @var array<callable> */
+	protected array $beforeStop = [];
+
 	/** @var string $bind */
 	protected string $bind;
 
@@ -116,12 +122,32 @@ final class Server {
 	}
 
 	/**
+	 * Add function to be called and processed on server stop
+	 * @param callable $fn
+	 * @return static
+	 */
+	public function onStop(callable $fn): static {
+		$this->onstop[] = $fn;
+		return $this;
+	}
+
+	/**
 	 * Add function to be called before we starting server
 	 * @param  callable $fn
 	 * @return static
 	 */
 	public function beforeStart(callable $fn): static {
 		$this->beforeStart[] = $fn;
+		return $this;
+	}
+
+	/**
+	 * Add function to be colled before the shutdown
+	 * @param callable $fn
+	 * @return static
+	 */
+	public function beforeStop(callable $fn): static {
+		$this->beforeStop[] = $fn;
 		return $this;
 	}
 
@@ -192,6 +218,15 @@ final class Server {
 			}
 		);
 
+		// Register shutdown on stop
+		$this->socket->on(
+			'shutdown', function () {
+				// Process first functions to run on start
+				foreach ($this->onstop as $fn) {
+					$fn();
+				}
+			}
+		);
 
 		$this->socket->on(
 			// @phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed, SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter
@@ -246,6 +281,11 @@ final class Server {
 	 */
 	public function stop($exit = true): static {
 		Timer::clearAll();
+		// Process first functions to run on start
+		foreach ($this->beforeStop as $fn) {
+			$fn();
+		}
+
 		$this->socket->stop();
 		if (isset($this->workerIds)) {
 			foreach ($this->workerIds as $workerId) {

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "014e1de1782c66db4a7c55e107b2ea4d",
+    "content-hash": "6e1f4be99cab07aa4137cd8945c422e7",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -811,16 +811,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-feature/controllable-process",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "0b07164f0bbec75a1c3a10b95790c0156698445d"
+                "reference": "46c735be6b87f228366d4bfeb35e4548248d3998"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/0b07164f0bbec75a1c3a10b95790c0156698445d",
-                "reference": "0b07164f0bbec75a1c3a10b95790c0156698445d",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/46c735be6b87f228366d4bfeb35e4548248d3998",
+                "reference": "46c735be6b87f228366d4bfeb35e4548248d3998",
                 "shasum": ""
             },
             "require": {
@@ -835,7 +835,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -856,9 +855,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/controllable-process"
             },
-            "time": "2024-01-26T09:17:57+00:00"
+            "time": "2024-01-29T11:55:37+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
