@@ -973,16 +973,16 @@
         },
         {
             "name": "manticoresoftware/telemetry",
-            "version": "0.1.13",
+            "version": "0.1.15",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/telemetry-lib.git",
-                "reference": "98edb6dd3782fab16400220c378c449b0827c1fe"
+                "reference": "505a20c7d5cfd4670e5e9476512ec1d2de1d230e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/98edb6dd3782fab16400220c378c449b0827c1fe",
-                "reference": "98edb6dd3782fab16400220c378c449b0827c1fe",
+                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/505a20c7d5cfd4670e5e9476512ec1d2de1d230e",
+                "reference": "505a20c7d5cfd4670e5e9476512ec1d2de1d230e",
                 "shasum": ""
             },
             "require": {
@@ -1019,9 +1019,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/telemetry-lib/issues",
-                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.13"
+                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.15"
             },
-            "time": "2023-07-28T11:37:28+00:00"
+            "time": "2024-01-30T12:36:30+00:00"
         },
         {
             "name": "php-ds/php-ds",

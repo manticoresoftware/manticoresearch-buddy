@@ -129,7 +129,7 @@ ghcr.io/manticoresoftware/manticoresearch:test-kit-latest -c './phar_builder/bin
 
 Check the build directory and get the built version of Buddy from there and replace it in your another OS in the "modules" directory.
 
-### Run custom process inside the Plugin
+#### Run custom process inside the Plugin
 
 To run the process that can maintain some logic and communicate you need to create the `Processor` class and add `getProcessors` method to the `Payload`
 
@@ -173,3 +173,65 @@ public static function getProcessors(): array {
   ];
 }
 ````
+
+### Communication protocol
+
+Manticore Buddy and Manticore Search communicates with each other in strict accordance with the following protocol:
+
+#### JSON over HTTP, SQL over HTTP
+
+#### C++ sends to PHP on the HTTP request
+
+json of:
+- `type`: `unknown json request`
+- `error`: error text which would be returned to the user
+- `message`:
+  - `path_query`. E.g. in Feb 2024, it's one of: `_doc`, `_create`, `_udpate`, `_mapping`, `bulk`, `_bulk`, `cli`, `cli_json`, `search`, `sql?mode=raw`, `sql`, `insert`, `_license`, (empty value) other will return an error as Buddy does not support it.
+  - `body`
+- `version`: max buddy protocol version it can handle (the current one is 1)
+
+#### PHP returns to C++ on the HTTP request
+
+json of:
+- `type`: `json response`
+- `message`: the json to return to the user
+- `error`: error to log to searchd log in case the query couldn't be completed in PHP
+- `version`: it's current protocol version (the current one is 1)
+
+Example:
+
+```json
+{
+  "type": "json response",
+  "message": {
+    "a": 123,
+    "b": "abc"
+  },
+  "error": "",
+  "version": 1
+}
+```
+
+#### SQL over MySQL
+
+#### C++ sends to PHP on the MySQL request
+
+json of:
+- `type`: `unknown sql request`
+- `user`: mysql user name
+- `error`: error text which would be returned to the user
+- `message`: SQL query failed to execute
+  - `path_query`: `""` (empty)
+  - `body`: the original SQL query itself
+- `version`: max buddy protocol version it can handle (the current one is 1)
+
+#### PHP returns to C++ on the MySQL request
+
+- `type`: `sql response`
+- `message`: the same `/cli` returns as json (i.e. an array)
+- `error`: error to log to searchd log in case the query couldn't be completed in PHP
+- `version`: it's current protocol version (the current one is 1)
+
+#### Headers
+
+When daemon sends a request to Buddy it should include header `Request-ID: smth`

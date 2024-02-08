@@ -139,6 +139,7 @@ final class Metric {
 			. "([^\(]*\(knn\s{$verPattern}\))?"
 			. "([^\(]*\(buddy\s{$verPattern}\))?$/ius"
 		;
+		/** @var string $version */
 		$version = static::getStatusMap()['version'] ?? '';
 		preg_match($matchExpr, $version, $m);
 
@@ -192,6 +193,10 @@ final class Metric {
 		$metrics = array_map(
 			'intval', array_filter(
 				$status, function ($key) {
+					if ($key === 'cluster_count' || $key === 'cluster_size') {
+						return true;
+					}
+
 					if (str_starts_with($key, 'command_')) {
 						return true;
 					}
@@ -219,15 +224,24 @@ final class Metric {
 	/**
 	 * Get result of show status query as map key => value
 	 *
-	 * @return array<string,string>
+	 * @return array<string,string|int>
 	 */
 	protected static function getStatusMap(): array {
-		/** @var array{0:array{data:array{Counter:string,Value:string}}} $result */
+		$map = [];
+		/** @var array{0:array{Counter:string,Value:string}} $result */
 		$result = static::sendManticoreRequest('SHOW STATUS');
-		return array_combine(
-			array_column($result, 'Counter'),
-			array_column($result, 'Value')
-		);
+		foreach ($result as ['Counter' => $key, 'Value' => $value]) {
+			if ($key === 'cluster_name') {
+				$map['cluster_count'] = ($map['cluster_count'] ?? 0) + 1;
+				continue;
+			}
+			if (isset($map[$key]) && is_numeric($map[$key]) && is_numeric($value)) {
+				$map[$key] += $value;
+			} else {
+				$map[$key] = $value;
+			}
+		}
+		return $map;
 	}
 
 	/**
