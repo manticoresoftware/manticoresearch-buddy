@@ -29,6 +29,7 @@ final class Payload extends BasePayload
 	/** @var array<string> */
 	public array $select = [];
 
+	/** @var string|null table */
 	public ?string $table = null;
 
 	/** @var array<string> */
@@ -84,6 +85,8 @@ final class Payload extends BasePayload
 	 * @return void
 	 */
 	private static function parseSqlRequest(self $self): void {
+
+
 		$payload = static::$sqlQueryParser::getParsedPayload();
 		$self->table = $payload['FROM'][0]['table'] ?? null;
 
