@@ -256,7 +256,7 @@ JSON format includes:
 
 JSON format includes:
 - `type`: "json response"
-- `message`: The JSON to return to the user. It also includes an `error` message that is displayed to the user. When necessary, Buddy can log the error in standard output.
+- `message`: This JSON object is returned to the user and may contain an `error` message for display. Additionally, Buddy has the capability to log this error using standard output. This response is precisely what Manticore will forward to the user, adhering to the guidelines specified in the [Manticore documentation](https://github.com/manticoresoftware/manticoresearch/blob/3cefedf3e71a433b9259571e873586ce13444fcd/manual/Connecting_to_the_server/HTTP.md?plain=1#L227-L247). For error response it's a struct: `{"error":"..."}`
 - `error_code`: An integer representing the HTTP error code that the daemon should use to respond to the client. If it's `0`, Manticore should return the original error code to the client.
 - `version`: An integer indicating the current protocol version.
 
@@ -290,6 +290,6 @@ JSON format includes:
 #### PHP Returns to C++ on the MySQL Request
 
 - `type`: "sql response"
-- `message`: The same as `/cli` returns as JSON (i.e., an array)
+- `message`: This JSON object is returned to the user and may contain an `error` message for display. Additionally, Buddy has the capability to log this error using standard output. This response is precisely what Manticore will forward to the user, adhering to the guidelines specified in the [Manticore documentation](https://github.com/manticoresoftware/manticoresearch/blob/3cefedf3e71a433b9259571e873586ce13444fcd/manual/Connecting_to_the_server/HTTP.md?plain=1#L126-L185). For error response it's a struct: `{"error":"..."}`
 - `error_code`: An integer representing the HTTP error code that the daemon should use to respond to the client. If it's `0`, Manticore should return the original error code to the client.
 - `version`: The current protocol version
