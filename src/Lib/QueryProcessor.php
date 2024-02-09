@@ -27,8 +27,7 @@ use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use Manticoresearch\Buddy\Core\Tool\Strings;
 use Psr\Container\ContainerInterface;
 
-class QueryProcessor
-{
+class QueryProcessor {
 	/** @var string */
 	protected const CORE_NS_PREFIX = 'Manticoresearch\\Buddy\\Base\\Plugin\\';
 	protected const EXTRA_NS_PREFIX = 'Manticoresearch\\Buddy\\Plugin\\';
