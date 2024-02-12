@@ -18,7 +18,6 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * Request for Backup command that has parsed parameters from SQL
  */
 final class Payload extends BasePayload {
-
 	public function __construct(public int $timeout = 0, public bool $isDeferred = false) {
 	}
 

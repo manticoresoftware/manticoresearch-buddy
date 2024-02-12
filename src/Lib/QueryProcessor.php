@@ -26,10 +26,6 @@ use Manticoresearch\Buddy\Core\Tool\Strings;
 use Psr\Container\ContainerInterface;
 
 class QueryProcessor {
-  /** @var string */
-	protected const CORE_NS_PREFIX = 'Manticoresearch\\Buddy\\Base\\Plugin\\';
-	protected const EXTRA_NS_PREFIX = 'Manticoresearch\\Buddy\\Plugin\\';
-
   /** @var ContainerInterface */
   // We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
@@ -137,8 +133,8 @@ class QueryProcessor {
 	 */
 	protected static function iteratePluginProcessors(callable $fn): void {
 		$list = [
-			static::CORE_NS_PREFIX => static::$corePlugins,
-			static::EXTRA_NS_PREFIX => static::$extraPlugins,
+			Pluggable::CORE_NS_PREFIX => static::$corePlugins,
+			Pluggable::EXTRA_NS_PREFIX => static::$extraPlugins,
 		];
 		foreach ($list as $prefix => $plugins) {
 			foreach ($plugins as $plugin) {
@@ -251,8 +247,8 @@ class QueryProcessor {
    */
 	public static function detectPluginPrefixFromRequest(Request $request): string {
 		$list = [
-			static::CORE_NS_PREFIX => static::$corePlugins,
-			static::EXTRA_NS_PREFIX => static::$extraPlugins,
+			Pluggable::CORE_NS_PREFIX => static::$corePlugins,
+			Pluggable::EXTRA_NS_PREFIX => static::$extraPlugins,
 		];
 		foreach ($list as $prefix => $plugins) {
 			foreach ($plugins as $plugin) {
