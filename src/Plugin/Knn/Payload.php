@@ -26,13 +26,13 @@ final class Payload extends BasePayload
 	public ?string $k = null;
 	public ?string $docId = null;
 
-	/** @var array<string> */
+	/** @var array<string> $select*/
 	public array $select = [];
 
-	/** @var string|null table */
+	/** @var ?string $table */
 	public ?string $table = null;
 
-	/** @var array<string> */
+	/** @var array<string> $condition */
 	public array $condition = [];
 
 	public Endpoint $endpointBundle;

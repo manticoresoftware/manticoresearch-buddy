@@ -161,6 +161,12 @@ final class Handler extends BaseHandlerWithClient
 	}
 
 	/**
+	 * This method updates SQL parsed payload.
+	 * For example this method allows to modify queries from
+	 * SELECT * FROM tbl WHERE knn(query_vector, 5, 1)
+	 * To
+	 * SELECT * FROM tbl WHERE knn(query_vector, 5, (-0.9999,-0.9999,-0.9999,-0.9999))
+	 *
 	 * @param Payload $payload
 	 * @param string $queryVector
 	 * @return void
@@ -168,7 +174,7 @@ final class Handler extends BaseHandlerWithClient
 	private static function substituteParsedQuery(Payload $payload, string $queryVector): void {
 
 		$parsedQuery = $payload::$sqlQueryParser::getParsedPayload();
-		if (!is_array($parsedQuery)) {
+		if ($parsedQuery === null) {
 			return;
 		}
 
