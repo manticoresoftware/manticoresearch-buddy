@@ -24,6 +24,16 @@ final class Payload extends BasePayload {
 	public function __construct(public ActionType $type) {
 	}
 
+	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Core logic for plugin support and helpers.'
+			. ' Also handles `create buddy plugin`, `delete buddy plugin`,'
+			. ' and `show buddy plugins`';
+	}
+
   /**
 	 * @param Request $request
 	 * @return static

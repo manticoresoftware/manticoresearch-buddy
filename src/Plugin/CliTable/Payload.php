@@ -23,6 +23,14 @@ final class Payload extends BasePayload {
 	public string $path;
 
 	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return '/cli endpoint based on /cli_json - outputs query result as a table';
+	}
+
+	/**
 	 * @param Request $request
 	 * @return static
 	 */
