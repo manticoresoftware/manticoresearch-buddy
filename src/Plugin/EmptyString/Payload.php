@@ -21,6 +21,16 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 final class Payload extends BasePayload {
 	public string $path;
 
+	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Handles empty queries,'
+			. ' which can occur when trimming comments or dealing with specific SQL'
+			. ' protocol instructions in comments that are not supported';
+	}
+
   /**
 	 * @param Request $request
 	 * @return static

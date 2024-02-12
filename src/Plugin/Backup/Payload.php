@@ -48,6 +48,14 @@ final class Payload extends BasePayload {
 		$this->configPath = $configFile;
 	}
 
+	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'BACKUP sql statement';
+	}
+
   /**
    * Create instance by parsing query into parameters
    *

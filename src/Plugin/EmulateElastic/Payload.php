@@ -38,6 +38,15 @@ final class Payload extends BasePayload {
 	public string $path;
 
 	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Emulates some Elastic queries and generates responses'
+		 . ' as if they were made by ES';
+	}
+
+	/**
 	 * @param Request $request
 	 * @return static
 	 */

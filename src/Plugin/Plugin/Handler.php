@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Strings;
 use RuntimeException;
 
 final class Handler extends BaseHandler {
@@ -64,12 +65,21 @@ final class Handler extends BaseHandler {
 					$plugins = static::getPlugins($pluggable);
 					foreach ($plugins as $type => $list) {
 						foreach ($list as $plugin) {
+							$prefix = match ($type) {
+								'core' => Pluggable::CORE_NS_PREFIX,
+								'external' => Pluggable::EXTRA_NS_PREFIX,
+								default => '',
+							};
+							/** @var array{short:string} $plugin */
+							$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
+							$className = $pluginPrefix . '\\Payload';
 							/** @var array{full:string,short:string,version:string} $plugin */
 							$rows[] = [
 								'Package' => $plugin['full'],
 								'Plugin' => $plugin['short'],
 								'Version' => $plugin['version'],
 								'Type' => $type,
+								'Info' => $className::getInfo(),
 							];
 						}
 					}
@@ -78,7 +88,8 @@ final class Handler extends BaseHandler {
 						->column('Package', Column::String)
 						->column('Plugin', Column::String)
 						->column('Version', Column::String)
-						->column('Type', Column::String);
+						->column('Type', Column::String)
+						->column('Info', Column::String);
 			}
 		};
 
@@ -118,17 +129,9 @@ final class Handler extends BaseHandler {
 	 * @return array{core:array<mixed>,local:array<mixed>,external:array<mixed>}
 	 */
 	protected static function getPlugins(Pluggable $pluggable): array {
-		$corePluggable = clone $pluggable;
-		// TODO: this is kind of hack and usage of function that not exposed to this space
-		$projectRoot = buddy_project_root();
-		if (!is_string($projectRoot)) {
-			throw new RuntimeException('Failed to find Buddy project root');
-		}
-		$corePluggable->setPluginDir($projectRoot);
-		$internalPlugins = $corePluggable->getList();
-		$localPlugins = array_filter($internalPlugins, fn ($v) => !str_starts_with($v['full'], 'manticoresoftware/'));
-		$corePlugins = array_udiff($internalPlugins, $localPlugins, fn($a, $b) => $a['full'] === $b['full'] ? 0 : 1);
-		$externalPlugins = $pluggable->getList();
+		$externalPlugins = $pluggable->fetchExtraPlugins();
+		$localPlugins = array_filter($externalPlugins, fn ($v) => !str_starts_with($v['full'], 'manticoresoftware/'));
+		$corePlugins = $pluggable->fetchCorePlugins();
 		return [
 			'core' => $corePlugins,
 			'local' => $localPlugins,
