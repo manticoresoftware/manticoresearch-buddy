@@ -28,6 +28,16 @@ final class Payload extends BasePayload {
 	/** @var array<string,int|string> */
 	public array $options;
 
+	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Assists in standardizing options in create and alter table statements'
+			. ' to show option=1 for integers. Also manages the logic'
+			. ' for creating sharded tables.';
+	}
+
   /**
 	 * @param Request $request
 	 * @return static

@@ -28,6 +28,14 @@ final class Payload extends BasePayload {
 	/** @var string $path */
 	public string $path;
 
+	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Manages the restoration of MVA fields with mysqldump';
+	}
+
   /**
 	 * @param Request $request
 	 * @return static

@@ -48,6 +48,15 @@ final class Payload extends BasePayload {
 	public bool $hasCliEndpoint;
 
 	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Various "show" queries handlers, for example,'
+			. ' `show queries`, `show fields`, `show full tables`, etc';
+	}
+
+	/**
 	 * @param Request $request
 	 * @return static
 	 */
