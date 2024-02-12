@@ -57,6 +57,15 @@ final class Payload extends BasePayload {
 	}
 
 	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Various SELECTs handlers needed for mysqldump'
+			. ' and other software support, mostly aiming to work similarly to MySQL';
+	}
+
+	/**
 	 * @param Request $request
 	 * @return static
 	 * @throws QueryParseError

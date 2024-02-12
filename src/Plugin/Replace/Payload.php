@@ -30,6 +30,14 @@ final class Payload extends BasePayload
 	public string $type;
 
 	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Enables partial replaces';
+	}
+
+	/**
 	 * @param  Request  $request
 	 * @return static
 	 */

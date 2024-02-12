@@ -34,6 +34,14 @@ final class Payload extends BasePayload
 	public Endpoint $endpointBundle;
 
 	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Enables KNN by document id';
+	}
+
+	/**
 	 * @param  Request  $request
 	 * @return static
 	 */

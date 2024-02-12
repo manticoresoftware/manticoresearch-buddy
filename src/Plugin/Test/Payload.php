@@ -22,6 +22,14 @@ final class Payload extends BasePayload {
 	}
 
 	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Test plugin, used exclusively for tests';
+	}
+
+	/**
 	 * @param Request $request
 	 * @return static
 	 */

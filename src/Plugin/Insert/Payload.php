@@ -30,6 +30,15 @@ final class Payload extends BasePayload {
 	}
 
 	/**
+	 * Get description for this plugin
+	 * @return string
+	 */
+	public static function getInfo(): string {
+		return 'Auto schema support. When an insert operation is performed'
+			. ' and the table does not exist, it creates it with data types auto-detection';
+	}
+
+	/**
 	 * @param Request $request
 	 * @return static
 	 */
