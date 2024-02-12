@@ -64,52 +64,52 @@ final class Payload extends BasePayload
 	}
 
 	/**
-	 * @param Payload $self
+	 * @param Payload $payload
 	 * @param Request $request
 	 * @return void
 	 */
-	private static function parseHttpRequest(self $self, Request $request): void {
-		$self->select = ['id', 'knn_dist()'];
+	private static function parseHttpRequest(self $payload, Request $request): void {
+		$payload->select = ['id', 'knn_dist()'];
 
-		$payload = json_decode($request->payload, true);
-		if (!is_array($payload)) {
+		$parsedPayload = json_decode($request->payload, true);
+		if (!is_array($parsedPayload)) {
 			return;
 		}
 
-		if (isset($payload['_source'])) {
-			$self->select = $payload['_source'];
+		if (isset($parsedPayload['_source'])) {
+			$payload->select = $parsedPayload['_source'];
 		}
-		if (isset($payload['knn']['filter'])) {
-			$self->condition = $payload['knn']['filter'];
+		if (isset($parsedPayload['knn']['filter'])) {
+			$payload->condition = $parsedPayload['knn']['filter'];
 		}
-		$self->table = $payload['index'];
-		$self->field = $payload['knn']['field'];
-		$self->k = (string)$payload['knn']['k'];
-		$self->docId = (string)$payload['knn']['doc_id'];
+		$payload->table = $parsedPayload['index'];
+		$payload->field = $parsedPayload['knn']['field'];
+		$payload->k = (string)$parsedPayload['knn']['k'];
+		$payload->docId = (string)$parsedPayload['knn']['doc_id'];
 	}
 
 	/**
-	 * @param Payload $self
+	 * @param Payload $payload
 	 * @return void
 	 */
-	private static function parseSqlRequest(self $self): void {
+	private static function parseSqlRequest(self $payload): void {
 
 
-		$payload = static::$sqlQueryParser::getParsedPayload();
-		$self->table = $payload['FROM'][0]['table'] ?? null;
+		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
+		$payload->table = $parsedPayload['FROM'][0]['table'] ?? null;
 
-		if (!isset($payload['WHERE'])) {
+		if (!isset($parsedPayload['WHERE'])) {
 			return;
 		}
 
-		foreach ($payload['WHERE'] as $condition) {
+		foreach ($parsedPayload['WHERE'] as $condition) {
 			if ($condition['base_expr'] !== 'knn') {
 				continue;
 			}
 
-			$self->field = (string)$condition['sub_tree'][0]['base_expr'];
-			$self->k = (string)$condition['sub_tree'][1]['base_expr'];
-			$self->docId = (string)$condition['sub_tree'][2]['base_expr'];
+			$payload->field = (string)$condition['sub_tree'][0]['base_expr'];
+			$payload->k = (string)$condition['sub_tree'][1]['base_expr'];
+			$payload->docId = (string)$condition['sub_tree'][2]['base_expr'];
 		}
 	}
 
