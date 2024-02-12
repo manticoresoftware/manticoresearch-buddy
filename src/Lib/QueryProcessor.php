@@ -19,9 +19,11 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
+use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use Manticoresearch\Buddy\Core\Tool\Strings;
 use Psr\Container\ContainerInterface;
 
@@ -45,14 +47,16 @@ class QueryProcessor {
 	/** @var array<array{full:string,short:string,version:string}> */
 	protected static array $extraPlugins = [];
 
-  /**
-   * This is the main entry point to start parsing and processing query
-   *
-   * @param Request $request
-   *  The request struct to process
-   * @return BaseHandler
-   *  The BaseHandler to execute to process the final query
-   */
+	protected static SqlQueryParser $sqlQueryParser;
+
+	/**
+	 * This is the main entry point to start parsing and processing query
+	 *
+	 * @param Request $request
+	 *  The request struct to process
+	 * @return BaseHandler
+	 *  The BaseHandler to execute to process the final query
+	 */
 	public static function process(Request $request): BaseHandler {
 		if (!static::$isInited) {
 			static::init();
@@ -61,7 +65,9 @@ class QueryProcessor {
 		$pluginName = substr($pluginPrefix, strrpos($pluginPrefix, '\\') + 1);
 		Buddy::debug("[$request->id] Plugin: $pluginName");
 		buddy_metric('plugin_' . Strings::camelcaseToUnderscore($pluginName), 1);
+		/** @var BasePayload $payloadClassName */
 		$payloadClassName = "{$pluginPrefix}\\Payload";
+		$payloadClassName::setParser(static::$sqlQueryParser);
 		$pluginPayload = $payloadClassName::fromRequest($request);
 		$pluginPayload->setSettings(static::$settings);
 		Buddy::debug("[$request->id] $pluginName payload: " . json_encode($pluginPayload));
@@ -91,6 +97,10 @@ class QueryProcessor {
 
 		if (!isset(static::$settings)) {
 			static::$settings = static::fetchManticoreSettings();
+		}
+
+		if (!isset(static::$sqlQueryParser)) {
+			static::$sqlQueryParser = SqlQueryParser::getInstance();
 		}
 
 		static::$pluggable = new Pluggable(
@@ -253,7 +263,9 @@ class QueryProcessor {
 		foreach ($list as $prefix => $plugins) {
 			foreach ($plugins as $plugin) {
 				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
+				/** @var BasePayload $pluginPayloadClass */
 				$pluginPayloadClass = "$pluginPrefix\\Payload";
+				$pluginPayloadClass::setParser(static::$sqlQueryParser);
 				if ($pluginPayloadClass::hasMatch($request)) {
 					return $pluginPrefix;
 				}

@@ -26,10 +26,14 @@ final class Payload extends BasePayload
 	public ?string $k = null;
 	public ?string $docId = null;
 
-	/** @var array<string> */
+	/** @var array<string> $select*/
 	public array $select = [];
 
+	/** @var ?string $table */
 	public ?string $table = null;
+
+	/** @var array<string> $condition */
+	public array $condition = [];
 
 	public Endpoint $endpointBundle;
 
@@ -42,46 +46,75 @@ final class Payload extends BasePayload
 	}
 
 	/**
-	 * @param  Request  $request
+	 * @param Request $request
 	 * @return static
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static();
-
 		$self->endpointBundle = $request->endpointBundle;
+
 		// If we need process this query as http request
 		if ($self->endpointBundle === Endpoint::Search) {
-			$self->select = ['id', 'knn_dist()'];
-
-			$payload = json_decode($request->payload, true);
-			if (is_array($payload)) {
-				if (isset($payload['_source'])) {
-					$self->select = $payload['_source'];
-				}
-				$self->table = $payload['index'];
-				$self->field = $payload['knn']['field'];
-				$self->k = (string)$payload['knn']['k'];
-				$self->docId = (string)$payload['knn']['doc_id'];
-			}
+			self::parseHttpRequest($self, $request);
 		} else {
-			$matches = $self::getMatches($request);
-
-			$self->select = array_map(
-				function ($row) {
-					return trim($row);
-				}, explode(',', $matches[1] ?? '')
-			);
-			$self->table = $matches[2] ?? null;
-			$self->field = $matches[3] ?? null;
-			$self->k = $matches[4] ?? null;
-			$self->docId = $matches[5] ?? null;
+			$self::parseSqlRequest($self);
 		}
 
 		return $self;
 	}
 
 	/**
-	 * @param  Request  $request
+	 * @param Payload $payload
+	 * @param Request $request
+	 * @return void
+	 */
+	private static function parseHttpRequest(self $payload, Request $request): void {
+		$payload->select = ['id', 'knn_dist()'];
+
+		$parsedPayload = json_decode($request->payload, true);
+		if (!is_array($parsedPayload)) {
+			return;
+		}
+
+		if (isset($parsedPayload['_source'])) {
+			$payload->select = $parsedPayload['_source'];
+		}
+		if (isset($parsedPayload['knn']['filter'])) {
+			$payload->condition = $parsedPayload['knn']['filter'];
+		}
+		$payload->table = $parsedPayload['index'];
+		$payload->field = $parsedPayload['knn']['field'];
+		$payload->k = (string)$parsedPayload['knn']['k'];
+		$payload->docId = (string)$parsedPayload['knn']['doc_id'];
+	}
+
+	/**
+	 * @param Payload $payload
+	 * @return void
+	 */
+	private static function parseSqlRequest(self $payload): void {
+
+
+		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
+		$payload->table = $parsedPayload['FROM'][0]['table'] ?? null;
+
+		if (!isset($parsedPayload['WHERE'])) {
+			return;
+		}
+
+		foreach ($parsedPayload['WHERE'] as $condition) {
+			if ($condition['base_expr'] !== 'knn') {
+				continue;
+			}
+
+			$payload->field = (string)$condition['sub_tree'][0]['base_expr'];
+			$payload->k = (string)$condition['sub_tree'][1]['base_expr'];
+			$payload->docId = (string)$condition['sub_tree'][2]['base_expr'];
+		}
+	}
+
+	/**
+	 * @param Request $request
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
@@ -92,24 +125,19 @@ final class Payload extends BasePayload
 			}
 		}
 
-		if (stripos($request->payload, 'knn') !== false && self::getMatches($request)) {
-			return true;
+		$payload = static::$sqlQueryParser::parse($request->payload);
+		if (isset($payload['WHERE'])) {
+			foreach ($payload['WHERE'] as $expression) {
+				if ($expression['expr_type'] === 'function'
+				&& $expression['base_expr'] === 'knn'
+					&& isset($expression['sub_tree'][2])
+					&& is_numeric($expression['sub_tree'][2]['base_expr'])
+				) {
+					return true;
+				}
+			}
 		}
 
 		return false;
-	}
-
-	/**
-	 * @param  Request  $request
-	 * @return array<string>|bool
-	 */
-	private static function getMatches(Request $request): array|bool {
-		$pattern = '/^select\s+(.*)from\s+`*([a-z0-9_-]+)`*\s+'.
-			'.*?knn\s+\(\s*(.*)?\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)/usi';
-		if (!preg_match($pattern, $request->payload, $matches)) {
-			return false;
-		}
-
-		return $matches;
 	}
 }
