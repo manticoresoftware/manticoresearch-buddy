@@ -12,12 +12,12 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Knn;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use PHPSQLParser\exceptions\UnsupportedFeatureException;
 use RuntimeException;
 
 final class Handler extends BaseHandlerWithClient
@@ -52,6 +52,12 @@ final class Handler extends BaseHandlerWithClient
 		)->run();
 	}
 
+	/**
+	 * @param Client $client
+	 * @param Payload $payload
+	 * @return string|false
+	 * @throws ManticoreSearchClientError
+	 */
 	private static function getQueryVectorValue(Client $client, Payload $payload): string|false {
 		$document = $client
 			->sendRequest('SELECT * FROM ' . $payload->table . ' WHERE id = ' . $payload->docId)
@@ -70,7 +76,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @param Payload $payload
 	 * @param string $queryVector
 	 * @return array <string, string>
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|QueryParseError
 	 */
 	private static function getKnnResult(Client $manticoreClient, Payload $payload, string $queryVector): array {
 		if ($payload->endpointBundle === Endpoint::Search) {
@@ -131,7 +137,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @param Payload $payload
 	 * @param string $queryVector
 	 * @return array <string, string>
-	 * @throws ManticoreSearchClientError|UnsupportedFeatureException
+	 * @throws QueryParseError|ManticoreSearchClientError
 	 */
 	private static function knnSqlQuery(Client $manticoreClient, Payload $payload, string $queryVector): array {
 
@@ -154,6 +160,11 @@ final class Handler extends BaseHandlerWithClient
 		return $result;
 	}
 
+	/**
+	 * @param Payload $payload
+	 * @param string $queryVector
+	 * @return void
+	 */
 	private static function substituteParsedQuery(Payload $payload, string $queryVector): void {
 
 		$parsedQuery = $payload::$sqlQueryParser::getParsedPayload();
