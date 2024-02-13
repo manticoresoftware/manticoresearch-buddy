@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Replace;
 
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -47,11 +48,15 @@ final class Payload extends BasePayload
 		$self->type = $request->format->value;
 
 		if ($request->format->value === RequestFormat::SQL->value) {
-			preg_match(
+			$hasMatches = preg_match(
 				'/replace\s+into\s+`?(.*?)`?\s+set\s+(.*?)\s+where\s+id\s*=\s*([0-9]+)/usi',
 				$request->payload,
 				$matches
 			);
+
+			if (!$hasMatches) {
+				throw QueryParseError::create('Failed to parse query, make sure it\'s correct', true);
+			}
 
 			$self->table = $matches[1] ?? '';
 			$self->set = self::parseSet($matches[2] ?? '');
@@ -68,7 +73,6 @@ final class Payload extends BasePayload
 				$self->set = $payload['doc'] ?? [];
 			}
 		}
-
 		return $self;
 	}
 

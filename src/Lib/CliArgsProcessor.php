@@ -159,10 +159,9 @@ final class CliArgsProcessor {
 	 */
 	protected static function parseDebug(array $opts): void {
 		if (!isset($opts['debug'])) {
-			// Set error reporting with excluding warnings
-			error_reporting(E_ALL & ~E_WARNING);
 			return;
 		}
+
 		putenv('DEBUG=1');
 	}
 
