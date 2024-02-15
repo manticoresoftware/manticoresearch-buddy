@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Replace;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -81,7 +82,7 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * @param Client $manticoreClient
 	 * @param string $table
-	 * @return array <int, array<string, string>>
+	 * @return array<int|string, array{type:string, properties:string}>
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function getFields(Client $manticoreClient, string $table): array {
@@ -91,6 +92,7 @@ final class Handler extends BaseHandlerWithClient {
 
 		if (is_array($descResult[0])) {
 			$fields = [];
+			/** @var array{Type:string, Properties:string, Field:string} $field */
 			foreach ($descResult[0]['data'] as $field) {
 				$fields[$field['Field']] = ['type' => $field['Type'], 'properties' => $field['Properties']];
 			}
@@ -103,9 +105,9 @@ final class Handler extends BaseHandlerWithClient {
 
 
 	/**
-	 * @param array $fields
+	 * @param array<int|string, array{type:string, properties:string}> $fields
 	 * @return void
-	 * @throws \Manticoresearch\Buddy\Core\Error\GenericError
+	 * @throws GenericError
 	 */
 	private static function checkStoredFields(array $fields): void {
 		foreach ($fields as $fieldName => $fieldSettings) {
@@ -124,13 +126,14 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
-	 * @param array<int, array<string, string>> $fields
-	 * @return array<string, string|int>
+	 * @param array<int|string, array{type:string, properties:string}> $fields
+	 * @return array<string, bool|float|int|string>
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function getRecordValues(Client $manticoreClient, Payload $payload, array $fields): array {
 		$sql = 'SELECT * FROM ' . $payload->table . ' WHERE id = ' . $payload->id;
 
+		/** @var array<int, array<string, array<int, array<string, string>>>> $records */
 		$records = $manticoreClient
 			->sendRequest($sql)
 			->getResult();
@@ -142,7 +145,12 @@ final class Handler extends BaseHandlerWithClient {
 		return ['id' => $payload->id];
 	}
 
-	private static function morphValuesByFieldType(array $records, $fields): array {
+	/**
+	 * @param array<string, bool|float|int|string|array<int, string>> $records
+	 * @param array<int|string, array{type:string, properties:string}> $fields
+	 * @return array<string, bool|float|int|string>
+	 */
+	private static function morphValuesByFieldType(array $records, array $fields): array {
 
 		foreach ($records as $fieldName => $fieldValue) {
 			$records[$fieldName] = match ($fields[$fieldName]['type']) {
@@ -157,12 +165,13 @@ final class Handler extends BaseHandlerWithClient {
 			};
 		}
 
+		/** @var array<string, bool|float|int|string> */
 		return $records;
 	}
 
 	/**
 	 * @param string $tableName
-	 * @param array<string, string|int|array<string>> $set
+	 * @param array<string, bool|float|int|string> $set
 	 * @return string
 	 */
 	private static function buildQuery(string $tableName, array $set): string {

@@ -15,7 +15,6 @@ use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * This is simple do nothing request that handle empty queries
@@ -25,7 +24,7 @@ final class Payload extends BasePayload {
 	public string $path;
 
 	public string $table;
-	/** @var array <string, string> */
+	/** @var array<string, bool|float|int|string> */
 	public array $set;
 	public int $id;
 	public string $type;
