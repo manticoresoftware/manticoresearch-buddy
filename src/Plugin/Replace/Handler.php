@@ -60,8 +60,7 @@ final class Handler extends BaseHandlerWithClient
 
 			$baseValues = static::getRecordValues($client, $payload, $fields);
 			if ($payload->type === RequestFormat::JSON->value) {
-
-				$payload->set = self::morphDataByFieldType($payload->set, $fields);
+				$payload->set = self::morphValuesByFieldType($payload->set, $fields);
 			}
 
 			$result = $client->sendRequest(static::buildQuery($payload->table, array_merge($baseValues, $payload->set)));
@@ -142,13 +141,13 @@ final class Handler extends BaseHandlerWithClient
 			->getResult();
 
 		if (isset($records[0]['data'][0])) {
-			return self::morphDataByFieldType($records[0]['data'][0], $fields);
+			return self::morphValuesByFieldType($records[0]['data'][0], $fields);
 		}
 
 		return ['id' => $payload->id];
 	}
 
-	private static function morphDataByFieldType(array $records, $fields): array
+	private static function morphValuesByFieldType(array $records, $fields): array
 	{
 
 		foreach ($records as $fieldName => $fieldValue) {
