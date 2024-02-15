@@ -28,6 +28,9 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 	. 'autoload.php'
 ;
 
+// Set error reporting with excluding warnings
+error_reporting(E_ALL & ~E_WARNING);
+
 set_error_handler(buddy_error_handler(...)); // @phpstan-ignore-line
 Buddy::setVersionFile(__DIR__ . '/../APP_VERSION');
 
