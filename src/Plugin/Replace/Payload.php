@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * This is simple do nothing request that handle empty queries
@@ -47,6 +48,10 @@ final class Payload extends BasePayload {
 		$self->type = $request->format->value;
 
 		if ($request->format->value === RequestFormat::SQL->value) {
+
+			/** @var array{REPLACE:array<int, array{table?:string, expr_type: string, base_expr: string}>,
+			 *   SET:array<int, array{expr_type: string, sub_tree: array<int, array{base_expr: string}>}>,
+			 *   WHERE:array<int, array{base_expr: string}>} $payload */
 			$payload = static::$sqlQueryParser::parse($request->payload);
 
 			$self->table = self::parseTable($payload['REPLACE']);
@@ -91,7 +96,7 @@ final class Payload extends BasePayload {
 	}
 
 	/**
-	 * @param array $tableStatement
+	 * @param array<int, array{table?:string, expr_type: string, base_expr: string}> $tableStatement
 	 * @return string
 	 * @throws ManticoreSearchClientError
 	 */
@@ -105,7 +110,7 @@ final class Payload extends BasePayload {
 	}
 
 	/**
-	 * @param array $setStatement
+	 * @param array<int, array{expr_type: string, sub_tree: array<int, array{base_expr: string}>}> $setStatement
 	 * @return array <string, string>
 	 */
 	public static function parseSet(array $setStatement): array {
