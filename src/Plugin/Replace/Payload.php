@@ -20,8 +20,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
  */
-final class Payload extends BasePayload
-{
+final class Payload extends BasePayload {
 	public string $path;
 
 	public string $table;
@@ -34,8 +33,7 @@ final class Payload extends BasePayload
 	 * Get description for this plugin
 	 * @return string
 	 */
-	public static function getInfo(): string
-	{
+	public static function getInfo(): string {
 		return 'Enables partial replaces';
 	}
 
@@ -43,20 +41,17 @@ final class Payload extends BasePayload
 	 * @param Request $request
 	 * @return static
 	 */
-	public static function fromRequest(Request $request): static
-	{
+	public static function fromRequest(Request $request): static {
 		$self = new static();
 		$self->path = $request->path;
 		$self->type = $request->format->value;
 
 		if ($request->format->value === RequestFormat::SQL->value) {
-
 			$payload = static::$sqlQueryParser::parse($request->payload);
 
 			$self->table = self::parseTable($payload['REPLACE']);
 			$self->set = self::parseSet($payload['SET']);
 			$self->id = (int)$payload['WHERE'][2]['base_expr'];
-
 		} else {
 			$pathChunks = explode('/', $request->path);
 			$payload = json_decode($request->payload, true);
@@ -77,11 +72,9 @@ final class Payload extends BasePayload
 	 * @param Request $request
 	 * @return bool
 	 */
-	public static function hasMatch(Request $request): bool
-	{
+	public static function hasMatch(Request $request): bool {
 
 		if ($request->format->value === RequestFormat::SQL->value) {
-
 			$payload = static::$sqlQueryParser::parse($request->payload);
 
 			if (isset($payload['REPLACE'])
@@ -89,11 +82,10 @@ final class Payload extends BasePayload
 				&& isset($payload['WHERE'][0]['base_expr']) && $payload['WHERE'][0]['base_expr'] === 'id'
 				&& isset($payload['WHERE'][1]['base_expr']) && $payload['WHERE'][1]['base_expr'] === '='
 				&& isset($payload['WHERE'][2]['base_expr']) && is_numeric($payload['WHERE'][2]['base_expr'])
-				&& count($payload['WHERE']) === 3) {
+				&& sizeof($payload['WHERE']) === 3) {
 				return true;
 			}
 			return false;
-
 		}
 
 		return str_contains($request->path, '/_update/');
@@ -104,8 +96,7 @@ final class Payload extends BasePayload
 	 * @return string
 	 * @throws ManticoreSearchClientError
 	 */
-	public static function parseTable(array $tableStatement): string
-	{
+	public static function parseTable(array $tableStatement): string {
 		foreach ($tableStatement as $item) {
 			if (isset($item['table']) && $item['expr_type'] === 'table') {
 				return $item['table'];
@@ -118,16 +109,17 @@ final class Payload extends BasePayload
 	 * @param array $setStatement
 	 * @return array <string, string>
 	 */
-	public static function parseSet(array $setStatement): array
-	{
+	public static function parseSet(array $setStatement): array {
 		$result = [];
 
 		foreach ($setStatement as $singleStatement) {
-			if (isset($singleStatement['sub_tree'][0]['base_expr']) &&
-				isset($singleStatement['sub_tree'][1]['base_expr']) &&
-				isset($singleStatement['sub_tree'][2]['base_expr'])) {
-				$result[$singleStatement['sub_tree'][0]['base_expr']] = $singleStatement['sub_tree'][2]['base_expr'];
+			if (!isset($singleStatement['sub_tree'][0]['base_expr'])
+				|| !isset($singleStatement['sub_tree'][1]['base_expr'])
+				|| !isset($singleStatement['sub_tree'][2]['base_expr'])) {
+				continue;
 			}
+
+			$result[$singleStatement['sub_tree'][0]['base_expr']] = $singleStatement['sub_tree'][2]['base_expr'];
 		}
 
 		return $result;

@@ -18,11 +18,9 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient
-{
+final class Handler extends BaseHandlerWithClient {
 	// Todo expose this types to Buddy-core
 	const TYPE_INT = 'uint';
 	const TYPE_BIGINT = 'bigint';
@@ -42,8 +40,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @param Payload $payload
 	 * @return void
 	 */
-	public function __construct(public Payload $payload)
-	{
+	public function __construct(public Payload $payload) {
 	}
 
 	/**
@@ -52,8 +49,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @return Task
 	 * @throws RuntimeException
 	 */
-	public function run(): Task
-	{
+	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $client): TaskResult {
 			$fields = self::getFields($client, $payload->table);
 			static::checkStoredFields($fields);
@@ -63,7 +59,9 @@ final class Handler extends BaseHandlerWithClient
 				$payload->set = self::morphValuesByFieldType($payload->set, $fields);
 			}
 
-			$result = $client->sendRequest(static::buildQuery($payload->table, array_merge($baseValues, $payload->set)));
+			$result = $client->sendRequest(
+				static::buildQuery($payload->table, array_merge($baseValues, $payload->set))
+			);
 
 			if ($result->getError()) {
 				throw ManticoreSearchResponseError::create($result->getError());
@@ -86,8 +84,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @return array <int, array<string, string>>
 	 * @throws ManticoreSearchClientError
 	 */
-	private static function getFields(Client $manticoreClient, string $table): array
-	{
+	private static function getFields(Client $manticoreClient, string $table): array {
 		$descResult = $manticoreClient
 			->sendRequest('DESC ' . $table)
 			->getResult();
@@ -110,8 +107,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @return void
 	 * @throws \Manticoresearch\Buddy\Core\Error\GenericError
 	 */
-	private static function checkStoredFields(array $fields): void
-	{
+	private static function checkStoredFields(array $fields): void {
 		foreach ($fields as $fieldName => $fieldSettings) {
 			if ($fieldSettings['type'] !== 'text'
 				|| str_contains($fieldSettings['properties'], 'stored')) {
@@ -132,8 +128,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @return array<string, string|int>
 	 * @throws ManticoreSearchClientError
 	 */
-	private static function getRecordValues(Client $manticoreClient, Payload $payload, array $fields): array
-	{
+	private static function getRecordValues(Client $manticoreClient, Payload $payload, array $fields): array {
 		$sql = 'SELECT * FROM ' . $payload->table . ' WHERE id = ' . $payload->id;
 
 		$records = $manticoreClient
@@ -147,8 +142,7 @@ final class Handler extends BaseHandlerWithClient
 		return ['id' => $payload->id];
 	}
 
-	private static function morphValuesByFieldType(array $records, $fields): array
-	{
+	private static function morphValuesByFieldType(array $records, $fields): array {
 
 		foreach ($records as $fieldName => $fieldValue) {
 			$records[$fieldName] = match ($fields[$fieldName]['type']) {
@@ -158,7 +152,7 @@ final class Handler extends BaseHandlerWithClient
 				self::TYPE_TEXT, self::TYPE_STRING, self::TYPE_JSON =>
 					"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue)  . "'",
 				self::TYPE_MVA, self::TYPE_MVA64, self::TYPE_FLOAT_VECTOR =>
-					'(' . (is_array($fieldValue) ? implode(',',$fieldValue) : $fieldValue) . ')',
+					'(' . (is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue) . ')',
 				default => $fieldValue
 			};
 		}
@@ -171,8 +165,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @param array<string, string|int|array<string>> $set
 	 * @return string
 	 */
-	private static function buildQuery(string $tableName, array $set): string
-	{
+	private static function buildQuery(string $tableName, array $set): string {
 		return 'REPLACE INTO `' . $tableName . '` (' . implode(',', array_keys($set)) . ') ' .
 			'VALUES (' . implode(',', array_values($set)) . ')';
 	}
