@@ -64,7 +64,6 @@ final class Payload extends BasePayload {
 				$self->set = $payload['doc'] ?? [];
 			}
 		}
-
 		return $self;
 	}
 
