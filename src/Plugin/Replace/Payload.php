@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Replace;
 
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -33,29 +34,29 @@ final class Payload extends BasePayload
 	 * Get description for this plugin
 	 * @return string
 	 */
-	public static function getInfo(): string {
+	public static function getInfo(): string
+	{
 		return 'Enables partial replaces';
 	}
 
 	/**
-	 * @param  Request  $request
+	 * @param Request $request
 	 * @return static
 	 */
-	public static function fromRequest(Request $request): static {
+	public static function fromRequest(Request $request): static
+	{
 		$self = new static();
 		$self->path = $request->path;
 		$self->type = $request->format->value;
 
 		if ($request->format->value === RequestFormat::SQL->value) {
-			preg_match(
-				'/replace\s+into\s+`?(.*?)`?\s+set\s+(.*?)\s+where\s+id\s*=\s*([0-9]+)/usi',
-				$request->payload,
-				$matches
-			);
 
-			$self->table = $matches[1] ?? '';
-			$self->set = self::parseSet($matches[2] ?? '');
-			$self->id = (int)$matches[3];
+			$payload = static::$sqlQueryParser::parse($request->payload);
+
+			$self->table = self::parseTable($payload['REPLACE']);
+			$self->set = self::parseSet($payload['SET']);
+			$self->id = (int)$payload['WHERE'][2]['base_expr'];
+
 		} else {
 			$pathChunks = explode('/', $request->path);
 			$payload = json_decode($request->payload, true);
@@ -73,37 +74,59 @@ final class Payload extends BasePayload
 	}
 
 	/**
-	 * @param  Request  $request
+	 * @param Request $request
 	 * @return bool
 	 */
-	public static function hasMatch(Request $request): bool {
+	public static function hasMatch(Request $request): bool
+	{
 
 		if ($request->format->value === RequestFormat::SQL->value) {
-			return (stripos($request->payload, 'replace') !== false &&
-				stripos($request->payload, 'set') !== false);
+
+			$payload = static::$sqlQueryParser::parse($request->payload);
+
+			if (isset($payload['REPLACE'])
+				&& isset($payload['SET'])
+				&& isset($payload['WHERE'][0]['base_expr']) && $payload['WHERE'][0]['base_expr'] === 'id'
+				&& isset($payload['WHERE'][1]['base_expr']) && $payload['WHERE'][1]['base_expr'] === '='
+				&& isset($payload['WHERE'][2]['base_expr']) && is_numeric($payload['WHERE'][2]['base_expr'])
+				&& count($payload['WHERE']) === 3) {
+				return true;
+			}
+			return false;
+
 		}
 
 		return str_contains($request->path, '/_update/');
 	}
 
 	/**
-	 * @param  string  $setStatement
+	 * @param array $tableStatement
+	 * @return string
+	 * @throws ManticoreSearchClientError
+	 */
+	public static function parseTable(array $tableStatement): string
+	{
+		foreach ($tableStatement as $item) {
+			if (isset($item['table']) && $item['expr_type'] === 'table') {
+				return $item['table'];
+			}
+		}
+		throw ManticoreSearchClientError::create('Can\'t parse table name');
+	}
+
+	/**
+	 * @param array $setStatement
 	 * @return array <string, string>
 	 */
-	public static function parseSet(string $setStatement): array {
+	public static function parseSet(array $setStatement): array
+	{
 		$result = [];
-		if (preg_match_all('/(?:\'[^\']*\'|"[^"]*"|`[^`]*`|\([^)]*\)|[^,])+/usi', $setStatement, $matches)) {
-			if (isset($matches[0])) {
-				foreach ($matches[0] as $part) {
-					$groupMatches = [];
-					preg_match('/`?(.*?)`?\s*=\s*[\'"]?(.*?)[\'"]?$/usi', trim($part), $groupMatches);
 
-					if (!isset($groupMatches[1])) {
-						continue;
-					}
-
-					$result[$groupMatches[1]] = $groupMatches[2];
-				}
+		foreach ($setStatement as $singleStatement) {
+			if (isset($singleStatement['sub_tree'][0]['base_expr']) &&
+				isset($singleStatement['sub_tree'][1]['base_expr']) &&
+				isset($singleStatement['sub_tree'][2]['base_expr'])) {
+				$result[$singleStatement['sub_tree'][0]['base_expr']] = $singleStatement['sub_tree'][2]['base_expr'];
 			}
 		}
 
