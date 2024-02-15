@@ -156,16 +156,14 @@ final class Handler extends BaseHandlerWithClient
 				self::TYPE_INT, self::TYPE_BIGINT, self::TYPE_TIMESTAMP => (int)$fieldValue,
 				self::TYPE_BOOL => (bool)$fieldValue,
 				self::TYPE_FLOAT => (float)$fieldValue,
-				self::TYPE_TEXT, self::TYPE_STRING, self::TYPE_JSON => "'" . $fieldValue . "'",
-				self::TYPE_MVA, self::TYPE_MVA64, self::TYPE_FLOAT_VECTOR => '(' .
-					(is_array($fieldValue) ?
-					implode(',',$fieldValue) :
-					$fieldValue) . ')',
+				self::TYPE_TEXT, self::TYPE_STRING, self::TYPE_JSON =>
+					"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue)  . "'",
+				self::TYPE_MVA, self::TYPE_MVA64, self::TYPE_FLOAT_VECTOR =>
+					'(' . (is_array($fieldValue) ? implode(',',$fieldValue) : $fieldValue) . ')',
 				default => $fieldValue
 			};
 		}
 
-		Buddy::debug(json_encode($records));
 		return $records;
 	}
 
