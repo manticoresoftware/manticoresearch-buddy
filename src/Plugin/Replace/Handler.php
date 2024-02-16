@@ -100,7 +100,7 @@ final class Handler extends BaseHandlerWithClient {
 			return $fields;
 		}
 
-		throw ManticoreSearchClientError::create('Table hasn\'t fields');
+		throw ManticoreSearchClientError::create("Table hasn't fields");
 	}
 
 
@@ -131,7 +131,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function getRecordValues(Client $manticoreClient, Payload $payload, array $fields): array {
-		$sql = 'SELECT * FROM ' . $payload->table . ' WHERE id = ' . $payload->id;
+		$sql = 'SELECT * FROM  {$payload->table}  WHERE id = {$payload->id}';
 
 		/** @var array<int, array<string, array<int, array<string, string>>>> $records */
 		$records = $manticoreClient
@@ -175,8 +175,9 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return string
 	 */
 	private static function buildQuery(string $tableName, array $set): string {
-		return 'REPLACE INTO `' . $tableName . '` (' . implode(',', array_keys($set)) . ') ' .
-			'VALUES (' . implode(',', array_values($set)) . ')';
+		$keys = implode(',', array_keys($set));
+		$values = implode(',', array_values($set));
+		return "REPLACE INTO `$tableName` ($keys) VALUES ($values)";
 	}
 
 
