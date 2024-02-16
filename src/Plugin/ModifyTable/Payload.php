@@ -60,13 +60,13 @@ final class Payload extends BasePayload {
 				QueryParseError::throw('Failed to parse options');
 			}
 
-			foreach ($optionMatches as $optionMatche) {
+			foreach ($optionMatches as $optionMatch) {
 			// Trim quotes if the value is quoted
-				$value = trim($optionMatche['value'], "\"'");
-				if (in_array($optionMatche['key'], ['rf', 'shards'])) {
+				$value = trim($optionMatch['value'], "\"'");
+				if (in_array($optionMatch['key'], ['rf', 'shards'])) {
 					$value = (int)$value;
 				}
-				$options[$optionMatche['key']] = $value;
+				$options[$optionMatch['key']] = $value;
 			}
 		}
 

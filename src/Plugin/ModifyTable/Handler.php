@@ -66,6 +66,12 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return ?Task
 	 */
 	protected function validate(): ?Task {
+		if ($this->payload->options['rf'] < 1 || $this->payload->options['shards'] < 1) {
+			return static::getErrorTask(
+				'Invalid shards or rf options are set'
+			);
+		}
+
 		// Try to validate that we do not create the same table we have
 		$q = "SHOW CREATE TABLE {$this->payload->table}";
 		$resp = $this->manticoreClient->sendRequest($q);
