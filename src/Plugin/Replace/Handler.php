@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -22,18 +23,6 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
 final class Handler extends BaseHandlerWithClient {
-	// Todo expose this types to Buddy-core
-	const TYPE_INT = 'uint';
-	const TYPE_BIGINT = 'bigint';
-	const TYPE_TIMESTAMP = 'timestamp';
-	const TYPE_BOOL = 'bool';
-	const TYPE_FLOAT = 'float';
-	const TYPE_TEXT = 'text';
-	const TYPE_STRING = 'string';
-	const TYPE_JSON = 'json';
-	const TYPE_MVA = 'mva';
-	const TYPE_MVA64 = 'multi64';
-	const TYPE_FLOAT_VECTOR = 'float_vector';
 
 	/**
 	 * Initialize the executor
@@ -154,12 +143,12 @@ final class Handler extends BaseHandlerWithClient {
 
 		foreach ($records as $fieldName => $fieldValue) {
 			$records[$fieldName] = match ($fields[$fieldName]['type']) {
-				self::TYPE_INT, self::TYPE_BIGINT, self::TYPE_TIMESTAMP => (int)$fieldValue,
-				self::TYPE_BOOL => (bool)$fieldValue,
-				self::TYPE_FLOAT => (float)$fieldValue,
-				self::TYPE_TEXT, self::TYPE_STRING, self::TYPE_JSON =>
+				Fields::TYPE_INT, Fields::TYPE_BIGINT, Fields::TYPE_TIMESTAMP => (int)$fieldValue,
+				Fields::TYPE_BOOL => (bool)$fieldValue,
+				Fields::TYPE_FLOAT => (float)$fieldValue,
+				Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
 					"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue)  . "'",
-				self::TYPE_MVA, self::TYPE_MVA64, self::TYPE_FLOAT_VECTOR =>
+				Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
 					'(' . (is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue) . ')',
 				default => $fieldValue
 			};
