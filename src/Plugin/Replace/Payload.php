@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Replace;
 
-use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -20,12 +20,11 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
  */
-final class Payload extends BasePayload
-{
+final class Payload extends BasePayload {
 	public string $path;
 
 	public string $table;
-	/** @var array <string, string> */
+	/** @var array<string, bool|float|int|string> */
 	public array $set;
 	public int $id;
 	public string $type;
@@ -39,7 +38,7 @@ final class Payload extends BasePayload
 	}
 
 	/**
-	 * @param  Request  $request
+	 * @param Request $request
 	 * @return static
 	 */
 	public static function fromRequest(Request $request): static {
@@ -48,19 +47,15 @@ final class Payload extends BasePayload
 		$self->type = $request->format->value;
 
 		if ($request->format->value === RequestFormat::SQL->value) {
-			$hasMatches = preg_match(
-				'/replace\s+into\s+`?(.*?)`?\s+set\s+(.*?)\s+where\s+id\s*=\s*([0-9]+)/usi',
-				$request->payload,
-				$matches
-			);
 
-			if (!$hasMatches) {
-				throw QueryParseError::create('Failed to parse query, make sure it\'s correct', true);
-			}
+			/** @var array{REPLACE:array<int, array{table?:string, expr_type: string, base_expr: string}>,
+			 *   SET:array<int, array{expr_type: string, sub_tree: array<int, array{base_expr: string}>}>,
+			 *   WHERE:array<int, array{base_expr: string}>} $payload */
+			$payload = static::$sqlQueryParser::parse($request->payload);
 
-			$self->table = $matches[1] ?? '';
-			$self->set = self::parseSet($matches[2] ?? '');
-			$self->id = (int)$matches[3];
+			$self->table = self::parseTable($payload['REPLACE']);
+			$self->set = self::parseSet($payload['SET']);
+			$self->id = (int)$payload['WHERE'][2]['base_expr'];
 		} else {
 			$pathChunks = explode('/', $request->path);
 			$payload = json_decode($request->payload, true);
@@ -77,38 +72,57 @@ final class Payload extends BasePayload
 	}
 
 	/**
-	 * @param  Request  $request
+	 * @param Request $request
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
 
 		if ($request->format->value === RequestFormat::SQL->value) {
-			return (stripos($request->payload, 'replace') !== false &&
-				stripos($request->payload, 'set') !== false);
+			$payload = static::$sqlQueryParser::parse($request->payload);
+
+			if (isset($payload['REPLACE'])
+				&& isset($payload['SET'])
+				&& isset($payload['WHERE'][0]['base_expr']) && $payload['WHERE'][0]['base_expr'] === 'id'
+				&& isset($payload['WHERE'][1]['base_expr']) && $payload['WHERE'][1]['base_expr'] === '='
+				&& isset($payload['WHERE'][2]['base_expr']) && is_numeric($payload['WHERE'][2]['base_expr'])
+				&& sizeof($payload['WHERE']) === 3) {
+				return true;
+			}
+			return false;
 		}
 
 		return str_contains($request->path, '/_update/');
 	}
 
 	/**
-	 * @param  string  $setStatement
+	 * @param array<int, array{table?:string, expr_type: string, base_expr: string}> $tableStatement
+	 * @return string
+	 * @throws ManticoreSearchClientError
+	 */
+	public static function parseTable(array $tableStatement): string {
+		foreach ($tableStatement as $item) {
+			if (isset($item['table']) && $item['expr_type'] === 'table') {
+				return $item['table'];
+			}
+		}
+		throw ManticoreSearchClientError::create('Can\'t parse table name');
+	}
+
+	/**
+	 * @param array<int, array{expr_type: string, sub_tree: array<int, array{base_expr: string}>}> $setStatement
 	 * @return array <string, string>
 	 */
-	public static function parseSet(string $setStatement): array {
+	public static function parseSet(array $setStatement): array {
 		$result = [];
-		if (preg_match_all('/(?:\'[^\']*\'|"[^"]*"|`[^`]*`|\([^)]*\)|[^,])+/usi', $setStatement, $matches)) {
-			if (isset($matches[0])) {
-				foreach ($matches[0] as $part) {
-					$groupMatches = [];
-					preg_match('/`?(.*?)`?\s*=\s*[\'"]?(.*?)[\'"]?$/usi', trim($part), $groupMatches);
 
-					if (!isset($groupMatches[1])) {
-						continue;
-					}
-
-					$result[$groupMatches[1]] = $groupMatches[2];
-				}
+		foreach ($setStatement as $singleStatement) {
+			if (!isset($singleStatement['sub_tree'][0]['base_expr'])
+				|| !isset($singleStatement['sub_tree'][1]['base_expr'])
+				|| !isset($singleStatement['sub_tree'][2]['base_expr'])) {
+				continue;
 			}
+
+			$result[$singleStatement['sub_tree'][0]['base_expr']] = $singleStatement['sub_tree'][2]['base_expr'];
 		}
 
 		return $result;

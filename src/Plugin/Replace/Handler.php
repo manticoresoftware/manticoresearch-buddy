@@ -11,21 +11,23 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Replace;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient
-{
+final class Handler extends BaseHandlerWithClient {
+
 	/**
 	 * Initialize the executor
 	 *
-	 * @param  Payload  $payload
+	 * @param Payload $payload
 	 * @return void
 	 */
 	public function __construct(public Payload $payload) {
@@ -43,7 +45,17 @@ final class Handler extends BaseHandlerWithClient
 			static::checkStoredFields($fields);
 
 			$baseValues = static::getRecordValues($client, $payload, $fields);
-			$client->sendRequest(static::buildQuery($payload->table, array_merge($baseValues, $payload->set)));
+			if ($payload->type === RequestFormat::JSON->value) {
+				$payload->set = self::morphValuesByFieldType($payload->set, $fields);
+			}
+
+			$result = $client->sendRequest(
+				static::buildQuery($payload->table, array_merge($baseValues, $payload->set))
+			);
+
+			if ($result->getError()) {
+				throw ManticoreSearchResponseError::create($result->getError());
+			}
 
 			if ($payload->type === RequestFormat::JSON->value) {
 				return TaskResult::raw(['_index' => $payload->table, 'updated' => 1]);
@@ -57,106 +69,104 @@ final class Handler extends BaseHandlerWithClient
 	}
 
 	/**
-	 * @param  Client  $manticoreClient
-	 * @param  string  $table
-	 * @return array <int, array<string, string>>
+	 * @param Client $manticoreClient
+	 * @param string $table
+	 * @return array<int|string, array{type:string, properties:string}>
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function getFields(Client $manticoreClient, string $table): array {
 		$descResult = $manticoreClient
-			->sendRequest('DESC '.$table)
+			->sendRequest('DESC ' . $table)
 			->getResult();
 
 		if (is_array($descResult[0])) {
-			return $descResult[0]['data'];
+			$fields = [];
+			/** @var array{Type:string, Properties:string, Field:string} $field */
+			foreach ($descResult[0]['data'] as $field) {
+				$fields[$field['Field']] = ['type' => $field['Type'], 'properties' => $field['Properties']];
+			}
+
+			return $fields;
 		}
 
-		return [];
+		throw ManticoreSearchClientError::create("Table hasn't fields");
 	}
 
 
 	/**
-	 * @param  array<int, array<string, string>>  $fields
+	 * @param array<int|string, array{type:string, properties:string}> $fields
 	 * @return void
-	 * @throws \Manticoresearch\Buddy\Core\Error\GenericError
+	 * @throws GenericError
 	 */
 	private static function checkStoredFields(array $fields): void {
-		foreach ($fields as $field) {
-			if ($field['Type'] !== 'text'
-				|| str_contains($field['Properties'], 'stored')) {
+		foreach ($fields as $fieldName => $fieldSettings) {
+			if ($fieldSettings['type'] !== 'text'
+				|| str_contains($fieldSettings['properties'], 'stored')) {
 				continue;
 			}
 
 			ManticoreSearchResponseError::throw(
-				'Field '.$field['Field']
-				.' doesn\'t have stored property. Replace query can\'t be performed'
+				'Field ' . $fieldName
+				. ' doesn\'t have stored property. Replace query can\'t be performed'
 			);
 		}
 	}
 
 	/**
-	 * @param  Client  $manticoreClient
-	 * @param  Payload  $payload
-	 * @param  array<int, array<string, string>>  $fields
-	 * @return array<string, string|int>
+	 * @param Client $manticoreClient
+	 * @param Payload $payload
+	 * @param array<int|string, array{type:string, properties:string}> $fields
+	 * @return array<string, bool|float|int|string>
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function getRecordValues(Client $manticoreClient, Payload $payload, array $fields): array {
-		$sql = 'SELECT * FROM '.$payload->table.' WHERE id = '.$payload->id;
+		$sql = 'SELECT * FROM  {$payload->table}  WHERE id = {$payload->id}';
 
+		/** @var array<int, array<string, array<int, array<string, string>>>> $records */
 		$records = $manticoreClient
 			->sendRequest($sql)
 			->getResult();
 
-		$mvaFields = [];
-
-		foreach ($fields as $key) {
-			if ($key['Type'] !== 'mva') {
-				continue;
-			}
-
-			$mvaFields[] = $key['Field'];
-		}
-
-		if (is_array($records) && !empty($records[0]['data'][0])) {
-			// We need migrate MVA values to correct syntax for replace call
-			if ($mvaFields !== []) {
-				foreach ($mvaFields as $field) {
-					$records[0]['data'][0][$field] = '('.$records[0]['data'][0][$field].')';
-				}
-			}
-
-			return $records[0]['data'][0];
+		if (isset($records[0]['data'][0])) {
+			return self::morphValuesByFieldType($records[0]['data'][0], $fields);
 		}
 
 		return ['id' => $payload->id];
 	}
 
+	/**
+	 * @param array<string, bool|float|int|string|array<int, string>> $records
+	 * @param array<int|string, array{type:string, properties:string}> $fields
+	 * @return array<string, bool|float|int|string>
+	 */
+	private static function morphValuesByFieldType(array $records, array $fields): array {
+
+		foreach ($records as $fieldName => $fieldValue) {
+			$records[$fieldName] = match ($fields[$fieldName]['type']) {
+				Fields::TYPE_INT, Fields::TYPE_BIGINT, Fields::TYPE_TIMESTAMP => (int)$fieldValue,
+				Fields::TYPE_BOOL => (bool)$fieldValue,
+				Fields::TYPE_FLOAT => (float)$fieldValue,
+				Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
+					"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue)  . "'",
+				Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
+					'(' . (is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue) . ')',
+				default => $fieldValue
+			};
+		}
+
+		/** @var array<string, bool|float|int|string> */
+		return $records;
+	}
 
 	/**
-	 * @param  string  $tableName
-	 * @param  array<string, string|int|array<string>> $set
+	 * @param string $tableName
+	 * @param array<string, bool|float|int|string> $set
 	 * @return string
 	 */
 	private static function buildQuery(string $tableName, array $set): string {
-		$keys = [];
-		$values = [];
-		foreach ($set as $key => $value) {
-			$keys[] = $key;
-
-			if (is_numeric($value)) {
-				$values[] = $value;
-			} elseif (isset($value[0]) && is_string($value) && $value[0] === '(') {
-				$values[] = $value;
-			} elseif (is_array($value)) {
-				$values[] = '('.implode(',', $value).')';
-			} else {
-				$values[] = "'".$value."'";
-			}
-		}
-
-		return 'REPLACE INTO `'.$tableName.'` ('.implode(',', $keys).') '.
-			'VALUES ('.implode(',', $values).')';
+		$keys = implode(',', array_keys($set));
+		$values = implode(',', array_values($set));
+		return "REPLACE INTO `$tableName` ($keys) VALUES ($values)";
 	}
 
 
