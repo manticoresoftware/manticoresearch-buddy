@@ -120,13 +120,16 @@ final class Handler extends BaseHandlerWithClient
 			->getResult();
 
 		if (is_array($result['hits']) && isset($result['hits']['hits'])) {
-			foreach ($result['hits']['hits'] as $k => $v) {
-				if ($v['_id'] !== $payload->docId) {
+			// Removing requested doc from result set
+			$filteredResults = [];
+			foreach ($result['hits']['hits'] as $v) {
+				if ($v['_id'] === $payload->docId) {
 					continue;
 				}
 
-				unset($result['hits']['hits'][$k]);
+				$filteredResults[] = $v;
 			}
+			$result['hits']['hits'] = $filteredResults;
 		}
 
 		return $result;
