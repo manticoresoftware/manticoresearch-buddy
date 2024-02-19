@@ -67,8 +67,7 @@ final class Handler extends BaseHandler {
 						foreach ($list as $plugin) {
 							$prefix = match ($type) {
 								'core' => Pluggable::CORE_NS_PREFIX,
-								'external' => Pluggable::EXTRA_NS_PREFIX,
-								default => '',
+								default => Pluggable::EXTRA_NS_PREFIX,
 							};
 							/** @var array{short:string} $plugin */
 							$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
@@ -130,7 +129,7 @@ final class Handler extends BaseHandler {
 	 */
 	protected static function getPlugins(Pluggable $pluggable): array {
 		$externalPlugins = $pluggable->fetchExtraPlugins();
-		$localPlugins = array_filter($externalPlugins, fn ($v) => !str_starts_with($v['full'], 'manticoresoftware/'));
+		$localPlugins = $pluggable->fetchLocalPlugins();
 		$corePlugins = $pluggable->fetchCorePlugins();
 		return [
 			'core' => $corePlugins,

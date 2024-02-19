@@ -45,6 +45,9 @@ class QueryProcessor {
 	protected static array $corePlugins = [];
 
 	/** @var array<array{full:string,short:string,version:string}> */
+	protected static array $localPlugins = [];
+
+	/** @var array<array{full:string,short:string,version:string}> */
 	protected static array $extraPlugins = [];
 
 	protected static SqlQueryParser $sqlQueryParser;
@@ -108,6 +111,7 @@ class QueryProcessor {
 			static::getHooks(),
 		);
 		static::$corePlugins = static::$pluggable->fetchCorePlugins();
+		static::$localPlugins = static::$pluggable->fetchLocalPlugins();
 		static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
 
 		static::$isInited = true;
@@ -143,10 +147,11 @@ class QueryProcessor {
 	 */
 	protected static function iteratePluginProcessors(callable $fn): void {
 		$list = [
-			Pluggable::CORE_NS_PREFIX => static::$corePlugins,
-			Pluggable::EXTRA_NS_PREFIX => static::$extraPlugins,
+			[Pluggable::CORE_NS_PREFIX, static::$corePlugins],
+			[Pluggable::EXTRA_NS_PREFIX, static::$extraPlugins],
+			[Pluggable::EXTRA_NS_PREFIX, static::$localPlugins],
 		];
-		foreach ($list as $prefix => $plugins) {
+		foreach ($list as [$prefix, $plugins]) {
 			foreach ($plugins as $plugin) {
 				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
 				$pluginPayloadClass = "$pluginPrefix\\Payload";
@@ -203,12 +208,7 @@ class QueryProcessor {
 	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getCorePlugins(): array {
-		return array_values(
-			array_filter(
-				static::$corePlugins,
-				fn ($v) => str_starts_with($v['full'], 'manticoresoftware/')
-			)
-		);
+		return static::$corePlugins;
 	}
 
 	/**
@@ -216,12 +216,7 @@ class QueryProcessor {
 	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getLocalPlugins(): array {
-		return array_values(
-			array_filter(
-				static::$corePlugins,
-				fn ($v) => !str_starts_with($v['full'], 'manticoresoftware/')
-			)
-		);
+		return static::$localPlugins;
 	}
 
 	/**
