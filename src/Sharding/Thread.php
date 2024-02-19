@@ -120,10 +120,14 @@ final class Thread {
 							continue;
 						}
 
+						// Each  tick here should return TRUE when done working
+						// or FALSE when it shoud be repeated on next ping
 						foreach ($ticks as $n => $tick) {
 							try {
-								$tick['fn'](...$tick['args']);
-								$ticks->remove($n);
+								$shouldRemove = $tick['fn'](...$tick['args']);
+								if ($shouldRemove) {
+									$ticks->remove($n);
+								}
 							} catch (Throwable $e) {
 								Buddy::debug("Error while processing tick: {$e->getMessage()}");
 								continue;

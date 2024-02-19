@@ -228,6 +228,7 @@ final class Operator {
 
 	/**
 	 * Helper to run table status checker on pings
+	 * It should return true when we done or false to repeat
 	 * @param  string $table
 	 * @return bool
 	 */
