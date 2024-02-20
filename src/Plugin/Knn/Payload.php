@@ -69,7 +69,7 @@ final class Payload extends BasePayload
 	 * @return void
 	 */
 	private static function parseHttpRequest(self $payload, Request $request): void {
-		$payload->select = ['id', 'knn_dist()'];
+		$payload->select = [];
 
 		$parsedPayload = json_decode($request->payload, true);
 		if (!is_array($parsedPayload)) {
