@@ -77,7 +77,7 @@ trait CheckInsertDataTrait {
 		];
 		foreach (array_keys($types) as $i) {
 			if (!isset($cols[$i], $predefinedTypes[$cols[$i]])) {
-				return;
+				continue;
 			}
 			$types[$i] = $predefinedTypes[$cols[$i]];
 		}
