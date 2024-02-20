@@ -107,7 +107,7 @@ final class Handler extends BaseHandlerWithClient
 			],
 		];
 
-		if ($payload->select !== ['*']) {
+		if ($payload->select !== []) {
 			$query['_source'] = $payload->select;
 		}
 
