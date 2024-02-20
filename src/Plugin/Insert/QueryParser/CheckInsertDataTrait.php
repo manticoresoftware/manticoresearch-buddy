@@ -51,7 +51,16 @@ trait CheckInsertDataTrait {
 		array $cols,
 		string $errorHandler
 	): void {
+		$predefinedTypes = [
+			'@timestamp' => Datatype::Timestamp,
+		];
 		$curTypes = array_map($checker, $rowVals);
+		foreach(array_keys($curTypes) as $i) {
+			if (!isset($cols[$i], $predefinedTypes[$cols[$i]])) {
+				return;
+			}
+			$curTypes[$i] = $predefinedTypes[$cols[$i]];
+		}
 		if (!empty($types)) {
 			// checking for column count in different rows
 			if (sizeof($curTypes) !== sizeof($types) or sizeof($curTypes) !== sizeof($cols)) {
@@ -125,17 +134,8 @@ trait CheckInsertDataTrait {
 		array $cols,
 		string $errorHandler
 	): void {
-		$predefinedTypes = [
-			'@timestamp' => 'timestamp',
-		];
 		$error = '';
 		foreach ($curTypes as $i => $t) {
-			if (isset($predefinedTypes[$cols[$i]])) {
-				if (!isset($types[$i])) {
-					$types[$i] = $predefinedTypes[$cols[$i]];
-				}
-				continue;
-			}
 			self::checkTypeBundlesCompatibility($t, $cols[$i], $i, $types, $error);
 		}
 		if ($error !== '') {
