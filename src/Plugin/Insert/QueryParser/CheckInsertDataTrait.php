@@ -52,6 +52,7 @@ trait CheckInsertDataTrait {
 		string $errorHandler
 	): void {
 		$curTypes = array_map($checker, $rowVals);
+		self::checkPredefinedColTypes($curTypes, $cols);
 		if (!empty($types)) {
 			// checking for column count in different rows
 			if (sizeof($curTypes) !== sizeof($types) or sizeof($curTypes) !== sizeof($cols)) {
@@ -60,6 +61,25 @@ trait CheckInsertDataTrait {
 			self::checkColTypesCompatibilityError($curTypes, $types, $cols, $errorHandler);
 		} else {
 			$types = $curTypes;
+		}
+	}
+
+	/**
+	 * Helper function for the detection of predefined types
+	 *
+	 * @param array<Datatype> &$types
+	 * @param array<string> $cols
+	 * @return void
+	 */
+	protected static function checkPredefinedColTypes(array &$types, array $cols): void {
+		$predefinedTypes = [
+			'@timestamp' => Datatype::Timestamp,
+		];
+		foreach (array_keys($types) as $i) {
+			if (!isset($cols[$i], $predefinedTypes[$cols[$i]])) {
+				continue;
+			}
+			$types[$i] = $predefinedTypes[$cols[$i]];
 		}
 	}
 
