@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Datatype;
 
 trait CheckInsertDataTrait {
 
@@ -55,7 +56,7 @@ trait CheckInsertDataTrait {
 			'@timestamp' => Datatype::Timestamp,
 		];
 		$curTypes = array_map($checker, $rowVals);
-		foreach(array_keys($curTypes) as $i) {
+		foreach (array_keys($curTypes) as $i) {
 			if (!isset($cols[$i], $predefinedTypes[$cols[$i]])) {
 				return;
 			}
