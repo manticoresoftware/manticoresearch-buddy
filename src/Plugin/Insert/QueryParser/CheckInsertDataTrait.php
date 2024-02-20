@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
 
-
 trait CheckInsertDataTrait {
 
 	/**
