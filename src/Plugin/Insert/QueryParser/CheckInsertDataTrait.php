@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
-use Manticoresearch\Buddy\Plugin\Insert\QueryParser\Datatype;
+
 
 trait CheckInsertDataTrait {
 
@@ -52,16 +52,8 @@ trait CheckInsertDataTrait {
 		array $cols,
 		string $errorHandler
 	): void {
-		$predefinedTypes = [
-			'@timestamp' => Datatype::Timestamp,
-		];
 		$curTypes = array_map($checker, $rowVals);
-		foreach (array_keys($curTypes) as $i) {
-			if (!isset($cols[$i], $predefinedTypes[$cols[$i]])) {
-				return;
-			}
-			$curTypes[$i] = $predefinedTypes[$cols[$i]];
-		}
+		self::checkPredefinedColTypes($curTypes, $cols);
 		if (!empty($types)) {
 			// checking for column count in different rows
 			if (sizeof($curTypes) !== sizeof($types) or sizeof($curTypes) !== sizeof($cols)) {
@@ -70,6 +62,25 @@ trait CheckInsertDataTrait {
 			self::checkColTypesCompatibilityError($curTypes, $types, $cols, $errorHandler);
 		} else {
 			$types = $curTypes;
+		}
+	}
+
+	/**
+	 * Helper function for the detection of predefined types
+	 *
+	 * @param array<Datatype> &$types
+	 * @param array<string> $cols
+	 * @return void
+	 */
+	protected static function checkPredefinedColTypes(array &$types, array $cols): void {
+		$predefinedTypes = [
+			'@timestamp' => Datatype::Timestamp,
+		];
+		foreach (array_keys($types) as $i) {
+			if (!isset($cols[$i], $predefinedTypes[$cols[$i]])) {
+				return;
+			}
+			$types[$i] = $predefinedTypes[$cols[$i]];
 		}
 	}
 
