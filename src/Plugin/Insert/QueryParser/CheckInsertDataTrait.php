@@ -15,6 +15,10 @@ use Manticoresearch\Buddy\Core\Error\GenericError;
 
 trait CheckInsertDataTrait {
 
+	const PREDEFINED_COL_TYPES = [
+		'@timestamp' => 'timestamp',
+	];
+
 	/**
 	 * Checking for unescaped characters. Just as a test feature so far
 	 *
@@ -127,6 +131,12 @@ trait CheckInsertDataTrait {
 	): void {
 		$error = '';
 		foreach ($curTypes as $i => $t) {
+			if (isset(self::PREDEFINED_COL_TYPES[$cols[$i]])) {
+				if (!isset($types[$i])) {
+					$types[$i] = self::PREDEFINED_COL_TYPES[$cols[$i]];
+				}
+				continue;
+			}
 			self::checkTypeBundlesCompatibility($t, $cols[$i], $i, $types, $error);
 		}
 		if ($error !== '') {

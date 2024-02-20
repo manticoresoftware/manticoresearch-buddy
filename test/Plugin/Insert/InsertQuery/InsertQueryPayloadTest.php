@@ -22,7 +22,8 @@ class InsertQueryPayloadTest extends TestCase {
 			[
 				'version' => 1,
 				'error' => '',
-				'payload' => 'INSERT INTO test(int_col, string_col, float_col) VALUES(1, \'string\', 2.22)',
+				'payload' => 'INSERT INTO test(int_col, string_col, float_col, @timestamp)'
+					. ' VALUES(1, \'string\', 2.22, \'2000-01-01T12:00:00Z\')',
 				'format' => RequestFormat::SQL,
 				'endpointBundle' => ManticoreEndpoint::Sql,
 				'path' => 'sql?mode=raw',
@@ -37,8 +38,9 @@ class InsertQueryPayloadTest extends TestCase {
 		$this->assertEquals(2, sizeof($payload->queries));
 		$this->assertEquals(
 			[
-				'CREATE TABLE IF NOT EXISTS test (int_col int,string_col text,float_col float)',
-				'INSERT INTO test(int_col, string_col, float_col) VALUES(1, \'string\', 2.22)',
+				'CREATE TABLE IF NOT EXISTS test (int_col int,string_col text,float_col float, @timestamp timestamp)',
+				'INSERT INTO test(int_col, string_col, float_col) VALUES(1, \'string\', 2.22,'
+					. '\'2000-01-01T12:00:00Z\')',
 			], $payload->queries
 		);
 	}
