@@ -71,7 +71,7 @@ final class Thread {
 				static::$instance = static::create();
 			} catch (Throwable $e) {
 				$msg = $e->getMessage();
-				Buddy::debug("Failed to initialize sharding thread: $msg");
+				Buddy::debugv("Failed to initialize sharding thread: $msg");
 				throw $e;
 			}
 		}
@@ -129,17 +129,17 @@ final class Thread {
 									$ticks->remove($n);
 								}
 							} catch (Throwable $e) {
-								Buddy::debug("Error while processing tick: {$e->getMessage()}");
+								Buddy::debugv("Error while processing tick: {$e->getMessage()}");
 								continue;
 							}
 						}
 					}
 				} catch (Throwable $e) {
-					Buddy::debug(
+					Buddy::debugv(
 						"Error while processing sharding: {$e->getMessage()}."
 						. ' Restarting after 5s'
 					);
-					Buddy::debug($e->getTraceAsString());
+					Buddy::debugv($e->getTraceAsString());
 					sleep(5); // <-- add extra protection delay
 					goto start;
 				}
@@ -156,7 +156,7 @@ final class Thread {
 	 */
 	public function execute(string $event, array $args = []): static {
 		$argsJson = json_encode($args);
-		Buddy::debug("Sharding Event: $event $argsJson");
+		Buddy::debugv("Sharding Event: $event $argsJson");
 		$this->process->write(serialize([$event, $args]));
 		return $this;
 	}

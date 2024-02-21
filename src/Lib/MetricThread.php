@@ -114,7 +114,7 @@ final class MetricThread {
 	 * @return static
 	 */
 	public function execute(string $method, array $args = []): static {
-		Buddy::debug("metric: $method " . json_encode($args));
+		Buddy::debugv("metric: $method " . json_encode($args));
 		$this->process->write(serialize([$method, $args]));
 		return $this;
 	}

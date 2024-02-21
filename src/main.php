@@ -143,14 +143,14 @@ $server->beforeStart(
 		static function () {
 			$memory = memory_get_usage() / 1024;
 			$formatted = number_format($memory, 3).'K';
-			Buddy::debug("memory usage: {$formatted}");
+			Buddy::debugv("memory usage: {$formatted}");
 		}, 60
 	);
 
 if (is_telemetry_enabled()) {
 	$server->addTicker(
 		static function () {
-			Buddy::debug('running metric snapshot');
+			Buddy::debugv('running metric snapshot');
 			MetricThread::instance()->execute(
 				'checkAndSnapshot',
 				[(int)(getenv('TELEMETRY_PERIOD', true) ?: 300)]

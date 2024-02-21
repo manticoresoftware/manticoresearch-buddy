@@ -40,8 +40,8 @@ final class Process {
 		$nodeId = $operator->node->id;
 		$hasSharding = $operator->hasSharding();
 		$sharded = $hasSharding ? 'yes' : 'no';
-		Buddy::debug("Node ID: $nodeId");
-		Buddy::debug("Sharded: $sharded");
+		Buddy::debugv("Node ID: $nodeId");
+		Buddy::debugv("Sharded: $sharded");
 
 		// Do nothing when sharding is disabled
 		if (!$operator->hasSharding()) {
@@ -63,7 +63,7 @@ final class Process {
 		// If this is not master
 		/** @var string */
 		$master = $operator->state->get('master');
-		Buddy::debug("Master: $master");
+		Buddy::debugv("Master: $master");
 		if ($master !== $nodeId) {
 			return;
 		}
