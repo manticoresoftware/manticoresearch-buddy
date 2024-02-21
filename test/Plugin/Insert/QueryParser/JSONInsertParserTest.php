@@ -93,11 +93,11 @@ class JSONInsertParserTest extends TestCase {
 
 		$query = '{"index" : "test", "id" : 1, "doc": { "col1" : "m1@google.com", "col2": 1,'
 			. '"col3": 111111111111, "col4": {"b": 2}, "col5": [1, 2], "col6": [1, 222222222222], "col7": "c",'
-			. '"col8": 0.1 } }';
+			. '"col8": 0.1, "@timestamp": "2000-01-01T12:00:00Z" } }';
 		$res = [
 			'name' => 'test',
-			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8'],
-			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi64', 'text', 'float'],
+			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', '@timestamp'],
+			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi64', 'text', 'float', 'timestamp'],
 		];
 		$this->assertEquals($res, self::$parser->parse($query));
 

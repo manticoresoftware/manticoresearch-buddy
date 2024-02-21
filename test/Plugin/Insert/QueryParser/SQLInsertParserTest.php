@@ -91,12 +91,13 @@ class SQLInsertParserTest extends TestCase {
 		echo "\nTesting the parsing of SQL insert request\n";
 
 		$query = 'INSERT INTO test(col1,col2,col3,col4,col5,col6,col7) VALUES'
-			. "('m1@google.com', 1, 111, '{\"b\":2}', (1,2), (1,11111111111), 'c'),"
-			. "('m2@google.com', 2, 222222222222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222222222222), 'qqq')";
+			. "('m1@google.com', 1, 111, '{\"b\":2}', (1,2), (1,11111111111), 'c', '2000-01-01T12:00:00Z'),"
+			. "('m2@google.com', 2, 222222222222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222222222222),"
+				. " 'qqq', '2000-01-01T12:00:30Z')";
 		$res = [
 			'name' => 'test',
-			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7'],
-			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi64', 'text'],
+			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', '@timestamp'],
+			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi64', 'text', 'timestamp'],
 		];
 		$this->assertEquals($res, self::$parser->parse($query));
 
