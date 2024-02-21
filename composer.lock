@@ -875,12 +875,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "275c074b21c3972b81671bc7e8826d105782fbec"
+                "reference": "4946a85b3e08feaeea2c11d7a6a70f568053bb51"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/275c074b21c3972b81671bc7e8826d105782fbec",
-                "reference": "275c074b21c3972b81671bc7e8826d105782fbec",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/4946a85b3e08feaeea2c11d7a6a70f568053bb51",
+                "reference": "4946a85b3e08feaeea2c11d7a6a70f568053bb51",
                 "shasum": ""
             },
             "require": {
@@ -919,7 +919,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2024-02-19T12:39:38+00:00"
+            "time": "2024-02-21T08:38:08+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -3723,16 +3723,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.58",
+            "version": "1.10.59",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "a23518379ec4defd9e47cbf81019526861623ec2"
+                "reference": "e607609388d3a6d418a50a49f7940e8086798281"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/a23518379ec4defd9e47cbf81019526861623ec2",
-                "reference": "a23518379ec4defd9e47cbf81019526861623ec2",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/e607609388d3a6d418a50a49f7940e8086798281",
+                "reference": "e607609388d3a6d418a50a49f7940e8086798281",
                 "shasum": ""
             },
             "require": {
@@ -3781,7 +3781,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-02-12T20:02:57+00:00"
+            "time": "2024-02-20T13:59:13+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",

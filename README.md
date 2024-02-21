@@ -94,6 +94,7 @@ To run a Buddy instance from the command line interface (CLI), use the following
   --disable-telemetry    disables telemetry for Buddy
   --threads=[N]          start N threads on launch, default is 4
   --debug                enable debug mode for testing
+  --debugv               enable verbose debug mode with periodic messages
   Examples:
   manticore-executor src/main.php --debug
   manticore-executor src/main.php --disable-telemetry
