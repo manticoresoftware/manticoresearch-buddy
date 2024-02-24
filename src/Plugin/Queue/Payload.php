@@ -1,5 +1,4 @@
-<?php
-declare(strict_types=1);
+<?php declare(strict_types=1);
 
 /*
   Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
@@ -21,70 +20,81 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
  */
-final class Payload extends BasePayload
-{
-    const TYPE_SOURCE = 'source';
-    const TYPE_VIEW = 'view';
+final class Payload extends BasePayload {
+	const TYPE_SOURCE = 'source';
+	const TYPE_VIEW = 'view';
 
-    public static string $type = self::TYPE_VIEW;
+	public static string $type;
+	public static string $sourceType;
 
-    public Endpoint $endpointBundle;
+	public Endpoint $endpointBundle;
 
-    /**
-     * @param  Request  $request
-     * @return static
-     */
-    public static function fromRequest(Request $request): static
-    {
-        $self = new static();
+	public array $parsedPayload = [];
 
-        $self->endpointBundle = $request->endpointBundle;
+	/**
+	 * @param Request $request
+	 * @return static
+	 */
+	public static function fromRequest(Request $request): static {
+		$self = new static();
 
-        preg_match(self::getPregPattern(), $request->payload, $matches);
-        if ($matches[1] === self::TYPE_SOURCE){
-            $self::$type = self::TYPE_SOURCE;
-        }
+		$self->endpointBundle = $request->endpointBundle;
+
+		$self->parsedPayload = static::$sqlQueryParser::getParsedPayload();
+
+		if (isset($self->parsedPayload['SOURCE'])) {
+			$self::$type = self::TYPE_SOURCE;
+		} elseif (isset($self->parsedPayload['VIEW'])) {
+			$self::$type = self::TYPE_VIEW;
+		}
+
+		return $self;
+	}
+
+	/**
+	 * @param Request $request
+	 * @return bool
+	 */
+	public static function hasMatch(Request $request): bool {
+
+		// CREATE SOURCE/ MATERIALIZED VIEW
+		// TODO done this later
+		// SHOW SOURCES/VIEWS
+		// DROP SOURCE/VIEW
+		// ALTER SOURCE/VIEW
 
 
-        return $self;
-    }
+		/*
+		 *
+		 * create source kafka (id bigint, term text, abbrev text, GlossDef json) type='kafka' broker_list='kafka1:9092' topic_list='myTopic' consumer_group='manticore' num_consumers='1';
+		 * {
 
-    /**
-     * @param  Request  $request
-     * @return bool
-     */
-    public static function hasMatch(Request $request): bool
-    {
+		 */
+		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
 
-        // CREATE SOURCE/ MATERIALIZED VIEW
-        // SHOW SOURCES/VIEWS
-        // DROP SOURCE/VIEW
-        // ALTER SOURCE/VIEW
+		return (isset($parsedPayload['SOURCE']) || isset($parsedPayload['VIEW']));
+	}
 
-        // create source (id, title, body, json, filterA, filterB) type='kafka'
 
-        if (preg_match(self::getPregPattern(), $request->payload) !== false) {
-            return true;
-        }
-        return false;
-    }
-
-    public static function getPregPattern(): string
-    {
-        return '/^(create|show|drop|alter|)\s+(source|materialized\s+view)/usi';
-    }
-
-    /**
-     * @return string
-     * @throws Exception
-     */
-    public function getHandlerClassName(): string
-    {
-        return __NAMESPACE__.'\\'.match (static::$type) {
-                self::TYPE_SOURCE => 'SourceHandler',
-                self::TYPE_VIEW => 'ViewHandler',
-                default => throw new Exception('Cannot find handler for request type: '.static::$type),
-            };
-    }
-
+	/**
+	 * @return string
+	 * @throws Exception
+	 */
+	public function getHandlerClassName(): string {
+		return __NAMESPACE__ . '\\' . match (static::$type) {
+				self::TYPE_SOURCE => function () {
+					foreach (static::$sqlQueryParser::getParsedPayload()['SOURCE']['options'] as $option) {
+						if (isset($option['sub_tree'][0]['base_expr'])
+							&& $option['sub_tree'][0]['base_expr'] === 'type') {
+							return match ((string)$option['sub_tree'][2]['base_expr']) {
+								'kafka'=> 'SourceHandlers\\Kafka'
+							};
+						}
+					}
+					throw new Exception('Cannot find handler for request type: ' . static::$type);
+				},
+				self::TYPE_VIEW => 'ViewHandler',
+				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
+		};
+	}
 }
