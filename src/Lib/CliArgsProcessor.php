@@ -16,7 +16,7 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 final class CliArgsProcessor {
 
 	private const LONG_OPTS  = [
-		'threads:', 'telemetry-period:', 'disable-telemetry', 'debug', 'version', 'help', 'listen:', 'bind:',
+		'threads:', 'telemetry-period:', 'disable-telemetry', 'debug', 'debugv', 'version', 'help', 'listen:', 'bind:',
 	];
 	private const DEFAULT_OPTS = [
 		'listen' => '127.0.0.1:9308',
@@ -46,6 +46,7 @@ final class CliArgsProcessor {
 			. "--disable-telemetry    disables telemetry for Buddy\n"
 			. "--threads=[N]          start N threads on launch, default is 4\n"
 			. "--debug                enable debug mode for testing\n"
+			. "--debugv               enable verbose debug mode with periodic messages\n"
 			. "Examples:\n"
 			. "$script --debug\n"
 			. "$script --disable-telemetry\n\n";
@@ -154,15 +155,19 @@ final class CliArgsProcessor {
 	}
 
 	/**
-	 * @param array{debug?:bool} $opts
+	 * @param array{debug?:bool,debugv?:bool} $opts
 	 * @return void
 	 */
 	protected static function parseDebug(array $opts): void {
-		if (!isset($opts['debug'])) {
+		if (isset($opts['debug'])) {
+			putenv('DEBUG=1');
+		}
+
+		if (!isset($opts['debugv'])) {
 			return;
 		}
 
-		putenv('DEBUG=1');
+		putenv('DEBUG=2');
 	}
 
 	/**

@@ -106,7 +106,7 @@ final class Queue {
 		if ($query['wait_for_id']) {
 			$waitFor = $this->getById($query['wait_for_id']);
 			if ($waitFor && $waitFor['status'] !== 'processed') {
-				Buddy::debug("Wait for ID: {$query['wait_for_id']} [{$waitFor['status']}]");
+				Buddy::debugv("Wait for ID: {$query['wait_for_id']} [{$waitFor['status']}]");
 				return true;
 			}
 		}
@@ -121,12 +121,12 @@ final class Queue {
 	 */
 	protected function handleQuery(Node $node, array $query): void {
 		$mt = microtime(true);
-		Buddy::debug("[{$node->id}] Queue query: {$query['query']}");
+		Buddy::debugv("[{$node->id}] Queue query: {$query['query']}");
 
 		$res = $this->executeQuery($query);
 		$status = empty($res['error']) ? 'processed' : 'error';
 
-		Buddy::debug("[{$node->id}] Queue query result [$status]: " . json_encode($res));
+		Buddy::debugv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
 
 		$duration = (int)((microtime(true) - $mt) * 1000);
 		$this->attemptToUpdateStatus($query, $status, $duration);
@@ -162,7 +162,7 @@ final class Queue {
 			return true;
 		}
 
-		Buddy::debug("Failed to update queue status for {$query['id']}");
+		Buddy::debugv("Failed to update queue status for {$query['id']}");
 		return false;
 	}
 

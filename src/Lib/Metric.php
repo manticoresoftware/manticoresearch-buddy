@@ -70,7 +70,7 @@ final class Metric {
 		}
 
 		$enabled = is_telemetry_enabled();
-		Buddy::debug(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
+		Buddy::debugv(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
 
 		// 1. Get versions
 		$labels = static::getVersions();
@@ -83,7 +83,7 @@ final class Metric {
 		// in different services, we collect already it in backup in addition
 		$labels['collector'] = 'buddy';
 
-		Buddy::debug(sprintf('labels: %s', json_encode($labels)));
+		Buddy::debugv(sprintf('labels: %s', json_encode($labels)));
 		static::$instance = new static($labels, $enabled);
 
 		return static::$instance;
@@ -212,7 +212,7 @@ final class Metric {
 
 		// 2. Get snapshot of tables metrics
 		$metrics = array_merge($metrics, static::getTablesMetrics());
-		Buddy::debug(sprintf('metrics: %s', json_encode($metrics)));
+		Buddy::debugv(sprintf('metrics: %s', json_encode($metrics)));
 
 		// 3. Finally send it
 		foreach ($metrics as $name => $value) {
