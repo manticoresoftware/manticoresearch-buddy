@@ -28,8 +28,9 @@ final class Kafka extends SourceHandler
 		$options = self::parseOptions($payload);
 
 		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . self::SOURCE_TABLE_NAME . ' ' .
-			"WHERE name = '$options->name'";
+			'SELECT * FROM ' . self::SOURCE_TABLE_NAME .
+			" WHERE match('@name \"" . $options->name . "\"')";
+
 
 		$record = $manticoreClient->sendRequest($sql)->getResult();
 		if (is_array($record[0]) && $record[0]['total']) {

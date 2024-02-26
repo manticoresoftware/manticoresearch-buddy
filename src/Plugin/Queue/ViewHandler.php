@@ -17,9 +17,9 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
-final class ViewHandler extends BaseHandlerWithClient {
+final class ViewHandler extends BaseHandlerWithClient
+{
 
 	const VIEWS_TABLE_NAME = '_views';
 
@@ -48,38 +48,49 @@ final class ViewHandler extends BaseHandlerWithClient {
 
 			$sourceName = $payload->parsedPayload['FROM'][0]['table'];
 			$viewName = $payload->parsedPayload['VIEW'][1];
+			$destinationTableName = $payload->parsedPayload['VIEW'][4];
+
 
 			self::checkAndCreateViews($manticoreClient);
-			self::checkName($viewName);
+			self::checkViewName($viewName, $manticoreClient);
+			self::checkDestinationTable($destinationTableName, $manticoreClient);
+
 
 			/**
-			 * CREATE MATERIALIZED VIEW view_table TO destination_kafka AS
-			 * SELECT
-			 * id,
-			 * term as name,
-			 * abbrev as short_name,
-			 * UTC_TIMESTAMP() as received_at,
-			 * GlossDef.size as size
-			 * FROM kafka;
+			 * CREATE MATERIALIZED VIEW view_table TO destination_kafka AS SELECT id, term as name, abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka;
 			 */
-
-			Buddy::debug(json_encode($payload->parsedPayload));
-
-
 
 
 			$sql = /** @lang ManticoreSearch */
-				'SELECT * FROM ' . SourceHandler::SOURCE_TABLE_NAME . ' ' .
-				"WHERE name = '$sourceName'";
+				'SELECT * FROM ' . SourceHandler::SOURCE_TABLE_NAME .
+				" WHERE match('@name \"" . $sourceName . "\"')";
 
 			$sourceRecords = $manticoreClient->sendRequest($sql)->getResult();
-			if (!$sourceRecords) {
+
+			if (is_array($sourceRecords) && empty($sourceRecords[0]['data'])) {
 				throw ManticoreSearchClientError::create('Chosen source not exist');
 			}
 
-			foreach ($sourceRecords as $source) {
+			unset($payload->parsedPayload['CREATE'], $payload->parsedPayload['VIEW']);
+			foreach ($sourceRecords[0]['data'] as $source) {
+				$payload->parsedPayload['FROM'][0]['table'] = $source['buffer_table'];
+				$payload->parsedPayload['FROM'][0]['no_quotes']['parts'] = [$source['buffer_table']];
+				$payload->parsedPayload['FROM'][0]['base_expr'] = $source['buffer_table'];
+
+				$payload::$sqlQueryParser::setParsedPayload($payload->parsedPayload);
+
+				$sql = /** @lang ManticoreSearch */
+					'INSERT INTO ' . self::VIEWS_TABLE_NAME .
+					"(id, name, query) VALUES (0,'$viewName', '" . /** TODO ask maybe we already has normal escaper  */
+					str_replace("'", "\\'", $payload::$sqlQueryParser::getCompletedPayload()) . "')";
+
+				$response = $manticoreClient->sendRequest($sql);
+				if ($response->hasError()) {
+					throw ManticoreSearchClientError::create($response->getError());
+				}
 			}
 
+			// Todo I think we need to send there affected rows or smth like this
 			return TaskResult::none();
 		};
 
@@ -96,14 +107,23 @@ final class ViewHandler extends BaseHandlerWithClient {
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	public static function checkName(string $viewName, Client $manticoreClient): void {
+	public static function checkViewName(string $viewName, Client $manticoreClient): void {
 		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . self::VIEWS_TABLE_NAME . " WHERE name = '$viewName'";
+			'SELECT * FROM ' . self::VIEWS_TABLE_NAME . " WHERE match('@name \"" . $viewName . "\"')";
 
 		$record = $manticoreClient->sendRequest($sql)->getResult();
 		if (is_array($record[0]) && $record[0]['total']) {
 			throw ManticoreSearchClientError::create("View $viewName already exist");
 		}
+	}
+
+	/**
+	 * @param string $tableName
+	 * @param Client $manticoreClient
+	 * @return bool
+	 */
+	public static function checkDestinationTable(string $tableName, Client $manticoreClient): bool {
+		return $manticoreClient->hasTable($tableName);
 	}
 
 	/**
