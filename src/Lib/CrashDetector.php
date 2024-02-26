@@ -40,6 +40,10 @@ class CrashDetector {
 			return false;
 		}
 
+		if (!file_exists($this->settings->searchdLog)) {
+			return false;
+		}
+
 		// Let's parse searchd.log now and find out last crash
 		$fp = fopen($this->settings->searchdLog, 'rb');
 		if (!$fp) {
