@@ -120,7 +120,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function getRecordValues(Client $manticoreClient, Payload $payload, array $fields): array {
-		$sql = 'SELECT * FROM  {$payload->table}  WHERE id = {$payload->id}';
+		$sql = "SELECT * FROM  {$payload->table}  WHERE id = {$payload->id}";
 
 		/** @var array<int, array<string, array<int, array<string, string>>>> $records */
 		$records = $manticoreClient
