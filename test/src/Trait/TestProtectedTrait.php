@@ -39,10 +39,10 @@ trait TestProtectedTrait {
 		$exCls = $exMsg = '';
 		try {
 			$res = self::invokeMethod($classInstance, $methodName, $args);
-			print_r($res);
 		} catch (GenericError $e) {
 			$exCls = $e::class;
-			echo 'test ' . (string)$e->hasResponseError();
+			echo 'error ' . (string)$e->hasResponseError();
+			print_r($e);
 			$customError = $e->getResponseError('');
 			$exMsg = $customError ?: $e->getMessage();
 		}
