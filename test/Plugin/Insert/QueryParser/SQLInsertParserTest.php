@@ -131,7 +131,7 @@ class SQLInsertParserTest extends TestCase {
 		[$exCls, $exMsg] = self::getExceptionInfo($parser, 'parse', [$query]);
 		$this->assertEquals(QueryParseError::class, $exCls);
 		$this->assertEquals(
-			"Cannot create table with column names missing",
+			'Cannot create table with column names missing',
 			$exMsg
 		);
 
