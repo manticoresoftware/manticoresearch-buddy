@@ -15,12 +15,14 @@ use Exception;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 
 /**
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
  */
-final class Payload extends BasePayload {
+final class Payload extends BasePayload
+{
 	const TYPE_SOURCE = 'source';
 	const TYPE_VIEW = 'view';
 
@@ -40,13 +42,16 @@ final class Payload extends BasePayload {
 
 		$self->endpointBundle = $request->endpointBundle;
 
-		$self->parsedPayload = static::$sqlQueryParser::getParsedPayload();
+		if ($self->endpointBundle === Endpoint::Sql) {
+			$self->parsedPayload = static::$sqlQueryParser::getParsedPayload();
 
-		if (isset($self->parsedPayload['SOURCE'])) {
-			$self::$type = self::TYPE_SOURCE;
-		} elseif (isset($self->parsedPayload['VIEW'])) {
-			$self::$type = self::TYPE_VIEW;
+			if (isset($self->parsedPayload['SOURCE'])) {
+				$self::$type = self::TYPE_SOURCE;
+			} elseif (isset($self->parsedPayload['VIEW'])) {
+				$self::$type = self::TYPE_VIEW;
+			}
 		}
+
 
 		return $self;
 	}
@@ -82,19 +87,23 @@ final class Payload extends BasePayload {
 	 */
 	public function getHandlerClassName(): string {
 		return __NAMESPACE__ . '\\' . match (static::$type) {
-				self::TYPE_SOURCE => function () {
-					foreach (static::$sqlQueryParser::getParsedPayload()['SOURCE']['options'] as $option) {
-						if (isset($option['sub_tree'][0]['base_expr'])
-							&& $option['sub_tree'][0]['base_expr'] === 'type') {
-							return match ((string)$option['sub_tree'][2]['base_expr']) {
-								'kafka'=> 'SourceHandlers\\Kafka'
-							};
-						}
-					}
-					throw new Exception('Cannot find handler for request type: ' . static::$type);
-				},
+				self::TYPE_SOURCE => self::parseSourceType(
+					static::$sqlQueryParser::getParsedPayload()['SOURCE']['options']
+				),
 				self::TYPE_VIEW => 'ViewHandler',
 				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
 		};
+	}
+
+	public static function parseSourceType(array $options): string {
+		foreach ($options as $option) {
+			if (isset($option['sub_tree'][0]['base_expr'])
+				&& $option['sub_tree'][0]['base_expr'] === 'type') {
+				return match (SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr'])) {
+					'kafka' => 'SourceHandlers\\Kafka'
+				};
+			}
+		}
+		throw new Exception('Cannot find handler for request type: ' . static::$type);
 	}
 }

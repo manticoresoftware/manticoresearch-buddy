@@ -15,11 +15,10 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 
 final class Kafka extends SourceHandler
 {
-
-
 	/**
 	 * @throws ManticoreSearchClientError
 	 */
@@ -30,11 +29,10 @@ final class Kafka extends SourceHandler
 
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . self::SOURCE_TABLE_NAME . ' ' .
-			"WHERE type = '" . self::SOURCE_TYPE_KAFKA . "' AND name = '$options->name'";
+			"WHERE name = '$options->name'";
 
 		$record = $manticoreClient->sendRequest($sql)->getResult();
-		if ($record[0]['total']) {
-			//todo debug
+		if (is_array($record[0]) && $record[0]['total']) {
 			throw ManticoreSearchClientError::create("Source $options->name already exist");
 		}
 
@@ -49,9 +47,7 @@ final class Kafka extends SourceHandler
 
 			/** @l $query */
 			$query = /** @lang ManticoreSearch */
-				'INSERT INTO ' . self::SOURCE_TABLE_NAME . ' (id, type, name, buffer_table, offset, attrs) ' .
-				'VALUES ' .
-				'(0, ' . self::SOURCE_TYPE_KAFKA . ", '$options->name','_buffer_{$options->name}_$i', 0, '$attrs')";
+				"CREATE TABLE _buffer_{$options->name}_{$i} $options->schema";
 
 			$request = $manticoreClient->sendRequest($query);
 			if ($request->hasError()) {
@@ -60,7 +56,9 @@ final class Kafka extends SourceHandler
 
 			/** @l $query */
 			$query = /** @lang ManticoreSearch */
-				"CREATE TABLE _buffer_{$options->name}_{$i} $options->schema";
+				'INSERT INTO ' . self::SOURCE_TABLE_NAME . ' (id, type, name, buffer_table, group_offset, attrs) ' .
+				'VALUES ' .
+				"(0, '" . self::SOURCE_TYPE_KAFKA . "', '$options->name','_buffer_{$options->name}_$i', 0, '$attrs')";
 
 			$request = $manticoreClient->sendRequest($query);
 			if ($request->hasError()) {
@@ -85,13 +83,17 @@ final class Kafka extends SourceHandler
 			}
 
 			match ((string)$option['sub_tree'][0]['base_expr']) {
-				'broker_list' => $result->brokerList = $option['sub_tree'][3]['base_expr'],
-				'topic_list' => $result->topicList = $option['sub_tree'][3]['base_expr'],
-				'consumer_group' => $result->consumerGroup = $option['sub_tree'][3]['base_expr'],
-				'num_consumers' => $result->numConsumers = $option['sub_tree'][3]['base_expr'],
+				'broker_list' =>
+				$result->brokerList = SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr']),
+				'topic_list' =>
+				$result->topicList = SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr']),
+				'consumer_group' =>
+				$result->consumerGroup = SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr']),
+				'num_consumers' =>
+				$result->numConsumers = (int)SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr']),
+				default => ''
 			};
 		}
-
 		return $result;
 	}
 }
