@@ -12,7 +12,7 @@
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Datatype;
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\SQLInsertParser;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
-use Manticoresearch\Buddy\CoreTest\Trait\TestProtectedTrait;
+use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
 class SQLInsertParserTest extends TestCase {
@@ -128,6 +128,7 @@ class SQLInsertParserTest extends TestCase {
 		echo "\nTesting the fails on the parsing of SQL insert request\n";
 		$parser = new SQLInsertParser();
 		$query = "INSERT INTO test VALUES ('val1')";
+		echo "aaaaaa\n";
 		[$exCls, $exMsg] = self::getExceptionInfo($parser, 'parse', [$query]);
 		$this->assertEquals(QueryParseError::class, $exCls);
 		$this->assertEquals(

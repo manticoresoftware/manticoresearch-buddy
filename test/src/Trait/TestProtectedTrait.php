@@ -41,10 +41,7 @@ trait TestProtectedTrait {
 			self::invokeMethod($classInstance, $methodName, $args);
 		} catch (GenericError $e) {
 			$exCls = $e::class;
-			echo 'error ' . (string)$e->hasResponseError();
-			print_r($e);
-			$customError = $e->getResponseError('');
-			$exMsg = $customError ?: $e->getMessage();
+			$exMsg = $e->getResponseError('') ?: $e->getMessage();
 		}
 
 		return [$exCls, $exMsg];
