@@ -38,9 +38,11 @@ trait TestProtectedTrait {
 	public static function getExceptionInfo(mixed $classInstance, string $methodName, array $args = []): array {
 		$exCls = $exMsg = '';
 		try {
-			self::invokeMethod($classInstance, $methodName, $args);
+			$res = self::invokeMethod($classInstance, $methodName, $args);
+			print_r($res);
 		} catch (GenericError $e) {
 			$exCls = $e::class;
+			echo 'test ' . (string)$e->hasResponseError();
 			$customError = $e->getResponseError('');
 			$exMsg = $customError ?: $e->getMessage();
 		}
