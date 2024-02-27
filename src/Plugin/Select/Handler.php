@@ -78,7 +78,8 @@ final class Handler extends BaseHandler {
 			}
 
 			// 2. Other cases with normal select * from [table]
-			if ($payload::HANDLED_TABLES[strtolower($payload->table)] === 0) {
+			$tableName = strtolower($payload->table);
+			if (isset($payload::HANDLED_TABLES[$tableName]) && $payload::HANDLED_TABLES[$tableName] === 0) {
 				return $payload->getTaskResult();
 			}
 
