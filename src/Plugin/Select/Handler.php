@@ -67,14 +67,9 @@ final class Handler extends BaseHandler {
 				return static::handleSelectDatabasePrefixed($manticoreClient, $payload);
 			}
 
-			// 0. Handle datagrip query
-			if (!$payload->table && $payload->fields === ['database', 'schema', 'user']) {
-				return static::handleSelectDatagrip($payload);
-			}
-
-			// 1. Handle empty table case first
+			// 1. Select that has no table
 			if (!$payload->table) {
-				return static::handleMethods($manticoreClient, $payload);
+				return static::handleNoTableSelect($manticoreClient, $payload);
 			}
 
 			// 2. Other cases with normal select * from [table]
@@ -631,6 +626,20 @@ final class Handler extends BaseHandler {
 		return $result;
 	}
 
+	/**
+	 * @param Client $manticoreClient
+	 * @param Payload $payload
+	 * @return TaskResult
+	 */
+	protected static function handleNoTableSelect(Client $manticoreClient, Payload $payload): TaskResult {
+		// 0. Handle datagrip query
+		if ($payload->fields === ['database', 'schema', 'user']) {
+			return static::handleSelectDatagrip($payload);
+		}
+
+		// 1. Handle empty table case first
+		return static::handleMethods($manticoreClient, $payload);
+	}
 
 	/**
 	 * @param array{0:array{columns:array<array<string,mixed>>,data:array<array<string,string>>}} $result
