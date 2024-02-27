@@ -59,8 +59,8 @@ final class Server {
 	 * @return void
 	 */
 	public function __construct(array $config = []) {
-		$this->bind = getenv('BIND') ?: '127.0.0.1';
-		$this->socket = new SwooleServer($this->bind, 0);
+		$this->bind = getenv('BIND_HOST') ?: '127.0.0.1';
+		$this->socket = new SwooleServer($this->bind, (int)(getenv('BIND_PORT') ?: 0));
 		$this->socket->set($config);
 		$this->ppid = posix_getppid();
 
