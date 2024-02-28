@@ -291,5 +291,5 @@ JSON format includes:
 
 - `type`: "sql response"
 - `message`: This JSON object is returned to the user and may contain an `error` message for display. Additionally, Buddy has the capability to log this error using standard output. This response is precisely what Manticore will forward to the user, adhering to the guidelines specified in the [Manticore documentation](https://github.com/manticoresoftware/manticoresearch/blob/3cefedf3e71a433b9259571e873586ce13444fcd/manual/Connecting_to_the_server/HTTP.md?plain=1#L126-L185). For error response it's a struct: `{"error":"..."}`
-- `error_code`: An integer representing the HTTP error code that the daemon should use to respond to the client. If it's `0`, Manticore should return the original error code to the client.
+- `error_code`: An integer representing the HTTP error code. Daemon just ignores it when the original request is received via the mysql protocol.
 - `version`: The current protocol version
