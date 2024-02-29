@@ -275,6 +275,7 @@ trait TestFunctionalTrait {
 		$port = static::getListenSqlPort();
 		// We use temporarely file just to skip issues with escaping post data in command line arg
 		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.data';
+		var_dump($query . $delimeter);
 		file_put_contents($payloadFile, $query . $delimeter);
 
 		$redirect = $redirectOutput ? '2>&1' : '';
@@ -347,7 +348,7 @@ trait TestFunctionalTrait {
 		$request = [
 			'type' => 'unknown json request',
 			'error' => $error,
-			'version' => 1,
+			'version' => 2,
 			'message' => [
 				'path_query' => '/sql?mode=raw',
 				'body' => $query,
