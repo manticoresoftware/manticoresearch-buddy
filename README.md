@@ -177,7 +177,7 @@ public static function getProcessors(): array {
 
 ### Communication Protocol v2
 
-This document simplifies and combines the communication protocols between Manticoresearch daemon and Buddy, highlighting both HTTP and MySQL interactions in a condensed format.
+This is the protocol description used for communication between Manticoresearch and Buddy.
 
 You can find communication protocol v1 [here](https://github.com/manticoresoftware/manticoresearch-buddy/tree/8973ad3491e08837f5f518f6165425fb8d94ecf1?tab=readme-ov-file#communication-protocol).
 
@@ -187,10 +187,11 @@ The request JSON format, applicable for both HTTP and MySQL communications, incl
 
 | Key | Description |
 |-|-|
-| `type` | Either "unknown json request" for HTTP or "unknown sql request" for MySQL. |
+| `type` | Either "unknown json request" when the original request is made via JSON over HTTP or "unknown sql request" for SQL over HTTP/mysql
+Set to "json response" for json responses and "sql response" for sql responses (to be returned to the mysql client or /sql endpoint) |
 | `error` | Error message to be returned to the user, if any. |
 | `message` | An object containing details such as `path_query` (specific to HTTP requests) and `body` which holds the main content of the request. For HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for MySQL, it remains empty (`""`). |
-| `version` | The maximum protocol version supported by the sender, current version is 1 for HTTP and 2 for MySQL. |
+| `version` | The maximum protocol version supported by the sender, current version is 2. |
 
 #### Response from Buddy to Manticoresearch
 
@@ -198,10 +199,11 @@ The response JSON structure, suitable for both HTTP and MySQL feedback mechanism
 
 | Key | Description |
 |-|-|
-| `type` | Set to "json response" for HTTP interactions and "sql response" for MySQL. |
+| `type` | Set to "json response" for json responses and "sql response" for sql responses (to be returned to the mysql client or /sql endpoint) |
 | `message` | A JSON object potentially containing an `error` message for display and/or logging. This is what Manticore forwards to the end-user. |
 | `error_code` | An integer representing the HTTP error code. For MySQL communications, this field is ignored. |
-| `version` | Indicates the current protocol version being used. |
+| `version` | Indicates the current protocol version being used. Currently is 2. |
+
 
 Example for HTTP Response:
 
@@ -213,7 +215,74 @@ Example for HTTP Response:
     "b": "abc"
   },
   "error_code": 0,
-  "version": 1
+  "version": 2
+}
+```
+
+
+Example for MySQL Response:
+
+```json
+{
+  "type": "sql response",
+  "message": [
+    {
+      "columns": [
+        {
+          "Field": {
+            "type": "string"
+          }
+        },
+        {
+          "Type": {
+            "type": "string"
+          }
+        },
+        {
+          "Properties": {
+            "type": "string"
+          }
+        }
+      ],
+      "data": [
+        {
+          "Field": "id",
+          "Type": "bigint",
+          "Properties": ""
+        },
+        {
+          "Field": "title",
+          "Type": "text",
+          "Properties": "indexed"
+        },
+        {
+          "Field": "gid",
+          "Type": "uint",
+          "Properties": ""
+        },
+        {
+          "Field": "title",
+          "Type": "string",
+          "Properties": ""
+        },
+        {
+          "Field": "j",
+          "Type": "json",
+          "Properties": ""
+        },
+        {
+          "Field": "new1",
+          "Type": "uint",
+          "Properties": ""
+        }
+      ],
+      "total": 6,
+      "error": "",
+      "warning": ""
+    }
+  ],
+  "error_code": 0,
+  "version": 2
 }
 ```
 
