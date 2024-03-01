@@ -177,34 +177,34 @@ public static function getProcessors(): array {
 
 ### Communication Protocol v2
 
-This is the protocol description used for communication between Manticoresearch and Buddy.
+This is the protocol description used for communication between Manticore Search and Buddy.
 
 You can find communication protocol v1 [here](https://github.com/manticoresoftware/manticoresearch-buddy/tree/8973ad3491e08837f5f518f6165425fb8d94ecf1?tab=readme-ov-file#communication-protocol).
 
-#### Request from ManticoreSearch to Buddy
+#### Request from Manticore Search to Buddy
 
-The request JSON format, applicable for both HTTP and MySQL communications, includes these key fields:
+The request from Manticore Search to Buddy is made in JSON format no matter how the original query is made (JSON/SQL/binary). The fields are:
 
 | Key | Description |
 |-|-|
-| `type` | Either "unknown json request" when the original request is made via JSON over HTTP or "unknown sql request" for SQL over HTTP/mysql |
+| `type` | Either `unknown json request` when the original request is made via JSON over HTTP or `unknown sql request` for SQL over HTTP/mysql. |
 | `error` | Error message to be returned to the user, if any. |
 | `message` | An object containing details such as `path_query` (specific to JSON over HTTP requests) and `body` which holds the main content of the request. For JSON over HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for SQL over HTTP/mysql, it remains empty (`""`). |
 | `version` | The maximum protocol version supported by the sender, current version is 2. |
 
-#### Response from Buddy to Manticoresearch
+#### Response from Buddy to Manticore Search
 
-The response JSON structure, suitable for both JSON over HTTP and SQL over HTTP/mysql feedback mechanisms, is outlined below:
+The response JSON structure:
 
 | Key | Description |
 |-|-|
-| `type` | Set to "json response" for json responses and "sql response" for sql responses (to be returned to the mysql client or /sql endpoint) |
-| `message` | A JSON object potentially containing an `error` message for display and/or logging. This is what Manticore forwards to the end-user. |
-| `error_code` | An integer representing the JSON over HTTP error code. For SQL over HTTP/mysql communications, this field is ignored. |
-| `version` | Indicates the current protocol version being used. Currently is 2. |
+| `type` | Set to `json response` if the request type was `unknown json request` and `sql response` for `unknown sql request`. |
+| `message` | A JSON object potentially containing an `error` message for displaying and/or logging. This is what Manticore Search will forward to the end-user. |
+| `error_code` | An integer representing the HTTP error code which will be a part of the HTTP response to the user making a JSON over HTTP request. For SQL over HTTP/mysql communications, this field is ignored. |
+| `version` | Indicates the current protocol version being used. Currentl version is 2. |
 
 
-Example for HTTP Response:
+Example of HTTP Response:
 
 ```json
 {
@@ -219,7 +219,7 @@ Example for HTTP Response:
 ```
 
 
-Example for MySQL Response:
+Example of MySQL Response:
 
 ```json
 {
@@ -285,4 +285,4 @@ Example for MySQL Response:
 }
 ```
 
-Note: The structure for error responses in the `message` field follows the guidelines specified in the [Manticore documentation](https://github.com/manticoresoftware/manticoresearch/blob/3cefedf3e71a433b9259571e873586ce13444fcd/manual/Connecting_to_the_server/HTTP.md?plain=1#L227-L247) for HTTP and similarly structured documentation for MySQL interactions.
+Note: The structure for error responses in the `message` field follows the guidelines specified in the [Manticore Search documentation](https://github.com/manticoresoftware/manticoresearch/blob/3cefedf3e71a433b9259571e873586ce13444fcd/manual/Connecting_to_the_server/HTTP.md?plain=1#L227-L247) for JSON and similarly structured documentation for SQL interactions.
