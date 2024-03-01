@@ -177,7 +177,7 @@ public static function getProcessors(): array {
 
 ### Communication Protocol v2
 
-This document simplifies and combines the communication protocols between C++ and PHP, highlighting both HTTP and MySQL interactions in a condensed format.
+This document simplifies and combines the communication protocols between Manticoresearch daemon and Buddy, highlighting both HTTP and MySQL interactions in a condensed format.
 
 You can find communication protocol v1 [here](https://github.com/manticoresoftware/manticoresearch-buddy/tree/8973ad3491e08837f5f518f6165425fb8d94ecf1?tab=readme-ov-file#communication-protocol).
 
