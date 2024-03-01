@@ -190,18 +190,18 @@ The request JSON format, applicable for both HTTP and MySQL communications, incl
 | `type` | Either "unknown json request" when the original request is made via JSON over HTTP or "unknown sql request" for SQL over HTTP/mysql
 Set to "json response" for json responses and "sql response" for sql responses (to be returned to the mysql client or /sql endpoint) |
 | `error` | Error message to be returned to the user, if any. |
-| `message` | An object containing details such as `path_query` (specific to HTTP requests) and `body` which holds the main content of the request. For HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for MySQL, it remains empty (`""`). |
+| `message` | An object containing details such as `path_query` (specific to JSON over HTTP requests) and `body` which holds the main content of the request. For JSON over HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for SQL over HTTP/mysql, it remains empty (`""`). |
 | `version` | The maximum protocol version supported by the sender, current version is 2. |
 
 #### Response from Buddy to Manticoresearch
 
-The response JSON structure, suitable for both HTTP and MySQL feedback mechanisms, is outlined below:
+The response JSON structure, suitable for both JSON over HTTP and SQL over HTTP/mysql feedback mechanisms, is outlined below:
 
 | Key | Description |
 |-|-|
 | `type` | Set to "json response" for json responses and "sql response" for sql responses (to be returned to the mysql client or /sql endpoint) |
 | `message` | A JSON object potentially containing an `error` message for display and/or logging. This is what Manticore forwards to the end-user. |
-| `error_code` | An integer representing the HTTP error code. For MySQL communications, this field is ignored. |
+| `error_code` | An integer representing the JSON over HTTP error code. For SQL over HTTP/mysql communications, this field is ignored. |
 | `version` | Indicates the current protocol version being used. Currently is 2. |
 
 
