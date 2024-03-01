@@ -288,7 +288,7 @@ trait TestFunctionalTrait {
 	 * @param string $query
 	 * @param bool $redirectOutput
 	 * @param string $path
-	 * @return array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}>
+	 * @return array{error:string}|array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}>
 	 * @throws Exception
 	 */
 	protected static function runHttpQuery(
@@ -313,7 +313,7 @@ trait TestFunctionalTrait {
 			$output
 		);
 
-		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
+		/** @var array{error:string}|array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = match ($path) {
 			'cli_json', 'sql', 'sql?mode=raw' => (array)json_decode(implode(PHP_EOL, $output), true),
 			'cli' => [

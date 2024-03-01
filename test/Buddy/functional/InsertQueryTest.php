@@ -62,6 +62,8 @@ class InsertQueryTest extends TestCase {
 		echo "\nTesting the execution of HTTP Elastic-like insert query to a non-existing table\n";
 		$query = '{"col1": 1, "col2": 2}';
 		$out = static::runHttpQuery($query, true, "{$this->testTable}/_create/1");
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
+		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
 		if (!isset($outData['_id'], $outData['_index'], $outData['result'])) {
 			$this->fail();
@@ -70,6 +72,8 @@ class InsertQueryTest extends TestCase {
 		$this->assertEquals($result, [$outData['_id'], $outData['_index'], $outData['result']]);
 
 		$out = static::runHttpQuery($query, true, "{$this->testTable}/_doc");
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
+		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
 		if (!isset($outData['_index'], $outData['result'])) {
 			$this->fail();
@@ -78,6 +82,8 @@ class InsertQueryTest extends TestCase {
 		$this->assertEquals($result, [$outData['_index'], $outData['result']]);
 
 		$out = static::runHttpQuery($query, true, "{$this->testTable}/_doc/2");
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
+		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
 		if (!isset($outData['_id'], $outData['_index'], $outData['result'])) {
 			$this->fail();
@@ -90,6 +96,8 @@ class InsertQueryTest extends TestCase {
 		echo "\nTesting the fail on the execution of HTTP Elastic-like insert query to a non-existing table\n";
 		$query = '{"col1": 1, "col2": 2}';
 		$out = static::runHttpQuery($query, true, "{$this->testTable}/_create");
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
+		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
 		if (!isset($outData['error'])) {
 			$this->fail();
@@ -113,6 +121,8 @@ class InsertQueryTest extends TestCase {
 			. '{ "title" : "Red Bag", "price": 12.5, "id": 3 }'
 			. "\n";
 		$out = static::runHttpQuery($query, true, '_bulk');
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
+		$this->assertArrayHasKey(0, $out);
 		/** @var array{items:array<int,array<string,array<string,mixed>>>} */
 		$outData = $out[0]['data'][0];
 		$this->assertEquals(2, sizeof($outData['items']));
@@ -142,12 +152,11 @@ class InsertQueryTest extends TestCase {
 			. '{ "title" : "Red Bag", "price": 12.5, "id": 3 }'
 			. "\n";
 		$out = static::runHttpQuery($query, true, '_bulk');
-		/** @var array<int,array<string,mixed>> */
-		$outData = $out[0]['data'][0];
-		if (!isset($outData['error'])) {
+		if (!isset($out['error'])) {
 			$this->fail();
 		}
-		$this->assertEquals('id has already been specified', $outData['error']);
+
+		$this->assertEquals('id has already been specified', $out['error']);
 	}
 
 	public function testAutoColumnAddOnInsert(): void {
@@ -165,6 +174,8 @@ class InsertQueryTest extends TestCase {
 			. '{ "title" : "Green Bag", "new_price": 20.5 }'
 			. "\n";
 		$out = static::runHttpQuery($query, true, '_bulk');
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
+		$this->assertArrayHasKey(0, $out);
 		/** @var array{items:array<int,array<string,array<string,mixed>>>} */
 		$outData = $out[0]['data'][0];
 		$this->assertEquals(3, sizeof($outData['items']));
