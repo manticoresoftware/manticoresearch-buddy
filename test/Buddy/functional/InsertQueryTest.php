@@ -144,10 +144,10 @@ class InsertQueryTest extends TestCase {
 		$out = static::runHttpQuery($query, true, '_bulk');
 		/** @var array<int,array<string,mixed>> */
 		$outData = $out[0]['data'][0];
-		if (!isset($outData[0], $outData[0]['error'])) {
+		if (!isset($outData['error'])) {
 			$this->fail();
 		}
-		$this->assertEquals('id has already been specified', $outData[0]['error']);
+		$this->assertEquals('id has already been specified', $outData['error']);
 	}
 
 	public function testAutoColumnAddOnInsert(): void {

@@ -202,7 +202,7 @@ trait TestFunctionalTrait {
 		$result2 = static::runHttpQuery($query);
 
 		$this->assertStringContainsString($error, implode(PHP_EOL, $result1));
-		$this->assertEquals($error, $result2[0]['error']);
+		$this->assertEquals($error, $result2['error']);
 	}
 
 	/**
@@ -275,7 +275,6 @@ trait TestFunctionalTrait {
 		$port = static::getListenSqlPort();
 		// We use temporarely file just to skip issues with escaping post data in command line arg
 		$payloadFile = \sys_get_temp_dir() . '/payload-' . uniqid() . '.data';
-		var_dump($query . $delimeter);
 		file_put_contents($payloadFile, $query . $delimeter);
 
 		$redirect = $redirectOutput ? '2>&1' : '';
