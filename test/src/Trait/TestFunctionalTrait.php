@@ -202,7 +202,7 @@ trait TestFunctionalTrait {
 		$result2 = static::runHttpQuery($query);
 
 		$this->assertStringContainsString($error, implode(PHP_EOL, $result1));
-		$this->assertEquals($error, $result2[0]['error']);
+		$this->assertEquals($error, $result2['error']);
 	}
 
 	/**
@@ -347,7 +347,7 @@ trait TestFunctionalTrait {
 		$request = [
 			'type' => 'unknown json request',
 			'error' => $error,
-			'version' => 1,
+			'version' => 2,
 			'message' => [
 				'path_query' => '/sql?mode=raw',
 				'body' => $query,

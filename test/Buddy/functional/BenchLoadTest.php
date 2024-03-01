@@ -90,7 +90,7 @@ class BenchLoadTest extends TestCase {
 		$request = [
 			'type' => 'unknown json request',
 			'error' => '',
-			'version' => 1,
+			'version' => 2,
 			'message' => [
 				'path_query' => '/cli_json',
 				'body' => $query,

@@ -24,7 +24,7 @@ use Manticoresearch\Buddy\Core\Task\Task;
 echo 'Running query: $query' . PHP_EOL. PHP_EOL;
 try {
   \$request = Request::fromPayload([
-    'version' => 1,
+    'version' => 2,
     'type' => 'unknown json request',
     'error' => '',
     'message' => [

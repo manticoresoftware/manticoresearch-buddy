@@ -54,7 +54,7 @@ class InsertQueryTest extends TestCase {
 		echo "\nTesting the fail on the execution of HTTP insert query to a non-existing table\n";
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1,2) ";
 		$out = static::runHttpQuery($query);
-		$result = [['total' => 0,'error' => "P01: wrong number of values here near ') '",'warning' => '']];
+		$result = ['error' => "P01: wrong number of values here near ') '"];
 		$this->assertEquals($result, $out);
 	}
 
@@ -144,10 +144,10 @@ class InsertQueryTest extends TestCase {
 		$out = static::runHttpQuery($query, true, '_bulk');
 		/** @var array<int,array<string,mixed>> */
 		$outData = $out[0]['data'][0];
-		if (!isset($outData[0], $outData[0]['error'])) {
+		if (!isset($outData['error'])) {
 			$this->fail();
 		}
-		$this->assertEquals('id has already been specified', $outData[0]['error']);
+		$this->assertEquals('id has already been specified', $outData['error']);
 	}
 
 	public function testAutoColumnAddOnInsert(): void {

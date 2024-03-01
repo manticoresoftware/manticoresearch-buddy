@@ -76,11 +76,7 @@ class ShowQueriesTest extends TestCase {
 		$query = 'SHOW QUERIES 123';
 		$out = static::runHttpQuery($query);
 		$result = [
-			[
-				'total' => 0,
-				'error' => "P01: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES 123'",
-				'warning' => '',
-			],
+			'error' => "P01: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES 123'",
 		];
 		$this->assertEquals($result, $out);
 	}

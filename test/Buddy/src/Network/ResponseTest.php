@@ -64,7 +64,7 @@ class ResponseTest extends TestCase {
 			'version' => 1,
 			'type' => 'json response',
 			'message' => [
-				['total' => 0, 'warning' => '', 'error' => 'simple error #1'],
+				'error' => 'simple error #1',
 			],
 			'error' => 'simple error #1',
 		];
