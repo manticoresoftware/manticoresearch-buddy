@@ -152,11 +152,13 @@ class InsertQueryTest extends TestCase {
 			. '{ "title" : "Red Bag", "price": 12.5, "id": 3 }'
 			. "\n";
 		$out = static::runHttpQuery($query, true, '_bulk');
-		if (!isset($out['error'])) {
+		/** @var array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> */
+		$outData = $out[0];
+		if (!isset($outData['error'])) {
 			$this->fail();
 		}
 
-		$this->assertEquals('id has already been specified', $out['error']);
+		$this->assertEquals('id has already been specified', $outData['error']);
 	}
 
 	public function testAutoColumnAddOnInsert(): void {

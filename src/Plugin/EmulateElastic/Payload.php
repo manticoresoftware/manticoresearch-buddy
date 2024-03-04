@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
 
 use Exception;
+use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -73,6 +74,11 @@ final class Payload extends BasePayload {
 				$self->path = $request->path;
 				break;
 			default:
+				if ($pathParts[0] == '_index_template') {
+					$customError = InvalidNetworkRequestError::create('', true);
+					$customError->setResponseErrorCode(200);
+					throw $customError;
+				}
 				throw new Exception("Unsupported request type in {$request->path}: " . static::$requestTarget);
 		}
 
