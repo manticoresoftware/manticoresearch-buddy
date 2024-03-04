@@ -20,7 +20,7 @@ class ResponseTest extends TestCase {
 	public function testBuddyResponseFromErrorAndMessageOk(): void {
 		echo "\nTesting the building of Buddy response \n";
 		$result = [
-			'version' => 1,
+			'version' => 2,
 			'type' => 'json response',
 			'message' => ['test message'],
 			'error' => 'simple error #1',
@@ -38,7 +38,7 @@ class ResponseTest extends TestCase {
 	public function testBuddyResponseFromMessageOk(): void {
 		echo "\nTesting the building of Buddy response from message\n";
 		$result = [
-			'version' => 1,
+			'version' => 2,
 			'type' => 'json response',
 			'message' => ['test message'],
 			'error' => '',
@@ -61,7 +61,7 @@ class ResponseTest extends TestCase {
 	public function testBuddyResponseFromErrorOk(): void {
 		echo "\nTesting the building of Buddy response from error\n";
 		$result = [
-			'version' => 1,
+			'version' => 2,
 			'type' => 'json response',
 			'message' => [
 				'error' => 'simple error #1',
