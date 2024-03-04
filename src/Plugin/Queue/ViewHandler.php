@@ -81,7 +81,7 @@ final class ViewHandler extends BaseHandlerWithClient
 
 				$sql = /** @lang ManticoreSearch */
 					'INSERT INTO ' . self::VIEWS_TABLE_NAME .
-					"(id, name, query) VALUES (0,'$viewName', '" . /** TODO ask maybe we already has normal escaper  */
+					"(id, name, sourceName, query) VALUES (0,'$viewName','$sourceName', '" . /** TODO ask maybe we already has normal escaper  */
 					str_replace("'", "\\'", $payload::$sqlQueryParser::getCompletedPayload()) . "')";
 
 				$response = $manticoreClient->sendRequest($sql);

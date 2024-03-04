@@ -12,10 +12,16 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Exception;
+use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
 
 /**
  * This is simple do nothing request that handle empty queries
@@ -100,10 +106,22 @@ final class Payload extends BasePayload
 			if (isset($option['sub_tree'][0]['base_expr'])
 				&& $option['sub_tree'][0]['base_expr'] === 'type') {
 				return match (SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr'])) {
-					'kafka' => 'SourceHandlers\\Kafka'
+					'kafka' => 'SourceHandlers\\KafkaWorker'
 				};
 			}
 		}
 		throw new Exception('Cannot find handler for request type: ' . static::$type);
+	}
+
+	/**
+	 * @throws ContainerExceptionInterface
+	 * @throws NotFoundExceptionInterface
+	 */
+	public static function getProcessors(): array {
+		/** @var Client $client */
+		$client = Pluggable::getContainer()->get('manticoreClient');
+		return [
+			new QueueProcess($client),
+		];
 	}
 }
