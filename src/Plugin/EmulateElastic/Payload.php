@@ -74,7 +74,7 @@ final class Payload extends BasePayload {
 				$self->path = $request->path;
 				break;
 			default:
-				if ($pathParts[0] == '_index_template') {
+				if ($pathParts[0] === '_index_template') {
 					$customError = InvalidNetworkRequestError::create('', true);
 					$customError->setResponseErrorCode(200);
 					throw $customError;

@@ -152,8 +152,9 @@ class InsertQueryTest extends TestCase {
 			. '{ "title" : "Red Bag", "price": 12.5, "id": 3 }'
 			. "\n";
 		$out = static::runHttpQuery($query, true, '_bulk');
-		/** @var array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> */
-		$outData = $out[0];
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
+		$this->assertArrayHasKey(0, $out);
+		$outData = $out[0]['data'][0];
 		if (!isset($outData['error'])) {
 			$this->fail();
 		}
