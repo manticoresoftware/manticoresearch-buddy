@@ -189,7 +189,7 @@ The request from Manticore Search to Buddy is made in JSON format no matter how 
 |-|-|
 | `type` | Either `unknown json request` when the original request is made via JSON over HTTP or `unknown sql request` for SQL over HTTP/mysql. |
 | `error` | Error message to be returned to the user, if any. |
-| `message` | An object containing details such as `path_query` (specific to JSON over HTTP requests) and `body` which holds the main content of the request. For JSON over HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for SQL over HTTP/mysql, it remains empty (`""`). |
+| `message` | An object containing details such as `path_query` (specific to JSON over HTTP requests), `http_method`  (`HEAD`, `GET`, etc) and `body` which holds the main content of the request. For JSON over HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for SQL over HTTP/mysql, it remains empty (`""`). `http_method` is set to `""` for SQL over HTTP/mysql |
 | `version` | The maximum protocol version supported by the sender, current version is 2. |
 
 #### Response from Buddy to Manticore Search
