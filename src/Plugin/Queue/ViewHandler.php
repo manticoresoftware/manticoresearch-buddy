@@ -81,7 +81,7 @@ final class ViewHandler extends BaseHandlerWithClient
 
 				$sql = /** @lang ManticoreSearch */
 					'INSERT INTO ' . self::VIEWS_TABLE_NAME .
-					"(id, name, sourceName, query) VALUES (0,'$viewName','$sourceName', '" . /** TODO ask maybe we already has normal escaper  */
+					"(id, name, source_name, query) VALUES (0,'$viewName','$sourceName', '" . /** TODO ask maybe we already has normal escaper  */
 					str_replace("'", "\\'", $payload::$sqlQueryParser::getCompletedPayload()) . "')";
 
 				$response = $manticoreClient->sendRequest($sql);
@@ -137,7 +137,7 @@ final class ViewHandler extends BaseHandlerWithClient
 		}
 
 		$sql = /** @lang ManticoreSearch */
-			'CREATE TABLE ' . self::VIEWS_TABLE_NAME . ' (id bigint, name text, query text)';
+			'CREATE TABLE ' . self::VIEWS_TABLE_NAME . ' (id bigint, name text, source_name text, query text)';
 
 		$request = $manticoreClient->sendRequest($sql);
 		if ($request->hasError()) {

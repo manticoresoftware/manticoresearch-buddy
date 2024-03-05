@@ -4,9 +4,11 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\SourceHandlers\SourceHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Workers\KafkaWorker;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use RdKafka\Exception;
 
 class QueueProcess extends BaseProcessor
 {
@@ -28,11 +30,14 @@ class QueueProcess extends BaseProcessor
 		parent::stop();
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws Exception
+	 */
 	public function runPool(): void {
-		Buddy::debug('+++++++');
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . SourceHandler::SOURCE_TABLE_NAME .
-			" match('@name \"" . SourceHandler::SOURCE_TYPE_KAFKA . "\"')";
+			" WHERE match('@name \"" . SourceHandler::SOURCE_TYPE_KAFKA . "\"')";
 		$results = $this->client->sendRequest($sql);
 
 		if ($results->hasError()) {
@@ -40,7 +45,7 @@ class QueueProcess extends BaseProcessor
 			return;
 		}
 
-		foreach ($results->getResult() as $instance) {
+		foreach ($results->getResult()[0]['data'] as $instance) {
 			$desc = $this->client->sendRequest('DESC ' . $instance['buffer_table']);
 
 			if ($desc->hasError()) {
@@ -48,11 +53,13 @@ class QueueProcess extends BaseProcessor
 				continue;
 			}
 
+			$attrs = json_decode($instance['attrs'], true);
+			Buddy::debugv(json_encode($desc->getResult()));
 			// id, type, name, buffer_table, group_offset, attrs
 			go(
-				function () use ($instance) {
+				function () use ($instance, $attrs) {
 					$kafkaWorker = new KafkaWorker(
-						$this->client, $instance['attrs']['broker'], $instance['attrs']['topic'], $instance['attrs']['group']
+						$this->client, $attrs['broker'], $attrs['topic'], $attrs['group']
 					);
 					$kafkaWorker->run();
 				}

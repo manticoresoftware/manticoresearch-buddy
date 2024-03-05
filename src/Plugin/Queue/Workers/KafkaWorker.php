@@ -31,6 +31,7 @@ class KafkaWorker
 	 * @throws Exception
 	 */
 	public function run() {
+		Buddy::debugv("------->> Start consuming");
 		$conf = new \RdKafka\Conf();
 		$conf->set('group.id', $this->consumerGroup);
 		$conf->set('metadata.broker.list', $this->brokerList);

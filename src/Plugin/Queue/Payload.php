@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Exception;
+use Manticoresearch\Buddy\Base\Plugin\Queue\SourceHandlers\SourceHandler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
@@ -76,7 +77,8 @@ final class Payload extends BasePayload
 		/*
 		 *
 		 * create source kafka (id bigint, term text, abbrev text, GlossDef json) type='kafka' broker_list='kafka1:9092' topic_list='myTopic' consumer_group='manticore' num_consumers='1';
-		 * {
+		 * CREATE TABLE destination_kafka (id bigint, name text, short_name text, received_at text, size multi)
+		 * CREATE MATERIALIZED VIEW view_table TO destination_kafka AS SELECT id, term as name, abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka;
 
 		 */
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
@@ -104,7 +106,7 @@ final class Payload extends BasePayload
 			if (isset($option['sub_tree'][0]['base_expr'])
 				&& $option['sub_tree'][0]['base_expr'] === 'type') {
 				return match (SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr'])) {
-					'kafka' => 'SourceHandlers\\KafkaWorker'
+					'kafka' => 'SourceHandlers\\Kafka'
 				};
 			}
 		}
@@ -118,8 +120,10 @@ final class Payload extends BasePayload
 	public static function getProcessors(): array {
 		/** @var Client $client */
 		$client = Pluggable::getContainer()->get('manticoreClient');
-		return [
-			(new QueueProcess)->setClient($client),
-		];
+
+		if ($client->hasTable(SourceHandler::SOURCE_TABLE_NAME)) {
+			return [(new QueueProcess)->setClient($client)];
+		}
+		return [];
 	}
 }
