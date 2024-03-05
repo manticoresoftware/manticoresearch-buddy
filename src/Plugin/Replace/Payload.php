@@ -20,8 +20,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
  */
-final class Payload extends BasePayload
-{
+final class Payload extends BasePayload {
 	public string $path;
 
 	public string $table;
