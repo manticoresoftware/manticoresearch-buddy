@@ -16,14 +16,15 @@ class KafkaWorker
 	private array $topicList;
 	private string $consumerGroup;
 
+	private array $mapping;
+
 	/**
-	 * @throws ManticoreSearchClientError
 	 */
-	public function __construct(Client $client, string $brokerList, string $topicList, string $consumerGroup) {
+	public function __construct(Client $client, string $brokerList, string $topicList, string $consumerGroup, array $mapping) {
 		$this->client = $client;
 		$this->consumerGroup = $consumerGroup;
 		$this->brokerList = $brokerList;
-
+$this->mapping = $mapping;
 		$this->topicList = array_map(fn($item) => trim($item), explode(',', $topicList));
 	}
 
@@ -73,8 +74,9 @@ class KafkaWorker
 			$message = $consumer->consume(120 * 1000);
 			switch ($message->err) {
 				case RD_KAFKA_RESP_ERR_NO_ERROR:
-					$this->insertMessageToBuffer($message->payload);
-					$this->updateOffset($message->partition, $message->offset);
+					if ($this->process($message->payload)){
+						$consumer->commit($message);
+					}
 					break;
 				case RD_KAFKA_RESP_ERR__PARTITION_EOF:
 					Buddy::debugv('KafkaWorker worker -> No more messages; will wait for more ');
@@ -88,11 +90,8 @@ class KafkaWorker
 		}
 	}
 
-	private function insertMessageToBuffer(string $messages) {
+	private function process(string $messages): bool {
 		Buddy::debug($messages);
-	}
-
-	private function updateOffset($partition, $offset) {
-		Buddy::debug("Partition $partition Offset $offset");
+		return true;
 	}
 }
