@@ -20,7 +20,7 @@ class InsertQueryPayloadTest extends TestCase {
 		echo "\nTesting the creation of InsertQuery\Request from manticore request data struct\n";
 		$request = Request::fromArray(
 			[
-				'version' => 1,
+				'version' => 2,
 				'error' => '',
 				'payload' => 'INSERT INTO test(int_col, string_col, float_col, @timestamp)'
 					. ' VALUES(1, \'string\', 2.22, \'2000-01-01T12:00:00Z\')',

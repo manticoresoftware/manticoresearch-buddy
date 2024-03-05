@@ -202,6 +202,11 @@ final class CliArgsProcessor {
 	 * @return void
 	 */
 	protected static function parseBind(array $opts): void {
-		putenv("BIND={$opts['bind']}");
+		$host = $opts['bind'];
+		if (false !== strpos($host, ':')) {
+			[$host, $port] = explode(':', $host);
+			putenv("BIND_PORT={$port}");
+		}
+		putenv("BIND_HOST={$host}");
 	}
 }

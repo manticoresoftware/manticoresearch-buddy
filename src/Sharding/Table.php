@@ -556,7 +556,7 @@ final class Table {
 
 		// Finaly generate create table
 		return "CREATE TABLE `{$this->name}`
-			type='distributed' {$locals->join(' ')} {$agents->join(' ')}
+			type='distributed' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
 		";
 	}
 

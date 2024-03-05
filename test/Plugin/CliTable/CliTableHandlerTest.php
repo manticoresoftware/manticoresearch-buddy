@@ -44,7 +44,7 @@ class CliTableHandlerTest extends TestCase {
 			[
 				'error' => '',
 				'payload' => 'SHOW QUERIES',
-				'version' => 1,
+				'version' => 2,
 				'format' => RequestFormat::SQL,
 				'endpointBundle' => ManticoreEndpoint::Cli,
 				'path' => 'cli',

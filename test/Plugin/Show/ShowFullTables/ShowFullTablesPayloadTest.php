@@ -87,7 +87,7 @@ class ShowFullTablesPayloadTest extends TestCase {
 				ShowFullTablesPayload::fromRequest(
 					Request::fromArray(
 						[
-							'version' => 1,
+							'version' => 2,
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
@@ -120,7 +120,7 @@ class ShowFullTablesPayloadTest extends TestCase {
 				ShowFullTablesPayload::fromRequest(
 					Request::fromArray(
 						[
-							'version' => 1,
+							'version' => 2,
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
@@ -164,7 +164,7 @@ class ShowFullTablesPayloadTest extends TestCase {
 		}
 		echo $query . PHP_EOL;
 		return [
-			'version' => 1,
+			'version' => 2,
 			'error' => '',
 			'payload' => $query,
 			'format' => RequestFormat::SQL,
