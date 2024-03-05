@@ -20,7 +20,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
  */
-final class Payload extends BasePayload {
+final class Payload extends BasePayload
+{
 	public string $path;
 
 	public string $table;
@@ -48,9 +49,11 @@ final class Payload extends BasePayload {
 
 		if ($request->format->value === RequestFormat::SQL->value) {
 
-			/** @var array{REPLACE:array<int, array{table?:string, expr_type: string, base_expr: string}>,
+			/** @var array{REPLACE:array<int, array{table?:string, expr_type: string, base_expr: string,
+			 *   no_quotes: array{parts: array<int, string>}}>,
 			 *   SET:array<int, array{expr_type: string, sub_tree: array<int, array{base_expr: string}>}>,
-			 *   WHERE:array<int, array{base_expr: string}>} $payload */
+			 *   WHERE:array<int, array{base_expr: string}>} $payload
+			 */
 			$payload = static::$sqlQueryParser::parse($request->payload);
 
 			$self->table = self::parseTable($payload['REPLACE']);
@@ -95,14 +98,15 @@ final class Payload extends BasePayload {
 	}
 
 	/**
-	 * @param array<int, array{table?:string, expr_type: string, base_expr: string}> $tableStatement
+	 * @param array<int, array{table?:string, expr_type: string, base_expr: string,
+	 *   no_quotes: array{parts: array<int, string>}}> $tableStatement
 	 * @return string
 	 * @throws ManticoreSearchClientError
 	 */
 	public static function parseTable(array $tableStatement): string {
 		foreach ($tableStatement as $item) {
 			if (isset($item['table']) && $item['expr_type'] === 'table') {
-				return $item['table'];
+				return $item['no_quotes']['parts'][0];
 			}
 		}
 		throw ManticoreSearchClientError::create('Can\'t parse table name');
