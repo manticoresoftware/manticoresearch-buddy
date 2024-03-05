@@ -47,7 +47,7 @@ class ShowQueriesHandlerTest extends TestCase {
 			[
 				'error' => "P01: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
 				'payload' => 'SHOW QUERIES',
-				'version' => 1,
+				'version' => 2,
 				'format' => RequestFormat::SQL,
 				'endpointBundle' => ManticoreEndpoint::Sql,
 				'path' => 'sql?mode=raw',

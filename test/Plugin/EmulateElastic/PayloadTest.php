@@ -23,7 +23,7 @@ class PayloadTest extends TestCase {
 				'error' => '/test/_mapping - unsupported endpoint',
 				'payload' => '{"properties":{"location":{"type":"geo_point"},'.
 					'"title":{"type":"text","fields":{"keyword":{"type":"keyword","ignore_above":256}}}}}',
-				'version' => 1,
+				'version' => 2,
 				'format' => RequestFormat::JSON,
 				'endpointBundle' => ManticoreEndpoint::Elastic,
 				'path' => '/test/_mapping',
@@ -53,7 +53,7 @@ class PayloadTest extends TestCase {
 				'error' => '/test/_mapping - unsupported endpoint',
 				'payload' => '{"properties":{"location":{"type":"geo_point"},'.
 					'"title":{"type":"text","fields":{"keyword":{"type":"keyword","ignore_above":256}}}}}',
-				'version' => 1,
+				'version' => 2,
 				'format' => RequestFormat::JSON,
 				'endpointBundle' => ManticoreEndpoint::Elastic,
 				'path' => '/test/_mapping',
@@ -69,7 +69,7 @@ class PayloadTest extends TestCase {
 				'error' => '/test/_unknown - unsupported endpoint',
 				'payload' => '{"properties":{"location":{"type":"geo_point"},'.
 				'"title":{"type":"text","fields":{"keyword":{"type":"keyword","ignore_above":256}}}}}',
-				'version' => 1,
+				'version' => 2,
 				'format' => RequestFormat::JSON,
 				'endpointBundle' => ManticoreEndpoint::Elastic,
 				'path' => '/test/_unknown',

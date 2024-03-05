@@ -34,7 +34,7 @@ class QueryProcessorTest extends TestCase {
 		echo "\nTesting the processing of execution command\n";
 		$request = Request::fromArray(
 			[
-				'version' => 1,
+				'version' => 2,
 				'error' => '',
 				'payload' => 'BACKUP TO /tmp',
 				'format' => RequestFormat::SQL,
@@ -52,7 +52,7 @@ class QueryProcessorTest extends TestCase {
 
 		$request = Request::fromArray(
 			[
-				'version' => 1,
+				'version' => 2,
 				'error' => '',
 				'payload' => 'SHOW QUERIES',
 				'format' => RequestFormat::SQL,
@@ -73,7 +73,7 @@ class QueryProcessorTest extends TestCase {
 		$this->expectExceptionMessage('Failed to handle query: Some command');
 		$request = Request::fromArray(
 			[
-				'version' => 1,
+				'version' => 2,
 				'error' => '',
 				'payload' => 'Some command',
 				'format' => RequestFormat::SQL,
@@ -91,7 +91,7 @@ class QueryProcessorTest extends TestCase {
 
 		$request = Request::fromArray(
 			[
-				'version' => 1,
+				'version' => 2,
 				'error' => "table 'test' absent, or does not support INSERT",
 				'payload' => 'INSERT INTO test(col1) VALUES("test")',
 				'format' => RequestFormat::SQL,

@@ -87,7 +87,7 @@ class InsertQueryHandlerTest extends TestCase {
 		$mockServerUrl = self::setUpMockManticoreServer(false);
 		$request = Request::fromArray(
 			[
-				'version' => 1,
+				'version' => 2,
 				'error' => "table 'test' absent, or does not support INSERT",
 				'payload' => 'INSERT INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,

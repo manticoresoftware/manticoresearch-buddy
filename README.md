@@ -175,31 +175,36 @@ public static function getProcessors(): array {
 }
 ````
 
-### Communication protocol
+### Communication Protocol v2
 
-Manticore Buddy and Manticore Search communicates with each other in strict accordance with the following protocol:
+This is the protocol description used for communication between Manticore Search and Buddy.
 
-#### JSON over HTTP, SQL over HTTP
+You can find communication protocol v1 [here](https://github.com/manticoresoftware/manticoresearch-buddy/tree/8973ad3491e08837f5f518f6165425fb8d94ecf1?tab=readme-ov-file#communication-protocol).
 
-#### C++ sends to PHP on the HTTP request
+#### Request from Manticore Search to Buddy
 
-json of:
-- `type`: `unknown json request`
-- `error`: error text which would be returned to the user
-- `message`:
-  - `path_query`. E.g. in Feb 2024, it's one of: `_doc`, `_create`, `_udpate`, `_mapping`, `bulk`, `_bulk`, `cli`, `cli_json`, `search`, `sql?mode=raw`, `sql`, `insert`, `_license`, (empty value) other will return an error as Buddy does not support it.
-  - `body`
-- `version`: max buddy protocol version it can handle (the current one is 1)
+The request from Manticore Search to Buddy is made in JSON format no matter how the original query is made (JSON/SQL/binary). The fields are:
 
-#### PHP returns to C++ on the HTTP request
+| Key | Description |
+|-|-|
+| `type` | Either `unknown json request` when the original request is made via JSON over HTTP or `unknown sql request` for SQL over HTTP/mysql. |
+| `error` | Error message to be returned to the user, if any. |
+| `message` | An object containing details such as `path_query` (specific to JSON over HTTP requests) and `body` which holds the main content of the request. For JSON over HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for SQL over HTTP/mysql, it remains empty (`""`). |
+| `version` | The maximum protocol version supported by the sender, current version is 2. |
 
-json of:
-- `type`: `json response`
-- `message`: the json to return to the user
-- `error`: error to log to searchd log in case the query couldn't be completed in PHP
-- `version`: it's current protocol version (the current one is 1)
+#### Response from Buddy to Manticore Search
 
-Example:
+The response JSON structure:
+
+| Key | Description |
+|-|-|
+| `type` | Set to `json response` if the request type was `unknown json request` and `sql response` for `unknown sql request`. |
+| `message` | A JSON object potentially containing an `error` message for displaying and/or logging. This is what Manticore Search will forward to the end-user. |
+| `error_code` | An integer representing the HTTP error code which will be a part of the HTTP response to the user making a JSON over HTTP request. For SQL over HTTP/mysql communications, this field is ignored. |
+| `version` | Indicates the current protocol version being used. Currentl version is 2. |
+
+
+Example of HTTP Response:
 
 ```json
 {
@@ -208,31 +213,76 @@ Example:
     "a": 123,
     "b": "abc"
   },
-  "error": "",
-  "version": 1
+  "error_code": 0,
+  "version": 2
 }
 ```
 
-#### SQL over MySQL
 
-#### C++ sends to PHP on the MySQL request
+Example of MySQL Response:
 
-json of:
-- `type`: `unknown sql request`
-- `user`: mysql user name
-- `error`: error text which would be returned to the user
-- `message`: SQL query failed to execute
-  - `path_query`: `""` (empty)
-  - `body`: the original SQL query itself
-- `version`: max buddy protocol version it can handle (the current one is 1)
+```json
+{
+  "type": "sql response",
+  "message": [
+    {
+      "columns": [
+        {
+          "Field": {
+            "type": "string"
+          }
+        },
+        {
+          "Type": {
+            "type": "string"
+          }
+        },
+        {
+          "Properties": {
+            "type": "string"
+          }
+        }
+      ],
+      "data": [
+        {
+          "Field": "id",
+          "Type": "bigint",
+          "Properties": ""
+        },
+        {
+          "Field": "title",
+          "Type": "text",
+          "Properties": "indexed"
+        },
+        {
+          "Field": "gid",
+          "Type": "uint",
+          "Properties": ""
+        },
+        {
+          "Field": "title",
+          "Type": "string",
+          "Properties": ""
+        },
+        {
+          "Field": "j",
+          "Type": "json",
+          "Properties": ""
+        },
+        {
+          "Field": "new1",
+          "Type": "uint",
+          "Properties": ""
+        }
+      ],
+      "total": 6,
+      "error": "",
+      "warning": ""
+    }
+  ],
+  "error_code": 0,
+  "version": 2
+}
+```
 
-#### PHP returns to C++ on the MySQL request
-
-- `type`: `sql response`
-- `message`: the same `/cli` returns as json (i.e. an array)
-- `error`: error to log to searchd log in case the query couldn't be completed in PHP
-- `version`: it's current protocol version (the current one is 1)
-
-#### Headers
-
-When daemon sends a request to Buddy it should include header `Request-ID: smth`
+Note: The structure for error responses in the `message` field follows the guidelines specified in the [Manticore Search documentation](https://github.com/manticoresoftware/manticoresearch/blob/3cefedf3e71a433b9259571e873586ce13444fcd/manual/Connecting_to_the_server/HTTP.md?plain=1#L227-L247) for JSON and similarly structured documentation for SQL interactions.

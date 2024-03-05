@@ -88,21 +88,23 @@ final class Util {
 		int $replicationFactor
 	): Vector {
 		$assignedNodes = new Set();
+		$sortedNodes = $nodes->sorted();
 
 		for ($i = 0; $i < $shardCount; $i++) {
 			$usedNodesInCurrentReplication = new Set();
 
 			for ($j = 0; $j < $replicationFactor; $j++) {
 				$minShards = min($nodeMap->values()->toArray());
-
 				$nodesWithMinShards = $nodeMap->filter(
 					fn($node, $shards) =>
 					$shards === $minShards
 					&& !$usedNodesInCurrentReplication->contains($node)
 				)
-				  ->keys();
+				  ->keys()->sorted()->toArray();
+				$minShardsCount = sizeof($nodesWithMinShards);
 
-				$node = $nodesWithMinShards->toArray()[array_rand($nodesWithMinShards->toArray())];
+				$consistentIndex = ($i + $j) % $minShardsCount;
+				$node = $nodesWithMinShards[$consistentIndex];
 
 				$schema->get($node)['shards']->add($i);
 				$assignedNodes->add($node);
@@ -112,7 +114,7 @@ final class Util {
 
 			foreach ($usedNodesInCurrentReplication as $node) {
 				$schema[$node]['connections'] = $usedNodesInCurrentReplication
-				->map(fn($i) => $nodes[$i]);
+				->map(fn($i) => $sortedNodes[$i]);
 			}
 		}
 

@@ -181,7 +181,7 @@ class BackupPayloadTest extends TestCase {
 				BackupPayload::fromRequest(
 					Request::fromArray(
 						[
-							'version' => 1,
+							'version' => 2,
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
@@ -218,7 +218,7 @@ class BackupPayloadTest extends TestCase {
 				BackupPayload::fromRequest(
 					Request::fromArray(
 						[
-							'version' => 1,
+							'version' => 2,
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
@@ -275,7 +275,7 @@ class BackupPayloadTest extends TestCase {
 		}
 		echo $query . PHP_EOL;
 		return [
-			'version' => 1,
+			'version' => 2,
 			'error' => '',
 			'payload' => $query,
 			'format' => RequestFormat::SQL,

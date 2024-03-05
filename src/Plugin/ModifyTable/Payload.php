@@ -61,12 +61,13 @@ final class Payload extends BasePayload {
 			}
 
 			foreach ($optionMatches as $optionMatch) {
-			// Trim quotes if the value is quoted
+				$key = strtolower($optionMatch['key']);
+				// Trim quotes if the value is quoted
 				$value = trim($optionMatch['value'], "\"'");
-				if (in_array($optionMatch['key'], ['rf', 'shards'])) {
+				if (in_array($key, ['rf', 'shards'])) {
 					$value = (int)$value;
 				}
-				$options[$optionMatch['key']] = $value;
+				$options[$key] = $value;
 			}
 		}
 
