@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "014e1de1782c66db4a7c55e107b2ea4d",
+    "content-hash": "bafc1bb4bd8876686759ff56b7fbe241",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -3447,6 +3447,44 @@
             "time": "2022-12-30T00:23:10+00:00"
         },
         {
+            "name": "kwn/php-rdkafka-stubs",
+            "version": "v2.2.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/kwn/php-rdkafka-stubs.git",
+                "reference": "23b865d6b3e8fe1f080aa7371dc1da3339361996"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/kwn/php-rdkafka-stubs/zipball/23b865d6b3e8fe1f080aa7371dc1da3339361996",
+                "reference": "23b865d6b3e8fe1f080aa7371dc1da3339361996",
+                "shasum": ""
+            },
+            "require": {
+                "ext-rdkafka": ">=4.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^8.2.4"
+            },
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Karol Wnuk",
+                    "email": "k.wnuk@ascetic.pl"
+                }
+            ],
+            "description": "Rdkafka extension stubs for your IDE",
+            "support": {
+                "issues": "https://github.com/kwn/php-rdkafka-stubs/issues",
+                "source": "https://github.com/kwn/php-rdkafka-stubs/tree/v2.2.1"
+            },
+            "time": "2022-08-16T15:27:51+00:00"
+        },
+        {
             "name": "myclabs/deep-copy",
             "version": "1.11.1",
             "source": {
@@ -5320,6 +5358,38 @@
                 }
             ],
             "time": "2024-02-16T15:06:51+00:00"
+        },
+        {
+            "name": "swoole/ide-helper",
+            "version": "5.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/swoole/ide-helper.git",
+                "reference": "4b6e615cb27c251b6248b8bd9501edbd02a45c18"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/swoole/ide-helper/zipball/4b6e615cb27c251b6248b8bd9501edbd02a45c18",
+                "reference": "4b6e615cb27c251b6248b8bd9501edbd02a45c18",
+                "shasum": ""
+            },
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
+                {
+                    "name": "Team Swoole",
+                    "email": "team@swoole.com"
+                }
+            ],
+            "description": "IDE help files for Swoole.",
+            "support": {
+                "issues": "https://github.com/swoole/ide-helper/issues",
+                "source": "https://github.com/swoole/ide-helper/tree/5.0.3"
+            },
+            "time": "2023-04-28T22:20:18+00:00"
         },
         {
             "name": "theseer/tokenizer",
