@@ -2,8 +2,8 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers;
 
-use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RdKafka\Exception;
 use RdKafka\KafkaConsumer;
@@ -16,15 +16,17 @@ class KafkaWorker
 	private array $topicList;
 	private string $consumerGroup;
 
-	private array $mapping;
+	private string $bufferTable;
+	private array $fields;
 
 	/**
 	 */
-	public function __construct(Client $client, string $brokerList, string $topicList, string $consumerGroup, array $mapping) {
+	public function __construct(Client $client, string $brokerList, string $topicList, string $consumerGroup, string $bufferTable, array $fields) {
 		$this->client = $client;
 		$this->consumerGroup = $consumerGroup;
 		$this->brokerList = $brokerList;
-$this->mapping = $mapping;
+		$this->bufferTable = $bufferTable;
+		$this->fields = $fields;
 		$this->topicList = array_map(fn($item) => trim($item), explode(',', $topicList));
 	}
 
@@ -32,7 +34,7 @@ $this->mapping = $mapping;
 	 * @throws Exception
 	 */
 	public function run() {
-		Buddy::debugv("------->> Start consuming");
+		Buddy::debugv('------->> Start consuming');
 		$conf = new \RdKafka\Conf();
 		$conf->set('group.id', $this->consumerGroup);
 		$conf->set('metadata.broker.list', $this->brokerList);
@@ -50,12 +52,12 @@ $this->mapping = $mapping;
 			function (KafkaConsumer $kafka, $err, array $partitions = null) {
 				switch ($err) {
 					case RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS:
-						Buddy::debugv('KafkaWorker worker -> Assign: '.json_encode($partitions));
+						Buddy::debugv('-----> KafkaWorker worker -> Assign: ' . json_encode($partitions));
 						$kafka->assign($partitions);
 						break;
 
 					case RD_KAFKA_RESP_ERR__REVOKE_PARTITIONS:
-						Buddy::debugv('KafkaWorker worker -> Revoke: '.json_encode($partitions));
+						Buddy::debugv('-----> KafkaWorker worker -> Revoke: ' . json_encode($partitions));
 						$kafka->assign(null);
 						break;
 
@@ -74,15 +76,15 @@ $this->mapping = $mapping;
 			$message = $consumer->consume(120 * 1000);
 			switch ($message->err) {
 				case RD_KAFKA_RESP_ERR_NO_ERROR:
-					if ($this->process($message->payload)){
+					if ($this->process($message->payload)) {
 						$consumer->commit($message);
 					}
 					break;
 				case RD_KAFKA_RESP_ERR__PARTITION_EOF:
-					Buddy::debugv('KafkaWorker worker -> No more messages; will wait for more ');
+					Buddy::debugv('-----> KafkaWorker worker -> No more messages; will wait for more ');
 					break;
 				case RD_KAFKA_RESP_ERR__TIMED_OUT:
-					Buddy::debugv('KafkaWorker worker -> Consume timeout ');
+					Buddy::debugv('-----> KafkaWorker worker -> Consume timeout ');
 					break;
 				default:
 					throw new \Exception($message->errstr(), $message->err);
@@ -90,8 +92,43 @@ $this->mapping = $mapping;
 		}
 	}
 
-	private function process(string $messages): bool {
-		Buddy::debug($messages);
-		return true;
+	private function process(string $message): bool {
+		if ($this->insertMessageIntoBuffer($this->mapMessage($message))) {
+			return true;
+		}
+		return false;
+	}
+
+	private function mapMessage(string $message): array {
+		$message = array_change_key_case(json_decode($message, true));
+		$values = [];
+		foreach ($this->fields as $fieldName => $fieldType) {
+			$values[$fieldName] = $this->morphValuesByFieldType($message[$fieldName] ?? null, $fieldType);
+		}
+		return $values;
+	}
+
+	private function insertMessageIntoBuffer(array $message): bool {
+		$fields = implode(', ', array_keys($message));
+		$values = implode(', ', array_values($message));
+		$sql = "REPLACE INTO $this->bufferTable ($fields) VALUES ($values)";
+		$request = $this->client->sendRequest($sql);
+		return $request->hasError();
+	}
+
+	/**
+	 * TODO Duplicate from Replace plugin. Expose to core
+	 */
+	private function morphValuesByFieldType(mixed $fieldValue, string $fieldType): mixed {
+		return match ($fieldType) {
+			Fields::TYPE_INT, Fields::TYPE_BIGINT, Fields::TYPE_TIMESTAMP => (int)$fieldValue,
+			Fields::TYPE_BOOL => (bool)$fieldValue,
+			Fields::TYPE_FLOAT => (float)$fieldValue,
+			Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
+				"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue)  . "'",
+			Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
+				'(' . (is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue) . ')',
+			default => $fieldValue
+		};
 	}
 }

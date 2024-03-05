@@ -20,7 +20,6 @@ class QueueProcess extends BaseProcessor
 	}
 
 	public function start(): void {
-		Buddy::debug('-----> Queue process: start');
 		parent::start();
 		$this->execute('runPool');
 	}
@@ -54,12 +53,16 @@ class QueueProcess extends BaseProcessor
 			}
 
 			$attrs = json_decode($instance['attrs'], true);
-			Buddy::debugv(json_encode($desc->getResult()));
-			// id, type, name, buffer_table, group_offset, attrs
+
+			$fields = [];
+			foreach ($desc->getResult()[0]['data'] as $field) {
+				$fields[$field['Field']] = $field['Type'];
+			}
+
 			go(
-				function () use ($instance, $attrs) {
+				function () use ($instance, $attrs, $fields) {
 					$kafkaWorker = new KafkaWorker(
-						$this->client, $attrs['broker'], $attrs['topic'], $attrs['group']
+						$this->client, $attrs['broker'], $attrs['topic'], $attrs['group'], $instance['buffer_table'], $fields
 					);
 					$kafkaWorker->run();
 				}

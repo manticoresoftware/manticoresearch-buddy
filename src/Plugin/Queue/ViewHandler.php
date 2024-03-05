@@ -56,11 +56,6 @@ final class ViewHandler extends BaseHandlerWithClient
 			self::checkDestinationTable($destinationTableName, $manticoreClient);
 
 
-			/**
-			 * CREATE MATERIALIZED VIEW view_table TO destination_kafka AS SELECT id, term as name, abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka;
-			 */
-
-
 			$sql = /** @lang ManticoreSearch */
 				'SELECT * FROM ' . SourceHandler::SOURCE_TABLE_NAME .
 				" WHERE match('@name \"" . $sourceName . "\"')";
