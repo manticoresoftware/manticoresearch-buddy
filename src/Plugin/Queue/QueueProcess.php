@@ -10,18 +10,17 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 class QueueProcess extends BaseProcessor
 {
-	private static Client $client;
+	private Client $client;
 
-	public function __construct(Client $client) {
-		self::$client = $client;
-		parent::__construct();
+	public function setClient(Client $client): static {
+		$this->client = $client;
+		return $this;
 	}
 
 	public function start(): void {
-		Buddy::debug("-----> Queue process: start");
+		Buddy::debug('-----> Queue process: start');
 		parent::start();
-
-		$this->execute('runPool', [self::$client]);
+		$this->execute('runPool');
 	}
 
 	public function stop(): void {
@@ -29,12 +28,12 @@ class QueueProcess extends BaseProcessor
 		parent::stop();
 	}
 
-	public static function runPool(Client $client): void {
-		Buddy::debug("+++++++");
+	public function runPool(): void {
+		Buddy::debug('+++++++');
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . SourceHandler::SOURCE_TABLE_NAME .
 			" match('@name \"" . SourceHandler::SOURCE_TYPE_KAFKA . "\"')";
-		$results = $client->sendRequest($sql);
+		$results = $this->client->sendRequest($sql);
 
 		if ($results->hasError()) {
 			Buddy::debug("Can't get sources. Exit worker pool. Reason: " . $results->getError());
@@ -42,7 +41,7 @@ class QueueProcess extends BaseProcessor
 		}
 
 		foreach ($results->getResult() as $instance) {
-			$desc = $client->sendRequest('DESC ' . $instance['buffer_table']);
+			$desc = $this->client->sendRequest('DESC ' . $instance['buffer_table']);
 
 			if ($desc->hasError()) {
 				Buddy::debug("Can't describe table ". $instance['buffer_table'] .'. Reason: '. $desc->getError());
@@ -51,9 +50,9 @@ class QueueProcess extends BaseProcessor
 
 			// id, type, name, buffer_table, group_offset, attrs
 			go(
-				function () use ($client, $instance) {
+				function () use ($instance) {
 					$kafkaWorker = new KafkaWorker(
-						$client, $instance['attrs']['broker'], $instance['attrs']['topic'], $instance['attrs']['group']
+						$this->client, $instance['attrs']['broker'], $instance['attrs']['topic'], $instance['attrs']['group']
 					);
 					$kafkaWorker->run();
 				}

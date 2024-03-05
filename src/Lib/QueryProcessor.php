@@ -119,11 +119,16 @@ class QueryProcessor {
 
 	/**
 	 * Run start method of all plugin handlers
+	 * @param ?callable $fn
 	 * @return void
 	 */
-	public static function startPlugins(): void {
+	public static function startPlugins(?callable $fn = null): void {
 		static::iteratePluginProcessors(
-			static function (BaseProcessor $processor) {
+			static function (BaseProcessor $processor) use ($fn) {
+				if (isset($fn)) {
+					$fn($processor->getProcess()->process);
+				}
+
 				$processor->start();
 			}
 		);

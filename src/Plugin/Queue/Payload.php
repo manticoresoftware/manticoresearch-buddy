@@ -12,13 +12,11 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Exception;
-use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -121,7 +119,7 @@ final class Payload extends BasePayload
 		/** @var Client $client */
 		$client = Pluggable::getContainer()->get('manticoreClient');
 		return [
-			new QueueProcess($client),
+			(new QueueProcess)->setClient($client),
 		];
 	}
 }
