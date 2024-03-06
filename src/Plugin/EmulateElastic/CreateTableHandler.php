@@ -128,8 +128,8 @@ class CreateTableHandler extends BaseHandlerWithClient {
 		$defaults = [
 			'sim' => 'l2',
 			'params' => [
-				'ef_construction' => 100,
 				'm' => 16,
+				'ef_construction' => 100,
 			],
 		];
 
