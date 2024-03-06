@@ -3,6 +3,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Batch;
+use Manticoresearch\Buddy\Base\Plugin\Queue\ViewHandler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -13,6 +14,7 @@ class KafkaWorker
 {
 	private Client $client;
 
+	private string $name;
 	private string $brokerList;
 	private array $topicList;
 	private string $consumerGroup;
@@ -20,27 +22,31 @@ class KafkaWorker
 	private string $bufferTable;
 	private array $fields;
 
+	private int $batchSize;
+
 
 	/**
 	 */
 	public function __construct(
+		string $name,
 		Client $client,
 		string $brokerList,
 		string $topicList,
 		string $consumerGroup,
 		string $bufferTable,
-		array  $fields
+		array  $fields,
+		int    $batchSize = 100
 	) {
+		$this->name = $name;
 		$this->client = $client;
 		$this->consumerGroup = $consumerGroup;
 		$this->brokerList = $brokerList;
 		$this->bufferTable = $bufferTable;
 		$this->fields = $fields;
 		$this->topicList = array_map(fn($item) => trim($item), explode(',', $topicList));
+		$this->batchSize = $batchSize;
 	}
 
-	public function setBatchSize() {
-	}
 
 	/**
 	 * @throws Exception
@@ -48,12 +54,26 @@ class KafkaWorker
 	public function run() {
 		Buddy::debugv('------->> Start consuming');
 
-		$batch = new Batch(20);
+		$batch = new Batch($this->batchSize);
 		$batch->setCallback(
 			function ($batch) {
 				return $this->processBatch($batch);
 			}
 		);
+
+		$sql = /** @lang ManticoreSearch */
+			'SELECT * FROM ' . ViewHandler::VIEWS_TABLE_NAME .
+			" WHERE match('@query \"$this->bufferTable\"') AND match('@name \"$this->name\"')";
+		$results = $this->client->sendRequest($sql);
+
+		if ($results->hasError()) {
+			Buddy::debug("Can't get sources. Exit worker pool. Reason: " . $results->getError());
+			return;
+		}
+
+		Buddy::debugv(json_encode($results->getResult()));
+
+
 
 		$conf = new \RdKafka\Conf();
 		$conf->set('group.id', $this->consumerGroup);
@@ -117,52 +137,51 @@ class KafkaWorker
 	}
 
 	public function processBatch(array $batch): bool {
-		$failed = 0;
-		foreach ($batch as $message) {
-			if ($this->process($message)) {
-				continue;
-			}
-
-			$failed++;
-		}
-
-		return $failed === 0;
-	}
-
-	private function process(string $message): bool {
-		if ($this->insertMessageIntoBuffer($this->mapMessage($message))) {
+		if ($this->insertToBuffer($this->mapMessages($batch))) {
 			return true;
 		}
 		return false;
 	}
 
-	private function mapMessage(string $message): array {
-		$message = array_change_key_case(json_decode($message, true));
-		$values = [];
-		foreach ($this->fields as $fieldName => $fieldType) {
-			if (isset($message[$fieldName])) {
-				$values[$fieldName] = $this->morphValuesByFieldType($message[$fieldName], $fieldType);
-			} else {
-				if (in_array(
-					$fieldType, [Fields::TYPE_INT,
-						Fields::TYPE_BIGINT,
-						Fields::TYPE_TIMESTAMP,
-						Fields::TYPE_BOOL,
-						Fields::TYPE_FLOAT]
-				)) {
-					$values[$fieldName] = 0;
+
+	private function mapMessages(array $batch): array {
+		$results = [];
+		foreach ($batch as $k => $message) {
+			$message = array_change_key_case(json_decode($message, true));
+			$row = [];
+			foreach ($this->fields as $fieldName => $fieldType) {
+				if (isset($message[$fieldName])) {
+					$row[$fieldName] = $this->morphValuesByFieldType($message[$fieldName], $fieldType);
 				} else {
-					$values[$fieldName] = "''";
+					if (in_array(
+						$fieldType, [Fields::TYPE_INT,
+							Fields::TYPE_BIGINT,
+							Fields::TYPE_TIMESTAMP,
+							Fields::TYPE_BOOL,
+							Fields::TYPE_FLOAT]
+					)) {
+						$row[$fieldName] = 0;
+					} else {
+						$row[$fieldName] = "''";
+					}
 				}
 			}
+			$results[] = $row;
 		}
-		return $values;
+
+		return $results;
 	}
 
-	private function insertMessageIntoBuffer(array $message): bool {
-		$fields = implode(', ', array_keys($message));
-		$values = implode(', ', array_values($message));
-		$sql = "REPLACE INTO $this->bufferTable ($fields) VALUES ($values)";
+	private function insertToBuffer(array $batch): bool {
+
+		$fields = implode(', ', array_keys($batch[0]));
+
+		$values = [];
+		foreach ($batch as $row) {
+			$values[] = '( ' . implode(', ', array_values($row)) . ' )';
+		}
+		$values = implode(",\n", $values);
+		$sql = "REPLACE INTO $this->bufferTable ($fields) VALUES $values";
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {

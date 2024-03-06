@@ -57,9 +57,9 @@ final class Kafka extends SourceHandler
 
 			/** @l $query */
 			$query = /** @lang ManticoreSearch */
-				'INSERT INTO ' . self::SOURCE_TABLE_NAME . ' (id, type, name, buffer_table, group_offset, attrs) ' .
+				'INSERT INTO ' . self::SOURCE_TABLE_NAME . ' (id, type, name, full_name, buffer_table, attrs) ' .
 				'VALUES ' .
-				"(0, '" . self::SOURCE_TYPE_KAFKA . "', '$options->name','_buffer_{$options->name}_$i', 0, '$attrs')";
+				"(0, '" . self::SOURCE_TYPE_KAFKA . "', '$options->name','{$options->name}_$i','_buffer_{$options->name}_$i', '$attrs')";
 
 			$request = $manticoreClient->sendRequest($query);
 			if ($request->hasError()) {

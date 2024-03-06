@@ -65,7 +65,7 @@ abstract class SourceHandler extends BaseHandlerWithClient {
 
 		$sql = /** @lang ManticoreSearch */
 			'CREATE TABLE ' . self::SOURCE_TABLE_NAME .
-			' (id bigint, type text, name text, buffer_table text, group_offset bigint, attrs json)';
+			' (id bigint, type text, name text, full_name text, buffer_table text, attrs json)';
 
 		$request = $manticoreClient->sendRequest($sql);
 		if ($request->hasError()) {

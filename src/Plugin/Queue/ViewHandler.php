@@ -74,10 +74,12 @@ final class ViewHandler extends BaseHandlerWithClient
 
 				$payload::$sqlQueryParser::setParsedPayload($payload->parsedPayload);
 
+				$sourceFullName = $source['full_name'];
+				$escapedQuery = str_replace("'", "\\'", $payload::$sqlQueryParser::getCompletedPayload());
 				$sql = /** @lang ManticoreSearch */
 					'INSERT INTO ' . self::VIEWS_TABLE_NAME .
-					"(id, name, source_name, query) VALUES (0,'$viewName','$sourceName', '" . /** TODO ask maybe we already has normal escaper  */
-					str_replace("'", "\\'", $payload::$sqlQueryParser::getCompletedPayload()) . "')";
+					'(id, name, source_name, destination_name, query) VALUES ' .
+					"(0,'$viewName','$sourceFullName', '$destinationTableName', '$escapedQuery')";
 
 				$response = $manticoreClient->sendRequest($sql);
 				if ($response->hasError()) {
@@ -132,7 +134,7 @@ final class ViewHandler extends BaseHandlerWithClient
 		}
 
 		$sql = /** @lang ManticoreSearch */
-			'CREATE TABLE ' . self::VIEWS_TABLE_NAME . ' (id bigint, name text, source_name text, query text)';
+			'CREATE TABLE ' . self::VIEWS_TABLE_NAME . ' (id bigint, name text, source_name text, destination_name text, query text)';
 
 		$request = $manticoreClient->sendRequest($sql);
 		if ($request->hasError()) {
