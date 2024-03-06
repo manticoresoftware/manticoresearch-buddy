@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\SourceHandlers\SourceHandler;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
@@ -49,6 +50,10 @@ final class ViewHandler extends BaseHandlerWithClient
 			$sourceName = $payload->parsedPayload['FROM'][0]['table'];
 			$viewName = $payload->parsedPayload['VIEW'][1];
 			$destinationTableName = $payload->parsedPayload['VIEW'][4];
+
+			if (isset($payload->parsedPayload['LIMIT'])){
+				throw GenericError::create("Can't use query with limit");
+			}
 
 
 			self::checkAndCreateViews($manticoreClient);

@@ -1,8 +1,7 @@
 <?php declare(strict_types=1);
 
-namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers;
+namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\Batch;
 use Manticoresearch\Buddy\Base\Plugin\Queue\ViewHandler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
@@ -21,8 +20,9 @@ class KafkaWorker
 
 	private string $bufferTable;
 	private array $fields;
-
 	private int $batchSize;
+
+	private View $view;
 
 
 	/**
@@ -45,36 +45,34 @@ class KafkaWorker
 		$this->fields = $fields;
 		$this->topicList = array_map(fn($item) => trim($item), explode(',', $topicList));
 		$this->batchSize = $batchSize;
+		$this->view = $this->initView();
 	}
 
 
-	/**
-	 * @throws Exception
-	 */
-	public function run() {
-		Buddy::debugv('------->> Start consuming');
-
-		$batch = new Batch($this->batchSize);
-		$batch->setCallback(
-			function ($batch) {
-				return $this->processBatch($batch);
-			}
-		);
-
+	private function initView() {
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . ViewHandler::VIEWS_TABLE_NAME .
-			" WHERE match('@query \"$this->bufferTable\"') AND match('@name \"$this->name\"')";
+			" WHERE match('@source_name \"$this->name\"')";
 		$results = $this->client->sendRequest($sql);
 
 		if ($results->hasError()) {
-			Buddy::debug("Can't get sources. Exit worker pool. Reason: " . $results->getError());
+			Buddy::debug('Error during getting view. Exit worker. Reason: ' . $results->getError());
 			return;
 		}
 
-		Buddy::debugv(json_encode($results->getResult()));
+		$results = $results->getResult();
+		if (!isset($results[0]['data'][0])) {
+			Buddy::debug("Can't find view with source_name $this->name");
+			return;
+		}
 
+		$destinationTableName = $results[0]['data'][0]['destination_name'];
+		$query = $results[0]['data'][0]['query'];
 
+		return new View($this->client, $destinationTableName, $query);
+	}
 
+	private function initKafkaConfig() {
 		$conf = new \RdKafka\Conf();
 		$conf->set('group.id', $this->consumerGroup);
 		$conf->set('metadata.broker.list', $this->brokerList);
@@ -107,7 +105,24 @@ class KafkaWorker
 				}
 			}
 		);
+		return $conf;
+	}
 
+	/**
+	 * @throws Exception
+	 */
+	public function run() {
+		Buddy::debugv('------->> Start consuming');
+
+		$batch = new Batch($this->batchSize);
+		$batch->setCallback(
+			function ($batch) {
+				return $this->processBatch($batch);
+			}
+		);
+
+
+		$conf = $this->initKafkaConfig();
 
 		$consumer = new KafkaConsumer($conf);
 		$consumer->subscribe($this->topicList);
@@ -137,7 +152,8 @@ class KafkaWorker
 	}
 
 	public function processBatch(array $batch): bool {
-		if ($this->insertToBuffer($this->mapMessages($batch))) {
+		if ($this->insertToBuffer($this->mapMessages($batch))
+			&& $this->view->run()) {
 			return true;
 		}
 		return false;
@@ -210,5 +226,8 @@ class KafkaWorker
 
 	private function escapeSting(string $value): string {
 		return str_replace("'", "\'", $value);
+	}
+
+	private function processView() {
 	}
 }

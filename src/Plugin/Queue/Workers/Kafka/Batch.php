@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Manticoresearch\Buddy\Base\Plugin\Queue;
+namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
 use Closure;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
