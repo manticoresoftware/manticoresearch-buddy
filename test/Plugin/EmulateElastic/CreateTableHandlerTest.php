@@ -360,7 +360,7 @@ class CreateTableHandlerTest extends TestCase {
 				self::invokeMethod($handler, 'buildColumnExpr', [$columnInfo]);
 			} catch (Exception $e) {
 				$this->assertEquals(
-					'Unsupported settings for knn_vector type found in the data schema',
+					'Unsupported settings for `knn_vector` type found in the data schema',
 					$e->getMessage()
 				);
 			}
