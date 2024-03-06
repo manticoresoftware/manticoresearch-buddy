@@ -212,11 +212,11 @@ class CreateTableHandlerTest extends TestCase {
 				'dimension' => 2,
 				'method' => [
 					'name' => 'hnsw',
-					'space_type' => 'l2',
+					'space_type' => 'innerproduct',
 					'engine' => 'nmslib',
 					'parameters' => [
-						'ef_construction' => 128,
 						'm' => 24,
+						'ef_construction' => 128,
 					],
 				],
 			],

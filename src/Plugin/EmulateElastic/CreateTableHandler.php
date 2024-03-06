@@ -135,8 +135,8 @@ class CreateTableHandler extends BaseHandlerWithClient {
 
 		$settingsExpr = " knn_type='hnsw' knn_dims='{$colInfo['dimension']}'";
 		if (!isset($colInfo['method'])) {
-			return $settingsExpr . " hnsw_similarity='{$defaults['sim']}' hnsw_m={$defaults['params']['m']} " .
-				"hnsw_ef_construction={$defaults['params']['ef_construction']}";
+			return $settingsExpr . " hnsw_similarity='{$defaults['sim']}' hnsw_m='{$defaults['params']['m']}' " .
+				"hnsw_ef_construction='{$defaults['params']['ef_construction']}'";
 		}
 
 		/** @var array{name?:string,engine?:string,space_type?:string,parameters?:array<string,mixed>} $methodInfo */
