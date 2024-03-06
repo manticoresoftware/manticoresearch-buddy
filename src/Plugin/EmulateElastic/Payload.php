@@ -28,7 +28,8 @@ final class Payload extends BasePayload {
 	public static string $requestTarget;
 
 	/**
-	 * @var array<string,array{properties?:array<mixed>,type?:string,fields?:array<mixed>}> $columnInfo
+	 * @var array<string,array{properties?:array<mixed>,type?:string,fields?:array<mixed>,
+	 * dimension?:int,method?:array<mixed>}> $columnInfo
 	 */
 	public array $columnInfo;
 

@@ -53,7 +53,8 @@ class CreateTableHandler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param array<string,array{properties?:array<mixed>,type?:string,fields?:array<mixed>}> $columnInfo
+	 * @param array<string,array{properties?:array<mixed>,type?:string,fields?:array<mixed>,
+	 * dimension?:int,method?:array<mixed>}> $columnInfo
 	 * @return string
 	 */
 	protected static function buildColumnExpr(array $columnInfo): string {
@@ -66,12 +67,15 @@ class CreateTableHandler extends BaseHandlerWithClient {
 			'date_nanos' => 'bigint',
 			'dense_vector' => 'json',
 			'flattened' => 'json',
+			'flat_object' => 'json',
 			'geo_point' => 'json',
 			'geo_shape' => 'json',
 			'histogram' => 'json',
 			'ip' => 'string',
 			'long' => 'bigint',
 			'integer' => 'int',
+			'keyword' => 'string',
+			'knn_vector' => 'float_vector',
 			'short' => 'int',
 			'byte' => 'int',
 			'float' => 'float',
@@ -101,14 +105,64 @@ class CreateTableHandler extends BaseHandlerWithClient {
 				throw new \Exception("Unsupported data type $dataType found in the data schema");
 			}
 			$colType = $dataTypeMap[$dataType];
-			$dataTypeFlags = '';
-			if ($colType === 'text' && isset($colInfo['fields'], $colInfo['fields']['keyword'])) {
-				$dataTypeFlags .= ' indexed';
-			}
-			$colDefs[] = "$colName $colType" . $dataTypeFlags;
+			$dataTypeOptions = match (true) {
+				($dataType === 'knn_vector') => self::buildKnnFieldSettings($colInfo),
+				($colType === 'text' && isset($colInfo['fields'], $colInfo['fields']['keyword'])) => ' indexed',
+				default => '',
+			};
+			$colDefs[] = "$colName $colType" . $dataTypeOptions;
 		}
 
 		return implode(',', $colDefs);
 	}
 
+	/**
+	 * @param array{dimension?:int,method?:array<mixed>} $colInfo
+	 * @return string
+	 */
+	protected static function buildKnnFieldSettings(array $colInfo): string {
+		if (!isset($colInfo['dimension'])) {
+			throw new \Exception('Mandatory property `dimension` is missing for `knn_vector` type');
+		}
+		// default Opensearch settings for knn_vector type
+		$defaults = [
+			'sim' => 'l2',
+			'params' => [
+				'ef_construction' => 100,
+				'm' => 16,
+			],
+		];
+
+		$settingsExpr = " knn_type='hnsw' knn_dims='{$colInfo['dimension']}'";
+		if (!isset($colInfo['method'])) {
+			return $settingsExpr . " hnsw_similarity='{$defaults['sim']}' hnsw_m={$defaults['params']['m']} " .
+				"hnsw_ef_construction={$defaults['params']['ef_construction']}";
+		}
+
+		/** @var array{name?:string,engine?:string,space_type?:string,parameters?:array<string,mixed>} $methodInfo */
+		$methodInfo = $colInfo['method'];
+		if ((isset($methodInfo['name']) && $methodInfo['name'] !== 'hnsw')
+		|| (isset($methodInfo['engine']) && $methodInfo['engine'] !== 'nmslib')
+		|| (isset($methodInfo['space_type'])
+			&&	!in_array($methodInfo['space_type'], ['l2', 'innerproduct', 'cosinesimil']))
+		) {
+			throw new \Exception('Unsupported settings for `knn_vector` type found in the data schema');
+		}
+		$spaceTypeMapping = [
+			'innerproduct' => 'ip',
+			'cosinesim' => 'cosine',
+			'ef_construction' => 'hnsw_ef_construction',
+			'm' => 'hnsw_m',
+		];
+		$spaceType = isset($methodInfo['space_type'])
+			? ($spaceTypeMapping[$methodInfo['space_type']] ?? $methodInfo['space_type']) : $defaults['sim'];
+		$settingsExpr .= " hnsw_similarity='$spaceType'";
+		if (isset($methodInfo['parameters'])) {
+			foreach ($defaults['params'] as $name => $value) {
+				$settingsExpr .= " {$spaceTypeMapping[$name]}='" . ($methodInfo['parameters'][$name] ?? $value) . "'";
+			}
+		}
+
+		return $settingsExpr;
+	}
 }
