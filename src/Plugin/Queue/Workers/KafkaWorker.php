@@ -2,6 +2,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers;
 
+use Manticoresearch\Buddy\Base\Plugin\Queue\Batch;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -18,6 +19,7 @@ class KafkaWorker
 
 	private string $bufferTable;
 	private array $fields;
+
 
 	/**
 	 */
@@ -37,14 +39,26 @@ class KafkaWorker
 		$this->topicList = array_map(fn($item) => trim($item), explode(',', $topicList));
 	}
 
+	public function setBatchSize() {
+	}
+
 	/**
 	 * @throws Exception
 	 */
 	public function run() {
 		Buddy::debugv('------->> Start consuming');
+
+		$batch = new Batch(20);
+		$batch->setCallback(
+			function ($batch) {
+				return $this->processBatch($batch);
+			}
+		);
+
 		$conf = new \RdKafka\Conf();
 		$conf->set('group.id', $this->consumerGroup);
 		$conf->set('metadata.broker.list', $this->brokerList);
+		$conf->set('enable.auto.commit', 'false');
 
 		// Set where to start consuming messages when there is no initial offset in
 		// offset store or the desired offset is out of range.
@@ -78,12 +92,13 @@ class KafkaWorker
 		$consumer = new KafkaConsumer($conf);
 		$consumer->subscribe($this->topicList);
 
-
+		$lastFullMessage = null;
 		while (true) {
-			$message = $consumer->consume(120 * 1000);
+			$message = $consumer->consume(1000);
 			switch ($message->err) {
 				case RD_KAFKA_RESP_ERR_NO_ERROR:
-					if ($this->process($message->payload)) {
+					$lastFullMessage = $message;
+					if ($batch->add($message->payload)) {
 						$consumer->commit($message);
 					}
 					break;
@@ -91,12 +106,27 @@ class KafkaWorker
 					Buddy::debugv('-----> KafkaWorker worker -> No more messages; will wait for more ');
 					break;
 				case RD_KAFKA_RESP_ERR__TIMED_OUT:
-					Buddy::debugv('-----> KafkaWorker worker -> Consume timeout ');
+					if ($batch->checkProcessingTimeout() && $batch->process() && $lastFullMessage !== null) {
+						$consumer->commit($lastFullMessage);
+					}
 					break;
 				default:
 					throw new \Exception($message->errstr(), $message->err);
 			}
 		}
+	}
+
+	public function processBatch(array $batch): bool {
+		$failed = 0;
+		foreach ($batch as $message) {
+			if ($this->process($message)) {
+				continue;
+			}
+
+			$failed++;
+		}
+
+		return $failed === 0;
 	}
 
 	private function process(string $message): bool {
