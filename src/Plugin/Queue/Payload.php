@@ -78,7 +78,9 @@ final class Payload extends BasePayload
 		 *
 		 * CREATE SOURCE kafka (id bigint, term text, abbrev text, GlossDef json) type='kafka'
 		   broker_list='kafka:9092' topic_list='my-data' consumer_group='manticore' num_consumers='1';
+
 		 * CREATE TABLE destination_kafka (id bigint, name text, short_name text, received_at text, size multi);
+
 		 * CREATE MATERIALIZED VIEW view_table TO destination_kafka AS SELECT id, term as name,
 		   abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka;
 

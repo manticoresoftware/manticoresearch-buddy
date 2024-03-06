@@ -62,7 +62,8 @@ class QueueProcess extends BaseProcessor
 			go(
 				function () use ($instance, $attrs, $fields) {
 					$kafkaWorker = new KafkaWorker(
-						$this->client, $attrs['broker'], $attrs['topic'], $attrs['group'], $instance['buffer_table'], $fields
+						$this->client, $attrs['broker'], $attrs['topic'],
+						$attrs['group'], $instance['buffer_table'], $fields
 					);
 					$kafkaWorker->run();
 				}

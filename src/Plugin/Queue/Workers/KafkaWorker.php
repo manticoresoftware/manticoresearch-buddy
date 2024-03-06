@@ -21,7 +21,14 @@ class KafkaWorker
 
 	/**
 	 */
-	public function __construct(Client $client, string $brokerList, string $topicList, string $consumerGroup, string $bufferTable, array $fields) {
+	public function __construct(
+		Client $client,
+		string $brokerList,
+		string $topicList,
+		string $consumerGroup,
+		string $bufferTable,
+		array  $fields
+	) {
 		$this->client = $client;
 		$this->consumerGroup = $consumerGroup;
 		$this->brokerList = $brokerList;
@@ -103,7 +110,21 @@ class KafkaWorker
 		$message = array_change_key_case(json_decode($message, true));
 		$values = [];
 		foreach ($this->fields as $fieldName => $fieldType) {
-			$values[$fieldName] = $this->morphValuesByFieldType($message[$fieldName] ?? null, $fieldType);
+			if (isset($message[$fieldName])) {
+				$values[$fieldName] = $this->morphValuesByFieldType($message[$fieldName], $fieldType);
+			} else {
+				if (in_array(
+					$fieldType, [Fields::TYPE_INT,
+						Fields::TYPE_BIGINT,
+						Fields::TYPE_TIMESTAMP,
+						Fields::TYPE_BOOL,
+						Fields::TYPE_FLOAT]
+				)) {
+					$values[$fieldName] = 0;
+				} else {
+					$values[$fieldName] = "''";
+				}
+			}
 		}
 		return $values;
 	}
@@ -113,7 +134,13 @@ class KafkaWorker
 		$values = implode(', ', array_values($message));
 		$sql = "REPLACE INTO $this->bufferTable ($fields) VALUES ($values)";
 		$request = $this->client->sendRequest($sql);
-		return $request->hasError();
+
+		if ($request->hasError()) {
+			Buddy::debugv($sql);
+			Buddy::debug($request->getError());
+			return false;
+		}
+		return true;
 	}
 
 	/**
@@ -125,10 +152,14 @@ class KafkaWorker
 			Fields::TYPE_BOOL => (bool)$fieldValue,
 			Fields::TYPE_FLOAT => (float)$fieldValue,
 			Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
-				"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue)  . "'",
+				"'" . $this->escapeSting((is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue)) . "'",
 			Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
 				'(' . (is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue) . ')',
-			default => $fieldValue
+			default => $this->escapeSting($fieldValue)
 		};
+	}
+
+	private function escapeSting(string $value): string {
+		return str_replace("'", "\'", $value);
 	}
 }
