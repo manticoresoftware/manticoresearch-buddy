@@ -69,7 +69,7 @@ class KafkaWorker
 		$destinationTableName = $results[0]['data'][0]['destination_name'];
 		$query = $results[0]['data'][0]['query'];
 
-		return new View($this->client, $destinationTableName, $query, $this->batchSize);
+		return new View($this->client, $this->bufferTable, $destinationTableName, $query, $this->batchSize);
 	}
 
 	private function initKafkaConfig() {

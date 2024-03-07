@@ -4,7 +4,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 class View
 {
@@ -45,9 +44,7 @@ class View
 			if ($this->insert($batch)) {
 				continue;
 			}
-
 			$errors++;
-			sleep(10);
 		}
 
 		return $errors === 0;
@@ -94,10 +91,14 @@ class View
 			return false;
 		}
 
-		$ids = implode(',', $ids);
+		$ids = implode(',', array_keys($ids));
 		$sql = "DELETE FROM $this->buffer WHERE id in($ids)";
 
-		Buddy::debugv('ids -----> ' . $sql);
+		$request = $this->client->sendRequest($sql);
+
+		if ($request->hasError()) {
+			return false;
+		}
 
 		return true;
 	}
