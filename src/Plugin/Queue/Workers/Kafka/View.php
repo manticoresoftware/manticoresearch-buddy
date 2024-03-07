@@ -8,17 +8,25 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 class View
 {
-	const int BATCH = 200;
+	use StringFunctionsTrait;
+
 	private Client $client;
 
 	private string $query;
+
+	private string $buffer;
 	private string $destination;
 
-	public function __construct(Client $client, string $destination, string $query) {
+	private int $batchSize;
+
+	public function __construct(Client $client, string $buffer, string $destination, string $query, int $batchSize) {
 		$this->client = $client;
+		$this->buffer = $buffer;
 		$this->destination = $destination;
 		$this->query = $query;
+		$this->batchSize = $batchSize;
 
+		$this->getFields($client, $destination);
 		if (stripos($query, ' limit ') !== false) {
 			throw GenericError::create("Can't use query with limit");
 		}
@@ -33,18 +41,20 @@ class View
 				break;
 			}
 
+			$batch = $this->prepareValues($batch);
 			if ($this->insert($batch)) {
 				continue;
 			}
 
 			$errors++;
+			sleep(10);
 		}
 
 		return $errors === 0;
 	}
 
 	private function read(): array {
-		$sql = $this->query . ' LIMIT ' . self::BATCH;
+		$sql = "$this->query LIMIT $this->batchSize";
 		$readBuffer = $this->client->sendRequest($sql);
 
 		if ($readBuffer->hasError()) {
@@ -54,18 +64,42 @@ class View
 		return $readBuffer[0]['data'];
 	}
 
+	private function prepareValues(array $batch): array {
+		foreach ($batch as $k => $row) {
+			foreach ($row as $name => $value) {
+				$batch[$k][$name] = $this->morphValuesByFieldType($value, $this->getFieldType($name));
+			}
+		}
+		return $batch;
+	}
+
 	private function insert(array $batch): bool {
 
-		Buddy::debugv(json_encode($batch));
-//		$sql = "INSERT INTO $this->destination () VALUES ";
-//		$request = $this->client->sendRequest($sql);
-//
-//		if ($request->hasError()) {
-//			return false;
-//		}
-//
-//		return true;
-		return false;
+		$values = [];
+		$keys = implode(', ', array_keys($batch[0]));
+
+		$ids = [];
+		foreach ($batch as $row) {
+			$ids[$row['id']] = 1;
+			$values[] = '(' . implode(',', array_values($row)) . ')';
+		}
+		$values = implode(',', $values);
+		unset($batch);
+
+		// TODO rollback to INSERT
+		$sql = "REPLACE INTO $this->destination ($keys) VALUES $values";
+		$request = $this->client->sendRequest($sql);
+
+		if ($request->hasError()) {
+			return false;
+		}
+
+		$ids = implode(',', $ids);
+		$sql = "DELETE FROM $this->buffer WHERE id in($ids)";
+
+		Buddy::debugv('ids -----> ' . $sql);
+
+		return true;
 	}
 
 }

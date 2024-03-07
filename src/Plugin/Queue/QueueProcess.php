@@ -45,25 +45,14 @@ class QueueProcess extends BaseProcessor
 		}
 
 		foreach ($results->getResult()[0]['data'] as $instance) {
-			$desc = $this->client->sendRequest('DESC ' . $instance['buffer_table']);
-
-			if ($desc->hasError()) {
-				Buddy::debug("Can't describe table ". $instance['buffer_table'] .'. Reason: '. $desc->getError());
-				continue;
-			}
-
 			$attrs = json_decode($instance['attrs'], true);
 
-			$fields = [];
-			foreach ($desc->getResult()[0]['data'] as $field) {
-				$fields[$field['Field']] = $field['Type'];
-			}
-
 			go(
-				function () use ($instance, $attrs, $fields) {
-					$kafkaWorker = new KafkaWorker($instance['full_name'],
+				function () use ($instance, $attrs) {
+					$kafkaWorker = new KafkaWorker(
+						$instance['full_name'],
 						$this->client, $attrs['broker'], $attrs['topic'],
-						$attrs['group'], $instance['buffer_table'], $fields
+						$attrs['group'], $instance['buffer_table']
 					);
 					$kafkaWorker->run();
 				}

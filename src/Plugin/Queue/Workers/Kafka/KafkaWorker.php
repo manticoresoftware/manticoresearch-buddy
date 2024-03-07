@@ -3,6 +3,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\ViewHandler;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -11,6 +12,8 @@ use RdKafka\KafkaConsumer;
 
 class KafkaWorker
 {
+	use StringFunctionsTrait;
+
 	private Client $client;
 
 	private string $name;
@@ -19,13 +22,13 @@ class KafkaWorker
 	private string $consumerGroup;
 
 	private string $bufferTable;
-	private array $fields;
 	private int $batchSize;
 
 	private View $view;
 
 
 	/**
+	 * @throws GenericError
 	 */
 	public function __construct(
 		string $name,
@@ -34,7 +37,6 @@ class KafkaWorker
 		string $topicList,
 		string $consumerGroup,
 		string $bufferTable,
-		array  $fields,
 		int    $batchSize = 100
 	) {
 		$this->name = $name;
@@ -42,34 +44,32 @@ class KafkaWorker
 		$this->consumerGroup = $consumerGroup;
 		$this->brokerList = $brokerList;
 		$this->bufferTable = $bufferTable;
-		$this->fields = $fields;
 		$this->topicList = array_map(fn($item) => trim($item), explode(',', $topicList));
 		$this->batchSize = $batchSize;
 		$this->view = $this->initView();
+		$this->getFields($this->client, $bufferTable);
 	}
 
 
-	private function initView() {
+	private function initView(): View {
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . ViewHandler::VIEWS_TABLE_NAME .
 			" WHERE match('@source_name \"$this->name\"')";
 		$results = $this->client->sendRequest($sql);
 
 		if ($results->hasError()) {
-			Buddy::debug('Error during getting view. Exit worker. Reason: ' . $results->getError());
-			return;
+			throw GenericError::create('Error during getting view. Exit worker. Reason: ' . $results->getError());
 		}
 
 		$results = $results->getResult();
 		if (!isset($results[0]['data'][0])) {
-			Buddy::debug("Can't find view with source_name $this->name");
-			return;
+			throw GenericError::create("Can't find view with source_name $this->name");
 		}
 
 		$destinationTableName = $results[0]['data'][0]['destination_name'];
 		$query = $results[0]['data'][0]['query'];
 
-		return new View($this->client, $destinationTableName, $query);
+		return new View($this->client, $destinationTableName, $query, $this->batchSize);
 	}
 
 	private function initKafkaConfig() {
@@ -162,7 +162,7 @@ class KafkaWorker
 
 	private function mapMessages(array $batch): array {
 		$results = [];
-		foreach ($batch as $k => $message) {
+		foreach ($batch as $message) {
 			$message = array_change_key_case(json_decode($message, true));
 			$row = [];
 			foreach ($this->fields as $fieldName => $fieldType) {
@@ -197,7 +197,8 @@ class KafkaWorker
 			$values[] = '( ' . implode(', ', array_values($row)) . ' )';
 		}
 		$values = implode(",\n", $values);
-		$sql = "REPLACE INTO $this->bufferTable ($fields) VALUES $values";
+		$sql = /** @lang ManticoreSearch */
+			"REPLACE INTO $this->bufferTable ($fields) VALUES $values";
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {
@@ -208,26 +209,5 @@ class KafkaWorker
 		return true;
 	}
 
-	/**
-	 * TODO Duplicate from Replace plugin. Expose to core
-	 */
-	private function morphValuesByFieldType(mixed $fieldValue, string $fieldType): mixed {
-		return match ($fieldType) {
-			Fields::TYPE_INT, Fields::TYPE_BIGINT, Fields::TYPE_TIMESTAMP => (int)$fieldValue,
-			Fields::TYPE_BOOL => (bool)$fieldValue,
-			Fields::TYPE_FLOAT => (float)$fieldValue,
-			Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
-				"'" . $this->escapeSting((is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue)) . "'",
-			Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
-				'(' . (is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue) . ')',
-			default => $this->escapeSting($fieldValue)
-		};
-	}
 
-	private function escapeSting(string $value): string {
-		return str_replace("'", "\'", $value);
-	}
-
-	private function processView() {
-	}
 }
