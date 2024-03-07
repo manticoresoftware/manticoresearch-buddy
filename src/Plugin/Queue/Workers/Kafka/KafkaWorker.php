@@ -113,7 +113,7 @@ class KafkaWorker
 	 * @throws Exception
 	 */
 	public function run() {
-		Buddy::debugv('------->> Start consuming');
+		Buddy::debugv('------->> Start consuming ' . $this->name);
 
 		$batch = new Batch($this->batchSize);
 		$batch->setCallback(

@@ -77,7 +77,7 @@ final class Payload extends BasePayload
 		/*
 		 *
 		 * CREATE SOURCE kafka (id bigint, term text, abbrev text, GlossDef json) type='kafka'
-		   broker_list='kafka:9092' topic_list='my-data' consumer_group='manticore' num_consumers='1' batch=50;
+		   broker_list='kafka:9092' topic_list='my-data' consumer_group='manticore' num_consumers='4' batch=50;
 
 		 * CREATE TABLE destination_kafka (id bigint, name text, short_name text, received_at text, size multi);
 

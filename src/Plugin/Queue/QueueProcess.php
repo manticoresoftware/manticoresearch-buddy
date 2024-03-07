@@ -47,6 +47,7 @@ class QueueProcess extends BaseProcessor
 		foreach ($results->getResult()[0]['data'] as $instance) {
 			$attrs = json_decode($instance['attrs'], true);
 
+			Buddy::debugv("------->> Start worker ". $instance['full_name']);
 			go(
 				function () use ($instance, $attrs) {
 					$kafkaWorker = new KafkaWorker(
@@ -57,6 +58,8 @@ class QueueProcess extends BaseProcessor
 					$kafkaWorker->run();
 				}
 			);
+			Buddy::debugv("------->> .... ". $instance['full_name']);
+
 		}
 	}
 }
