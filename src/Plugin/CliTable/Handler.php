@@ -62,8 +62,12 @@ final class Handler extends BaseHandlerWithTableFormatter {
 				return TaskResult::raw($result);
 			}
 			// Convert JSON response from Manticore to table format
-			if (isset($result['error']) && $result['error'] !== '') {
-				return TaskResult::raw($tableFormatter->getTable($time0, $data, $total, $result['error']));
+			if (isset($result['error'])) {
+				/** @var string $errorMsg */
+				$errorMsg = $result['error'];
+				if ($errorMsg !== '') {
+					return TaskResult::raw($tableFormatter->getTable($time0, $data, $total, $errorMsg));
+				}
 			}
 			if (isset($result[0]['data']) && is_array($result[0]['data'])) {
 				$data = $result[0]['data'];
