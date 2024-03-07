@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
+namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;

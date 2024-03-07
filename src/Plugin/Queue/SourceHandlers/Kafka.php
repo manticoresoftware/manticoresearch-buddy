@@ -43,6 +43,7 @@ final class Kafka extends SourceHandler
 					'broker' => $options->brokerList,
 					'topic' => $options->topicList,
 					'group' => $options->consumerGroup ?? 'manticore',
+					'batch' => $options->batch ?? '100'
 				]
 			);
 

@@ -52,7 +52,7 @@ class QueueProcess extends BaseProcessor
 					$kafkaWorker = new KafkaWorker(
 						$instance['full_name'],
 						$this->client, $attrs['broker'], $attrs['topic'],
-						$attrs['group'], $instance['buffer_table']
+						$attrs['group'], $instance['buffer_table'], (int)$attrs['batch']
 					);
 					$kafkaWorker->run();
 				}

@@ -2,6 +2,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
+use Manticoresearch\Buddy\Base\Plugin\Queue\StringFunctionsTrait;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 
