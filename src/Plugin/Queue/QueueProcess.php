@@ -9,6 +9,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RdKafka\Exception;
+use function Co\run;
 
 class QueueProcess extends BaseProcessor
 {
@@ -44,22 +45,26 @@ class QueueProcess extends BaseProcessor
 			return;
 		}
 
-		foreach ($results->getResult()[0]['data'] as $instance) {
-			$attrs = json_decode($instance['attrs'], true);
+		run(
+			function () use ($results) {
+				foreach ($results->getResult()[0]['data'] as $instance) {
+					$attrs = json_decode($instance['attrs'], true);
 
-			Buddy::debugv("------->> Start worker ". $instance['full_name']);
-			go(
-				function () use ($instance, $attrs) {
-					$kafkaWorker = new KafkaWorker(
-						$instance['full_name'],
-						$this->client, $attrs['broker'], $attrs['topic'],
-						$attrs['group'], $instance['buffer_table'], (int)$attrs['batch']
+					Buddy::debugv('------->> Start worker ' . $instance['full_name']);
+
+					go(
+						function () use ($instance, $attrs) {
+							$kafkaWorker = new KafkaWorker(
+								$instance['full_name'],
+								$this->client, $attrs['broker'], $attrs['topic'],
+								$attrs['group'], $instance['buffer_table'], (int)$attrs['batch']
+							);
+							$kafkaWorker->run();
+						}
 					);
-					$kafkaWorker->run();
+					Buddy::debugv('------->> .... ' . $instance['full_name']);
 				}
-			);
-			Buddy::debugv("------->> .... ". $instance['full_name']);
-
-		}
+			}
+		);
 	}
 }
