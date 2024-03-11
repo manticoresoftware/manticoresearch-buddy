@@ -22,7 +22,8 @@ use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient {
+final class Handler extends BaseHandlerWithClient
+{
 
 	/**
 	 * Initialize the executor
@@ -144,10 +145,10 @@ final class Handler extends BaseHandlerWithClient {
 		foreach ($records as $fieldName => $fieldValue) {
 			$records[$fieldName] = match ($fields[$fieldName]['type']) {
 				Fields::TYPE_INT, Fields::TYPE_BIGINT, Fields::TYPE_TIMESTAMP => (int)$fieldValue,
-				Fields::TYPE_BOOL => (bool)$fieldValue,
+				Fields::TYPE_BOOL => ($fieldValue === 0) ? '0' : (bool)$fieldValue,
 				Fields::TYPE_FLOAT => (float)$fieldValue,
 				Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
-					"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue)  . "'",
+					"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue) . "'",
 				Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
 					'(' . (is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue) . ')',
 				default => $fieldValue

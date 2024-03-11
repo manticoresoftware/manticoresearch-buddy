@@ -200,6 +200,30 @@ class CreateTableHandlerTest extends TestCase {
 					],
 				],
 			],
+			// Opensearch-specific types
+			'some_keyword' => [
+				'type' => 'keyword',
+			],
+			'flat_object' => [
+				'type' => 'flat_object',
+			],
+			'knn_vector_with_settings' => [
+				'type' => 'knn_vector',
+				'dimension' => 2,
+				'method' => [
+					'name' => 'hnsw',
+					'space_type' => 'innerproduct',
+					'engine' => 'nmslib',
+					'parameters' => [
+						'm' => 24,
+						'ef_construction' => 128,
+					],
+				],
+			],
+			'knn_vector_by_default' => [
+				'type' => 'knn_vector',
+				'dimension' => 3,
+			],
 		];
 		$columnExpression = 'location json,title text indexed,blob string,name text,some_boolean bool,' .
 			'some_completion string,some_date timestamp,some_date_nanos bigint,some_dense_vector json,' .
@@ -208,7 +232,11 @@ class CreateTableHandlerTest extends TestCase {
 			'float_numeric float,half_float_numeric float,scaled_float_numeric float,unsigned_long_numeric int,' .
 			'some_point json,some_integer_range json,some_float_range json,some_long_range json,' .
 			'some_date_range json,some_ip_range json,text_search_as_you_type text,some_shape json,' .
-			'some_match_only_text text indexed,release string';
+			'some_match_only_text text indexed,release string,some_keyword string,flat_object json,' .
+			'knn_vector_with_settings float_vector knn_type=\'hnsw\' knn_dims=\'2\' hnsw_similarity=\'ip\' ' .
+			'hnsw_m=\'24\' hnsw_ef_construction=\'128\',' .
+			'knn_vector_by_default float_vector knn_type=\'hnsw\' knn_dims=\'3\' hnsw_similarity=\'l2\' ' .
+			'hnsw_m=\'16\' hnsw_ef_construction=\'100\'';
 		$payload = new Payload();
 		// Use a dummy Payload here just to initilaize a handler instance
 		$handler = new Handler($payload);
@@ -226,11 +254,6 @@ class CreateTableHandlerTest extends TestCase {
 			'join' => [
 				'some_join' => [
 					'type' => 'join',
-				],
-			],
-			'keyword' => [
-				'some_keyword' => [
-					'type' => 'keyword',
 				],
 			],
 			'double' => [
@@ -251,6 +274,22 @@ class CreateTableHandlerTest extends TestCase {
 			'rank_feature' => [
 				'some_rank_feature' => [
 					'type' => 'rank_feature',
+				],
+			],
+			// Opensearch-specific types
+			'nested' => [
+				'some_nested' => [
+					'type' => 'nested',
+				],
+			],
+			'token_count' => [
+				'some_token_count' => [
+					'type' => 'token_count',
+				],
+			],
+			'rank_features' => [
+				'some_rank_features' => [
+					'type' => 'rank_features',
 				],
 			],
 		];
@@ -279,6 +318,52 @@ class CreateTableHandlerTest extends TestCase {
 				'Data type not found for column test',
 				$e->getMessage()
 			);
+		}
+	}
+
+	public function testKnnTypeExpressionFromOpensearchQueryFail():void {
+		$columnInfoSet = [
+			[
+				'knn_vector' => [
+					'type' => 'knn_vector',
+					'dimension' => 2,
+					'method' => [
+						'name' => 'hnsw',
+						'space_type' => 'l2',
+						'engine' => 'lucene',
+						'parameters' => [
+							'ef_construction' => 128,
+							'm' => 24,
+						],
+					],
+				],
+			],
+			[
+				'knn_vector' => [
+					'type' => 'knn_vector',
+					'dimension' => 3,
+					'method' => [
+						'name' => 'hnsw',
+						'space_type' => 'l1',
+						'engine' => 'nmslib',
+						'parameters' => [
+							'm' => 24,
+						],
+					],
+				],
+			],
+		];
+		$payload = new Payload();
+		$handler = new Handler($payload);
+		foreach ($columnInfoSet as $columnInfo) {
+			try {
+				self::invokeMethod($handler, 'buildColumnExpr', [$columnInfo]);
+			} catch (Exception $e) {
+				$this->assertEquals(
+					'Unsupported settings for `knn_vector` type found in the data schema',
+					$e->getMessage()
+				);
+			}
 		}
 	}
 }
