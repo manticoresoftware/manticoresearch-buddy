@@ -309,11 +309,21 @@ final class Metric {
 
 		// 2. Get variables
 		$varResult = static::sendManticoreRequest('SHOW VARIABLES');
+		$boolVars = ['auto_optimize', 'secondary_indexes', 'pseudo_sharding', 'accurate_aggregation'];
+		$strVars = ['query_log_format', 'distinct_precision_threshold', 'max_allowed_packet'];
 		foreach ($varResult as ['Variable_name' => $key, 'Value' => $value]) {
-			if ($key === 'secondary_indexes') {
-				$labels['manticore_secondary_indexes_enabled'] = static::boolToString((bool)$value);
-				break;
+			/** @var string $key */
+			if (in_array($key, $boolVars)) {
+				$labels["manticore_{$key}_enabled"] = static::boolToString((bool)$value);
+				continue;
 			}
+
+			if (!in_array($key, $strVars)) {
+				continue;
+			}
+
+			/** @var string|int $value */
+			$labels["manticore_{$key}"] = (string)$value;
 		}
 
 		return $labels;
