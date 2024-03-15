@@ -187,7 +187,10 @@ final class Metric {
 	 * @return void
 	 */
 	public function snapshot(): void {
-		// 1. Get metrics from SHOW STATUS query
+		// 1. Update labels with those that can change
+		$this->telemetry->updateLabels(static::getVariableLabels());
+
+		// 2. Get metrics from SHOW STATUS query
 		$status = $this->getStatusMap();
 		/** @var array<string,int> $metrics */
 		$metrics = array_map(
@@ -210,11 +213,14 @@ final class Metric {
 			)
 		);
 
-		// 2. Get snapshot of tables metrics
+		// Display labels we will send
+		Buddy::debugv(sprintf('labels: %s', json_encode($this->telemetry->getLabels())));
+
+		// 3. Get snapshot of tables metrics
 		$metrics = array_merge($metrics, static::getTablesMetrics());
 		Buddy::debugv(sprintf('metrics: %s', json_encode($metrics)));
 
-		// 3. Finally send it
+		// 4. Finally send it
 		foreach ($metrics as $name => $value) {
 			$this->add($name, $value);
 		}
@@ -307,7 +313,15 @@ final class Metric {
 			}
 		}
 
-		// 2. Get variables
+		return $labels;
+	}
+
+	/**
+	 * Get lables that changes on each request we batch
+	 * @return array<string,string>s
+	 */
+	protected static function getVariableLabels(): array {
+		$labels = [];
 		$varResult = static::sendManticoreRequest('SHOW VARIABLES');
 		$boolVars = ['auto_optimize', 'secondary_indexes', 'pseudo_sharding', 'accurate_aggregation'];
 		$strVars = ['query_log_format', 'distinct_precision_threshold', 'max_allowed_packet'];
@@ -325,7 +339,6 @@ final class Metric {
 			/** @var string|int $value */
 			$labels["manticore_{$key}"] = (string)$value;
 		}
-
 		return $labels;
 	}
 
