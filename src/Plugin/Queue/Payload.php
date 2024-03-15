@@ -31,6 +31,8 @@ final class Payload extends BasePayload
 {
 	const TYPE_SOURCE = 'source';
 	const TYPE_VIEW = 'view';
+	const TYPE_MULTIPLE_SOURCES = 'sources';
+	const TYPE_MULTIPLE_VIEWS = 'views';
 
 	public static string $type;
 	public static string $sourceType;
@@ -55,9 +57,17 @@ final class Payload extends BasePayload
 				$self::$type = self::TYPE_SOURCE;
 			} elseif (isset($self->parsedPayload['VIEW'])) {
 				$self::$type = self::TYPE_VIEW;
+			} elseif (isset($self->parsedPayload['SHOW'][0]['base_expr'])) {
+				switch ($self->parsedPayload['SHOW'][0]['base_expr']) {
+					case self::TYPE_MULTIPLE_SOURCES:
+						$self::$type = self::TYPE_MULTIPLE_SOURCES;
+						break;
+					case self::TYPE_MULTIPLE_VIEWS:
+						$self::$type = self::TYPE_MULTIPLE_VIEWS;
+						break;
+				}
 			}
 		}
-
 
 		return $self;
 	}
@@ -69,8 +79,11 @@ final class Payload extends BasePayload
 	public static function hasMatch(Request $request): bool {
 
 		// CREATE SOURCE/ MATERIALIZED VIEW
+
+
 		// TODO done this later
 		// SHOW SOURCES/VIEWS
+		// SHOW CREATE SOURCE / MATERIALIZED VIEW
 		// DROP SOURCE/VIEW
 		// ALTER SOURCE/VIEW
 
@@ -86,8 +99,15 @@ final class Payload extends BasePayload
 		   abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka;
 
 		 */
+
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
-		return (isset($parsedPayload['SOURCE']) || isset($parsedPayload['VIEW']));
+
+		return (
+			isset($parsedPayload['SOURCE']) ||
+			isset($parsedPayload['VIEW']) ||
+			(isset($parsedPayload['SHOW'][0]['base_expr']) &&
+				in_array($parsedPayload['SHOW'][0]['base_expr'], ['sources', 'views']))
+		);
 	}
 
 
@@ -101,6 +121,8 @@ final class Payload extends BasePayload
 					static::$sqlQueryParser::getParsedPayload()['SOURCE']['options']
 				),
 				self::TYPE_VIEW => 'ViewHandler',
+				self::TYPE_MULTIPLE_SOURCES => 'SourceHandlers\\MultipleSourcesHandler',
+				self::TYPE_MULTIPLE_VIEWS => 'SourceHandlers\\MultipleViewsHandler',
 				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
 		};
 	}
