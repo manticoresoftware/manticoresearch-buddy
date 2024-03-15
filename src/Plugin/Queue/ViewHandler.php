@@ -48,10 +48,10 @@ final class ViewHandler extends BaseHandlerWithClient
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 
 			$sourceName = $payload->parsedPayload['FROM'][0]['table'];
-			$viewName = $payload->parsedPayload['VIEW'][1];
-			$destinationTableName = $payload->parsedPayload['VIEW'][4];
+			$viewName = $payload->parsedPayload['VIEW']['no_quotes']['parts'][0];
+			$destinationTableName = $payload->parsedPayload['VIEW']['to']['no_quotes']['parts'][0];
 
-			if (isset($payload->parsedPayload['LIMIT'])){
+			if (isset($payload->parsedPayload['LIMIT'])) {
 				throw GenericError::create("Can't use query with limit");
 			}
 

@@ -18,6 +18,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -86,7 +87,6 @@ final class Payload extends BasePayload
 
 		 */
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
-
 		return (isset($parsedPayload['SOURCE']) || isset($parsedPayload['VIEW']));
 	}
 
