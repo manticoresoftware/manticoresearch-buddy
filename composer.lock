@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "014e1de1782c66db4a7c55e107b2ea4d",
+    "content-hash": "0b57ec4fb5e66b63bf751bb9391369d8",
     "packages": [
         {
             "name": "composer/ca-bundle",
-            "version": "1.4.1",
+            "version": "1.4.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/composer/ca-bundle.git",
-                "reference": "3ce240142f6d59b808dd65c1f52f7a1c252e6cfd"
+                "reference": "18fc0ab083a48f85bfee31f3786537353b8a8403"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/composer/ca-bundle/zipball/3ce240142f6d59b808dd65c1f52f7a1c252e6cfd",
-                "reference": "3ce240142f6d59b808dd65c1f52f7a1c252e6cfd",
+                "url": "https://api.github.com/repos/composer/ca-bundle/zipball/18fc0ab083a48f85bfee31f3786537353b8a8403",
+                "reference": "18fc0ab083a48f85bfee31f3786537353b8a8403",
                 "shasum": ""
             },
             "require": {
@@ -64,7 +64,7 @@
             "support": {
                 "irc": "irc://irc.freenode.org/composer",
                 "issues": "https://github.com/composer/ca-bundle/issues",
-                "source": "https://github.com/composer/ca-bundle/tree/1.4.1"
+                "source": "https://github.com/composer/ca-bundle/tree/1.4.2"
             },
             "funding": [
                 {
@@ -80,7 +80,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-02-23T10:16:52+00:00"
+            "time": "2024-03-14T13:20:33+00:00"
         },
         {
             "name": "composer/class-map-generator",
@@ -815,17 +815,17 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "acd31ecfef91a82d5245ebcf04ccb284b0204073"
+                "reference": "0567a8c9c5c680ca8c7c0d91e9731d481095d5f8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/acd31ecfef91a82d5245ebcf04ccb284b0204073",
-                "reference": "acd31ecfef91a82d5245ebcf04ccb284b0204073",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/0567a8c9c5c680ca8c7c0d91e9731d481095d5f8",
+                "reference": "0567a8c9c5c680ca8c7c0d91e9731d481095d5f8",
                 "shasum": ""
             },
             "require": {
                 "composer/composer": "^2.5",
-                "manticoresoftware/php-sql-parser": "v4.6.0-patch1",
+                "manticoresoftware/php-sql-parser": "v4.6.0-patch2",
                 "php-ds/php-ds": "^1.4",
                 "symfony/console": "^6.2",
                 "symfony/dependency-injection": "^6.1"
@@ -859,7 +859,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2024-03-06T05:09:58+00:00"
+            "time": "2024-03-14T19:38:51+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -975,16 +975,16 @@
         },
         {
             "name": "manticoresoftware/php-sql-parser",
-            "version": "v4.6.0-patch1",
+            "version": "v4.6.0-patch2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/PHP-SQL-Parser.git",
-                "reference": "3ecefaf08bd6551e779107ac76eee0d5b82cd277"
+                "reference": "c928f6dbb1c88303bc346b5bd0ca2e63e0e10b70"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/3ecefaf08bd6551e779107ac76eee0d5b82cd277",
-                "reference": "3ecefaf08bd6551e779107ac76eee0d5b82cd277",
+                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/c928f6dbb1c88303bc346b5bd0ca2e63e0e10b70",
+                "reference": "c928f6dbb1c88303bc346b5bd0ca2e63e0e10b70",
                 "shasum": ""
             },
             "require": {
@@ -1031,20 +1031,20 @@
                 "issues": "https://github.com/greenlion/PHP-SQL-Parser/issues",
                 "source": "https://github.com/greenlion/PHP-SQL-Parser"
             },
-            "time": "2024-02-24T11:52:25+00:00"
+            "time": "2024-03-14T14:23:30+00:00"
         },
         {
             "name": "manticoresoftware/telemetry",
-            "version": "0.1.15",
+            "version": "0.1.19",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/telemetry-lib.git",
-                "reference": "505a20c7d5cfd4670e5e9476512ec1d2de1d230e"
+                "reference": "7035168ea0ab91b8a18aa2be7bdd2434e5920843"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/505a20c7d5cfd4670e5e9476512ec1d2de1d230e",
-                "reference": "505a20c7d5cfd4670e5e9476512ec1d2de1d230e",
+                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/7035168ea0ab91b8a18aa2be7bdd2434e5920843",
+                "reference": "7035168ea0ab91b8a18aa2be7bdd2434e5920843",
                 "shasum": ""
             },
             "require": {
@@ -1081,9 +1081,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/telemetry-lib/issues",
-                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.15"
+                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.19"
             },
-            "time": "2024-01-30T12:36:30+00:00"
+            "time": "2024-03-15T11:17:26+00:00"
         },
         {
             "name": "php-ds/php-ds",
@@ -5014,16 +5014,16 @@
         },
         {
             "name": "sebastian/resource-operations",
-            "version": "3.0.3",
+            "version": "3.0.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/resource-operations.git",
-                "reference": "0f4443cb3a1d92ce809899753bc0d5d5a8dd19a8"
+                "reference": "05d5692a7993ecccd56a03e40cd7e5b09b1d404e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/resource-operations/zipball/0f4443cb3a1d92ce809899753bc0d5d5a8dd19a8",
-                "reference": "0f4443cb3a1d92ce809899753bc0d5d5a8dd19a8",
+                "url": "https://api.github.com/repos/sebastianbergmann/resource-operations/zipball/05d5692a7993ecccd56a03e40cd7e5b09b1d404e",
+                "reference": "05d5692a7993ecccd56a03e40cd7e5b09b1d404e",
                 "shasum": ""
             },
             "require": {
@@ -5035,7 +5035,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "3.0-dev"
+                    "dev-main": "3.0-dev"
                 }
             },
             "autoload": {
@@ -5056,8 +5056,7 @@
             "description": "Provides a list of PHP built-in functions that operate on resources",
             "homepage": "https://www.github.com/sebastianbergmann/resource-operations",
             "support": {
-                "issues": "https://github.com/sebastianbergmann/resource-operations/issues",
-                "source": "https://github.com/sebastianbergmann/resource-operations/tree/3.0.3"
+                "source": "https://github.com/sebastianbergmann/resource-operations/tree/3.0.4"
             },
             "funding": [
                 {
@@ -5065,8 +5064,7 @@
                     "type": "github"
                 }
             ],
-            "abandoned": true,
-            "time": "2020-09-28T06:45:17+00:00"
+            "time": "2024-03-14T16:00:52+00:00"
         },
         {
             "name": "sebastian/type",
