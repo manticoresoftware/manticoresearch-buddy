@@ -317,7 +317,7 @@ final class Metric {
 	}
 
 	/**
-	 * Get lables that changes on each request we batch
+	 * Get labels that change on each request we batch
 	 * @return array<string,string>s
 	 */
 	protected static function getVariableLabels(): array {
