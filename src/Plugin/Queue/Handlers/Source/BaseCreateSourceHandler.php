@@ -9,7 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\Queue\SourceHandlers;
+namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
@@ -18,7 +18,9 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
-final class MultipleSourcesHandler extends BaseHandlerWithClient {
+abstract class BaseCreateSourceHandler extends BaseHandlerWithClient {
+	const SOURCE_TABLE_NAME = '_sources';
+	const SOURCE_TYPE_KAFKA = 'kafka';
 
 	/**
 	 * Initialize the executor
@@ -43,18 +45,8 @@ final class MultipleSourcesHandler extends BaseHandlerWithClient {
 		 */
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 
-			if (!$manticoreClient->hasTable(SourceHandler::SOURCE_TABLE_NAME)) {
-				return TaskResult::none();
-			}
-
-			$sql = /** @lang manticore */
-				"SELECT name FROM ".SourceHandler::SOURCE_TABLE_NAME." GROUP BY name";
-      $result = $manticoreClient->sendRequest($sql);
-			if ($result->hasError()){
-				throw ManticoreSearchClientError::create($result->getError());
-			}
-
-			return TaskResult::raw($result->getResult());
+			self::checkAndCreateSource($manticoreClient);
+			return static::handle($payload, $manticoreClient);
 		};
 
 		return Task::create(
@@ -62,4 +54,24 @@ final class MultipleSourcesHandler extends BaseHandlerWithClient {
 			[$this->payload, $this->manticoreClient]
 		)->run();
 	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 */
+	protected static function checkAndCreateSource(Client $manticoreClient): void {
+		if ($manticoreClient->hasTable(self::SOURCE_TABLE_NAME)) {
+			return;
+		}
+
+		$sql = /** @lang ManticoreSearch */
+			'CREATE TABLE ' . self::SOURCE_TABLE_NAME .
+			' (id bigint, type text, name text, full_name text, buffer_table text, attrs json, original_query text)';
+
+		$request = $manticoreClient->sendRequest($sql);
+		if ($request->hasError()) {
+			throw ManticoreSearchClientError::create($request->getError());
+		}
+	}
+
+	abstract public static function handle(Payload $payload, Client $manticoreClient): TaskResult;
 }

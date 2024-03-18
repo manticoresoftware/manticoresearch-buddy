@@ -2,7 +2,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\SourceHandlers\SourceHandler;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka\KafkaWorker;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -36,8 +36,8 @@ class QueueProcess extends BaseProcessor
 	 */
 	public function runPool(): void {
 		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . SourceHandler::SOURCE_TABLE_NAME .
-			" WHERE match('@name \"" . SourceHandler::SOURCE_TYPE_KAFKA . "\"')";
+			'SELECT * FROM ' . BaseCreateSourceHandler::SOURCE_TABLE_NAME .
+			" WHERE match('@name \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\"')";
 		$results = $this->client->sendRequest($sql);
 
 		if ($results->hasError()) {

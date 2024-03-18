@@ -2,8 +2,8 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
+use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\CreateViewHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\StringFunctionsTrait;
-use Manticoresearch\Buddy\Base\Plugin\Queue\ViewHandler;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
@@ -54,7 +54,7 @@ class KafkaWorker
 
 	private function initView(): View {
 		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . ViewHandler::VIEWS_TABLE_NAME .
+			'SELECT * FROM ' . CreateViewHandler::VIEWS_TABLE_NAME .
 			" WHERE match('@source_name \"$this->name\"')";
 		$results = $this->client->sendRequest($sql);
 

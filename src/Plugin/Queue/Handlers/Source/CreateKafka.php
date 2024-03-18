@@ -9,7 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\Queue\SourceHandlers;
+namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
@@ -17,7 +17,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 
-final class Kafka extends SourceHandler
+final class CreateKafka extends BaseCreateSourceHandler
 {
 	/**
 	 * @throws ManticoreSearchClientError
@@ -56,11 +56,13 @@ final class Kafka extends SourceHandler
 				throw ManticoreSearchClientError::create((string)$request->getError());
 			}
 
+			$escapedPayload = str_replace("'", "\\'", $payload->originQuery);
 			/** @l $query */
 			$query = /** @lang ManticoreSearch */
-				'INSERT INTO ' . self::SOURCE_TABLE_NAME . ' (id, type, name, full_name, buffer_table, attrs) ' .
+				'INSERT INTO ' . self::SOURCE_TABLE_NAME . ' (id, type, name, full_name, buffer_table, attrs, original_query) ' .
 				'VALUES ' .
-				"(0, '" . self::SOURCE_TYPE_KAFKA . "', '$options->name','{$options->name}_$i','_buffer_{$options->name}_$i', '$attrs')";
+				"(0, '" . self::SOURCE_TYPE_KAFKA . "', '$options->name','{$options->name}_$i',".
+				"'_buffer_{$options->name}_$i', '$attrs', '$escapedPayload')";
 
 			$request = $manticoreClient->sendRequest($query);
 			if ($request->hasError()) {
@@ -93,6 +95,8 @@ final class Kafka extends SourceHandler
 				$result->consumerGroup = SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr']),
 				'num_consumers' =>
 				$result->numConsumers = (int)SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr']),
+				'batch' =>
+				$result->batch = (int)SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr']),
 				default => ''
 			};
 		}

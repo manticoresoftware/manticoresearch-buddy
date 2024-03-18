@@ -9,9 +9,10 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\Queue;
+namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\SourceHandlers\SourceHandler;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHandler;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -19,7 +20,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
-final class ViewHandler extends BaseHandlerWithClient
+final class CreateViewHandler extends BaseHandlerWithClient
 {
 
 	const VIEWS_TABLE_NAME = '_views';
@@ -62,7 +63,7 @@ final class ViewHandler extends BaseHandlerWithClient
 
 
 			$sql = /** @lang ManticoreSearch */
-				'SELECT * FROM ' . SourceHandler::SOURCE_TABLE_NAME .
+				'SELECT * FROM ' . BaseCreateSourceHandler::SOURCE_TABLE_NAME .
 				" WHERE match('@name \"" . $sourceName . "\"')";
 
 			$sourceRecords = $manticoreClient->sendRequest($sql)->getResult();
@@ -81,10 +82,12 @@ final class ViewHandler extends BaseHandlerWithClient
 
 				$sourceFullName = $source['full_name'];
 				$escapedQuery = str_replace("'", "\\'", $payload::$sqlQueryParser::getCompletedPayload());
+				$escapedOriginalQuery = str_replace("'", "\\'", $payload->originQuery);
+
 				$sql = /** @lang ManticoreSearch */
 					'INSERT INTO ' . self::VIEWS_TABLE_NAME .
-					'(id, name, source_name, destination_name, query) VALUES ' .
-					"(0,'$viewName','$sourceFullName', '$destinationTableName', '$escapedQuery')";
+					'(id, name, source_name, destination_name, query, original_query) VALUES ' .
+					"(0,'$viewName','$sourceFullName', '$destinationTableName', '$escapedQuery','$escapedOriginalQuery')";
 
 				$response = $manticoreClient->sendRequest($sql);
 				if ($response->hasError()) {
@@ -92,7 +95,6 @@ final class ViewHandler extends BaseHandlerWithClient
 				}
 			}
 
-			// Todo I think we need to send there affected rows or smth like this
 			return TaskResult::none();
 		};
 
@@ -139,7 +141,8 @@ final class ViewHandler extends BaseHandlerWithClient
 		}
 
 		$sql = /** @lang ManticoreSearch */
-			'CREATE TABLE ' . self::VIEWS_TABLE_NAME . ' (id bigint, name text, source_name text, destination_name text, query text)';
+			'CREATE TABLE ' . self::VIEWS_TABLE_NAME .
+			' (id bigint, name text, source_name text, destination_name text, query text, original_query text)';
 
 		$request = $manticoreClient->sendRequest($sql);
 		if ($request->hasError()) {

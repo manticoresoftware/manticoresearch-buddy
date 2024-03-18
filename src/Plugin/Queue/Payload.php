@@ -12,13 +12,12 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Exception;
-use Manticoresearch\Buddy\Base\Plugin\Queue\SourceHandlers\SourceHandler;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHandler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -31,14 +30,23 @@ final class Payload extends BasePayload
 {
 	const TYPE_SOURCE = 'source';
 	const TYPE_VIEW = 'view';
-	const TYPE_MULTIPLE_SOURCES = 'sources';
-	const TYPE_MULTIPLE_VIEWS = 'views';
+	const TYPE_SOURCES = 'sources';
+	const TYPE_VIEWS = 'views';
+
+  const REQUEST_TYPE_GET = 'get';
+	const REQUEST_TYPE_VIEW = 'view';
+	const REQUEST_TYPE_CREATE = 'create';
+	const REQUEST_TYPE_EDIT = 'alter';
+	const REQUEST_TYPE_DELETE = 'drop';
+
+
 
 	public static string $type;
 	public static string $sourceType;
 
 	public Endpoint $endpointBundle;
 
+	public string $originQuery = '';
 	public array $parsedPayload = [];
 
 	/**
@@ -51,19 +59,30 @@ final class Payload extends BasePayload
 		$self->endpointBundle = $request->endpointBundle;
 
 		if ($self->endpointBundle === Endpoint::Sql) {
+			$self->originQuery = $request->payload;
 			$self->parsedPayload = static::$sqlQueryParser::getParsedPayload();
 
 			if (isset($self->parsedPayload['SOURCE'])) {
-				$self::$type = self::TYPE_SOURCE;
+				$self::$type = self::REQUEST_TYPE_CREATE.self::TYPE_SOURCE;
 			} elseif (isset($self->parsedPayload['VIEW'])) {
-				$self::$type = self::TYPE_VIEW;
-			} elseif (isset($self->parsedPayload['SHOW'][0]['base_expr'])) {
+				$self::$type = self::REQUEST_TYPE_CREATE.self::TYPE_VIEW;
+			} elseif (isset($self->parsedPayload['SHOW'][0]['base_expr'])
+				&& in_array($self->parsedPayload['SHOW'][0]['base_expr'], ['sources', 'views'])) {
 				switch ($self->parsedPayload['SHOW'][0]['base_expr']) {
-					case self::TYPE_MULTIPLE_SOURCES:
-						$self::$type = self::TYPE_MULTIPLE_SOURCES;
+					case self::TYPE_SOURCES:
+						$self::$type = self::REQUEST_TYPE_VIEW.self::TYPE_SOURCES;
 						break;
-					case self::TYPE_MULTIPLE_VIEWS:
-						$self::$type = self::TYPE_MULTIPLE_VIEWS;
+					case self::TYPE_VIEWS:
+						$self::$type = self::REQUEST_TYPE_VIEW.self::TYPE_VIEWS;
+						break;
+				}
+			} elseif (isset($self->parsedPayload['SHOW'][1]['expr_type'])) {
+				switch ($self->parsedPayload['SHOW'][1]['expr_type']) {
+					case self::TYPE_SOURCE:
+						$self::$type = self::REQUEST_TYPE_GET.self::TYPE_SOURCES;
+						break;
+					case self::TYPE_VIEW:
+						$self::$type = self::REQUEST_TYPE_GET.self::TYPE_VIEWS;
 						break;
 				}
 			}
@@ -106,7 +125,9 @@ final class Payload extends BasePayload
 			isset($parsedPayload['SOURCE']) ||
 			isset($parsedPayload['VIEW']) ||
 			(isset($parsedPayload['SHOW'][0]['base_expr']) &&
-				in_array($parsedPayload['SHOW'][0]['base_expr'], ['sources', 'views']))
+				in_array($parsedPayload['SHOW'][0]['base_expr'], ['sources', 'views'])) ||
+			(isset($parsedPayload['SHOW'][1]['expr_type']) &&
+				in_array($parsedPayload['SHOW'][1]['expr_type'], ['source', 'view']))
 		);
 	}
 
@@ -117,12 +138,18 @@ final class Payload extends BasePayload
 	 */
 	public function getHandlerClassName(): string {
 		return __NAMESPACE__ . '\\' . match (static::$type) {
-				self::TYPE_SOURCE => self::parseSourceType(
+				self::REQUEST_TYPE_CREATE.self::TYPE_SOURCE => self::parseSourceType(
 					static::$sqlQueryParser::getParsedPayload()['SOURCE']['options']
 				),
-				self::TYPE_VIEW => 'ViewHandler',
-				self::TYPE_MULTIPLE_SOURCES => 'SourceHandlers\\MultipleSourcesHandler',
-				self::TYPE_MULTIPLE_VIEWS => 'SourceHandlers\\MultipleViewsHandler',
+				self::REQUEST_TYPE_CREATE.self::TYPE_VIEW => 'Handlers\\View\\CreateViewHandler',
+
+
+				self::REQUEST_TYPE_VIEW.self::TYPE_SOURCES => 'Handlers\\Source\\ViewSourceHandler',
+				self::REQUEST_TYPE_VIEW.self::TYPE_VIEWS => 'Handlers\\View\\ViewViewsHandler',
+
+				self::REQUEST_TYPE_GET.self::TYPE_SOURCES => 'Handlers\\Source\\GetSourceHandler',
+				self::REQUEST_TYPE_GET.self::TYPE_VIEWS => 'Handlers\\View\\GetViewHandler',
+
 				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
 		};
 	}
@@ -132,7 +159,7 @@ final class Payload extends BasePayload
 			if (isset($option['sub_tree'][0]['base_expr'])
 				&& $option['sub_tree'][0]['base_expr'] === 'type') {
 				return match (SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr'])) {
-					'kafka' => 'SourceHandlers\\Kafka'
+					'kafka' => 'Handlers\\Source\\CreateKafka'
 				};
 			}
 		}
@@ -147,7 +174,7 @@ final class Payload extends BasePayload
 		/** @var Client $client */
 		$client = Pluggable::getContainer()->get('manticoreClient');
 
-		if ($client->hasTable(SourceHandler::SOURCE_TABLE_NAME)) {
+		if ($client->hasTable(BaseCreateSourceHandler::SOURCE_TABLE_NAME)) {
 			return [(new QueueProcess)->setClient($client)];
 		}
 		return [];
