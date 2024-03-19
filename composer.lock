@@ -340,16 +340,16 @@
         },
         {
             "name": "composer/pcre",
-            "version": "3.1.2",
+            "version": "3.1.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/composer/pcre.git",
-                "reference": "4775f35b2d70865807c89d32c8e7385b86eb0ace"
+                "reference": "5b16e25a5355f1f3afdfc2f954a0a80aec4826a8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/composer/pcre/zipball/4775f35b2d70865807c89d32c8e7385b86eb0ace",
-                "reference": "4775f35b2d70865807c89d32c8e7385b86eb0ace",
+                "url": "https://api.github.com/repos/composer/pcre/zipball/5b16e25a5355f1f3afdfc2f954a0a80aec4826a8",
+                "reference": "5b16e25a5355f1f3afdfc2f954a0a80aec4826a8",
                 "shasum": ""
             },
             "require": {
@@ -391,7 +391,7 @@
             ],
             "support": {
                 "issues": "https://github.com/composer/pcre/issues",
-                "source": "https://github.com/composer/pcre/tree/3.1.2"
+                "source": "https://github.com/composer/pcre/tree/3.1.3"
             },
             "funding": [
                 {
@@ -407,7 +407,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-03-07T15:38:35+00:00"
+            "time": "2024-03-19T10:26:25+00:00"
         },
         {
             "name": "composer/semver",
@@ -1035,16 +1035,16 @@
         },
         {
             "name": "manticoresoftware/telemetry",
-            "version": "0.1.19",
+            "version": "0.1.21",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/telemetry-lib.git",
-                "reference": "7035168ea0ab91b8a18aa2be7bdd2434e5920843"
+                "reference": "954890948c23612e75c40b7e29363f6d7ea28955"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/7035168ea0ab91b8a18aa2be7bdd2434e5920843",
-                "reference": "7035168ea0ab91b8a18aa2be7bdd2434e5920843",
+                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/954890948c23612e75c40b7e29363f6d7ea28955",
+                "reference": "954890948c23612e75c40b7e29363f6d7ea28955",
                 "shasum": ""
             },
             "require": {
@@ -1081,9 +1081,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/telemetry-lib/issues",
-                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.19"
+                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.21"
             },
-            "time": "2024-03-15T11:17:26+00:00"
+            "time": "2024-03-19T11:33:03+00:00"
         },
         {
             "name": "php-ds/php-ds",
@@ -3730,16 +3730,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.62",
+            "version": "1.10.63",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "cd5c8a1660ed3540b211407c77abf4af193a6af9"
+                "reference": "ad12836d9ca227301f5fb9960979574ed8628339"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/cd5c8a1660ed3540b211407c77abf4af193a6af9",
-                "reference": "cd5c8a1660ed3540b211407c77abf4af193a6af9",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/ad12836d9ca227301f5fb9960979574ed8628339",
+                "reference": "ad12836d9ca227301f5fb9960979574ed8628339",
                 "shasum": ""
             },
             "require": {
@@ -3788,7 +3788,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-03-13T12:27:20+00:00"
+            "time": "2024-03-18T16:53:53+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
