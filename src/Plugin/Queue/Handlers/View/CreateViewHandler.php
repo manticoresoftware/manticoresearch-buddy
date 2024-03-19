@@ -86,8 +86,8 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 				$sql = /** @lang ManticoreSearch */
 					'INSERT INTO ' . self::VIEWS_TABLE_NAME .
-					'(id, name, source_name, destination_name, query, original_query) VALUES ' .
-					"(0,'$viewName','$sourceFullName', '$destinationTableName', '$escapedQuery','$escapedOriginalQuery')";
+					'(id, name, source_name, destination_name, query, original_query, suspended) VALUES ' .
+					"(0,'$viewName','$sourceFullName', '$destinationTableName', '$escapedQuery','$escapedOriginalQuery', 0)";
 
 				$response = $manticoreClient->sendRequest($sql);
 				if ($response->hasError()) {
@@ -142,7 +142,7 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 		$sql = /** @lang ManticoreSearch */
 			'CREATE TABLE ' . self::VIEWS_TABLE_NAME .
-			' (id bigint, name text, source_name text, destination_name text, query text, original_query text)';
+			' (id bigint, name text, source_name text, destination_name text, query text, original_query text, suspended bool)';
 
 		$request = $manticoreClient->sendRequest($sql);
 		if ($request->hasError()) {
