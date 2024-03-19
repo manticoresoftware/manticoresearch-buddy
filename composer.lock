@@ -4,32 +4,32 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bafc1bb4bd8876686759ff56b7fbe241",
+    "content-hash": "23b274a581276f633cb38c09b27ba94a",
     "packages": [
         {
             "name": "composer/ca-bundle",
-            "version": "1.4.2",
+            "version": "1.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/composer/ca-bundle.git",
-                "reference": "18fc0ab083a48f85bfee31f3786537353b8a8403"
+                "reference": "0c5ccfcfea312b5c5a190a21ac5cef93f74baf99"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/composer/ca-bundle/zipball/18fc0ab083a48f85bfee31f3786537353b8a8403",
-                "reference": "18fc0ab083a48f85bfee31f3786537353b8a8403",
+                "url": "https://api.github.com/repos/composer/ca-bundle/zipball/0c5ccfcfea312b5c5a190a21ac5cef93f74baf99",
+                "reference": "0c5ccfcfea312b5c5a190a21ac5cef93f74baf99",
                 "shasum": ""
             },
             "require": {
                 "ext-openssl": "*",
                 "ext-pcre": "*",
-                "php": "^5.3.2 || ^7.0 || ^8.0"
+                "php": "^7.2 || ^8.0"
             },
             "require-dev": {
-                "phpstan/phpstan": "^0.12.55",
+                "phpstan/phpstan": "^1.10",
                 "psr/log": "^1.0",
                 "symfony/phpunit-bridge": "^4.2 || ^5",
-                "symfony/process": "^2.5 || ^3.0 || ^4.0 || ^5.0 || ^6.0 || ^7.0"
+                "symfony/process": "^4.0 || ^5.0 || ^6.0 || ^7.0"
             },
             "type": "library",
             "extra": {
@@ -64,7 +64,7 @@
             "support": {
                 "irc": "irc://irc.freenode.org/composer",
                 "issues": "https://github.com/composer/ca-bundle/issues",
-                "source": "https://github.com/composer/ca-bundle/tree/1.4.2"
+                "source": "https://github.com/composer/ca-bundle/tree/1.5.0"
             },
             "funding": [
                 {
@@ -80,20 +80,20 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-03-14T13:20:33+00:00"
+            "time": "2024-03-15T14:00:32+00:00"
         },
         {
             "name": "composer/class-map-generator",
-            "version": "1.1.0",
+            "version": "1.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/composer/class-map-generator.git",
-                "reference": "953cc4ea32e0c31f2185549c7d216d7921f03da9"
+                "reference": "8286a62d243312ed99b3eee20d5005c961adb311"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/composer/class-map-generator/zipball/953cc4ea32e0c31f2185549c7d216d7921f03da9",
-                "reference": "953cc4ea32e0c31f2185549c7d216d7921f03da9",
+                "url": "https://api.github.com/repos/composer/class-map-generator/zipball/8286a62d243312ed99b3eee20d5005c961adb311",
+                "reference": "8286a62d243312ed99b3eee20d5005c961adb311",
                 "shasum": ""
             },
             "require": {
@@ -137,7 +137,7 @@
             ],
             "support": {
                 "issues": "https://github.com/composer/class-map-generator/issues",
-                "source": "https://github.com/composer/class-map-generator/tree/1.1.0"
+                "source": "https://github.com/composer/class-map-generator/tree/1.1.1"
             },
             "funding": [
                 {
@@ -153,7 +153,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-06-30T13:58:57+00:00"
+            "time": "2024-03-15T12:53:41+00:00"
         },
         {
             "name": "composer/composer",
@@ -811,16 +811,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-feature/workers",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "0567a8c9c5c680ca8c7c0d91e9731d481095d5f8"
+                "reference": "53b079242bd2deff2b048ba875839ba258344d12"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/0567a8c9c5c680ca8c7c0d91e9731d481095d5f8",
-                "reference": "0567a8c9c5c680ca8c7c0d91e9731d481095d5f8",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/53b079242bd2deff2b048ba875839ba258344d12",
+                "reference": "53b079242bd2deff2b048ba875839ba258344d12",
                 "shasum": ""
             },
             "require": {
@@ -836,7 +836,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -857,9 +856,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/workers"
             },
-            "time": "2024-03-14T19:38:51+00:00"
+            "time": "2024-03-19T10:40:51+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -1035,16 +1034,16 @@
         },
         {
             "name": "manticoresoftware/telemetry",
-            "version": "0.1.15",
+            "version": "0.1.19",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/telemetry-lib.git",
-                "reference": "505a20c7d5cfd4670e5e9476512ec1d2de1d230e"
+                "reference": "7035168ea0ab91b8a18aa2be7bdd2434e5920843"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/505a20c7d5cfd4670e5e9476512ec1d2de1d230e",
-                "reference": "505a20c7d5cfd4670e5e9476512ec1d2de1d230e",
+                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/7035168ea0ab91b8a18aa2be7bdd2434e5920843",
+                "reference": "7035168ea0ab91b8a18aa2be7bdd2434e5920843",
                 "shasum": ""
             },
             "require": {
@@ -1081,9 +1080,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/telemetry-lib/issues",
-                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.15"
+                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.19"
             },
-            "time": "2024-01-30T12:36:30+00:00"
+            "time": "2024-03-15T11:17:26+00:00"
         },
         {
             "name": "php-ds/php-ds",
@@ -3768,16 +3767,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.62",
+            "version": "1.10.63",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "cd5c8a1660ed3540b211407c77abf4af193a6af9"
+                "reference": "ad12836d9ca227301f5fb9960979574ed8628339"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/cd5c8a1660ed3540b211407c77abf4af193a6af9",
-                "reference": "cd5c8a1660ed3540b211407c77abf4af193a6af9",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/ad12836d9ca227301f5fb9960979574ed8628339",
+                "reference": "ad12836d9ca227301f5fb9960979574ed8628339",
                 "shasum": ""
             },
             "require": {
@@ -3826,7 +3825,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-03-13T12:27:20+00:00"
+            "time": "2024-03-18T16:53:53+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
