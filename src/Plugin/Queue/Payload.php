@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Exception;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHandler;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
@@ -33,12 +34,13 @@ final class Payload extends BasePayload
 	const TYPE_SOURCES = 'sources';
 	const TYPE_VIEWS = 'views';
 
-  const REQUEST_TYPE_GET = 'get';
+	const TYPE_MATERLIALIZED = 'materialized';
+
+	const REQUEST_TYPE_GET = 'get';
 	const REQUEST_TYPE_VIEW = 'view';
 	const REQUEST_TYPE_CREATE = 'create';
 	const REQUEST_TYPE_EDIT = 'alter';
 	const REQUEST_TYPE_DELETE = 'drop';
-
 
 
 	public static string $type;
@@ -52,6 +54,7 @@ final class Payload extends BasePayload
 	/**
 	 * @param Request $request
 	 * @return static
+	 * @throws GenericError
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static();
@@ -62,29 +65,21 @@ final class Payload extends BasePayload
 			$self->originQuery = $request->payload;
 			$self->parsedPayload = static::$sqlQueryParser::getParsedPayload();
 
+
 			if (isset($self->parsedPayload['SOURCE'])) {
-				$self::$type = self::REQUEST_TYPE_CREATE.self::TYPE_SOURCE;
+				$self::$type = self::REQUEST_TYPE_CREATE . self::TYPE_SOURCE;
 			} elseif (isset($self->parsedPayload['VIEW'])) {
-				$self::$type = self::REQUEST_TYPE_CREATE.self::TYPE_VIEW;
-			} elseif (isset($self->parsedPayload['SHOW'][0]['base_expr'])
-				&& in_array($self->parsedPayload['SHOW'][0]['base_expr'], ['sources', 'views'])) {
-				switch ($self->parsedPayload['SHOW'][0]['base_expr']) {
-					case self::TYPE_SOURCES:
-						$self::$type = self::REQUEST_TYPE_VIEW.self::TYPE_SOURCES;
-						break;
-					case self::TYPE_VIEWS:
-						$self::$type = self::REQUEST_TYPE_VIEW.self::TYPE_VIEWS;
-						break;
-				}
-			} elseif (isset($self->parsedPayload['SHOW'][1]['expr_type'])) {
-				switch ($self->parsedPayload['SHOW'][1]['expr_type']) {
-					case self::TYPE_SOURCE:
-						$self::$type = self::REQUEST_TYPE_GET.self::TYPE_SOURCES;
-						break;
-					case self::TYPE_VIEW:
-						$self::$type = self::REQUEST_TYPE_GET.self::TYPE_VIEWS;
-						break;
-				}
+				$self::$type = self::REQUEST_TYPE_CREATE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW;
+			} elseif (self::isViewSourcesMatch($self->parsedPayload)) {
+				$self::$type = self::REQUEST_TYPE_VIEW . self::TYPE_SOURCES;
+			} elseif (self::isViewMaterializedViewsMatch($self->parsedPayload)) {
+				$self::$type = self::REQUEST_TYPE_VIEW . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS;
+			} elseif (self::isGetSourceMatch($self->parsedPayload)) {
+				$self::$type = self::REQUEST_TYPE_GET . self::TYPE_SOURCES;
+			} elseif (self::isGetMaterializedViewMatch($self->parsedPayload)) {
+				$self::$type = self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS;
+			} else {
+				throw GenericError::create("Can't detect payload type. Payload: " . json_encode($self->parsedPayload));
 			}
 		}
 
@@ -104,7 +99,7 @@ final class Payload extends BasePayload
 		// SHOW SOURCES/VIEWS
 		// SHOW CREATE SOURCE / MATERIALIZED VIEW
 		// DROP SOURCE/VIEW
-		// ALTER SOURCE/VIEW
+		// alter materialized view name suspended=1/0.
 
 
 		/*
@@ -121,16 +116,78 @@ final class Payload extends BasePayload
 
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
 
+		echo json_encode($parsedPayload) . "\n";
+
 		return (
 			isset($parsedPayload['SOURCE']) ||
 			isset($parsedPayload['VIEW']) ||
-			(isset($parsedPayload['SHOW'][0]['base_expr']) &&
-				in_array($parsedPayload['SHOW'][0]['base_expr'], ['sources', 'views'])) ||
-			(isset($parsedPayload['SHOW'][1]['expr_type']) &&
-				in_array($parsedPayload['SHOW'][1]['expr_type'], ['source', 'view']))
+			self::isViewSourcesMatch($parsedPayload) ||
+			self::isViewMaterializedViewsMatch($parsedPayload) ||
+			self::isGetSourceMatch($parsedPayload) ||
+			self::isGetMaterializedViewMatch($parsedPayload)
 		);
 	}
 
+
+	/**
+	 * Should match SHOW MATERIALIZED VIEW
+	 *
+	 * @param array $parsedPayload
+	 * @return bool
+	 * @example {"SHOW":[{"expr_type":"reserved","base_expr":"materialized"},{"expr_type":"reserved","base_expr":"views"}]}
+	 */
+	private static function isViewMaterializedViewsMatch(array $parsedPayload): bool {
+		return (isset($parsedPayload['SHOW'][0]['base_expr']) &&
+			isset($parsedPayload['SHOW'][1]['base_expr']) &&
+			$parsedPayload['SHOW'][0]['base_expr'] === self::TYPE_MATERLIALIZED &&
+			$parsedPayload['SHOW'][1]['base_expr'] === self::TYPE_VIEWS);
+	}
+
+	/**
+	 * Should match SHOW MATERIALIZED VIEW {name}
+	 *
+	 * @param array $parsedPayload
+	 * @return bool
+	 * @example {"SHOW":[{"expr_type":"reserved","base_expr":"materialized"},{"expr_type":"reserved","base_expr":"view"},
+	 * {"expr_type":"view","view":"view_table","no_quotes":{"delim":false,"parts":["view_table"]},
+	 * "base_expr":"view_table"}]}
+	 */
+	private static function isGetMaterializedViewMatch(array $parsedPayload): bool {
+		return (isset($parsedPayload['SHOW'][0]['base_expr']) &&
+			isset($parsedPayload['SHOW'][1]['base_expr']) &&
+			!empty($parsedPayload['SHOW'][2]['no_quotes']['parts'][0]) &&
+			$parsedPayload['SHOW'][0]['base_expr'] === self::TYPE_MATERLIALIZED &&
+			$parsedPayload['SHOW'][1]['base_expr'] === self::TYPE_VIEW);
+	}
+
+
+	/**
+	 * Should match SHOW SOURCES
+	 *
+	 * @param array $parsedPayload
+	 * @return bool
+	 * @example {"SHOW":[{"expr_type":"reserved","base_expr":"sources"}]}
+	 */
+	private static function isViewSourcesMatch(array $parsedPayload): bool {
+		return (isset($parsedPayload['SHOW'][0]['base_expr']) &&
+			$parsedPayload['SHOW'][0]['base_expr'] === self::TYPE_SOURCES);
+	}
+
+	/**
+	 * Should match SHOW SOURCE {name}
+	 *
+	 * @param array $parsedPayload
+	 * @return bool
+	 * @example {"SHOW":[{"expr_type":"reserved","base_expr":"source"},
+	 * {"expr_type":"source","source":"kafka","no_quotes":{"delim":false,"parts":["kafka"]},"base_expr":"kafka"}]}
+	 */
+	private static function isGetSourceMatch(array $parsedPayload): bool {
+		return (
+			isset($parsedPayload['SHOW'][0]['base_expr']) &&
+			$parsedPayload['SHOW'][0]['base_expr'] === self::TYPE_SOURCE &&
+			!empty($parsedPayload['SHOW'][1]['no_quotes']['parts'][0])
+		);
+	}
 
 	/**
 	 * @return string
@@ -138,17 +195,17 @@ final class Payload extends BasePayload
 	 */
 	public function getHandlerClassName(): string {
 		return __NAMESPACE__ . '\\' . match (static::$type) {
-				self::REQUEST_TYPE_CREATE.self::TYPE_SOURCE => self::parseSourceType(
+				self::REQUEST_TYPE_CREATE . self::TYPE_SOURCE => self::parseSourceType(
 					static::$sqlQueryParser::getParsedPayload()['SOURCE']['options']
 				),
-				self::REQUEST_TYPE_CREATE.self::TYPE_VIEW => 'Handlers\\View\\CreateViewHandler',
+				self::REQUEST_TYPE_CREATE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\CreateViewHandler',
 
 
-				self::REQUEST_TYPE_VIEW.self::TYPE_SOURCES => 'Handlers\\Source\\ViewSourceHandler',
-				self::REQUEST_TYPE_VIEW.self::TYPE_VIEWS => 'Handlers\\View\\ViewViewsHandler',
+				self::REQUEST_TYPE_VIEW . self::TYPE_SOURCES => 'Handlers\\Source\\ViewSourceHandler',
+				self::REQUEST_TYPE_VIEW . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS => 'Handlers\\View\\ViewViewsHandler',
 
-				self::REQUEST_TYPE_GET.self::TYPE_SOURCES => 'Handlers\\Source\\GetSourceHandler',
-				self::REQUEST_TYPE_GET.self::TYPE_VIEWS => 'Handlers\\View\\GetViewHandler',
+				self::REQUEST_TYPE_GET . self::TYPE_SOURCES => 'Handlers\\Source\\GetSourceHandler',
+				self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS => 'Handlers\\View\\GetViewHandler',
 
 				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
 		};
