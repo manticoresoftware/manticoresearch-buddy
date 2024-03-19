@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseGetHandler;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
 final class GetSourceHandler extends BaseGetHandler
 {
@@ -34,5 +35,10 @@ final class GetSourceHandler extends BaseGetHandler
 
 	#[\Override] protected function getTableName(): string {
 		return BaseCreateSourceHandler::SOURCE_TABLE_NAME;
+	}
+
+	#[\Override] protected function getName(Payload $payload): string
+	{
+		return $payload->parsedPayload['SHOW'][1]['no_quotes']['parts'][0];
 	}
 }

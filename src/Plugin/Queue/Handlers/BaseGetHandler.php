@@ -77,9 +77,7 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 		)->run();
 	}
 
-	protected function getName(Payload $payload): string {
-		return $payload->parsedPayload['SHOW'][1]['no_quotes']['parts'][0];
-	}
+	abstract protected function getName(Payload $payload): string;
 
 	abstract protected function getTableName(): string;
 

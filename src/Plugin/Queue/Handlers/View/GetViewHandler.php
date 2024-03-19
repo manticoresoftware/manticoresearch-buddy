@@ -12,9 +12,14 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseGetHandler;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
 final class GetViewHandler extends BaseGetHandler
 {
+
+	#[\Override] protected function getName(Payload $payload): string {
+		return $payload->parsedPayload['SHOW'][2]['no_quotes']['parts'][0];
+	}
 
 	#[\Override] protected static function formatResult(string $query): string {
 		return $query;

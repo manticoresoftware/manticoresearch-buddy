@@ -65,7 +65,7 @@ class QueueProcess extends BaseProcessor
 			$kafkaWorker->run();
 		};
 
-		// Add worker to the pool and automaticaly start it
+		// Add worker to the pool and automatically start it
 		$this->process->addWorker($workerFn, true);
 
 		// When we need to use this method from the Handler
