@@ -22,7 +22,7 @@ final class GetViewHandler extends BaseGetHandler
 	}
 
 	#[\Override] protected static function formatResult(string $query): string {
-		return str_replace("\n", "", $query);
+		return str_replace("\n", '', $query);
 	}
 
 	#[\Override] protected function getType(): string {
@@ -33,8 +33,7 @@ final class GetViewHandler extends BaseGetHandler
 		return CreateViewHandler::VIEWS_TABLE_NAME;
 	}
 
-	#[\Override] protected function getFields()
-	{
+	#[\Override] protected function getFields() {
 		return ['suspended'];
 	}
 }

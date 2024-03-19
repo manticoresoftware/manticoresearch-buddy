@@ -65,24 +65,24 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 
 			$formattedResult = static::formatResult($rawResult[0]['data'][0]['original_query']);
 
-			$result = [
+			$resultData = [
 				$type => $name,
 				'Create Table' => $formattedResult,
 			];
 
-			foreach ($fields as $field){
-				if ($field === 'original_query'){
+			foreach ($fields as $field) {
+				if ($field === 'original_query') {
 					continue;
 				}
-				$result[$field] = $rawResult[0]['data'][0][$field];
+				$resultData[$field] = $rawResult[0]['data'][0][$field];
 			}
 
-			$taskResult = TaskResult::withData([$result])
+			$taskResult = TaskResult::withData([$resultData])
 				->column($type, Column::String)
 				->column('Create Table', Column::String);
 
-			foreach ($fields as $field){
-				if ($field === 'original_query'){
+			foreach ($fields as $field) {
+				if ($field === 'original_query') {
 					continue;
 				}
 				$taskResult = $taskResult->column($field, Column::String);

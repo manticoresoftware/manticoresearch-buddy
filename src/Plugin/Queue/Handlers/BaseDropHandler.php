@@ -50,7 +50,6 @@ abstract class BaseDropHandler extends BaseHandlerWithClient
 				throw ManticoreSearchClientError::create($result->getError());
 			}
 
-
 			return TaskResult::raw($result->getResult());
 		};
 
