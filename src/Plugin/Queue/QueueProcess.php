@@ -9,7 +9,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RdKafka\Exception;
-use function Co\run;
 
 class QueueProcess extends BaseProcessor
 {
@@ -22,7 +21,7 @@ class QueueProcess extends BaseProcessor
 
 	public function start(): void {
 		parent::start();
-		$this->execute('runPool');
+		$this->runPool();
 	}
 
 	public function stop(): void {
@@ -31,10 +30,11 @@ class QueueProcess extends BaseProcessor
 	}
 
 	/**
+	 * This is just initialization method and should not be invoked outside
 	 * @throws ManticoreSearchClientError
 	 * @throws Exception
 	 */
-	public function runPool(): void {
+	protected function runPool(): void {
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . BaseCreateSourceHandler::SOURCE_TABLE_NAME .
 			" WHERE match('@name \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\"')";
@@ -45,26 +45,32 @@ class QueueProcess extends BaseProcessor
 			return;
 		}
 
-		run(
-			function () use ($results) {
-				foreach ($results->getResult()[0]['data'] as $instance) {
-					$attrs = json_decode($instance['attrs'], true);
+		foreach ($results->getResult()[0]['data'] as $instance) {
+			$attrs = json_decode($instance['attrs'], true);
 
-					Buddy::debugv('------->> Start worker ' . $instance['full_name']);
+			$this->runWorker($instance, $attrs);
+		}
+	}
 
-					go(
-						function () use ($instance, $attrs) {
-							$kafkaWorker = new KafkaWorker(
-								$instance['full_name'],
-								$this->client, $attrs['broker'], $attrs['topic'],
-								$attrs['group'], $instance['buffer_table'], (int)$attrs['batch']
-							);
-							$kafkaWorker->run();
-						}
-					);
-					Buddy::debugv('------->> .... ' . $instance['full_name']);
-				}
-			}
-		);
+	// TODO: declare type and info
+	// This method also can be called with execute method of the processor from the Handler
+	public function runWorker($instance, $attrs): void {
+		$workerFn = function () use ($instance, $attrs): void {
+			Buddy::debugv('------->> Start worker ' . $instance['full_name']);
+			$kafkaWorker = new KafkaWorker(
+				$instance['full_name'],
+				$this->client, $attrs['broker'], $attrs['topic'],
+				$attrs['group'], $instance['buffer_table'], (int)$attrs['batch']
+			);
+			$kafkaWorker->run();
+		};
+
+		// Add worker to the pool and automaticaly start it
+		$this->process->addWorker($workerFn, true);
+
+		// When we need to use this method from the Handler
+		// we simply get processor and execute method with parameters
+		// processor->execute('runWorker', [...args])
+		// That will
 	}
 }
