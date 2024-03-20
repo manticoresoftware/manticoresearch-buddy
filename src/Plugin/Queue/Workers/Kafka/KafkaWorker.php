@@ -2,7 +2,6 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\CreateViewHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\StringFunctionsTrait;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -32,46 +31,29 @@ class KafkaWorker
 	 * @throws GenericError
 	 */
 	public function __construct(
-		string $name,
 		Client $client,
-		string $brokerList,
-		string $topicList,
-		string $consumerGroup,
-		string $bufferTable,
-		int    $batchSize = 100
+		array  $instance
 	) {
-		$this->name = $name;
+
+		$attrs = json_decode($instance['attrs'], true);
+
+		$this->name = $instance['full_name'];
 		$this->client = $client;
-		$this->consumerGroup = $consumerGroup;
-		$this->brokerList = $brokerList;
-		$this->bufferTable = $bufferTable;
-		$this->topicList = array_map(fn($item) => trim($item), explode(',', $topicList));
-		$this->batchSize = $batchSize;
-		$this->view = $this->initView();
-		$this->getFields($this->client, $bufferTable);
+		$this->consumerGroup = $attrs['group'];
+		$this->brokerList = $attrs['broker'];
+		$this->bufferTable = $instance['buffer_table'];
+		$this->topicList = array_map(fn($item) => trim($item), explode(',', $attrs['topic']));
+		$this->batchSize = (int)$attrs['batch'];
+		$this->view = new View(
+			$this->client,
+			$this->bufferTable,
+			$instance['destination_name'],
+			$instance['query'],
+			$this->batchSize
+		);
+		$this->getFields($this->client, $this->bufferTable);
 	}
 
-
-	private function initView(): View {
-		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . CreateViewHandler::VIEWS_TABLE_NAME .
-			" WHERE match('@source_name \"$this->name\"')";
-		$results = $this->client->sendRequest($sql);
-
-		if ($results->hasError()) {
-			throw GenericError::create('Error during getting view. Exit worker. Reason: ' . $results->getError());
-		}
-
-		$results = $results->getResult();
-		if (!isset($results[0]['data'][0])) {
-			throw GenericError::create("Can't find view with source_name $this->name");
-		}
-
-		$destinationTableName = $results[0]['data'][0]['destination_name'];
-		$query = $results[0]['data'][0]['query'];
-
-		return new View($this->client, $this->bufferTable, $destinationTableName, $query, $this->batchSize);
-	}
 
 	private function initKafkaConfig() {
 		$conf = new \RdKafka\Conf();

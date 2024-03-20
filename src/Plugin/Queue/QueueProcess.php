@@ -3,7 +3,9 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHandler;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\CreateViewHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka\KafkaWorker;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
@@ -12,16 +14,35 @@ use RdKafka\Exception;
 
 class QueueProcess extends BaseProcessor
 {
+
+
+	protected static $instance;
 	private Client $client;
 
-	public function setClient(Client $client): static {
-		$this->client = $client;
-		return $this;
+	private function __clone() {
 	}
 
+
+	public static function getInstance(): QueueProcess {
+		if (self::$instance === null) {
+			self::$instance = new self;
+		}
+
+		return self::$instance;
+	}
+
+	public function setClient(Client $client): QueueProcess {
+		self::getInstance()->client = $client;
+		return self::getInstance();
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws Exception
+	 */
 	public function start(): void {
 		parent::start();
-		$this->runPool();
+		self::getInstance()->runPool();
 	}
 
 	public function stop(): void {
@@ -37,7 +58,7 @@ class QueueProcess extends BaseProcessor
 	protected function runPool(): void {
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . BaseCreateSourceHandler::SOURCE_TABLE_NAME .
-			" WHERE match('@name \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\"')";
+			" WHERE match('@name \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\" LIMIT 99999')";
 		$results = $this->client->sendRequest($sql);
 
 		if ($results->hasError()) {
@@ -46,31 +67,59 @@ class QueueProcess extends BaseProcessor
 		}
 
 		foreach ($results->getResult()[0]['data'] as $instance) {
-			$attrs = json_decode($instance['attrs'], true);
 
-			$this->runWorker($instance, $attrs);
+			$sql = /** @lang ManticoreSearch */
+				'SELECT * FROM ' . CreateViewHandler::VIEWS_TABLE_NAME .
+				" WHERE match('@source_name \"{$instance['full_name']}\"')";
+			$results = $this->client->sendRequest($sql);
+
+			if ($results->hasError()) {
+				throw GenericError::create('Error during getting view. Exit worker. Reason: ' . $results->getError());
+			}
+
+			$results = $results->getResult();
+			if (!isset($results[0]['data'][0])) {
+				throw GenericError::create("Can't find view with source_name {$instance['full_name']}");
+			}
+
+			if (!empty($results[0]['data'][0]['suspended'])){
+				Buddy::debugv("Worker {$instance['full_name']} is suspended. Skip running");
+				continue;
+			}
+
+			$instance['destination_name'] = $results[0]['data'][0]['destination_name'];
+			$instance['query'] = $results[0]['data'][0]['query'];
+			$this->runWorker($instance);
 		}
 	}
 
 	// TODO: declare type and info
 	// This method also can be called with execute method of the processor from the Handler
-	public function runWorker($instance, $attrs): void {
-		$workerFn = function () use ($instance, $attrs): void {
+	public function runWorker($instance): void {
+		$workerFn = function () use ($instance): void {
 			Buddy::debugv('------->> Start worker ' . $instance['full_name']);
-			$kafkaWorker = new KafkaWorker(
-				$instance['full_name'],
-				$this->client, $attrs['broker'], $attrs['topic'],
-				$attrs['group'], $instance['buffer_table'], (int)$attrs['batch']
-			);
+			$kafkaWorker = new KafkaWorker($this->client, $instance);
 			$kafkaWorker->run();
 		};
 
 		// Add worker to the pool and automatically start it
-		$this->process->addWorker($workerFn, true);
+		$this->process->addWorker($workerFn, true, $instance['full_name']);
 
 		// When we need to use this method from the Handler
 		// we simply get processor and execute method with parameters
 		// processor->execute('runWorker', [...args])
 		// That will
+	}
+
+	public function stopWorkerByName(string $name):bool {
+		$result = false;
+		foreach ($this->getProcess()->getWorkers() as $worker){
+			if ($worker->name === $name){
+				Buddy::debugv("Remove worker: ".json_encode($worker));
+				$this->getProcess()->removeWorker($worker);
+				$result = true;
+			}
+		}
+		return $result;
 	}
 }

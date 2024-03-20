@@ -78,6 +78,8 @@ final class Payload extends BasePayload
 				$self::$type = self::REQUEST_TYPE_GET . self::TYPE_SOURCES;
 			} elseif (self::isGetMaterializedViewMatch($self->parsedPayload)) {
 				$self::$type = self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS;
+			} elseif (self::isDropSourceMatch($self->parsedPayload)) {
+				$self::$type = self::REQUEST_TYPE_DELETE . self::TYPE_SOURCE;
 			} else {
 				throw GenericError::create("Can't detect payload type. Payload: " . json_encode($self->parsedPayload));
 			}
@@ -124,7 +126,8 @@ final class Payload extends BasePayload
 			self::isViewSourcesMatch($parsedPayload) ||
 			self::isViewMaterializedViewsMatch($parsedPayload) ||
 			self::isGetSourceMatch($parsedPayload) ||
-			self::isGetMaterializedViewMatch($parsedPayload)
+			self::isGetMaterializedViewMatch($parsedPayload) ||
+			self::isDropSourceMatch($parsedPayload)
 		);
 	}
 
@@ -190,6 +193,24 @@ final class Payload extends BasePayload
 	}
 
 	/**
+	 * Should match DROP SOURCE {name}
+	 *
+	 * @param array $parsedPayload
+	 * @return bool
+	 * @example {"DROP":{"expr_type":"source","option":false,"if-exists":false,
+	 * "sub_tree":[{"expr_type":"reserved","base_expr":"source"},
+	 * {"expr_type":"expression","base_expr":"kafka","sub_tree":[{"expr_type":"source","table":"kafka","no_quotes":
+	 * {"delim":false,"parts":["kafka"]},"alias":false,"base_expr":"kafka","delim":false}]}]}}
+	 */
+	private static function isDropSourceMatch(array $parsedPayload): bool {
+		return (
+			isset($parsedPayload['DROP']['expr_type']) &&
+			isset($parsedPayload['DROP']['sub_tree'][1]['sub_tree'][0]['no_quotes']['parts'][0]) &&
+			$parsedPayload['DROP']['expr_type'] === self::TYPE_SOURCE
+		);
+	}
+
+	/**
 	 * @return string
 	 * @throws Exception
 	 */
@@ -199,14 +220,11 @@ final class Payload extends BasePayload
 					static::$sqlQueryParser::getParsedPayload()['SOURCE']['options']
 				),
 				self::REQUEST_TYPE_CREATE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\CreateViewHandler',
-
-
 				self::REQUEST_TYPE_VIEW . self::TYPE_SOURCES => 'Handlers\\Source\\ViewSourceHandler',
 				self::REQUEST_TYPE_VIEW . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS => 'Handlers\\View\\ViewViewsHandler',
-
 				self::REQUEST_TYPE_GET . self::TYPE_SOURCES => 'Handlers\\Source\\GetSourceHandler',
 				self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS => 'Handlers\\View\\GetViewHandler',
-
+				self::REQUEST_TYPE_DELETE . self::TYPE_SOURCE => 'Handlers\\Source\\DropSourceHandler',
 				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
 		};
 	}
@@ -232,7 +250,7 @@ final class Payload extends BasePayload
 		$client = Pluggable::getContainer()->get('manticoreClient');
 
 		if ($client->hasTable(BaseCreateSourceHandler::SOURCE_TABLE_NAME)) {
-			return [(new QueueProcess)->setClient($client)];
+			return [QueueProcess::getInstance()->setClient($client)];
 		}
 		return [];
 	}

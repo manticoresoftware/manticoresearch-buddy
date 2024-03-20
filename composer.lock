@@ -815,12 +815,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "53b079242bd2deff2b048ba875839ba258344d12"
+                "reference": "f6f0c20f29d585b6a93fb7088f48587e2081e0ac"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/53b079242bd2deff2b048ba875839ba258344d12",
-                "reference": "53b079242bd2deff2b048ba875839ba258344d12",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/f6f0c20f29d585b6a93fb7088f48587e2081e0ac",
+                "reference": "f6f0c20f29d585b6a93fb7088f48587e2081e0ac",
                 "shasum": ""
             },
             "require": {
@@ -858,7 +858,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/workers"
             },
-            "time": "2024-03-19T10:40:51+00:00"
+            "time": "2024-03-20T22:16:12+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -1034,16 +1034,16 @@
         },
         {
             "name": "manticoresoftware/telemetry",
-            "version": "0.1.21",
+            "version": "0.1.23",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/telemetry-lib.git",
-                "reference": "954890948c23612e75c40b7e29363f6d7ea28955"
+                "reference": "8e2efd649a04d449b87fcc7de1261f13dac184bd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/954890948c23612e75c40b7e29363f6d7ea28955",
-                "reference": "954890948c23612e75c40b7e29363f6d7ea28955",
+                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/8e2efd649a04d449b87fcc7de1261f13dac184bd",
+                "reference": "8e2efd649a04d449b87fcc7de1261f13dac184bd",
                 "shasum": ""
             },
             "require": {
@@ -1080,9 +1080,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/telemetry-lib/issues",
-                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.21"
+                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.23"
             },
-            "time": "2024-03-19T11:33:03+00:00"
+            "time": "2024-03-20T07:42:24+00:00"
         },
         {
             "name": "php-ds/php-ds",
