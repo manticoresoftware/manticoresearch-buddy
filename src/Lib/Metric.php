@@ -24,6 +24,7 @@ use RuntimeException;
 
 final class Metric {
 	const MAX_QUEUE_SIZE = 200;
+	const RATE_MULTIPLIER = 1000;
 
 	/** @var ContainerInterface */
 	// We set this on initialization (init.php) so we are sure we have it in class
@@ -37,6 +38,12 @@ final class Metric {
 
 	/** @var int $queueCount */
 	protected int $queueCount = 0;
+
+	/** @var int $snapshotTime timestamp of latest snapshot */
+	protected int $snapshotTime;
+
+	/** @var array<string,int> $snapshot last snashpot we made to calcaulte diffs */
+	protected array $snapshot = [];
 
 	/**
 	 * Setter for container property
@@ -57,6 +64,7 @@ final class Metric {
 	 */
 	public function __construct(array $labels, public bool $enabled) {
 		$this->telemetry = new TelemetryMetric($labels);
+		$this->snapshotTime = time();
 	}
 
 	/**
@@ -220,11 +228,42 @@ final class Metric {
 		$metrics = array_merge($metrics, static::getTablesMetrics());
 		Buddy::debugv(sprintf('metrics: %s', json_encode($metrics)));
 
+		$now = time();
+		$duration = 0;
+		$saveSnapshot = ($now - $this->snapshotTime) > 0;
+		if ($saveSnapshot) {
+			$duration = $now - $this->snapshotTime;
+		}
+
 		// 4. Finally send it
+		$rateMetrics = [];
 		foreach ($metrics as $name => $value) {
 			$this->add($name, $value);
+
+			// Caculate rate metrics when we need
+			if (!str_starts_with($name, 'command_') || $duration <= 0) {
+				continue;
+			}
+
+			$rateName = "{$name}_rate";
+			$diff = $value - ($this->snapshot[$name] ?? 0);
+			$rateValue = (int)(static::RATE_MULTIPLIER * ($diff / $duration));
+			// Store it for debug
+			$rateMetrics[$rateName] = $rateValue;
+			// Add to metric
+			$this->add($rateName, $rateValue);
 		}
+		Buddy::debugv(sprintf('rates: %s', json_encode($rateMetrics)));
+
 		$this->send();
+
+		// Save last info about snapshot
+		if (!$saveSnapshot) {
+			return;
+		}
+
+		$this->snapshot = $metrics;
+		$this->snapshotTime = $now;
 	}
 
 	/**
