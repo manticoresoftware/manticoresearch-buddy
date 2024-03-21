@@ -13,12 +13,10 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseViewHandler;
 
-
 final class ViewViewsHandler extends BaseViewHandler {
 
 
-	#[\Override] protected function getTableName(): string
-	{
+	#[\Override] protected function getTableName(): string {
 		return CreateViewHandler::VIEWS_TABLE_NAME;
 	}
 }

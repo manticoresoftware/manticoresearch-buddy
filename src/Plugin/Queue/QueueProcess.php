@@ -9,6 +9,7 @@ use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
+use Manticoresearch\Buddy\Core\Process\Process;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RdKafka\Exception;
 
@@ -67,7 +68,6 @@ class QueueProcess extends BaseProcessor
 		}
 
 		foreach ($results->getResult()[0]['data'] as $instance) {
-
 			$sql = /** @lang ManticoreSearch */
 				'SELECT * FROM ' . CreateViewHandler::VIEWS_TABLE_NAME .
 				" WHERE match('@source_name \"{$instance['full_name']}\"')";
@@ -82,7 +82,7 @@ class QueueProcess extends BaseProcessor
 				throw GenericError::create("Can't find view with source_name {$instance['full_name']}");
 			}
 
-			if (!empty($results[0]['data'][0]['suspended'])){
+			if (!empty($results[0]['data'][0]['suspended'])) {
 				Buddy::debugv("Worker {$instance['full_name']} is suspended. Skip running");
 				continue;
 			}
@@ -103,7 +103,13 @@ class QueueProcess extends BaseProcessor
 		};
 
 		// Add worker to the pool and automatically start it
-		$this->process->addWorker($workerFn, true, $instance['full_name']);
+		$worker = Process::createWorker($workerFn, $instance['full_name']);
+		$worker->onStop(
+			static function () {
+				Buddy::debugv("I'm stoppign now");
+			}
+		);
+		$this->process->addWorker($worker, true);
 
 		// When we need to use this method from the Handler
 		// we simply get processor and execute method with parameters
@@ -111,15 +117,9 @@ class QueueProcess extends BaseProcessor
 		// That will
 	}
 
-	public function stopWorkerByName(string $name):bool {
-		$result = false;
-		foreach ($this->getProcess()->getWorkers() as $worker){
-			if ($worker->name === $name){
-				Buddy::debugv("Remove worker: ".json_encode($worker));
-				$this->getProcess()->removeWorker($worker);
-				$result = true;
-			}
-		}
-		return $result;
+	public function stopWorkerById(string $id):bool {
+		$worker = $this->process->getWorker($id);
+		$this->process->removeWorker($worker);
+		return true;
 	}
 }
