@@ -9,6 +9,7 @@ use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
+use Manticoresearch\Buddy\Core\Process\Process;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RdKafka\Exception;
 
@@ -67,7 +68,6 @@ class QueueProcess extends BaseProcessor
 		}
 
 		foreach ($results->getResult()[0]['data'] as $instance) {
-
 			$sql = /** @lang ManticoreSearch */
 				'SELECT * FROM ' . CreateViewHandler::VIEWS_TABLE_NAME .
 				" WHERE match('@source_name \"{$instance['full_name']}\"')";
@@ -82,7 +82,7 @@ class QueueProcess extends BaseProcessor
 				throw GenericError::create("Can't find view with source_name {$instance['full_name']}");
 			}
 
-			if (!empty($results[0]['data'][0]['suspended'])){
+			if (!empty($results[0]['data'][0]['suspended'])) {
 				Buddy::debugv("Worker {$instance['full_name']} is suspended. Skip running");
 				continue;
 			}
@@ -95,6 +95,9 @@ class QueueProcess extends BaseProcessor
 
 	// TODO: declare type and info
 	// This method also can be called with execute method of the processor from the Handler
+	/**
+	 * @throws \Exception
+	 */
 	public function runWorker($instance): void {
 		$workerFn = function () use ($instance): void {
 			Buddy::debugv('------->> Start worker ' . $instance['full_name']);
@@ -103,7 +106,7 @@ class QueueProcess extends BaseProcessor
 		};
 
 		// Add worker to the pool and automatically start it
-		$this->process->addWorker($workerFn, true, $instance['full_name']);
+		$this->process->addWorker(Process::createWorker($workerFn), true);
 
 		// When we need to use this method from the Handler
 		// we simply get processor and execute method with parameters
@@ -111,9 +114,12 @@ class QueueProcess extends BaseProcessor
 		// That will
 	}
 
-	public function stopWorkerById(string $id):bool {
+	/**
+	 * @throws \Exception
+	 */
+	public function stopWorkerById(string $id): bool {
 		$worker = self::getInstance()->getProcess()->getWorker($id);
-		$this->process->removeWorker($worker);
+		self::getInstance()->getProcess()->removeWorker($worker);
 		return true;
 	}
 }

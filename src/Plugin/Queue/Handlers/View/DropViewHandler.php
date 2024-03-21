@@ -35,7 +35,7 @@ final class DropViewHandler extends BaseDropHandler
 
 		$removed = 0;
 		foreach ($result->getResult()[0]['data'] as $row) {
-			QueueProcess::getInstance()->stopWorkerByName($row['source_name']);
+			QueueProcess::getInstance()->stopWorkerById($row['source_name']);
 
 			$sql = /** @lang Manticore */
 				"DELETE FROM $tableName WHERE id = " . $row['id'];
