@@ -77,9 +77,11 @@ final class Payload extends BasePayload
 			} elseif (self::isGetSourceMatch($self->parsedPayload)) {
 				$self::$type = self::REQUEST_TYPE_GET . self::TYPE_SOURCES;
 			} elseif (self::isGetMaterializedViewMatch($self->parsedPayload)) {
-				$self::$type = self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS;
+				$self::$type = self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEW;
 			} elseif (self::isDropSourceMatch($self->parsedPayload)) {
 				$self::$type = self::REQUEST_TYPE_DELETE . self::TYPE_SOURCE;
+			} elseif (self::isDropMaterializedViewMatch($self->parsedPayload)) {
+				$self::$type = self::REQUEST_TYPE_DELETE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW;
 			} else {
 				throw GenericError::create("Can't detect payload type. Payload: " . json_encode($self->parsedPayload));
 			}
@@ -98,13 +100,10 @@ final class Payload extends BasePayload
 		 * @example
 		 *
 		 * CREATE SOURCE kafka (id bigint, term text, abbrev text, GlossDef json) type='kafka'
-		   broker_list='kafka:9092' topic_list='my-data' consumer_group='manticore' num_consumers='4' batch=50;
-
+		 * broker_list='kafka:9092' topic_list='my-data' consumer_group='manticore' num_consumers='4' batch=50;
 		 * CREATE TABLE destination_kafka (id bigint, name text, short_name text, received_at text, size multi);
-
 		 * CREATE MATERIALIZED VIEW view_table TO destination_kafka AS SELECT id, term as name,
-		   abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka;
-
+		 * abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka;
 		 */
 
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
@@ -120,12 +119,14 @@ final class Payload extends BasePayload
 
 		return (
 			isset($parsedPayload['SOURCE']) ||
-			isset($parsedPayload['VIEW']) ||
+			isset($parsedPayload['VIEW']) || // TODO rework to exclude unnecessary calls like ALTER
 			self::isViewSourcesMatch($parsedPayload) ||
 			self::isViewMaterializedViewsMatch($parsedPayload) ||
 			self::isGetSourceMatch($parsedPayload) ||
 			self::isGetMaterializedViewMatch($parsedPayload) ||
-			self::isDropSourceMatch($parsedPayload)
+			self::isDropSourceMatch($parsedPayload) ||
+			self::isDropMaterializedViewMatch($parsedPayload) ||
+			self::isAlterMaterializedViewMatch($parsedPayload)
 		);
 	}
 
@@ -209,6 +210,28 @@ final class Payload extends BasePayload
 	}
 
 	/**
+	 * Should match DROP MATERIALIZED VIEW {name}
+	 *
+	 * @param array $parsedPayload
+	 * @return bool
+	 * @example {"DROP":{"expr_type":"view","option":false,"if-exists":false,"sub_tree":[
+	 * {"expr_type":"reserved","base_expr":"materialized"},
+	 * {"expr_type":"reserved","base_expr":"view"}
+	 * {"expr_type":"expression","base_expr":"view_table","sub_tree":[
+	 * {"expr_type":"view","table":"view_table","no_quotes":{"delim":false,"parts":["view_table"]},
+	 * "alias":false,"base_expr":"view_table","delim":false}]}]}}
+	 */
+	private static function isDropMaterializedViewMatch(array $parsedPayload): bool {
+		return (
+			isset($parsedPayload['DROP']['sub_tree'][0]) &&
+			isset($parsedPayload['DROP']['sub_tree'][1]) &&
+			!empty($parsedPayload['DROP']['sub_tree'][2]['sub_tree'][0]['no_quotes']['parts']) &&
+			$parsedPayload['DROP']['sub_tree'][0]['base_expr'] === self::TYPE_MATERLIALIZED &&
+			$parsedPayload['DROP']['sub_tree'][1]['base_expr'] === self::TYPE_VIEW
+		);
+	}
+
+	/**
 	 * Should match ALTER MATERIALIZED VIEW {name} suspended=0;
 	 *
 	 * @param array $parsedPayload
@@ -221,7 +244,12 @@ final class Payload extends BasePayload
 	 * {"expr_type":"const","base_expr":"0"}]}]}}
 	 */
 	private static function isAlterMaterializedViewMatch(array $parsedPayload): bool {
-		return false;
+		return (
+			isset($parsedPayload['ALTER']['base_expr']) &&
+			!empty($parsedPayload['VIEW']['no_quotes']['parts']) &&
+			!empty($parsedPayload['VIEW']['options']) &&
+			$parsedPayload['ALTER']['base_expr'] === self::TYPE_MATERLIALIZED . ' ' . self::TYPE_VIEW
+		);
 	}
 
 	/**
@@ -237,8 +265,9 @@ final class Payload extends BasePayload
 				self::REQUEST_TYPE_VIEW . self::TYPE_SOURCES => 'Handlers\\Source\\ViewSourceHandler',
 				self::REQUEST_TYPE_VIEW . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS => 'Handlers\\View\\ViewViewsHandler',
 				self::REQUEST_TYPE_GET . self::TYPE_SOURCES => 'Handlers\\Source\\GetSourceHandler',
-				self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS => 'Handlers\\View\\GetViewHandler',
+				self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\GetViewHandler',
 				self::REQUEST_TYPE_DELETE . self::TYPE_SOURCE => 'Handlers\\Source\\DropSourceHandler',
+				self::REQUEST_TYPE_DELETE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\DropViewHandler',
 				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
 		};
 	}

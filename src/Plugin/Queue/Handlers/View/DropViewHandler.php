@@ -9,7 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
+namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseDropHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
@@ -17,20 +17,15 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\QueueProcess;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 
-final class DropSourceHandler extends BaseDropHandler
+final class DropViewHandler extends BaseDropHandler
 {
 
 	/**
-	 * @param string $name
-	 * @param string $tableName
-	 * @param Client $manticoreClient
-	 * @return int
 	 * @throws ManticoreSearchClientError
 	 */
 	protected static function processDrop(string $name, string $tableName, Client $manticoreClient): int {
 		$sql = /** @lang Manticore */
 			"SELECT * FROM $tableName WHERE match('@name \"$name\"')";
-
 
 		$result = $manticoreClient->sendRequest($sql);
 
@@ -39,44 +34,28 @@ final class DropSourceHandler extends BaseDropHandler
 		}
 
 		$removed = 0;
-		foreach ($result->getResult()[0]['data'] as $sourceRow) {
-			QueueProcess::getInstance()->stopWorkerByName($sourceRow['full_name']);
-			self::removeSourceRowData($sourceRow, $manticoreClient);
+		foreach ($result->getResult()[0]['data'] as $row) {
+			QueueProcess::getInstance()->stopWorkerByName($row['source_name']);
+
+			$sql = /** @lang Manticore */
+				"DELETE FROM $tableName WHERE id = " . $row['id'];
+			$request = $manticoreClient->sendRequest($sql);
+			if ($request->hasError()) {
+				throw ManticoreSearchClientError::create($request->getError());
+			}
+
 			$removed++;
 		}
 
 		return $removed;
 	}
 
-	/**
-	 * @param array $sourceRow
-	 * @param Client $client
-	 * @throws ManticoreSearchClientError
-	 */
-	protected static function removeSourceRowData(array $sourceRow, Client $client): void {
-
-		$queries = [
-			/** @lang Manticore */
-			"DROP TABLE {$sourceRow['buffer_table']}",
-			/** @lang Manticore */
-			"UPDATE _views SET suspended=1 WHERE match('@source_name \"{$sourceRow['full_name']}\"')",
-			/** @lang Manticore */
-			"DELETE FROM _sources WHERE id = {$sourceRow['id']}",
-		];
-
-		foreach ($queries as $query) {
-			$request = $client->sendRequest($query);
-			if ($request->hasError()) {
-				throw ManticoreSearchClientError::create($request->getError());
-			}
-		}
-	}
 
 	#[\Override] protected function getName(Payload $payload): string {
-		return $payload->parsedPayload['DROP']['sub_tree'][1]['sub_tree'][0]['no_quotes']['parts'][0];
+		return $payload->parsedPayload['DROP']['sub_tree'][2]['sub_tree'][0]['no_quotes']['parts'][0];
 	}
 
 	#[\Override] protected function getTableName(): string {
-		return BaseCreateSourceHandler::SOURCE_TABLE_NAME;
+		return CreateViewHandler::VIEWS_TABLE_NAME;
 	}
 }
