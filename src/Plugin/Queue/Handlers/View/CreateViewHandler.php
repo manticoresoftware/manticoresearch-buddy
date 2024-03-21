@@ -60,7 +60,10 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 			self::checkAndCreateViews($manticoreClient);
 			self::checkViewName($viewName, $manticoreClient);
-			self::checkDestinationTable($destinationTableName, $manticoreClient);
+
+			if (!self::checkDestinationTable($destinationTableName, $manticoreClient)){
+				return TaskResult::withError("Destination table non exist");
+			}
 
 
 			$sql = /** @lang ManticoreSearch */
@@ -97,7 +100,7 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 				$source['destination_name'] = $destinationTableName;
 				$source['query'] = $escapedQuery;
-				QueueProcess::getInstance()->runWorker($source);
+				QueueProcess::getInstance()->runWorker($source, false);
 			}
 
 			return TaskResult::none();

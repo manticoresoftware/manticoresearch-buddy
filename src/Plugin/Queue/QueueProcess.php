@@ -11,7 +11,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Process\Process;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use RdKafka\Exception;
 
 class QueueProcess extends BaseProcessor
 {
@@ -39,7 +38,7 @@ class QueueProcess extends BaseProcessor
 
 	/**
 	 * @throws ManticoreSearchClientError
-	 * @throws Exception
+	 * @throws GenericError
 	 */
 	public function start(): void {
 		parent::start();
@@ -54,12 +53,24 @@ class QueueProcess extends BaseProcessor
 	/**
 	 * This is just initialization method and should not be invoked outside
 	 * @throws ManticoreSearchClientError
-	 * @throws Exception
+	 * @throws GenericError
+	 * @throws \Exception
 	 */
 	protected function runPool(): void {
+
+		if (!$this->client->hasTable(BaseCreateSourceHandler::SOURCE_TABLE_NAME)){
+			Buddy::debugv("Queue source table not exist. Exit queue process pool");
+			return;
+		}
+
+		if (!$this->client->hasTable(CreateViewHandler::VIEWS_TABLE_NAME)){
+			Buddy::debugv("Queue views table not exist. Exit queue process pool");
+			return;
+		}
+
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . BaseCreateSourceHandler::SOURCE_TABLE_NAME .
-			" WHERE match('@name \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\" LIMIT 99999')";
+			" WHERE match('@name \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\"') LIMIT 99999";
 		$results = $this->client->sendRequest($sql);
 
 		if ($results->hasError()) {
@@ -79,7 +90,8 @@ class QueueProcess extends BaseProcessor
 
 			$results = $results->getResult();
 			if (!isset($results[0]['data'][0])) {
-				throw GenericError::create("Can't find view with source_name {$instance['full_name']}");
+				Buddy::debugv("Can't find view with source_name {$instance['full_name']}");
+				continue;
 			}
 
 			if (!empty($results[0]['data'][0]['suspended'])) {
@@ -89,6 +101,7 @@ class QueueProcess extends BaseProcessor
 
 			$instance['destination_name'] = $results[0]['data'][0]['destination_name'];
 			$instance['query'] = $results[0]['data'][0]['query'];
+			echo "++++++++++++++++ ". $instance['full_name']."\n";
 			$this->runWorker($instance);
 		}
 	}
@@ -98,7 +111,7 @@ class QueueProcess extends BaseProcessor
 	/**
 	 * @throws \Exception
 	 */
-	public function runWorker(array $instance): void {
+	public function runWorker(array $instance, $shouldStart = true): void {
 		$workerFn = function () use ($instance): void {
 			Buddy::debugv('------->> Start worker ' . $instance['full_name']);
 			$kafkaWorker = new KafkaWorker($this->client, $instance);
@@ -106,7 +119,7 @@ class QueueProcess extends BaseProcessor
 		};
 
 		// Add worker to the pool and automatically start it
-		$this->process->addWorker(Process::createWorker($workerFn), true);
+		$this->process->addWorker(Process::createWorker($workerFn), $shouldStart);
 
 		// When we need to use this method from the Handler
 		// we simply get processor and execute method with parameters
