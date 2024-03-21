@@ -11,12 +11,11 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseGetHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
+use Manticoresearch\Buddy\Base\Plugin\Queue\QueueProcess;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
-use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
@@ -38,64 +37,70 @@ final class AlterViewHandler extends BaseHandlerWithClient
 	 */
 	public function run(): Task {
 
-
 		/**
 		 * @param Client $manticoreClient
 		 * @return TaskResult
 		 * @throws ManticoreSearchClientError
 		 */
-		$taskFn = static function (Client $manticoreClient): TaskResult {
+		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 
-			if (!$manticoreClient->hasTable($tableName)) {
+			$viewsTable = Payload::VIEWS_TABLE_NAME;
+
+			if (!$manticoreClient->hasTable($viewsTable)) {
 				return TaskResult::none();
 			}
 
-			$fields[] = 'original_query';
-			$stringFields = implode(',', $fields);
+			$name = $payload->parsedPayload['VIEW']['no_quotes']['parts'][0] ?? '';
+
+			$option = $payload->parsedPayload['VIEW']['options'][0]['sub_tree'][0]['base_expr'];
+			$value = $payload->parsedPayload['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
+
 			$sql = /** @lang manticore */
-				"SELECT $stringFields FROM $tableName WHERE match('@name \"$name\"') LIMIT 1";
+				"SELECT * FROM $viewsTable WHERE match('@name \"$name\"')";
 			$rawResult = $manticoreClient->sendRequest($sql);
 			if ($rawResult->hasError()) {
 				throw ManticoreSearchClientError::create($rawResult->getError());
 			}
 
-			$rawResult = $rawResult->getResult();
+			$affected = 0;
+			$ids = [];
+			foreach ($rawResult[0]['data'] as $row) {
+				$ids[] = $row['id'];
 
-			if (empty($rawResult[0]['data'])) {
-				return TaskResult::none();
-			}
+				if ($value === '0') {
+					$sourceQuery = 'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME . " WHERE match('@full_name \"{$row['source_name']}\"')";
+					$instance = $manticoreClient->sendRequest($sourceQuery);
+					if ($instance->hasError()) {
+						throw ManticoreSearchClientError::create($instance->getError());
+					}
 
-			$formattedResult = static::formatResult($rawResult[0]['data'][0]['original_query']);
+					$instance = $instance->getResult()[0]['data'][0];
+					$instance['destination_name'] = $row['destination_name'];
+					$instance['query'] = $row['query'];
 
-			$resultData = [
-				$type => $name,
-				'Create Table' => $formattedResult,
-			];
-
-			foreach ($fields as $field) {
-				if ($field === 'original_query') {
-					continue;
+					QueueProcess::getInstance()->runWorker($instance);
+				} else {
+					QueueProcess::getInstance()->stopWorkerById($row['source_name']);
 				}
-				$resultData[$field] = $rawResult[0]['data'][0][$field];
 			}
 
-			$taskResult = TaskResult::withData([$resultData])
-				->column($type, Column::String)
-				->column('Create Table', Column::String);
-
-			foreach ($fields as $field) {
-				if ($field === 'original_query') {
-					continue;
+			if ($ids !== []) {
+				$stringIds = implode(',', $ids);
+				$sql = /** @lang manticore */
+					"UPDATE $viewsTable SET $option = $value WHERE id in ($stringIds)";
+				$rawResult = $manticoreClient->sendRequest($sql);
+				if ($rawResult->hasError()) {
+					throw ManticoreSearchClientError::create($rawResult->getError());
 				}
-				$taskResult = $taskResult->column($field, Column::String);
 			}
 
-			return $taskResult;
+
+			return TaskResult::withTotal($affected);
 		};
 
 		return Task::create(
 			$taskFn,
-			[$name, $type, $fields, $tableName, $this->manticoreClient]
+			[$this->payload, $this->manticoreClient]
 		)->run();
 	}
 }
