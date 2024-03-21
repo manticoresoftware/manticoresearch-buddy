@@ -120,6 +120,11 @@ final class Payload extends BasePayload
 
 		echo json_encode($parsedPayload) . "\n";
 
+		// TODO Alter should synchronize views and source (at least count of records to count of buffer tables)
+		// TODO Alter should run worker
+		// TODO Alter should stop worker
+		// TODO Alter suspend=0 should be blocked if source not exist
+
 		return (
 			isset($parsedPayload['SOURCE']) ||
 			isset($parsedPayload['VIEW']) ||

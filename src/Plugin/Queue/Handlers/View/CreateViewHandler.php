@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
+use Manticoresearch\Buddy\Base\Plugin\Queue\QueueProcess;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -93,6 +94,10 @@ final class CreateViewHandler extends BaseHandlerWithClient
 				if ($response->hasError()) {
 					throw ManticoreSearchClientError::create($response->getError());
 				}
+
+				$source['destination_name'] = $destinationTableName;
+				$source['query'] = $escapedQuery;
+				QueueProcess::getInstance()->runWorker($source);
 			}
 
 			return TaskResult::none();
