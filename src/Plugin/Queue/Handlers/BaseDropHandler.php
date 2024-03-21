@@ -43,7 +43,7 @@ abstract class BaseDropHandler extends BaseHandlerWithClient
 				return TaskResult::none();
 			}
 
-			return TaskResult::withTotal(self::processDrop($name, $tableName, $manticoreClient));
+			return TaskResult::withTotal(static::processDrop($name, $tableName, $manticoreClient));
 		};
 
 		return Task::create(

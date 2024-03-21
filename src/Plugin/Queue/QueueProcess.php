@@ -112,7 +112,7 @@ class QueueProcess extends BaseProcessor
 	}
 
 	public function stopWorkerById(string $id):bool {
-		$worker = $this->process->getWorker($id);
+		$worker = self::getInstance()->getProcess()->getWorker($id);
 		$this->process->removeWorker($worker);
 		return true;
 	}

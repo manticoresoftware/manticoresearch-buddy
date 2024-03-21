@@ -23,7 +23,7 @@ final class DropViewHandler extends BaseDropHandler
 	/**
 	 * @throws ManticoreSearchClientError
 	 */
-	protected static function processDrop(string $name, string $tableName, Client $manticoreClient): int {
+	#[\Override] protected static function processDrop(string $name, string $tableName, Client $manticoreClient): int {
 		$sql = /** @lang Manticore */
 			"SELECT * FROM $tableName WHERE match('@name \"$name\"')";
 
