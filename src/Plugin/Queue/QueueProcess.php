@@ -67,27 +67,28 @@ class QueueProcess extends BaseProcessor
 		}
 
 		foreach ($results->getResult()[0]['data'] as $instance) {
+
 			$sql = /** @lang ManticoreSearch */
 				'SELECT * FROM ' . CreateViewHandler::VIEWS_TABLE_NAME .
 				" WHERE match('@source_name \"{$instance['full_name']}\"')";
-			$viewResults = $this->client->sendRequest($sql);
+			$results = $this->client->sendRequest($sql);
 
-			if ($viewResults->hasError()) {
-				throw GenericError::create('Error during getting view. Exit worker. Reason: ' . $viewResults->getError());
+			if ($results->hasError()) {
+				throw GenericError::create('Error during getting view. Exit worker. Reason: ' . $results->getError());
 			}
 
-			$viewResults = $viewResults->getResult();
-			if (!isset($viewResults[0]['data'][0])) {
-				continue;
+			$results = $results->getResult();
+			if (!isset($results[0]['data'][0])) {
+				throw GenericError::create("Can't find view with source_name {$instance['full_name']}");
 			}
 
-			if (!empty($viewResults[0]['data'][0]['suspended'])) {
+			if (!empty($results[0]['data'][0]['suspended'])){
 				Buddy::debugv("Worker {$instance['full_name']} is suspended. Skip running");
 				continue;
 			}
 
-			$instance['destination_name'] = $viewResults[0]['data'][0]['destination_name'];
-			$instance['query'] = $viewResults[0]['data'][0]['query'];
+			$instance['destination_name'] = $results[0]['data'][0]['destination_name'];
+			$instance['query'] = $results[0]['data'][0]['query'];
 			$this->runWorker($instance);
 		}
 	}
@@ -110,17 +111,9 @@ class QueueProcess extends BaseProcessor
 		// That will
 	}
 
-	public function stopWorkerByName(string $name): bool {
-		$result = false;
-		foreach ($this->getProcess()->getWorkers() as $worker) {
-			if ($worker->name !== $name) {
-				continue;
-			}
-
-			Buddy::debugv('Remove worker: ' . json_encode($worker));
-			$this->getProcess()->removeWorker($worker);
-			$result = true;
-		}
-		return $result;
+	public function stopWorkerById(string $id):bool {
+		$worker = $this->process->getWorker($id);
+		$this->process->removeWorker($worker);
+		return true;
 	}
 }
