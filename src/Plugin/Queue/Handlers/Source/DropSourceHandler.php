@@ -77,6 +77,6 @@ final class DropSourceHandler extends BaseDropHandler
 	}
 
 	#[\Override] protected function getTableName(): string {
-		return BaseCreateSourceHandler::SOURCE_TABLE_NAME;
+		return Payload::SOURCE_TABLE_NAME;
 	}
 }

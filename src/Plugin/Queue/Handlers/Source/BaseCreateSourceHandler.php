@@ -19,7 +19,6 @@ use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
 abstract class BaseCreateSourceHandler extends BaseHandlerWithClient {
-	const SOURCE_TABLE_NAME = '_sources';
 	const SOURCE_TYPE_KAFKA = 'kafka';
 
 	/**
@@ -59,12 +58,12 @@ abstract class BaseCreateSourceHandler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError
 	 */
 	protected static function checkAndCreateSource(Client $manticoreClient): void {
-		if ($manticoreClient->hasTable(self::SOURCE_TABLE_NAME)) {
+		if ($manticoreClient->hasTable(Payload::SOURCE_TABLE_NAME)) {
 			return;
 		}
 
 		$sql = /** @lang ManticoreSearch */
-			'CREATE TABLE ' . self::SOURCE_TABLE_NAME .
+			'CREATE TABLE ' . Payload::SOURCE_TABLE_NAME .
 			' (id bigint, type text, name text, full_name text, buffer_table text, attrs json, original_query text)';
 
 		$request = $manticoreClient->sendRequest($sql);

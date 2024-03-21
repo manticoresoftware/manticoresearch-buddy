@@ -56,6 +56,6 @@ final class DropViewHandler extends BaseDropHandler
 	}
 
 	#[\Override] protected function getTableName(): string {
-		return CreateViewHandler::VIEWS_TABLE_NAME;
+		return Payload::VIEWS_TABLE_NAME;
 	}
 }

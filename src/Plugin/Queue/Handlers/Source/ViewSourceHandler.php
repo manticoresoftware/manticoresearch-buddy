@@ -12,10 +12,11 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseViewHandler;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
 final class ViewSourceHandler extends BaseViewHandler
 {
 	#[\Override] protected function getTableName(): string {
-		return BaseCreateSourceHandler::SOURCE_TABLE_NAME;
+		return Payload::SOURCE_TABLE_NAME;
 	}
 }

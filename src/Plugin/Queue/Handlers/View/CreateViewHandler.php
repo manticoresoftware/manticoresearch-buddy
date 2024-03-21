@@ -24,8 +24,6 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 final class CreateViewHandler extends BaseHandlerWithClient
 {
 
-	const VIEWS_TABLE_NAME = '_views';
-
 	/**
 	 * Initialize the executor
 	 *
@@ -67,7 +65,7 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 
 			$sql = /** @lang ManticoreSearch */
-				'SELECT * FROM ' . BaseCreateSourceHandler::SOURCE_TABLE_NAME .
+				'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
 				" WHERE match('@name \"" . $sourceName . "\"')";
 
 			$sourceRecords = $manticoreClient->sendRequest($sql)->getResult();
@@ -89,7 +87,7 @@ final class CreateViewHandler extends BaseHandlerWithClient
 				$escapedOriginalQuery = str_replace("'", "\\'", $payload->originQuery);
 
 				$sql = /** @lang ManticoreSearch */
-					'INSERT INTO ' . self::VIEWS_TABLE_NAME .
+					'INSERT INTO ' . Payload::VIEWS_TABLE_NAME .
 					'(id, name, source_name, destination_name, query, original_query, suspended) VALUES ' .
 					"(0,'$viewName','$sourceFullName', '$destinationTableName', '$escapedQuery','$escapedOriginalQuery', 0)";
 
@@ -121,7 +119,7 @@ final class CreateViewHandler extends BaseHandlerWithClient
 	 */
 	public static function checkViewName(string $viewName, Client $manticoreClient): void {
 		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . self::VIEWS_TABLE_NAME . " WHERE match('@name \"" . $viewName . "\"')";
+			'SELECT * FROM ' . Payload::VIEWS_TABLE_NAME . " WHERE match('@name \"" . $viewName . "\"')";
 
 		$record = $manticoreClient->sendRequest($sql)->getResult();
 		if (is_array($record[0]) && $record[0]['total']) {
@@ -144,12 +142,12 @@ final class CreateViewHandler extends BaseHandlerWithClient
 	 * @throws ManticoreSearchClientError
 	 */
 	public static function checkAndCreateViews(Client $manticoreClient): void {
-		if ($manticoreClient->hasTable(self::VIEWS_TABLE_NAME)) {
+		if ($manticoreClient->hasTable(Payload::VIEWS_TABLE_NAME)) {
 			return;
 		}
 
 		$sql = /** @lang ManticoreSearch */
-			'CREATE TABLE ' . self::VIEWS_TABLE_NAME .
+			'CREATE TABLE ' . Payload::VIEWS_TABLE_NAME .
 			' (id bigint, name text, source_name text, destination_name text, query text, original_query text, suspended bool)';
 
 		$request = $manticoreClient->sendRequest($sql);

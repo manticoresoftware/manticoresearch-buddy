@@ -29,6 +29,10 @@ use Psr\Container\NotFoundExceptionInterface;
  */
 final class Payload extends BasePayload
 {
+
+	const SOURCE_TABLE_NAME = '_sources';
+	const VIEWS_TABLE_NAME = '_views';
+
 	const TYPE_SOURCE = 'source';
 	const TYPE_VIEW = 'view';
 	const TYPE_SOURCES = 'sources';
@@ -39,7 +43,7 @@ final class Payload extends BasePayload
 	const REQUEST_TYPE_GET = 'get';
 	const REQUEST_TYPE_VIEW = 'view';
 	const REQUEST_TYPE_CREATE = 'create';
-	const REQUEST_TYPE_EDIT = 'alter';
+	const REQUEST_TYPE_ALTER = 'alter';
 	const REQUEST_TYPE_DELETE = 'drop';
 
 
@@ -82,6 +86,8 @@ final class Payload extends BasePayload
 				$self::$type = self::REQUEST_TYPE_DELETE . self::TYPE_SOURCE;
 			} elseif (self::isDropMaterializedViewMatch($self->parsedPayload)) {
 				$self::$type = self::REQUEST_TYPE_DELETE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW;
+			} elseif (self::isAlterMaterializedViewMatch($self->parsedPayload)) {
+				$self::$type = self::REQUEST_TYPE_ALTER . self::TYPE_MATERLIALIZED . self::TYPE_VIEW;
 			} else {
 				throw GenericError::create("Can't detect payload type. Payload: " . json_encode($self->parsedPayload));
 			}
@@ -326,7 +332,7 @@ final class Payload extends BasePayload
 			isset($parsedPayload['ALTER']['base_expr']) &&
 			!empty($parsedPayload['VIEW']['no_quotes']['parts']) &&
 			!empty($parsedPayload['VIEW']['options']) &&
-			$parsedPayload['ALTER']['base_expr'] === self::TYPE_MATERLIALIZED . ' ' . self::TYPE_VIEW
+			strtolower($parsedPayload['ALTER']['base_expr']) === self::TYPE_MATERLIALIZED . ' ' . self::TYPE_VIEW
 		);
 	}
 
@@ -346,6 +352,7 @@ final class Payload extends BasePayload
 				self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\GetViewHandler',
 				self::REQUEST_TYPE_DELETE . self::TYPE_SOURCE => 'Handlers\\Source\\DropSourceHandler',
 				self::REQUEST_TYPE_DELETE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\DropViewHandler',
+				self::REQUEST_TYPE_ALTER . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\AlterViewHandler',
 				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
 		};
 	}
@@ -370,7 +377,7 @@ final class Payload extends BasePayload
 		/** @var Client $client */
 		$client = Pluggable::getContainer()->get('manticoreClient');
 
-		if ($client->hasTable(BaseCreateSourceHandler::SOURCE_TABLE_NAME)) {
+		if ($client->hasTable(Payload::SOURCE_TABLE_NAME)) {
 			return [QueueProcess::getInstance()->setClient($client)];
 		}
 		return [];

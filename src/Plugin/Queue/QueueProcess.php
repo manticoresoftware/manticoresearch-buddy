@@ -58,18 +58,18 @@ class QueueProcess extends BaseProcessor
 	 */
 	protected function runPool(): void {
 
-		if (!$this->client->hasTable(BaseCreateSourceHandler::SOURCE_TABLE_NAME)){
+		if (!$this->client->hasTable(Payload::SOURCE_TABLE_NAME)){
 			Buddy::debugv("Queue source table not exist. Exit queue process pool");
 			return;
 		}
 
-		if (!$this->client->hasTable(CreateViewHandler::VIEWS_TABLE_NAME)){
+		if (!$this->client->hasTable(Payload::VIEWS_TABLE_NAME)){
 			Buddy::debugv("Queue views table not exist. Exit queue process pool");
 			return;
 		}
 
 		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . BaseCreateSourceHandler::SOURCE_TABLE_NAME .
+			'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
 			" WHERE match('@name \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\"') LIMIT 99999";
 		$results = $this->client->sendRequest($sql);
 
@@ -80,7 +80,7 @@ class QueueProcess extends BaseProcessor
 
 		foreach ($results->getResult()[0]['data'] as $instance) {
 			$sql = /** @lang ManticoreSearch */
-				'SELECT * FROM ' . CreateViewHandler::VIEWS_TABLE_NAME .
+				'SELECT * FROM ' . Payload::VIEWS_TABLE_NAME .
 				" WHERE match('@source_name \"{$instance['full_name']}\"')";
 			$results = $this->client->sendRequest($sql);
 

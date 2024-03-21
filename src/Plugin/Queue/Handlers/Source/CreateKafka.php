@@ -28,7 +28,7 @@ final class CreateKafka extends BaseCreateSourceHandler
 		$options = self::parseOptions($payload);
 
 		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . self::SOURCE_TABLE_NAME .
+			'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
 			" WHERE match('@name \"" . $options->name . "\"')";
 
 
@@ -59,7 +59,7 @@ final class CreateKafka extends BaseCreateSourceHandler
 			$escapedPayload = str_replace("'", "\\'", $payload->originQuery);
 			/** @l $query */
 			$query = /** @lang ManticoreSearch */
-				'INSERT INTO ' . self::SOURCE_TABLE_NAME . ' (id, type, name, full_name, buffer_table, attrs, original_query) ' .
+				'INSERT INTO ' . Payload::SOURCE_TABLE_NAME . ' (id, type, name, full_name, buffer_table, attrs, original_query) ' .
 				'VALUES ' .
 				"(0, '" . self::SOURCE_TYPE_KAFKA . "', '$options->name','{$options->name}_$i',".
 				"'_buffer_{$options->name}_$i', '$attrs', '$escapedPayload')";

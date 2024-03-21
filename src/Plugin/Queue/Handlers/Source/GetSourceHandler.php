@@ -34,7 +34,7 @@ final class GetSourceHandler extends BaseGetHandler
 	}
 
 	#[\Override] protected function getTableName(): string {
-		return BaseCreateSourceHandler::SOURCE_TABLE_NAME;
+		return Payload::SOURCE_TABLE_NAME;
 	}
 
 	#[\Override] protected function getName(Payload $payload): string {
