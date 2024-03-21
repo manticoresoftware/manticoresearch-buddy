@@ -110,6 +110,8 @@ final class Payload extends BasePayload
 
 		echo json_encode($parsedPayload) . "\n";
 
+		// TODO case insensitive queries
+
 		// TODO Alter should synchronize views and source (at least count of records to count of buffer tables)
 		// TODO Alter should run worker
 		// TODO Alter should stop worker
