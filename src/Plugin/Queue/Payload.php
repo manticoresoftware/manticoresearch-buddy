@@ -94,17 +94,8 @@ final class Payload extends BasePayload
 	 */
 	public static function hasMatch(Request $request): bool {
 
-		// CREATE SOURCE/ MATERIALIZED VIEW
-
-
-		// TODO done this later
-		// SHOW SOURCES/VIEWS
-		// SHOW CREATE SOURCE / MATERIALIZED VIEW
-		// DROP SOURCE/VIEW
-		// alter materialized view name suspended=1/0.
-
-
-		/*
+		/**
+		 * @example
 		 *
 		 * CREATE SOURCE kafka (id bigint, term text, abbrev text, GlossDef json) type='kafka'
 		   broker_list='kafka:9092' topic_list='my-data' consumer_group='manticore' num_consumers='4' batch=50;
@@ -124,6 +115,8 @@ final class Payload extends BasePayload
 		// TODO Alter should run worker
 		// TODO Alter should stop worker
 		// TODO Alter suspend=0 should be blocked if source not exist
+		// TODO Finish drop source and view
+		// TODO finish alter
 
 		return (
 			isset($parsedPayload['SOURCE']) ||
@@ -213,6 +206,22 @@ final class Payload extends BasePayload
 			isset($parsedPayload['DROP']['sub_tree'][1]['sub_tree'][0]['no_quotes']['parts'][0]) &&
 			$parsedPayload['DROP']['expr_type'] === self::TYPE_SOURCE
 		);
+	}
+
+	/**
+	 * Should match ALTER MATERIALIZED VIEW {name} suspended=0;
+	 *
+	 * @param array $parsedPayload
+	 * @return bool
+	 *
+	 * @example {"ALTER":{"base_expr":"materialized view","sub_tree":[]},"VIEW":{"base_expr":"view_table",
+	 * "name":"view_table","no_quotes":{"delim":false,"parts":["view_table"]},"create-def":false,
+	 * "options":[{"expr_type":"expression","base_expr":"suspended=0","delim":" ","sub_tree":[{"expr_type":
+	 * "reserved","base_expr":"suspended"},{"expr_type":"operator","base_expr":"="},
+	 * {"expr_type":"const","base_expr":"0"}]}]}}
+	 */
+	private static function isAlterMaterializedViewMatch(array $parsedPayload): bool {
+		return false;
 	}
 
 	/**
