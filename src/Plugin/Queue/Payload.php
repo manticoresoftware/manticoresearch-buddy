@@ -66,9 +66,9 @@ final class Payload extends BasePayload
 			$self->parsedPayload = static::$sqlQueryParser::getParsedPayload();
 
 
-			if (isset($self->parsedPayload['SOURCE'])) {
+			if (self::isCreateSourceMatch($self->parsedPayload)) {
 				$self::$type = self::REQUEST_TYPE_CREATE . self::TYPE_SOURCE;
-			} elseif (isset($self->parsedPayload['VIEW'])) {
+			} elseif (self::isMaterializedViewMatch($self->parsedPayload)) {
 				$self::$type = self::REQUEST_TYPE_CREATE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW;
 			} elseif (self::isViewSourcesMatch($self->parsedPayload)) {
 				$self::$type = self::REQUEST_TYPE_VIEW . self::TYPE_SOURCES;
@@ -101,7 +101,9 @@ final class Payload extends BasePayload
 		 *
 		 * CREATE SOURCE kafka (id bigint, term text, abbrev text, GlossDef json) type='kafka'
 		 * broker_list='kafka:9092' topic_list='my-data' consumer_group='manticore' num_consumers='4' batch=50;
+		 *
 		 * CREATE TABLE destination_kafka (id bigint, name text, short_name text, received_at text, size multi);
+		 *
 		 * CREATE MATERIALIZED VIEW view_table TO destination_kafka AS SELECT id, term as name,
 		 * abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka;
 		 */
@@ -114,12 +116,11 @@ final class Payload extends BasePayload
 		// TODO Alter should run worker
 		// TODO Alter should stop worker
 		// TODO Alter suspend=0 should be blocked if source not exist
-		// TODO Finish drop source and view
 		// TODO finish alter
 
 		return (
-			isset($parsedPayload['SOURCE']) ||
-			isset($parsedPayload['VIEW']) || // TODO rework to exclude unnecessary calls like ALTER
+			self::isCreateSourceMatch($parsedPayload) ||
+			self::isMaterializedViewMatch($parsedPayload) ||
 			self::isViewSourcesMatch($parsedPayload) ||
 			self::isViewMaterializedViewsMatch($parsedPayload) ||
 			self::isGetSourceMatch($parsedPayload) ||
@@ -130,6 +131,83 @@ final class Payload extends BasePayload
 		);
 	}
 
+
+	/**
+	 * Should match CREATE SOURCE {name} (field type) option=value
+	 *
+	 * @param array $parsedPayload
+	 * @return bool
+	 * @example {"CREATE":{"expr_type":"source","not-exists":false,"base_expr":"SOURCE","sub_tree":[{"expr_type":
+	 * "reserved","base_expr":"SOURCE"}]},"SOURCE":{"base_expr":"kafka","name":"kafka","no_quotes":{"delim":false,
+	 * "parts":["kafka"]},"create-def":{"expr_type":"bracket_expression","base_expr":" (id bigint, term text,
+   * abbrev text, GlossDef json)","sub_tree":[{"expr_type":"column-def","base_expr":"id bigint","sub_tree":
+   * [{"expr_type":"colref","base_expr":"id","no_quotes":{"delim":false,"parts":["id"]}},{"expr_type":
+	 * "column-type","base_expr":"bigint","sub_tree":[{"expr_type":"data-type","base_expr":"bigint",
+	 * "unsigned":false,"zerofill":false,"length":false}],"unique":false,"nullable":true,"auto_inc":false,
+	 * "primary":false}]},{"expr_type":"column-def","base_expr":"term text","sub_tree":[{"expr_type":"colref",
+	 * "base_expr":"term","no_quotes":{"delim":false,"parts":["term"]}},{"expr_type":"column-type","base_expr":
+	 * "text","sub_tree":[{"expr_type":"data-type","base_expr":"text","binary":false}],"unique":false,"nullable":true,
+	 * "auto_inc":false,"primary":false}]},{"expr_type":"column-def","base_expr":"abbrev text","sub_tree":
+	 * [{"expr_type":"colref","base_expr":"abbrev","no_quotes":{"delim":false,"parts":["abbrev"]}},{"expr_type":
+	 * "column-type","base_expr":"text","sub_tree":[{"expr_type":"data-type","base_expr":"text","binary":false}],
+	 * "unique":false,"nullable":true,"auto_inc":false,"primary":false}]},{"expr_type":"column-def","base_expr":
+	 * "GlossDef json","sub_tree":[{"expr_type":"colref","base_expr":"GlossDef","no_quotes":{"delim":false,
+	 * "parts":["GlossDef"]}},{"expr_type":"column-type","base_expr":"json","sub_tree":[],"unique":false,
+	 * "nullable":true,"auto_inc":false,"primary":false}]}]},"options":[{"expr_type":"expression",
+	 * "base_expr":"type='kafka'","delim":" ","sub_tree":[{"expr_type":"reserved","base_expr":"type"},{"expr_type":
+	 * "operator","base_expr":"="},{"expr_type":"const","base_expr":"'kafka'"}]},{"expr_type":"expression",
+	 * "base_expr":"broker_list='kafka:9092'","delim":" ","sub_tree":[{"expr_type":"reserved","base_expr":
+	 * "broker_list"},{"expr_type":"operator","base_expr":"="},{"expr_type":"const","base_expr":"'kafka:9092'"}]},
+	 * {"expr_type":"expression","base_expr":"topic_list='my-data'","delim":" ","sub_tree":[{"expr_type":"reserved",
+	 * "base_expr":"topic_list"},{"expr_type":"operator","base_expr":"="},{"expr_type":"const","base_expr":
+	 * "'my-data'"}]},{"expr_type":"expression","base_expr":"consumer_group='manticore'","delim":" ",
+	 * "sub_tree":[{"expr_type":"reserved","base_expr":"consumer_group"},{"expr_type":"operator","base_expr":"="},
+	 * {"expr_type":"const","base_expr":"'manticore'"}]},{"expr_type":"expression","base_expr":"num_consumers='4'",
+	 * "delim":" ","sub_tree":[{"expr_type":"reserved","base_expr":"num_consumers"},{"expr_type":"operator",
+	 * "base_expr":"="},{"expr_type":"const","base_expr":"'4'"}]}]}}
+	 */
+	private static function isCreateSourceMatch(array $parsedPayload): bool {
+		return (
+			isset($parsedPayload['CREATE']) &&
+			!empty($parsedPayload['SOURCE']['no_quotes']['parts'][0]) &&
+			!empty($parsedPayload['SOURCE']['create-def']) &&
+			!empty($parsedPayload['SOURCE']['options'])
+		);
+	}
+
+
+	/**
+	 * Should match CREATE MATERIALIZED VIEW view_table.....
+	 *
+	 * @param array $parsedPayload
+	 * @return bool
+	 * @example {"CREATE":{"base_expr":"MATERIALIZED VIEW","sub_tree":[]},"VIEW":{"base_expr":"view_table",
+	 * "name":"view_table","no_quotes":{"delim":false,"parts":["view_table"]},"create-def":false,"options":false,
+	 * "to":{"expr_type":"table","table":"destination_kafka","base_expr":"destination_kafka","no_quotes":{"delim":false,
+	 * "parts":["destination_kafka"]}}},"SELECT":[{"expr_type":"colref","alias":false,"base_expr":"id","no_quotes":
+	 * {"delim":false,"parts":["id"]},"sub_tree":false,"delim":","},{"expr_type":"colref","alias":{"as":true,
+	 * "name":"name","base_expr":"as name","no_quotes":{"delim":false,"parts":["name"]}},"base_expr":"term",
+	 * "no_quotes":{"delim":false,"parts":["term"]},"sub_tree":false,"delim":","},{"expr_type":"colref",
+	 * "alias":{"as":true,"name":"short_name","base_expr":"as short_name","no_quotes":{"delim":false,"parts":
+	 * ["short_name"]}},"base_expr":"abbrev","no_quotes":{"delim":false,"parts":["abbrev"]},"sub_tree":false,
+	 * "delim":","},{"expr_type":"function","alias":{"as":true,"name":"received_at","base_expr":"as received_at",
+	 * "no_quotes":{"delim":false,"parts":["received_at"]}},"base_expr":"UTC_TIMESTAMP","sub_tree":false,
+	 * "delim":","},{"expr_type":"colref","alias":{"as":true,"name":"size","base_expr":"as size","no_quotes":{
+	 * "delim":false,"parts":["size"]}},"base_expr":"GlossDef.size","no_quotes":{"delim":".","parts":["GlossDef",
+	 * "size"]},"sub_tree":false,"delim":false}],"FROM":[{"expr_type":"table","table":"kafka","no_quotes":{"delim":
+	 * false,"parts":["kafka"]},"alias":false,"hints":false,"join_type":"JOIN","ref_type":false,"ref_clause":false,
+	 * "base_expr":"kafka","sub_tree":false}]}
+	 *
+	 */
+	private static function isMaterializedViewMatch(array $parsedPayload): bool {
+		return (
+			isset($parsedPayload['CREATE']) &&
+			isset($parsedPayload['SELECT']) &&
+			isset($parsedPayload['FROM']) &&
+			!empty($parsedPayload['VIEW']['no_quotes']['parts'][0]) &&
+			!empty($parsedPayload['VIEW']['to'])
+		);
+	}
 
 	/**
 	 * Should match SHOW MATERIALIZED VIEW

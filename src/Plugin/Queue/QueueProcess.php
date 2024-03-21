@@ -98,7 +98,7 @@ class QueueProcess extends BaseProcessor
 	/**
 	 * @throws \Exception
 	 */
-	public function runWorker($instance): void {
+	public function runWorker(array $instance): void {
 		$workerFn = function () use ($instance): void {
 			Buddy::debugv('------->> Start worker ' . $instance['full_name']);
 			$kafkaWorker = new KafkaWorker($this->client, $instance);
