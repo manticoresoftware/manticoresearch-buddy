@@ -98,7 +98,10 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 				$source['destination_name'] = $destinationTableName;
 				$source['query'] = $escapedQuery;
-				QueueProcess::getInstance()->runWorker($source, false);
+
+				QueueProcess::getInstance()
+					->getProcess()
+					->execute('runWorker', [$source]);
 			}
 
 			return TaskResult::none();

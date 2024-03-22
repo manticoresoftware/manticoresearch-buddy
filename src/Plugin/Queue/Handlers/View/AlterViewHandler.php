@@ -78,7 +78,10 @@ final class AlterViewHandler extends BaseHandlerWithClient
 					$instance['destination_name'] = $row['destination_name'];
 					$instance['query'] = $row['query'];
 
-					QueueProcess::getInstance()->runWorker($instance);
+					QueueProcess::getInstance()
+						->getProcess()
+						->execute('runWorker', [$instance]);
+
 				} else {
 					QueueProcess::getInstance()->stopWorkerById($row['source_name']);
 				}
