@@ -18,6 +18,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class AlterViewHandler extends BaseHandlerWithClient
 {
@@ -62,26 +63,37 @@ final class AlterViewHandler extends BaseHandlerWithClient
 				throw ManticoreSearchClientError::create($rawResult->getError());
 			}
 
-			$affected = 0;
 			$ids = [];
-			foreach ($rawResult[0]['data'] as $row) {
+
+			/**
+			 * This need for removing unnecessary records that leaves after decreasing consumers count
+			 */
+			$dropIds = [];
+
+			foreach ($rawResult->getResult()[0]['data'] as $row) {
 				$ids[] = $row['id'];
 
 				if ($value === '0') {
-					$sourceQuery = 'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME . " WHERE match('@full_name \"{$row['source_name']}\"')";
-					$instance = $manticoreClient->sendRequest($sourceQuery);
-					if ($instance->hasError()) {
-						throw ManticoreSearchClientError::create($instance->getError());
-					}
 
-					$instance = $instance->getResult()[0]['data'][0];
-					$instance['destination_name'] = $row['destination_name'];
-					$instance['query'] = $row['query'];
+						$sourceQuery = 'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME . " WHERE match('@full_name \"{$row['source_name']}\"')";
+						$instance = $manticoreClient->sendRequest($sourceQuery);
+						if ($instance->hasError()) {
+							throw ManticoreSearchClientError::create($instance->getError());
+						}
+
+						if (empty($instance->getResult()[0]['data'])){
+							$dropIds[] = $row['id'];
+							continue;
+						}
+						$instance = $instance->getResult()[0]['data'][0];
+						$instance['destination_name'] = $row['destination_name'];
+						$instance['query'] = $row['query'];
+
+
 
 					QueueProcess::getInstance()
 						->getProcess()
 						->execute('runWorker', [$instance]);
-
 				} else {
 					QueueProcess::getInstance()->stopWorkerById($row['source_name']);
 				}
@@ -97,8 +109,19 @@ final class AlterViewHandler extends BaseHandlerWithClient
 				}
 			}
 
+			if ($dropIds !== []) {
+				$dropIds = implode(',', $dropIds);
+				Buddy::debugv("Remove orphan views records ids ($dropIds)");
+				$sql = /** @lang manticore */
+					"DELETE FROM $viewsTable WHERE id in ($dropIds)";
+				$rawResult = $manticoreClient->sendRequest($sql);
+				if ($rawResult->hasError()) {
+					throw ManticoreSearchClientError::create($rawResult->getError());
+				}
+			}
 
-			return TaskResult::withTotal($affected);
+
+			return TaskResult::withTotal(sizeof($ids));
 		};
 
 		return Task::create(

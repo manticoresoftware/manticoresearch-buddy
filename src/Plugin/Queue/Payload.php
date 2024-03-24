@@ -117,9 +117,8 @@ final class Payload extends BasePayload
 
 		// TODO case insensitive queries
 
-		// TODO Alter should synchronize views and source (at least count of records to count of buffer tables)
-		// TODO Alter should run worker
-		// TODO Alter should stop worker
+
+
 		// TODO Alter suspend=0 should be blocked if source not exist
 		// TODO finish alter
 
