@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 
 final class CreateKafka extends BaseCreateSourceHandler
@@ -61,7 +62,7 @@ final class CreateKafka extends BaseCreateSourceHandler
 			$query = /** @lang ManticoreSearch */
 				'INSERT INTO ' . Payload::SOURCE_TABLE_NAME . ' (id, type, name, full_name, buffer_table, attrs, original_query) ' .
 				'VALUES ' .
-				"(0, '" . self::SOURCE_TYPE_KAFKA . "', '$options->name','{$options->name}_$i',".
+				"(0, '" . self::SOURCE_TYPE_KAFKA . "', '$options->name','{$options->name}_$i'," .
 				"'_buffer_{$options->name}_$i', '$attrs', '$escapedPayload')";
 
 			$request = $manticoreClient->sendRequest($query);
@@ -70,7 +71,48 @@ final class CreateKafka extends BaseCreateSourceHandler
 			}
 		}
 
+		self::cleanOrphanViews($options->name, $manticoreClient);
+
 		return TaskResult::none();
+	}
+
+	public static function cleanOrphanViews(string $sourceName, Client $client) {
+
+		// Todo debug
+		$viewsTable = Payload::VIEWS_TABLE_NAME;
+		$sql = /** @lang Manticore */
+			"SELECT * FROM $viewsTable " .
+			"WHERE MATCH('@source_name \"" . $sourceName . "_*\" and suspended=1')";
+
+		$request = $client->sendRequest($sql);
+		if ($request->hasError()) {
+			throw ManticoreSearchClientError::create((string)$request->getError());
+		}
+
+		$ids = [];
+		foreach ($request->getResult()[0]['data'] as $orphanView) {
+			$viewSourceName = explode('_', $orphanView['source_name']);
+			// remove index from array, leave only name
+			array_pop($viewSourceName);
+			$viewSourceName = implode('_', $viewSourceName);
+
+			if ($viewSourceName !== $sourceName) {
+				continue;
+			}
+
+			$ids[] = $orphanView['id'];
+		}
+
+		if ($ids !== []){
+			$ids = implode(',', $ids);
+			Buddy::debugv("Remove orphan views records ids ($ids)");
+			$sql = /** @lang manticore */
+				"DELETE FROM $viewsTable WHERE id in ($ids)";
+			$rawResult = $client->sendRequest($sql);
+			if ($rawResult->hasError()) {
+				throw ManticoreSearchClientError::create($rawResult->getError());
+			}
+		}
 	}
 
 

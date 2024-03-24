@@ -119,7 +119,7 @@ class QueueProcess extends BaseProcessor
 		};
 
 		// Add worker to the pool and automatically start it
-		$this->process->addWorker(Process::createWorker($workerFn), $shouldStart);
+		$this->process->addWorker(Process::createWorker($workerFn, $instance['full_name']), $shouldStart);
 
 		// When we need to use this method from the Handler
 		// we simply get processor and execute method with parameters

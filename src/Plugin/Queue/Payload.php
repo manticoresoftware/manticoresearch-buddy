@@ -117,11 +117,6 @@ final class Payload extends BasePayload
 
 		// TODO case insensitive queries
 
-
-
-		// TODO Alter suspend=0 should be blocked if source not exist
-		// TODO finish alter
-
 		return (
 			self::isCreateSourceMatch($parsedPayload) ||
 			self::isMaterializedViewMatch($parsedPayload) ||

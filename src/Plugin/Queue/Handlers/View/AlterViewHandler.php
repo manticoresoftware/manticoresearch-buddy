@@ -39,6 +39,7 @@ final class AlterViewHandler extends BaseHandlerWithClient
 	public function run(): Task {
 
 		/**
+		 * @param Payload $payload
 		 * @param Client $manticoreClient
 		 * @return TaskResult
 		 * @throws ManticoreSearchClientError
@@ -65,31 +66,24 @@ final class AlterViewHandler extends BaseHandlerWithClient
 
 			$ids = [];
 
-			/**
-			 * This need for removing unnecessary records that leaves after decreasing consumers count
-			 */
-			$dropIds = [];
-
 			foreach ($rawResult->getResult()[0]['data'] as $row) {
 				$ids[] = $row['id'];
 
+
+				$sourceQuery = 'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME . " WHERE match('@full_name \"{$row['source_name']}\"')";
+				$instance = $manticoreClient->sendRequest($sourceQuery);
+				if ($instance->hasError()) {
+					throw ManticoreSearchClientError::create($instance->getError());
+				}
+
+				if (empty($instance->getResult()[0]['data'])){
+					return TaskResult::withError("Can't ALTER view without referred source. Create source ({$row['source_name']}) first");
+				}
+
 				if ($value === '0') {
-
-						$sourceQuery = 'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME . " WHERE match('@full_name \"{$row['source_name']}\"')";
-						$instance = $manticoreClient->sendRequest($sourceQuery);
-						if ($instance->hasError()) {
-							throw ManticoreSearchClientError::create($instance->getError());
-						}
-
-						if (empty($instance->getResult()[0]['data'])){
-							$dropIds[] = $row['id'];
-							continue;
-						}
 						$instance = $instance->getResult()[0]['data'][0];
 						$instance['destination_name'] = $row['destination_name'];
 						$instance['query'] = $row['query'];
-
-
 
 					QueueProcess::getInstance()
 						->getProcess()
@@ -108,18 +102,6 @@ final class AlterViewHandler extends BaseHandlerWithClient
 					throw ManticoreSearchClientError::create($rawResult->getError());
 				}
 			}
-
-			if ($dropIds !== []) {
-				$dropIds = implode(',', $dropIds);
-				Buddy::debugv("Remove orphan views records ids ($dropIds)");
-				$sql = /** @lang manticore */
-					"DELETE FROM $viewsTable WHERE id in ($dropIds)";
-				$rawResult = $manticoreClient->sendRequest($sql);
-				if ($rawResult->hasError()) {
-					throw ManticoreSearchClientError::create($rawResult->getError());
-				}
-			}
-
 
 			return TaskResult::withTotal(sizeof($ids));
 		};
