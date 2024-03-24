@@ -31,9 +31,6 @@ trait StringFunctionsTrait
 		return $this->fields[$field];
 	}
 
-	/**
-	 * TODO Duplicate from Replace plugin. Expose to core
-	 */
 	protected function morphValuesByFieldType(mixed $fieldValue, string $fieldType): mixed {
 		return match ($fieldType) {
 			Fields::TYPE_INT, Fields::TYPE_BIGINT, Fields::TYPE_TIMESTAMP => (int)$fieldValue,

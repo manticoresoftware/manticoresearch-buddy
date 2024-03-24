@@ -84,8 +84,7 @@ class View
 		$values = implode(',', $values);
 		unset($batch);
 
-		// TODO rollback to INSERT
-		$sql = "REPLACE INTO $this->destination ($keys) VALUES $values";
+		$sql = "INSERT INTO $this->destination ($keys) VALUES $values";
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {

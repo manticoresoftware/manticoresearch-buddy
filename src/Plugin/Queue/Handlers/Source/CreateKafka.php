@@ -82,7 +82,6 @@ final class CreateKafka extends BaseCreateSourceHandler
 			return;
 		}
 
-		// Todo debug
 		$sql = /** @lang Manticore */
 			"SELECT * FROM $viewsTable " .
 			"WHERE MATCH('@source_name \"" . $sourceName . "_*\"') AND suspended=1";
