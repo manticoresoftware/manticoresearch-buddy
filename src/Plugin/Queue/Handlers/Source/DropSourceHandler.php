@@ -40,7 +40,10 @@ final class DropSourceHandler extends BaseDropHandler
 
 		$removed = 0;
 		foreach ($result->getResult()[0]['data'] as $sourceRow) {
-			QueueProcess::getInstance()->stopWorkerById($sourceRow['full_name']);
+			QueueProcess::getInstance()
+				->getProcess()
+				->execute('stopWorkerById', [$sourceRow['full_name']]);
+
 			self::removeSourceRowData($sourceRow, $manticoreClient);
 			$removed++;
 		}

@@ -77,9 +77,12 @@ final class CreateKafka extends BaseCreateSourceHandler
 	}
 
 	public static function cleanOrphanViews(string $sourceName, Client $client) {
+		$viewsTable = Payload::VIEWS_TABLE_NAME;
+		if (!$client->hasTable($viewsTable)){
+			return;
+		}
 
 		// Todo debug
-		$viewsTable = Payload::VIEWS_TABLE_NAME;
 		$sql = /** @lang Manticore */
 			"SELECT * FROM $viewsTable " .
 			"WHERE MATCH('@source_name \"" . $sourceName . "_*\" and suspended=1')";
