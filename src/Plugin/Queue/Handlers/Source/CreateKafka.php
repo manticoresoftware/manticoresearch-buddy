@@ -71,12 +71,12 @@ final class CreateKafka extends BaseCreateSourceHandler
 			}
 		}
 
-		self::cleanOrphanViews($options->name, $manticoreClient);
+		self::cleanOrphanViews($options->name, $options->numConsumers,  $manticoreClient);
 
 		return TaskResult::none();
 	}
 
-	public static function cleanOrphanViews(string $sourceName, Client $client) {
+	public static function cleanOrphanViews(string $sourceName, int $maxIndex, Client $client) {
 		$viewsTable = Payload::VIEWS_TABLE_NAME;
 		if (!$client->hasTable($viewsTable)){
 			return;
@@ -85,7 +85,7 @@ final class CreateKafka extends BaseCreateSourceHandler
 		// Todo debug
 		$sql = /** @lang Manticore */
 			"SELECT * FROM $viewsTable " .
-			"WHERE MATCH('@source_name \"" . $sourceName . "_*\" and suspended=1')";
+			"WHERE MATCH('@source_name \"" . $sourceName . "_*\"') AND suspended=1";
 
 		$request = $client->sendRequest($sql);
 		if ($request->hasError()) {
@@ -96,10 +96,11 @@ final class CreateKafka extends BaseCreateSourceHandler
 		foreach ($request->getResult()[0]['data'] as $orphanView) {
 			$viewSourceName = explode('_', $orphanView['source_name']);
 			// remove index from array, leave only name
-			array_pop($viewSourceName);
+			$index = array_pop($viewSourceName);
 			$viewSourceName = implode('_', $viewSourceName);
 
-			if ($viewSourceName !== $sourceName) {
+			echo "-------+++++------>$index < $maxIndex \n";
+			if ($viewSourceName !== $sourceName || $index < $maxIndex) {
 				continue;
 			}
 

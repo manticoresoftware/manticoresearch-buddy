@@ -77,7 +77,7 @@ final class AlterViewHandler extends BaseHandlerWithClient
 				}
 
 				if (empty($instance->getResult()[0]['data'])){
-					return TaskResult::withError("Can't ALTER view without referred source. Create source ({$row['source_name']}) first");
+					return TaskResult::withError("Can't ALTER view without referred source. Create source for current view first");
 				}
 
 				if ($value === '0') {
@@ -89,7 +89,9 @@ final class AlterViewHandler extends BaseHandlerWithClient
 						->getProcess()
 						->execute('runWorker', [$instance]);
 				} else {
-					QueueProcess::getInstance()->stopWorkerById($row['source_name']);
+					QueueProcess::getInstance()
+						->getProcess()
+						->execute('stopWorkerById', [$row['source_name']]);
 				}
 			}
 

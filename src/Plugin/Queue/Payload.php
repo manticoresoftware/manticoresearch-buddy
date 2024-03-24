@@ -116,6 +116,8 @@ final class Payload extends BasePayload
 		echo json_encode($parsedPayload) . "\n";
 
 		// TODO case insensitive queries
+		// TODO Aliases
+		// TODO response from Dima about stop worker
 
 		return (
 			self::isCreateSourceMatch($parsedPayload) ||
