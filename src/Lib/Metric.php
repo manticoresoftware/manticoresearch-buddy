@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Lib;
 
 use Exception;
+use FilesystemIterator;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -20,11 +21,15 @@ use OpenMetrics\Exposition\Text\Exceptions\InvalidArgumentException;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RuntimeException;
+use SplFileInfo;
 
 final class Metric {
 	const MAX_QUEUE_SIZE = 200;
 	const RATE_MULTIPLIER = 1000;
+	const MAX_VOLUME_SIZE_TIME_MS = 1000;
 
 	/** @var ContainerInterface */
 	// We set this on initialization (init.php) so we are sure we have it in class
@@ -44,6 +49,14 @@ final class Metric {
 
 	/** @var array<string,int> $snapshot last snashpot we made to calcaulte diffs */
 	protected array $snapshot = [];
+
+	/** @var bool if we should to collect volume size or not */
+	protected bool $collectVolumeMetrics = true;
+
+	/** @var string $dataDir path to the datadir that we will use to volume calc */
+	protected string $dataDir = '';
+
+	protected string $binlogDir = '';
 
 	/**
 	 * Setter for container property
@@ -65,6 +78,8 @@ final class Metric {
 	public function __construct(array $labels, public bool $enabled) {
 		$this->telemetry = new TelemetryMetric($labels);
 		$this->snapshotTime = time();
+		[$this->dataDir, $this->binlogDir] = $this->getVolumeDirs();
+		$this->collectVolumeMetrics = !!$this->dataDir;
 	}
 
 	/**
@@ -228,42 +243,25 @@ final class Metric {
 		$metrics = array_merge($metrics, static::getTablesMetrics());
 		Buddy::debugv(sprintf('metrics: %s', json_encode($metrics)));
 
-		$now = time();
-		$duration = 0;
-		$saveSnapshot = ($now - $this->snapshotTime) > 0;
-		if ($saveSnapshot) {
-			$duration = $now - $this->snapshotTime;
-		}
-
-		// 4. Finally send it
-		$rateMetrics = [];
-		foreach ($metrics as $name => $value) {
-			$this->add($name, $value);
-
-			// Caculate rate metrics when we need
-			if (!str_starts_with($name, 'command_') || $duration <= 0) {
-				continue;
-			}
-
-			$rateName = "{$name}_rate";
-			$diff = $value - ($this->snapshot[$name] ?? 0);
-			$rateValue = (int)(static::RATE_MULTIPLIER * ($diff / $duration));
-			// Store it for debug
-			$rateMetrics[$rateName] = $rateValue;
-			// Add to metric
-			$this->add($rateName, $rateValue);
-		}
+		// 4. Get Rate Metrics
+		$rateMetrics = static::getRateMetrics($metrics);
+		$metrics = array_merge($metrics, $rateMetrics);
 		Buddy::debugv(sprintf('rates: %s', json_encode($rateMetrics)));
 
-		$this->send();
-
-		// Save last info about snapshot
-		if (!$saveSnapshot) {
-			return;
+		// 5. Collect volume metrics if enabled
+		if ($this->collectVolumeMetrics) {
+			$volumeMetrics = $this->getVolumeMetrics();
+			$metrics = array_merge($metrics, $volumeMetrics);
+			Buddy::debugv(sprintf('volume: %s', json_encode($volumeMetrics)));
 		}
 
-		$this->snapshot = $metrics;
-		$this->snapshotTime = $now;
+		// 6. Add all metrics to the batch
+		foreach ($metrics as $name => $value) {
+			$this->add($name, $value);
+		}
+
+		// 7. Send it
+		$this->send();
 	}
 
 	/**
@@ -355,6 +353,69 @@ final class Metric {
 		return $labels;
 	}
 
+
+	/**
+	 * Get current data dir from settings
+	 * @return array{0:string,1:string}
+	 */
+	protected static function getVolumeDirs(): array {
+		$dataDir = '';
+		$binlogDir = '';
+		$configResult = static::sendManticoreRequest('SHOW SETTINGS');
+		/** @var string $value */
+		foreach ($configResult as ['Setting_name' => $key, 'Value' => $value]) {
+			if ($key === 'searchd.data_dir') {
+				$dataDir = $value;
+				continue;
+			}
+
+			if ($key === 'searchd.binlog_path') {
+				$binlogDir = $value;
+				continue;
+			}
+
+			if ($dataDir && $binlogDir) {
+				break;
+			}
+		}
+		return [$dataDir, $binlogDir];
+	}
+
+	/**
+	 * Get volume size and other metrics related to data dir
+	 * @return array<string,int>
+	 */
+	protected function getVolumeMetrics(): array {
+		$size = 0;
+		$t = (int)(microtime(true) * 1000);
+		// Create Recursive Directory Iterator
+		$iterator = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator($this->dataDir, FilesystemIterator::SKIP_DOTS),
+			RecursiveIteratorIterator::SELF_FIRST
+		);
+
+		// Iterate through files and accumulate their sizes
+		/** @var SplFileInfo $file */
+		foreach ($iterator as $file) {
+			if (strpos($file->getPathname(), $this->binlogDir) !== false
+					||
+				!$file->isFile()
+			) {
+				continue;
+			}
+			$size += $file->getSize();
+		}
+		$duration = (int)(microtime(true) * 1000) - $t;
+		// If we collect metrics too slow, disable it
+		if ($duration > static::MAX_VOLUME_SIZE_TIME_MS) {
+			$this->collectVolumeMetrics = false;
+		}
+		return [
+			'volume_size_bytes' => $size,
+			'volume_size_time_ms' => $duration,
+		];
+	}
+
 	/**
 	 * Get labels that change on each request we batch
 	 * @return array<string,string>s
@@ -379,6 +440,44 @@ final class Metric {
 			$labels["manticore_{$key}"] = (string)$value;
 		}
 		return $labels;
+	}
+
+	/**
+	 * Get rate metrics based on the base
+	 * @param  array<string,int>  $metrics
+	 * @return array<string,int>
+	 */
+	protected function getRateMetrics(array $metrics): array {
+		$now = time();
+		$duration = 0;
+		$saveSnapshot = ($now - $this->snapshotTime) > 0;
+		if ($saveSnapshot) {
+			$duration = $now - $this->snapshotTime;
+		}
+
+		$rateMetrics = [];
+		foreach ($metrics as $name => $value) {
+			$this->add($name, $value);
+
+			// Caculate rate metrics when we need
+			if (!str_starts_with($name, 'command_') || $duration <= 0) {
+				continue;
+			}
+
+			$rateName = "{$name}_rate";
+			$diff = $value - ($this->snapshot[$name] ?? 0);
+			$rateValue = (int)(static::RATE_MULTIPLIER * ($diff / $duration));
+			// Store it for debug
+			$rateMetrics[$rateName] = $rateValue;
+		}
+
+		// Save last info about snapshot
+		if ($saveSnapshot) {
+			$this->snapshot = $metrics;
+			$this->snapshotTime = $now;
+		}
+
+		return $rateMetrics;
 	}
 
 	/**
