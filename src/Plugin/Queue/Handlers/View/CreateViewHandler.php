@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Base\Plugin\Queue\QueueProcess;
 use Manticoresearch\Buddy\Core\Error\GenericError;
@@ -59,8 +58,8 @@ final class CreateViewHandler extends BaseHandlerWithClient
 			self::checkAndCreateViews($manticoreClient);
 			self::checkViewName($viewName, $manticoreClient);
 
-			if (!self::checkDestinationTable($destinationTableName, $manticoreClient)){
-				return TaskResult::withError("Destination table non exist");
+			if (!self::checkDestinationTable($destinationTableName, $manticoreClient)) {
+				return TaskResult::withError('Destination table non exist');
 			}
 
 

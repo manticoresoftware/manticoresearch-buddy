@@ -3,8 +3,6 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
-use Manticoresearch\Buddy\Base\Plugin\Queue\QueueProcess;
-use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;

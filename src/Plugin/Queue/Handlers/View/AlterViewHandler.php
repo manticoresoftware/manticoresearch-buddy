@@ -18,7 +18,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class AlterViewHandler extends BaseHandlerWithClient
 {
@@ -76,7 +75,7 @@ final class AlterViewHandler extends BaseHandlerWithClient
 					throw ManticoreSearchClientError::create($instance->getError());
 				}
 
-				if (empty($instance->getResult()[0]['data'])){
+				if (empty($instance->getResult()[0]['data'])) {
 					return TaskResult::withError("Can't ALTER view without referred source. Create source ({$row['source_name']}) first");
 				}
 

@@ -3,7 +3,6 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHandler;
-use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\CreateViewHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka\KafkaWorker;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
@@ -58,13 +57,13 @@ class QueueProcess extends BaseProcessor
 	 */
 	protected function runPool(): void {
 
-		if (!$this->client->hasTable(Payload::SOURCE_TABLE_NAME)){
-			Buddy::debugv("Queue source table not exist. Exit queue process pool");
+		if (!$this->client->hasTable(Payload::SOURCE_TABLE_NAME)) {
+			Buddy::debugv('Queue source table not exist. Exit queue process pool');
 			return;
 		}
 
-		if (!$this->client->hasTable(Payload::VIEWS_TABLE_NAME)){
-			Buddy::debugv("Queue views table not exist. Exit queue process pool");
+		if (!$this->client->hasTable(Payload::VIEWS_TABLE_NAME)) {
+			Buddy::debugv('Queue views table not exist. Exit queue process pool');
 			return;
 		}
 
@@ -101,7 +100,7 @@ class QueueProcess extends BaseProcessor
 
 			$instance['destination_name'] = $results[0]['data'][0]['destination_name'];
 			$instance['query'] = $results[0]['data'][0]['query'];
-			echo "++++++++++++++++ ". $instance['full_name']."\n";
+			echo '++++++++++++++++ '. $instance['full_name']."\n";
 			$this->runWorker($instance);
 		}
 	}
