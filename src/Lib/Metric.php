@@ -464,7 +464,7 @@ final class Metric {
 				continue;
 			}
 
-			$rateName = "{$name}_rate";
+			$rateName = "{$name}_rps";
 			$diff = $value - ($this->snapshot[$name] ?? 0);
 			$rateValue = (int)(static::RATE_MULTIPLIER * ($diff / $duration));
 			// Store it for debug
