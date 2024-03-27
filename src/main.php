@@ -108,6 +108,10 @@ $server->beforeStart(
 			// Configure PHP memory limit and post data sizeMetricThreadTest.php
 			ini_set('memory_limit', '384M');
 			ini_set('post_max_size', $settings->maxAllowedPacket);
+			// Disable JIT because there is almost no benefit in our cases, and we encounter
+			// weird issues with JIT in some instances of comment removal regex.
+			// As tested across 1000 runs of the same regex, JIT offers no benefit.
+			ini_set('pcre.jit', 0);
 		}
 	)
 	// We need to run it outside of couroutine so do it before
