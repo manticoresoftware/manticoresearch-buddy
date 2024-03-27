@@ -78,7 +78,7 @@ final class CreateKafka extends BaseCreateSourceHandler
 
 	public static function cleanOrphanViews(string $sourceName, int $maxIndex, Client $client) {
 		$viewsTable = Payload::VIEWS_TABLE_NAME;
-		if (!$client->hasTable($viewsTable)){
+		if (!$client->hasTable($viewsTable)) {
 			return;
 		}
 
@@ -106,15 +106,17 @@ final class CreateKafka extends BaseCreateSourceHandler
 			$ids[] = $orphanView['id'];
 		}
 
-		if ($ids !== []){
-			$ids = implode(',', $ids);
-			Buddy::debugv("Remove orphan views records ids ($ids)");
-			$sql = /** @lang manticore */
-				"DELETE FROM $viewsTable WHERE id in ($ids)";
-			$rawResult = $client->sendRequest($sql);
-			if ($rawResult->hasError()) {
-				throw ManticoreSearchClientError::create($rawResult->getError());
-			}
+		if ($ids === []) {
+			return;
+		}
+
+		$ids = implode(',', $ids);
+		Buddy::debugv("Remove orphan views records ids ($ids)");
+		$sql = /** @lang manticore */
+			"DELETE FROM $viewsTable WHERE id in ($ids)";
+		$rawResult = $client->sendRequest($sql);
+		if ($rawResult->hasError()) {
+			throw ManticoreSearchClientError::create($rawResult->getError());
 		}
 	}
 
