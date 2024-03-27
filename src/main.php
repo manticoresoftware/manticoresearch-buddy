@@ -102,7 +102,7 @@ $server->beforeStart(
 			buddy_metric('crash', 1);
 		}
 	)
-	->onStart(
+	->beforeStart(
 		static function () {
 			$settings = QueryProcessor::getSettings();
 			// Configure PHP memory limit and post data sizeMetricThreadTest.php
