@@ -815,17 +815,17 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "5737651b5feca276f8979777563c897d3c6df54c"
+                "reference": "da0561a0ef495b04a145cbea79881298be220352"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/5737651b5feca276f8979777563c897d3c6df54c",
-                "reference": "5737651b5feca276f8979777563c897d3c6df54c",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/da0561a0ef495b04a145cbea79881298be220352",
+                "reference": "da0561a0ef495b04a145cbea79881298be220352",
                 "shasum": ""
             },
             "require": {
                 "composer/composer": "^2.5",
-                "manticoresoftware/php-sql-parser": "v4.6.0-patch2",
+                "manticoresoftware/php-sql-parser": "v4.6.0-patch4",
                 "php-ds/php-ds": "^1.4",
                 "symfony/console": "^6.2",
                 "symfony/dependency-injection": "^6.1"
@@ -859,7 +859,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2024-03-19T15:05:59+00:00"
+            "time": "2024-03-28T14:03:36+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -975,16 +975,16 @@
         },
         {
             "name": "manticoresoftware/php-sql-parser",
-            "version": "v4.6.0-patch2",
+            "version": "v4.6.0-patch4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/PHP-SQL-Parser.git",
-                "reference": "c928f6dbb1c88303bc346b5bd0ca2e63e0e10b70"
+                "reference": "0034db8c6e2ec62267c5b10d4aa2009eb2787956"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/c928f6dbb1c88303bc346b5bd0ca2e63e0e10b70",
-                "reference": "c928f6dbb1c88303bc346b5bd0ca2e63e0e10b70",
+                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/0034db8c6e2ec62267c5b10d4aa2009eb2787956",
+                "reference": "0034db8c6e2ec62267c5b10d4aa2009eb2787956",
                 "shasum": ""
             },
             "require": {
@@ -1031,7 +1031,7 @@
                 "issues": "https://github.com/greenlion/PHP-SQL-Parser/issues",
                 "source": "https://github.com/greenlion/PHP-SQL-Parser"
             },
-            "time": "2024-03-14T14:23:30+00:00"
+            "time": "2024-03-28T13:51:47+00:00"
         },
         {
             "name": "manticoresoftware/telemetry",
