@@ -81,7 +81,7 @@ final class Handler extends BaseHandlerWithClient
 			->sendRequest('DESC ' . $table);
 
 		if ($descResult->hasError()) {
-			throw ManticoreSearchClientError::create($descResult->getError());
+			throw ManticoreSearchClientError::create((string)$descResult->getError());
 		}
 
 		$descResult = $descResult->getResult();
