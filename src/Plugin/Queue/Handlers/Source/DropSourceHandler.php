@@ -27,7 +27,8 @@ final class DropSourceHandler extends BaseDropHandler
 	 * @return int
 	 * @throws ManticoreSearchClientError
 	 */
-	protected static function processDrop(string $name, string $tableName, Client $manticoreClient): int {
+	protected function processDrop(string $name, string $tableName): int {
+		$manticoreClient = $this->manticoreClient;
 		$sql = /** @lang Manticore */
 			"SELECT * FROM $tableName WHERE match('@name \"$name\"')";
 
@@ -40,7 +41,7 @@ final class DropSourceHandler extends BaseDropHandler
 
 		$removed = 0;
 		foreach ($result->getResult()[0]['data'] as $sourceRow) {
-			QueueProcess::getInstance()
+			$this->payload::$processor
 				->execute('stopWorkerById', [$sourceRow['full_name']]);
 
 			self::removeSourceRowData($sourceRow, $manticoreClient);

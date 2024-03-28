@@ -50,7 +50,7 @@ final class Payload extends BasePayload
 	public static string $sourceType;
 
 	public Endpoint $endpointBundle;
-
+	public static QueueProcess $processor;
 	public string $originQuery = '';
 	public array $parsedPayload = [];
 
@@ -369,12 +369,7 @@ final class Payload extends BasePayload
 	 * @throws NotFoundExceptionInterface
 	 */
 	public static function getProcessors(): array {
-		/** @var Client $client */
-		$client = Pluggable::getContainer()->get('manticoreClient');
-
-		if ($client->hasTable(Payload::SOURCE_TABLE_NAME)) {
-			return [QueueProcess::getInstance()->setClient($client)];
-		}
-		return [];
+		static::$processor = new QueueProcess();
+		return [static::$processor];
 	}
 }

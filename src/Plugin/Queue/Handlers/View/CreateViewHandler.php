@@ -39,13 +39,12 @@ final class CreateViewHandler extends BaseHandlerWithClient
 	public function run(): Task {
 
 		/**
-		 * @param Payload $payload
-		 * @param Client $manticoreClient
 		 * @return TaskResult
 		 * @throws ManticoreSearchClientError
 		 */
-		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
-
+		$taskFn = function (): TaskResult {
+			$payload = $this->payload;
+			$manticoreClient = $this->manticoreClient;
 			$sourceName = $payload->parsedPayload['FROM'][0]['table'];
 			$viewName = $payload->parsedPayload['VIEW']['no_quotes']['parts'][0];
 			$destinationTableName = $payload->parsedPayload['VIEW']['to']['no_quotes']['parts'][0];
@@ -97,19 +96,13 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 				$source['destination_name'] = $destinationTableName;
 				$source['query'] = $escapedQuery;
-
-				QueueProcess::getInstance()
-					->getProcess()
-					->execute('runWorker', [$source]);
+				$this->payload::$processor->execute('runWorker', [$source]);
 			}
 
 			return TaskResult::none();
 		};
 
-		return Task::create(
-			$taskFn,
-			[$this->payload, $this->manticoreClient]
-		)->run();
+		return Task::create($taskFn)->run();
 	}
 
 

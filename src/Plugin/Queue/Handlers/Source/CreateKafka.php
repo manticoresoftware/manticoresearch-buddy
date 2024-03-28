@@ -71,7 +71,7 @@ final class CreateKafka extends BaseCreateSourceHandler
 			}
 		}
 
-		self::cleanOrphanViews($options->name, $options->numConsumers,  $manticoreClient);
+		self::cleanOrphanViews($options->name, $options->numConsumers, $manticoreClient);
 
 		return TaskResult::none();
 	}

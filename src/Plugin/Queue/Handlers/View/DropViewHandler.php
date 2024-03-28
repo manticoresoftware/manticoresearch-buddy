@@ -13,9 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseDropHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
-use Manticoresearch\Buddy\Base\Plugin\Queue\QueueProcess;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 
 final class DropViewHandler extends BaseDropHandler
 {
@@ -23,7 +21,8 @@ final class DropViewHandler extends BaseDropHandler
 	/**
 	 * @throws ManticoreSearchClientError
 	 */
-	#[\Override] protected static function processDrop(string $name, string $tableName, Client $manticoreClient): int {
+	#[\Override] protected function processDrop(string $name, string $tableName): int {
+		$manticoreClient = $this->manticoreClient;
 		$sql = /** @lang Manticore */
 			"SELECT * FROM $tableName WHERE match('@name \"$name\"')";
 
@@ -35,7 +34,7 @@ final class DropViewHandler extends BaseDropHandler
 
 		$removed = 0;
 		foreach ($result->getResult()[0]['data'] as $row) {
-			QueueProcess::getInstance()->execute('stopWorkerById', [$row['source_name']]);
+			$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
 
 			$sql = /** @lang Manticore */
 				"DELETE FROM $tableName WHERE id = " . $row['id'];

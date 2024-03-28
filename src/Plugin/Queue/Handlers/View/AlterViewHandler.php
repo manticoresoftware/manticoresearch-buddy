@@ -38,13 +38,12 @@ final class AlterViewHandler extends BaseHandlerWithClient
 	public function run(): Task {
 
 		/**
-		 * @param Payload $payload
-		 * @param Client $manticoreClient
 		 * @return TaskResult
 		 * @throws ManticoreSearchClientError
 		 */
-		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
-
+		$taskFn = function (): TaskResult {
+			$payload = $this->payload;
+			$manticoreClient = $this->manticoreClient;
 			$viewsTable = Payload::VIEWS_TABLE_NAME;
 
 			if (!$manticoreClient->hasTable($viewsTable)) {
@@ -84,11 +83,9 @@ final class AlterViewHandler extends BaseHandlerWithClient
 						$instance['destination_name'] = $row['destination_name'];
 						$instance['query'] = $row['query'];
 
-					QueueProcess::getInstance()
-						->getProcess()
-						->execute('runWorker', [$instance]);
+					$this->payload::$processor->execute('runWorker', [$instance]);
 				} else {
-					QueueProcess::getInstance()->execute('stopWorkerById', [$row['source_name']]);
+					$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
 				}
 			}
 
@@ -105,9 +102,6 @@ final class AlterViewHandler extends BaseHandlerWithClient
 			return TaskResult::withTotal(sizeof($ids));
 		};
 
-		return Task::create(
-			$taskFn,
-			[$this->payload, $this->manticoreClient]
-		)->run();
+		return Task::create($taskFn)->run();
 	}
 }

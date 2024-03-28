@@ -815,12 +815,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "1da59b64252ca8520a543b1ddc91e5c7a709efe4"
+                "reference": "b8c74419896e7198e0c9b12d7bd8e78f29704914"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/1da59b64252ca8520a543b1ddc91e5c7a709efe4",
-                "reference": "1da59b64252ca8520a543b1ddc91e5c7a709efe4",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/b8c74419896e7198e0c9b12d7bd8e78f29704914",
+                "reference": "b8c74419896e7198e0c9b12d7bd8e78f29704914",
                 "shasum": ""
             },
             "require": {
@@ -858,7 +858,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/workers"
             },
-            "time": "2024-03-28T09:10:30+00:00"
+            "time": "2024-03-28T10:34:16+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",

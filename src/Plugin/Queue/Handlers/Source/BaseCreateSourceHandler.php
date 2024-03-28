@@ -35,7 +35,6 @@ abstract class BaseCreateSourceHandler extends BaseHandlerWithClient {
 	 * @return Task
 	 */
 	public function run(): Task {
-
 		/**
 		 * @param Payload $payload
 		 * @param Client $manticoreClient

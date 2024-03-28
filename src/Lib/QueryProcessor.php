@@ -119,16 +119,18 @@ class QueryProcessor {
 
 	/**
 	 * Run start method of all plugin handlers
+	 * Run start method of all plugin handlers
 	 * @param ?callable $fn
 	 * @return void
 	 */
 	public static function startPlugins(?callable $fn = null): void {
+		$client = static::getObjFromContainer('manticoreClient');
 		static::iteratePluginProcessors(
-			static function (BaseProcessor $processor) use ($fn) {
+			static function (BaseProcessor $processor) use ($fn, $client) {
 				if (isset($fn)) {
 					$fn($processor->getProcess()->process);
 				}
-
+				$processor->setClient($client);
 				$processor->start();
 			}
 		);

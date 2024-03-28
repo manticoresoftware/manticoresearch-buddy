@@ -6,42 +6,20 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHand
 use Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka\KafkaWorker;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Process\Process;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Throwable;
 
 class QueueProcess extends BaseProcessor
 {
-
-
-	protected static $instance;
-	private Client $client;
-
-	private function __clone() {
-	}
-
-
-	public static function getInstance(): QueueProcess {
-		if (self::$instance === null) {
-			self::$instance = new self;
-		}
-
-		return self::$instance;
-	}
-
-	public function setClient(Client $client): QueueProcess {
-		self::getInstance()->client = $client;
-		return self::getInstance();
-	}
-
 	/**
 	 * @throws ManticoreSearchClientError
 	 * @throws GenericError
 	 */
 	public function start(): void {
 		parent::start();
-		self::getInstance()->runPool();
+		$this->execute('runPool');
 	}
 
 	public function stop(): void {
@@ -55,7 +33,7 @@ class QueueProcess extends BaseProcessor
 	 * @throws GenericError
 	 * @throws \Exception
 	 */
-	protected function runPool(): void {
+	public function runPool(): void {
 
 		if (!$this->client->hasTable(Payload::SOURCE_TABLE_NAME)) {
 			Buddy::debugv('Queue source table not exist. Exit queue process pool');
@@ -130,11 +108,12 @@ class QueueProcess extends BaseProcessor
 	 * @throws \Exception
 	 */
 	public function stopWorkerById(string $id): bool {
-		$worker = self::getInstance()->getProcess()->getWorker($id);
-		if ($worker === null) {
+		try {
+			$worker = $this->process->getWorker($id);
+			$this->process->removeWorker($worker);
+		} catch (Throwable) {
+		} finally {
 			return true;
 		}
-		self::getInstance()->getProcess()->removeWorker($worker);
-		return true;
 	}
 }

@@ -3,7 +3,6 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -31,27 +30,25 @@ abstract class BaseDropHandler extends BaseHandlerWithClient
 
 		/**
 		 * @param string $name
-		 * @param string $tableName
-		 * @param Client $manticoreClient
 		 * @return TaskResult
 		 */
-		$taskFn = static function (string $name, string $tableName, Client $manticoreClient): TaskResult {
-
+		$taskFn = function (string $name, string $tableName): TaskResult {
+			$manticoreClient = $this->manticoreClient;
 			if (!$manticoreClient->hasTable($tableName)) {
 				return TaskResult::none();
 			}
 
-			return TaskResult::withTotal(static::processDrop($name, $tableName, $manticoreClient));
+			return TaskResult::withTotal($this->processDrop($name, $tableName, $manticoreClient));
 		};
 
 		return Task::create(
 			$taskFn,
-			[$name, $tableName, $this->manticoreClient]
+			[$name, $tableName]
 		)->run();
 	}
 
 
-	abstract protected static function processDrop(string $name, string $tableName, Client $manticoreClient): int;
+	abstract protected function processDrop(string $name, string $tableName): int;
 
 	abstract protected function getName(Payload $payload): string;
 
