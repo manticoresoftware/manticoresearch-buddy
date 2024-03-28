@@ -114,7 +114,9 @@ class SQLInsertParserTest extends TestCase {
 
 		$parser = new SQLInsertParser();
 		$query = 'INSERT INTO test(col1,col2,col3,col4,col5, col6, col7) VALUES'
+			. "\n"
 			. "('m1@google.com', 1, 111111111111, '{\"b\":2}', (1,2), (1,111), 'c'),"
+			. "\n"
 			. "('some text', 2, 222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222), 'qqq')";
 		$res = [
 			'name' => 'test',

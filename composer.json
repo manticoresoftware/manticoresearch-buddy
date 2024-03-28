@@ -32,7 +32,7 @@
 	"require": {
 		"react/http": "^1.8",
 		"react/socket": "^1.12",
-		"manticoresoftware/telemetry": "^0.1.9",
+		"manticoresoftware/telemetry": "^0.1.19",
 		"symfony/dependency-injection": "^6.1",
 		"manticoresoftware/buddy-core": "dev-feature/workers",
 		"php-ds/php-ds": "^1.4",
