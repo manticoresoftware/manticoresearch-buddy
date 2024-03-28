@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace Manticoresearch\Buddy\Base\Sharding;
+namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Ds\Set;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;

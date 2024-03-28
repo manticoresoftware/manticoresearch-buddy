@@ -14,7 +14,6 @@ use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Base\Network\EventHandler;
 use Manticoresearch\Buddy\Base\Network\Server;
-use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
@@ -116,8 +115,13 @@ $server->beforeStart(
 	)
 	// We need to run it outside of couroutine so do it before
 	->beforeStart(
+		static function () use ($server) {
+			QueryProcessor::startPlugins(fn($p) => $server->addProcess($p));
+		}
+	)
+	->beforeStop(
 		static function () {
-			QueryProcessor::startPlugins();
+			QueryProcessor::stopPlugins();
 		}
 	)
 	->beforeStop(
@@ -127,22 +131,11 @@ $server->beforeStart(
 	)
 	->beforeStart(
 		static function () use ($server) {
-			$process = ShardingThread::instance()->process;
-			$server->addProcess($process);
-		}
-	)
-	->beforeStart(
-		static function () use ($server) {
 			$process = MetricThread::instance()->process;
 			$server->addProcess($process);
 		}
 	)
 	->addHandler('request', EventHandler::request(...))
-	->addTicker(
-		static function () {
-			ShardingThread::instance()->execute('ping', []);
-		}, 1
-	)
 	->addTicker(
 		static function () {
 			$memory = memory_get_usage() / 1024;

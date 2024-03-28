@@ -12,7 +12,6 @@
 use Manticoresearch\Buddy\Base\Lib\CliArgsProcessor;
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Loader;
-use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
@@ -66,9 +65,9 @@ Pluggable::setCorePlugins(
 	'manticoresoftware/buddy-plugin-modify-table',
 	'manticoresoftware/buddy-plugin-knn',
 	'manticoresoftware/buddy-plugin-replace',
+	'manticoresoftware/buddy-plugin-sharding',
 	]
 );
 MetricThread::setContainer($container);
-ShardingThread::setContainer($container);
 
 return $container;

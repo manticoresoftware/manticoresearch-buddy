@@ -13,7 +13,7 @@ namespace Manticoresearch\Buddy\Base\Lib;
 
 use Exception;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\Base\Sharding\Thread as ShardingThread;
+use Manticoresearch\Buddy\Base\Plugin\Sharding\Payload as ShardingPayload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
@@ -119,11 +119,19 @@ class QueryProcessor {
 
 	/**
 	 * Run start method of all plugin handlers
+	 * Run start method of all plugin handlers
+	 * @param ?callable $fn
 	 * @return void
 	 */
-	public static function startPlugins(): void {
+	public static function startPlugins(?callable $fn = null): void {
+		/** @var HTTPClient $client ] */
+		$client = static::getObjFromContainer('manticoreClient');
 		static::iteratePluginProcessors(
-			static function (BaseProcessor $processor) {
+			static function (BaseProcessor $processor) use ($fn, $client) {
+				if (isset($fn)) {
+					$fn($processor->getProcess()->process);
+				}
+				$processor->setClient($client);
 				$processor->start();
 			}
 		);
@@ -298,7 +306,22 @@ class QueryProcessor {
 				'manticoresoftware/buddy-plugin-modify-table',
 				'shard',
 				function (array $args) {
-					ShardingThread::instance()->execute('shard', $args);
+					// TODO: remove the reference to the plugin,
+					// cuz plugins should be decoupled from the core,
+					// but for now for ease of migration we keep it here
+					$processor = ShardingPayload::getProcessors()[0];
+					$processor->execute('shard', $args);
+
+					$table = $args['table']['name'];
+					$tickerFn = static function (int $timerId) use ($processor, $table) {
+						$result = $processor->status($table);
+						if ($result !== true) {
+							return;
+						}
+
+						$processor::removeTicker($timerId);
+					};
+					$processor::addTicker($tickerFn, 1);
 				},
 			],
 		];
