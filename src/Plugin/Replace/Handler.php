@@ -78,9 +78,13 @@ final class Handler extends BaseHandlerWithClient
 	 */
 	private static function getFields(Client $manticoreClient, string $table): array {
 		$descResult = $manticoreClient
-			->sendRequest('DESC ' . $table)
-			->getResult();
+			->sendRequest('DESC ' . $table);
 
+		if ($descResult->hasError()) {
+			throw ManticoreSearchClientError::create($descResult->getError());
+		}
+
+		$descResult = $descResult->getResult();
 		if (is_array($descResult[0])) {
 			$fields = [];
 			/** @var array{Type:string, Properties:string, Field:string} $field */
