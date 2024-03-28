@@ -34,7 +34,7 @@
 		"react/socket": "^1.12",
 		"manticoresoftware/telemetry": "^0.1.19",
 		"symfony/dependency-injection": "^6.1",
-		"manticoresoftware/buddy-core": "dev-main",
+		"manticoresoftware/buddy-core": "dev-feature/workers",
 		"php-ds/php-ds": "^1.4",
 		"manticoresoftware/manticoresearch-backup": "^1.3"
 	},
@@ -42,7 +42,9 @@
 		"phpstan/phpstan": "^1.8",
 		"slevomat/coding-standard": "^8.5",
 		"squizlabs/php_codesniffer": "^3.7",
-		"phpunit/phpunit": "^9.5"
+		"phpunit/phpunit": "^9.5",
+		"kwn/php-rdkafka-stubs": "^2.2",
+		"swoole/ide-helper": "~5.0.0"
 	},
 	"repositories": [
 		{
