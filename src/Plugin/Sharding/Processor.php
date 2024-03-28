@@ -9,34 +9,37 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Sharding;
+namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Psr\Container\ContainerInterface;
 
-final class Process {
-	/** @var ContainerInterface */
-	protected static ContainerInterface $container;
+final class Processor extends BaseProcessor {
+	protected Operator $operator;
 
 	/**
-	 * Setter for container property
-	 *
-	 * @param ContainerInterface $container
-	 *  The container object to resolve the executor's dependencies in case such exist
+	 * Start the processor
 	 * @return void
-	 *  The CommandExecutorInterface to execute to process the final query
 	 */
-	public static function setContainer(ContainerInterface $container): void {
-		self::$container = $container;
+	public function start(): void {
+		Buddy::debugv('Starting sharding processor');
+
+		static::addTicker(
+			function () {
+				$this->execute('ping', []);
+			}, 1
+		);
+
+		$this->operator = new Operator($this->client, '');
+		parent::start();
 	}
 
 	/**
 	 * We execute this method in thread periodically
 	 * @return void
 	 */
-	public static function ping(): void {
-		$operator = static::getOperator();
+	public function ping(): void {
+		$operator = $this->operator;
 		$nodeId = $operator->node->id;
 		$hasSharding = $operator->hasSharding();
 		$sharded = $hasSharding ? 'yes' : 'no';
@@ -77,31 +80,21 @@ final class Process {
 	 * @param  mixed ...$args
 	 * @return void
 	 */
-	public static function shard(mixed ...$args): void {
+	public function shard(mixed ...$args): void {
 		/** @var array{table:array{cluster:string,name:string,structure:string,extra:string},shardCount:int,replicationFactor:int} $args */
-		static::getOperator()->shard(...$args);
+		$this->operator->shard(...$args);
 	}
 
 	/**
 	 * Validate the final status of the sharded table
-	 * @param  string $table
+	 * @param string $table
 	 * @return bool True when is done and false when need to repeat
 	 */
-	public static function status(string $table): bool {
-		return static::getOperator()->checkTableStatus($table);
-	}
-
-	/**
-	 * Helper to initialize and get operator for sharding
-	 * @return Operator
-	 */
-	private static function getOperator(): Operator {
-		static $operator;
-		if (!isset($operator)) {
-			/** @var Client */
-			$client = static::$container->get('manticoreClient');
-			$operator = new Operator($client, '');
+	public function status(string $table): bool {
+		// Do nothing, if we have no sharding
+		if (!$this->operator->hasSharding()) {
+			return true;
 		}
-		return $operator;
+		return $this->operator->checkTableStatus($table);
 	}
 }

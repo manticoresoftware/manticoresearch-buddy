@@ -10,7 +10,7 @@
  */
 
 use Ds\Set;
-use Manticoresearch\Buddy\Base\Sharding\Util;
+use Manticoresearch\Buddy\Base\Plugin\Sharding\Util;
 use PHPUnit\Framework\TestCase;
 
 class UtilTest extends TestCase {

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0b57ec4fb5e66b63bf751bb9391369d8",
+    "content-hash": "0347a1845837a45cf1b8a9a04b7c747f",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -811,21 +811,21 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-feature/workers",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "da0561a0ef495b04a145cbea79881298be220352"
+                "reference": "56c89a6daf2289d8db7fe60f017a9b052b22ea46"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/da0561a0ef495b04a145cbea79881298be220352",
-                "reference": "da0561a0ef495b04a145cbea79881298be220352",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/56c89a6daf2289d8db7fe60f017a9b052b22ea46",
+                "reference": "56c89a6daf2289d8db7fe60f017a9b052b22ea46",
                 "shasum": ""
             },
             "require": {
                 "composer/composer": "^2.5",
-                "manticoresoftware/php-sql-parser": "v4.6.0-patch4",
+                "manticoresoftware/php-sql-parser": "v4.6.0-patch3",
                 "php-ds/php-ds": "^1.4",
                 "symfony/console": "^6.2",
                 "symfony/dependency-injection": "^6.1"
@@ -836,7 +836,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -857,9 +856,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/workers"
             },
-            "time": "2024-03-28T14:03:36+00:00"
+            "time": "2024-03-29T12:03:28+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -975,16 +974,16 @@
         },
         {
             "name": "manticoresoftware/php-sql-parser",
-            "version": "v4.6.0-patch4",
+            "version": "v4.6.0-patch3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/PHP-SQL-Parser.git",
-                "reference": "0034db8c6e2ec62267c5b10d4aa2009eb2787956"
+                "reference": "8705a269bc37658210d8d4fe9438dc11c2325112"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/0034db8c6e2ec62267c5b10d4aa2009eb2787956",
-                "reference": "0034db8c6e2ec62267c5b10d4aa2009eb2787956",
+                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/8705a269bc37658210d8d4fe9438dc11c2325112",
+                "reference": "8705a269bc37658210d8d4fe9438dc11c2325112",
                 "shasum": ""
             },
             "require": {
@@ -1031,7 +1030,7 @@
                 "issues": "https://github.com/greenlion/PHP-SQL-Parser/issues",
                 "source": "https://github.com/greenlion/PHP-SQL-Parser"
             },
-            "time": "2024-03-28T13:51:47+00:00"
+            "time": "2024-03-21T00:07:55+00:00"
         },
         {
             "name": "manticoresoftware/telemetry",
@@ -3668,16 +3667,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.10.65",
+            "version": "1.10.66",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "3c657d057a0b7ecae19cb12db446bbc99d8839c6"
+                "reference": "94779c987e4ebd620025d9e5fdd23323903950bd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/3c657d057a0b7ecae19cb12db446bbc99d8839c6",
-                "reference": "3c657d057a0b7ecae19cb12db446bbc99d8839c6",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/94779c987e4ebd620025d9e5fdd23323903950bd",
+                "reference": "94779c987e4ebd620025d9e5fdd23323903950bd",
                 "shasum": ""
             },
             "require": {
@@ -3726,7 +3725,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-03-23T10:30:26+00:00"
+            "time": "2024-03-28T16:17:31+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
