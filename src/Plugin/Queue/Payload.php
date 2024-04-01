@@ -211,7 +211,8 @@ final class Payload extends BasePayload
 	}
 
 	/**
-	 * Should match SHOW MATERIALIZED VIEW
+	 * TODO broken now
+	 * Should match SHOW MATERIALIZED VIEWS
 	 *
 	 * @param array $parsedPayload
 	 * @return bool

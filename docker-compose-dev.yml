@@ -22,7 +22,7 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
   buddy:
     image: ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
-    container_name: manticore-buddy-kafka
+    container_name: manticore-buddy
     privileged: true
     tty: true
     entrypoint:
