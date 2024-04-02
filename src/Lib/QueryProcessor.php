@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Lib;
 use Exception;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Base\Plugin\Sharding\Payload as ShardingPayload;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
@@ -49,6 +50,9 @@ class QueryProcessor {
 
 	/** @var array<array{full:string,short:string,version:string}> */
 	protected static array $extraPlugins = [];
+
+	/** @var array<string,true> Here we keep disabled plugins map */
+	protected static array $disabledPlugins = [];
 
 	protected static SqlQueryParser $sqlQueryParser;
 
@@ -121,9 +125,10 @@ class QueryProcessor {
 	 * Run start method of all plugin handlers
 	 * Run start method of all plugin handlers
 	 * @param ?callable $fn
+	 * @param array<string> $filter
 	 * @return void
 	 */
-	public static function startPlugins(?callable $fn = null): void {
+	public static function startPlugins(?callable $fn = null, array $filter = []): void {
 		/** @var HTTPClient $client ] */
 		$client = static::getObjFromContainer('manticoreClient');
 		static::iteratePluginProcessors(
@@ -133,27 +138,55 @@ class QueryProcessor {
 				}
 				$processor->setClient($client);
 				$processor->start();
-			}
+			}, $filter
 		);
 	}
 
 	/**
 	 * Run stop method of all plugin handlers
+	 * @param array<string> $filter
 	 * @return void
 	 */
-	public static function stopPlugins(): void {
+	public static function stopPlugins(array $filter = []): void {
 		static::iteratePluginProcessors(
 			static function (BaseProcessor $processor) {
 				$processor->stop();
-			}
+			}, $filter
+		);
+	}
+
+	/**
+	 * Resume plugins after pause
+	 * @param array<string> $filter
+	 * @return void
+	 */
+	public static function resumePlugins(array $filter = []): void {
+		static::iteratePluginProcessors(
+			static function (BaseProcessor $processor) {
+				$processor->execute('resume');
+			}, $filter
+		);
+	}
+
+	/**
+	 * Run stop method of all plugin handlers
+	 * @param array<string> $filter
+	 * @return void
+	 */
+	public static function pausePlugins(array $filter = []): void {
+		static::iteratePluginProcessors(
+			static function (BaseProcessor $processor) {
+				$processor->execute('pause');
+			}, $filter
 		);
 	}
 
 	/**
 	 * @param  callable $fn
+	 * @param array<string> $filter If we pass name we filter only for this plugin
 	 * @return void
 	 */
-	protected static function iteratePluginProcessors(callable $fn): void {
+	protected static function iteratePluginProcessors(callable $fn, array $filter = []): void {
 		$list = [
 			[Pluggable::CORE_NS_PREFIX, static::$corePlugins],
 			[Pluggable::EXTRA_NS_PREFIX, static::$extraPlugins],
@@ -161,6 +194,10 @@ class QueryProcessor {
 		];
 		foreach ($list as [$prefix, $plugins]) {
 			foreach ($plugins as $plugin) {
+				// If we have filter, we
+				if ($filter && !in_array($plugin['full'], $filter)) {
+					continue;
+				}
 				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
 				$pluginPayloadClass = "$pluginPrefix\\Payload";
 				array_map($fn, $pluginPayloadClass::getProcessors());
@@ -269,9 +306,16 @@ class QueryProcessor {
 				/** @var BasePayload $pluginPayloadClass */
 				$pluginPayloadClass = "$pluginPrefix\\Payload";
 				$pluginPayloadClass::setParser(static::$sqlQueryParser);
-				if ($pluginPayloadClass::hasMatch($request)) {
-					return $pluginPrefix;
+				if (!$pluginPayloadClass::hasMatch($request)) {
+					continue;
 				}
+
+				// Do not execute in case the plugin is disabled
+				if (isset(static::$disabledPlugins[$plugin['full']])) {
+					GenericError::throw("Plugin '{$plugin['short']}' is disabled");
+				}
+
+				return $pluginPrefix;
 			}
 		}
 
@@ -289,7 +333,7 @@ class QueryProcessor {
 			[
 				'manticoresoftware/buddy-plugin-plugin',
 				'installed',
-				function () {
+				static function () {
 					static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
 				},
 			],
@@ -297,15 +341,39 @@ class QueryProcessor {
 			[
 				'manticoresoftware/buddy-plugin-plugin',
 				'deleted',
-				function () {
+				static function () {
 					static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
+				},
+			],
+			// Happens when we disable the plugin
+			[
+				'manticoresoftware/buddy-plugin-plugin',
+				'disabled',
+				static function (string $name) {
+					Buddy::debug("Plugin '$name' has been disabled");
+					static::$disabledPlugins[$name] = true;
+					static::pausePlugins([$name]);
+				},
+			],
+			// Happens when we enable the plugin
+			[
+				'manticoresoftware/buddy-plugin-plugin',
+				'enabled',
+				static function (string $name) {
+					Buddy::debug("Plugin '$name' has been enabled");
+					if (!isset(static::$disabledPlugins[$name])) {
+						return;
+					}
+
+					unset(static::$disabledPlugins[$name]);
+					static::resumePlugins([$name]);
 				},
 			],
 			// Happens when we run create table with shards in options
 			[
 				'manticoresoftware/buddy-plugin-modify-table',
 				'shard',
-				function (array $args) {
+				static function (array $args) {
 					// TODO: remove the reference to the plugin,
 					// cuz plugins should be decoupled from the core,
 					// but for now for ease of migration we keep it here
@@ -313,15 +381,7 @@ class QueryProcessor {
 					$processor->execute('shard', $args);
 
 					$table = $args['table']['name'];
-					$tickerFn = static function (int $timerId) use ($processor, $table) {
-						$result = $processor->status($table);
-						if ($result !== true) {
-							return;
-						}
-
-						$processor::removeTicker($timerId);
-					};
-					$processor::addTicker($tickerFn, 1);
+					$processor->addTicker(fn() => $processor->status($table), 1);
 				},
 			],
 		];

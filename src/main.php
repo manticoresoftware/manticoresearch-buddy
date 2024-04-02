@@ -116,12 +116,11 @@ $server->beforeStart(
 	// We need to run it outside of couroutine so do it before
 	->beforeStart(
 		static function () use ($server) {
-			QueryProcessor::startPlugins(fn($p) => $server->addProcess($p));
-		}
-	)
-	->beforeStop(
-		static function () {
-			QueryProcessor::stopPlugins();
+			QueryProcessor::startPlugins(
+				static function ($p) use (&$server) {
+					$server->addProcess($p);
+				}
+			);
 		}
 	)
 	->beforeStop(

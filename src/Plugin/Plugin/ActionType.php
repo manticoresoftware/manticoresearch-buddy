@@ -14,4 +14,6 @@ enum ActionType {
 	case Create;
 	case Show;
 	case Delete;
+	case Disable;
+	case Enable;
 }

@@ -10,8 +10,7 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\Plugin;
 
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -19,10 +18,7 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Strings;
 use RuntimeException;
 
-final class Handler extends BaseHandler {
-  /** @var HTTPClient $manticoreClient */
-	protected HTTPClient $manticoreClient;
-
+final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Initialize the executor
 	 *
@@ -89,6 +85,12 @@ final class Handler extends BaseHandler {
 						->column('Version', Column::String)
 						->column('Type', Column::String)
 						->column('Info', Column::String);
+
+				case 'Disable':
+					return TaskResult::none();
+
+				case 'Enable':
+					return TaskResult::none();
 			}
 		};
 
@@ -97,30 +99,16 @@ final class Handler extends BaseHandler {
 			ActionType::Create => fn() => static::processHook('installed'),
 			ActionType::Delete => fn() => static::processHook('deleted'),
 			ActionType::Show => fn() => null,
+			ActionType::Disable => fn() =>
+				static::processHook('disabled', [trim($this->payload->package ?? '', "'")]),
+			ActionType::Enable => fn() =>
+				static::processHook('enabled', [trim($this->payload->package ?? '', "'")]),
 		};
 
 		return Task::create(
 			$taskFn, [$this->payload]
 		)->on('success', $successFn)
 		 ->run();
-	}
-
-	/**
-	 * @return array<string>
-	 */
-	public function getProps(): array {
-		return ['manticoreClient'];
-	}
-
-	/**
-	 * Instantiating the http client to execute requests to Manticore server
-	 *
-	 * @param HTTPClient $client
-	 * $return HTTPClient
-	 */
-	public function setManticoreClient(HTTPClient $client): HTTPClient {
-		$this->manticoreClient = $client;
-		return $this->manticoreClient;
 	}
 
 	/**

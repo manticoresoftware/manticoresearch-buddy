@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class Processor extends BaseProcessor {
 	protected Operator $operator;
+	protected int $tickerId;
 
 	/**
 	 * Start the processor
@@ -23,22 +24,25 @@ final class Processor extends BaseProcessor {
 	 */
 	public function start(): void {
 		Buddy::debugv('Starting sharding processor');
-
-		static::addTicker(
-			function () {
-				$this->execute('ping', []);
-			}, 1
-		);
-
 		$this->operator = new Operator($this->client, '');
 		parent::start();
+		$this->tickerId = $this->addTicker(fn() => $this->execute('ping'), 1);
+	}
+
+	/**
+	 * Stop the processor
+	 * @return void
+	 */
+	public function stop(): void {
+		Buddy::debugv('Stopping sharding processor');
+		parent::stop();
 	}
 
 	/**
 	 * We execute this method in thread periodically
-	 * @return void
+	 * @return bool
 	 */
-	public function ping(): void {
+	public function ping(): bool {
 		$operator = $this->operator;
 		$nodeId = $operator->node->id;
 		$hasSharding = $operator->hasSharding();
@@ -48,14 +52,14 @@ final class Processor extends BaseProcessor {
 
 		// Do nothing when sharding is disabled
 		if (!$operator->hasSharding()) {
-			return;
+			return false;
 		}
 
 		// Do nothing if the cluster is not synced yet
 		$cluster = $operator->getCluster();
 		if (!$cluster->isActive()) {
 			Buddy::info('Cluster is syncing');
-			return;
+			return false;
 		}
 
 		$operator->processQueue();
@@ -68,11 +72,13 @@ final class Processor extends BaseProcessor {
 		$master = $operator->state->get('master');
 		Buddy::debugv("Master: $master");
 		if ($master !== $nodeId) {
-			return;
+			return false;
 		}
 
 		// Next only on master
 		$operator->checkBalance();
+
+		return false;
 	}
 
 	/**

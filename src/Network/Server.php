@@ -158,7 +158,6 @@ final class Server {
 	 */
 	public function addProcess(Process $process): static {
 		$this->socket->addProcess($process);
-
 		$this->onStart(
 			static function () use ($process) {
 				swoole_event_add(
@@ -173,7 +172,7 @@ final class Server {
 							if (is_string($output)) {
 								echo $output;
 							}
-						} catch (Throwable) {
+						} catch (Throwable $t) {
 						}
 					}
 				);
