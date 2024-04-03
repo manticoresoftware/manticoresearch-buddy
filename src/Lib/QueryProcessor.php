@@ -123,36 +123,26 @@ class QueryProcessor {
 
 	/**
 	 * Run start method of all plugin handlers
-	 * Run start method of all plugin handlers
+	 * We do not need stop cuz swoole manages it for us
 	 * @param ?callable $fn
 	 * @param array<string> $filter
-	 * @return void
+	 * @return array<array{0:callable,1:integer}>>
 	 */
-	public static function startPlugins(?callable $fn = null, array $filter = []): void {
+	public static function startPlugins(?callable $fn = null, array $filter = []): array {
 		/** @var HTTPClient $client ] */
 		$client = static::getObjFromContainer('manticoreClient');
+		$tickers = [];
 		static::iteratePluginProcessors(
-			static function (BaseProcessor $processor) use ($fn, $client) {
+			static function (BaseProcessor $processor) use ($fn, $client, &$tickers) {
 				if (isset($fn)) {
 					$fn($processor->getProcess()->process);
 				}
 				$processor->setClient($client);
-				$processor->start();
+				$tickers += $processor->start();
 			}, $filter
 		);
-	}
 
-	/**
-	 * Run stop method of all plugin handlers
-	 * @param array<string> $filter
-	 * @return void
-	 */
-	public static function stopPlugins(array $filter = []): void {
-		static::iteratePluginProcessors(
-			static function (BaseProcessor $processor) {
-				$processor->stop();
-			}, $filter
-		);
+		return $tickers;
 	}
 
 	/**
