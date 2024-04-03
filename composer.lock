@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0347a1845837a45cf1b8a9a04b7c747f",
+    "content-hash": "0b57ec4fb5e66b63bf751bb9391369d8",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -811,21 +811,21 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-feature/workers",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "55df7f4fbb5bf297694e87b1f732f4a28a33633f"
+                "reference": "3fb7e043f427f1b785eb9879f20fe45b35928252"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/55df7f4fbb5bf297694e87b1f732f4a28a33633f",
-                "reference": "55df7f4fbb5bf297694e87b1f732f4a28a33633f",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/3fb7e043f427f1b785eb9879f20fe45b35928252",
+                "reference": "3fb7e043f427f1b785eb9879f20fe45b35928252",
                 "shasum": ""
             },
             "require": {
                 "composer/composer": "^2.5",
-                "manticoresoftware/php-sql-parser": "v4.6.0-patch3",
+                "manticoresoftware/php-sql-parser": "v4.6.0-patch4",
                 "php-ds/php-ds": "^1.4",
                 "symfony/console": "^6.2",
                 "symfony/dependency-injection": "^6.1"
@@ -836,6 +836,7 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -856,9 +857,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/workers"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2024-04-03T11:43:04+00:00"
+            "time": "2024-04-03T12:13:43+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -974,16 +975,16 @@
         },
         {
             "name": "manticoresoftware/php-sql-parser",
-            "version": "v4.6.0-patch3",
+            "version": "v4.6.0-patch4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/PHP-SQL-Parser.git",
-                "reference": "8705a269bc37658210d8d4fe9438dc11c2325112"
+                "reference": "0034db8c6e2ec62267c5b10d4aa2009eb2787956"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/8705a269bc37658210d8d4fe9438dc11c2325112",
-                "reference": "8705a269bc37658210d8d4fe9438dc11c2325112",
+                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/0034db8c6e2ec62267c5b10d4aa2009eb2787956",
+                "reference": "0034db8c6e2ec62267c5b10d4aa2009eb2787956",
                 "shasum": ""
             },
             "require": {
@@ -1030,7 +1031,7 @@
                 "issues": "https://github.com/greenlion/PHP-SQL-Parser/issues",
                 "source": "https://github.com/greenlion/PHP-SQL-Parser"
             },
-            "time": "2024-03-21T00:07:55+00:00"
+            "time": "2024-03-28T13:51:47+00:00"
         },
         {
             "name": "manticoresoftware/telemetry",
