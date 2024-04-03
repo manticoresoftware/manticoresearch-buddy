@@ -11,12 +11,14 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
+use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\CreateViewHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
+use PHPSQLParser\PHPSQLParser;
 
 final class CreateKafka extends BaseCreateSourceHandler
 {
@@ -71,12 +73,15 @@ final class CreateKafka extends BaseCreateSourceHandler
 			}
 		}
 
-		self::cleanOrphanViews($options->name, $options->numConsumers, $manticoreClient);
+		self::handleOrphanViews($options->name, $options->numConsumers, $manticoreClient);
 
 		return TaskResult::none();
 	}
 
-	public static function cleanOrphanViews(string $sourceName, int $maxIndex, Client $client) {
+	/**
+	 * @throws ManticoreSearchClientError
+	 */
+	public static function handleOrphanViews(string $sourceName, int $maxIndex, Client $client): void {
 		$viewsTable = Payload::VIEWS_TABLE_NAME;
 		if (!$client->hasTable($viewsTable)) {
 			return;
@@ -91,14 +96,48 @@ final class CreateKafka extends BaseCreateSourceHandler
 			throw ManticoreSearchClientError::create((string)$request->getError());
 		}
 
+		$views = $request->getResult()[0]['data'];
+		$viewsCount = sizeof($views);
+
+		if ($viewsCount > 0 && $viewsCount < $maxIndex) {
+			$originalQuery = (string)$views[0]['original_query'];
+			$viewName = (string)$views[0]['name'];
+
+			$parser = new PHPSQLParser($originalQuery);
+			$destinationTableName = $parser->parsed['VIEW']['to']['no_quotes']['parts'][0];
+			unset($parser->parsed['CREATE'], $parser->parsed['VIEW']);
+
+			CreateViewHandler::createViewRecords(
+				$client, $viewName, $parser->parsed,
+				$sourceName, $originalQuery, $destinationTableName,
+				$maxIndex, $viewsCount, 1
+			);
+		} else {
+			$ids = self::getOrphanIds($views, $sourceName, $maxIndex);
+
+			if ($ids === []) {
+				return;
+			}
+
+			$ids = implode(',', $ids);
+			Buddy::debugv("Remove orphan views records ids ($ids)");
+			$sql = /** @lang manticore */
+				"DELETE FROM $viewsTable WHERE id in ($ids)";
+			$rawResult = $client->sendRequest($sql);
+			if ($rawResult->hasError()) {
+				throw ManticoreSearchClientError::create($rawResult->getError());
+			}
+		}
+	}
+
+
+	public static function getOrphanIds($views, $sourceName, $maxIndex): array {
 		$ids = [];
-		foreach ($request->getResult()[0]['data'] as $orphanView) {
+		foreach ($views as $orphanView) {
 			$viewSourceName = explode('_', $orphanView['source_name']);
 			// remove index from array, leave only name
 			$index = array_pop($viewSourceName);
 			$viewSourceName = implode('_', $viewSourceName);
-
-			echo "-------+++++------>$index < $maxIndex \n";
 			if ($viewSourceName !== $sourceName || $index < $maxIndex) {
 				continue;
 			}
@@ -106,20 +145,8 @@ final class CreateKafka extends BaseCreateSourceHandler
 			$ids[] = $orphanView['id'];
 		}
 
-		if ($ids === []) {
-			return;
-		}
-
-		$ids = implode(',', $ids);
-		Buddy::debugv("Remove orphan views records ids ($ids)");
-		$sql = /** @lang manticore */
-			"DELETE FROM $viewsTable WHERE id in ($ids)";
-		$rawResult = $client->sendRequest($sql);
-		if ($rawResult->hasError()) {
-			throw ManticoreSearchClientError::create($rawResult->getError());
-		}
+		return $ids;
 	}
-
 
 	public static function parseOptions(Payload $payload): \stdClass {
 		$result = new \stdClass();

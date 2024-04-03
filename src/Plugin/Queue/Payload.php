@@ -117,7 +117,6 @@ final class Payload extends BasePayload
 
 		// TODO case insensitive queries
 		// TODO Aliases
-		// TODO response from Dima about stop worker
 
 		return (
 			self::isCreateSourceMatch($parsedPayload) ||
@@ -211,7 +210,6 @@ final class Payload extends BasePayload
 	}
 
 	/**
-	 * TODO broken now
 	 * Should match SHOW MATERIALIZED VIEWS
 	 *
 	 * @param array $parsedPayload
@@ -221,8 +219,8 @@ final class Payload extends BasePayload
 	private static function isViewMaterializedViewsMatch(array $parsedPayload): bool {
 		return (isset($parsedPayload['SHOW'][0]['base_expr']) &&
 			isset($parsedPayload['SHOW'][1]['base_expr']) &&
-			$parsedPayload['SHOW'][0]['base_expr'] === self::TYPE_MATERLIALIZED &&
-			$parsedPayload['SHOW'][1]['base_expr'] === self::TYPE_VIEWS);
+			strtolower($parsedPayload['SHOW'][0]['base_expr']) === self::TYPE_MATERLIALIZED &&
+			strtolower($parsedPayload['SHOW'][1]['base_expr']) === self::TYPE_VIEWS);
 	}
 
 	/**

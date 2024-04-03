@@ -12,13 +12,14 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
-use Manticoresearch\Buddy\Base\Plugin\Queue\QueueProcess;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
+use PHPSQLParser\PHPSQLCreator;
 
 final class CreateViewHandler extends BaseHandlerWithClient
 {
@@ -73,31 +74,20 @@ final class CreateViewHandler extends BaseHandlerWithClient
 			}
 
 			unset($payload->parsedPayload['CREATE'], $payload->parsedPayload['VIEW']);
+
+
+			$newViews = self::createViewRecords(
+				$manticoreClient, $viewName, $payload->parsedPayload,
+				$sourceName, $payload->originQuery,
+				$destinationTableName, sizeof($sourceRecords[0]['data'])
+			);
+
 			foreach ($sourceRecords[0]['data'] as $source) {
-				$payload->parsedPayload['FROM'][0]['table'] = $source['buffer_table'];
-				$payload->parsedPayload['FROM'][0]['no_quotes']['parts'] = [$source['buffer_table']];
-				$payload->parsedPayload['FROM'][0]['base_expr'] = $source['buffer_table'];
-
-				$payload::$sqlQueryParser::setParsedPayload($payload->parsedPayload);
-
-				$sourceFullName = $source['full_name'];
-				$escapedQuery = str_replace("'", "\\'", $payload::$sqlQueryParser::getCompletedPayload());
-				$escapedOriginalQuery = str_replace("'", "\\'", $payload->originQuery);
-
-				$sql = /** @lang ManticoreSearch */
-					'INSERT INTO ' . Payload::VIEWS_TABLE_NAME .
-					'(id, name, source_name, destination_name, query, original_query, suspended) VALUES ' .
-					"(0,'$viewName','$sourceFullName', '$destinationTableName', '$escapedQuery','$escapedOriginalQuery', 0)";
-
-				$response = $manticoreClient->sendRequest($sql);
-				if ($response->hasError()) {
-					throw ManticoreSearchClientError::create($response->getError());
-				}
-
-				$source['destination_name'] = $destinationTableName;
-				$source['query'] = $escapedQuery;
+				$source['destination_name'] = $newViews[$source['full_name']]['destination_name'];
+				$source['query'] = $newViews[$source['full_name']]['query'];
 				$this->payload::$processor->execute('runWorker', [$source]);
 			}
+
 
 			return TaskResult::none();
 		};
@@ -105,6 +95,48 @@ final class CreateViewHandler extends BaseHandlerWithClient
 		return Task::create($taskFn)->run();
 	}
 
+	public static function createViewRecords(
+		Client $client,
+		string $viewName,
+		array  $parsedQuery,
+		string $sourceName,
+		string $originalQuery,
+		string $destinationTableName,
+		int    $iterations,
+		$startFrom = 0,
+		$suspended = 0
+	) {
+
+		$results = [];
+
+		Buddy::debugv("$startFrom -> $iterations");
+		for ($i = $startFrom; $i < $iterations; $i++) {
+			$bufferTableName = "_buffer_{$sourceName}_$i";
+			$sourceFullName = "{$sourceName}_$i";
+
+			$parsedQuery['FROM'][0]['table'] = $bufferTableName;
+			$parsedQuery['FROM'][0]['no_quotes']['parts'] = [$bufferTableName];
+			$parsedQuery['FROM'][0]['base_expr'] = $bufferTableName;
+
+			$escapedQuery = str_replace("'", "\\'", (new PHPSQLCreator())->create($parsedQuery));
+			$escapedOriginalQuery = str_replace("'", "\\'", $originalQuery);
+
+			$sql = /** @lang ManticoreSearch */
+				'INSERT INTO ' . Payload::VIEWS_TABLE_NAME .
+				'(id, name, source_name, destination_name, query, original_query, suspended) VALUES ' .
+				"(0,'$viewName','$sourceFullName', '$destinationTableName','$escapedQuery','$escapedOriginalQuery', $suspended)";
+
+			$response = $client->sendRequest($sql);
+			if ($response->hasError()) {
+				throw ManticoreSearchClientError::create($response->getError());
+			}
+
+			$results[$sourceFullName]['destination_name'] = $destinationTableName;
+			$results[$sourceFullName]['query'] = $escapedQuery;
+		}
+
+		return $results;
+	}
 
 	/**
 	 * @param string $viewName
@@ -143,7 +175,8 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 		$sql = /** @lang ManticoreSearch */
 			'CREATE TABLE ' . Payload::VIEWS_TABLE_NAME .
-			' (id bigint, name text, source_name text, destination_name text, query text, original_query text, suspended bool)';
+			' (id bigint, name text, source_name text, destination_name text, ' .
+			'query text, original_query text, suspended bool)';
 
 		$request = $manticoreClient->sendRequest($sql);
 		if ($request->hasError()) {
