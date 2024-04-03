@@ -13,11 +13,10 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Exception;
 use Manticoresearch\Buddy\Core\Error\GenericError;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
-use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -115,8 +114,9 @@ final class Payload extends BasePayload
 
 		echo json_encode($parsedPayload) . "\n";
 
-		// TODO case insensitive queries
 		// TODO Aliases
+		// TODO batch option isn't parsed in create smth query
+		// TODO check view with WHERE
 
 		return (
 			self::isCreateSourceMatch($parsedPayload) ||
@@ -236,8 +236,8 @@ final class Payload extends BasePayload
 		return (isset($parsedPayload['SHOW'][0]['base_expr']) &&
 			isset($parsedPayload['SHOW'][1]['base_expr']) &&
 			!empty($parsedPayload['SHOW'][2]['no_quotes']['parts'][0]) &&
-			$parsedPayload['SHOW'][0]['base_expr'] === self::TYPE_MATERLIALIZED &&
-			$parsedPayload['SHOW'][1]['base_expr'] === self::TYPE_VIEW);
+			strtolower($parsedPayload['SHOW'][0]['base_expr']) === self::TYPE_MATERLIALIZED &&
+			strtolower($parsedPayload['SHOW'][1]['base_expr']) === self::TYPE_VIEW);
 	}
 
 
@@ -250,7 +250,7 @@ final class Payload extends BasePayload
 	 */
 	private static function isViewSourcesMatch(array $parsedPayload): bool {
 		return (isset($parsedPayload['SHOW'][0]['base_expr']) &&
-			$parsedPayload['SHOW'][0]['base_expr'] === self::TYPE_SOURCES);
+			strtolower($parsedPayload['SHOW'][0]['base_expr']) === self::TYPE_SOURCES);
 	}
 
 	/**
@@ -264,7 +264,7 @@ final class Payload extends BasePayload
 	private static function isGetSourceMatch(array $parsedPayload): bool {
 		return (
 			isset($parsedPayload['SHOW'][0]['base_expr']) &&
-			$parsedPayload['SHOW'][0]['base_expr'] === self::TYPE_SOURCE &&
+			strtolower($parsedPayload['SHOW'][0]['base_expr']) === self::TYPE_SOURCE &&
 			!empty($parsedPayload['SHOW'][1]['no_quotes']['parts'][0])
 		);
 	}
@@ -283,7 +283,7 @@ final class Payload extends BasePayload
 		return (
 			isset($parsedPayload['DROP']['expr_type']) &&
 			isset($parsedPayload['DROP']['sub_tree'][1]['sub_tree'][0]['no_quotes']['parts'][0]) &&
-			$parsedPayload['DROP']['expr_type'] === self::TYPE_SOURCE
+			strtolower($parsedPayload['DROP']['expr_type']) === self::TYPE_SOURCE
 		);
 	}
 
@@ -304,8 +304,8 @@ final class Payload extends BasePayload
 			isset($parsedPayload['DROP']['sub_tree'][0]) &&
 			isset($parsedPayload['DROP']['sub_tree'][1]) &&
 			!empty($parsedPayload['DROP']['sub_tree'][2]['sub_tree'][0]['no_quotes']['parts']) &&
-			$parsedPayload['DROP']['sub_tree'][0]['base_expr'] === self::TYPE_MATERLIALIZED &&
-			$parsedPayload['DROP']['sub_tree'][1]['base_expr'] === self::TYPE_VIEW
+			strtolower($parsedPayload['DROP']['sub_tree'][0]['base_expr']) === self::TYPE_MATERLIALIZED &&
+			strtolower($parsedPayload['DROP']['sub_tree'][1]['base_expr']) === self::TYPE_VIEW
 		);
 	}
 
@@ -335,7 +335,7 @@ final class Payload extends BasePayload
 	 * @throws Exception
 	 */
 	public function getHandlerClassName(): string {
-		return __NAMESPACE__ . '\\' . match (static::$type) {
+		$handlerClassName = __NAMESPACE__ . '\\' . match (static::$type) {
 				self::REQUEST_TYPE_CREATE . self::TYPE_SOURCE => self::parseSourceType(
 					static::$sqlQueryParser::getParsedPayload()['SOURCE']['options']
 				),
@@ -348,7 +348,9 @@ final class Payload extends BasePayload
 				self::REQUEST_TYPE_DELETE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\DropViewHandler',
 				self::REQUEST_TYPE_ALTER . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\AlterViewHandler',
 				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
-		};
+			};
+		Buddy::debugv("Handler class: $handlerClassName");
+		return $handlerClassName;
 	}
 
 	public static function parseSourceType(array $options): string {

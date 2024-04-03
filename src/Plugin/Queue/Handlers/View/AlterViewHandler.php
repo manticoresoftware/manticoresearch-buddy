@@ -12,9 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
-use Manticoresearch\Buddy\Base\Plugin\Queue\QueueProcess;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -50,9 +48,9 @@ final class AlterViewHandler extends BaseHandlerWithClient
 				return TaskResult::none();
 			}
 
-			$name = $payload->parsedPayload['VIEW']['no_quotes']['parts'][0] ?? '';
+			$name = strtolower($payload->parsedPayload['VIEW']['no_quotes']['parts'][0] ?? '');
 
-			$option = $payload->parsedPayload['VIEW']['options'][0]['sub_tree'][0]['base_expr'];
+			$option = strtolower($payload->parsedPayload['VIEW']['options'][0]['sub_tree'][0]['base_expr']);
 			$value = $payload->parsedPayload['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
 
 			$sql = /** @lang manticore */
@@ -79,9 +77,9 @@ final class AlterViewHandler extends BaseHandlerWithClient
 				}
 
 				if ($value === '0') {
-						$instance = $instance->getResult()[0]['data'][0];
-						$instance['destination_name'] = $row['destination_name'];
-						$instance['query'] = $row['query'];
+					$instance = $instance->getResult()[0]['data'][0];
+					$instance['destination_name'] = $row['destination_name'];
+					$instance['query'] = $row['query'];
 
 					$this->payload::$processor->execute('runWorker', [$instance]);
 				} else {

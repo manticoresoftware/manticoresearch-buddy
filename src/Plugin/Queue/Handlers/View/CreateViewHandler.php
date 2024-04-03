@@ -41,14 +41,14 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 		/**
 		 * @return TaskResult
-		 * @throws ManticoreSearchClientError
+		 * @throws ManticoreSearchClientError|GenericError
 		 */
 		$taskFn = function (): TaskResult {
 			$payload = $this->payload;
 			$manticoreClient = $this->manticoreClient;
-			$sourceName = $payload->parsedPayload['FROM'][0]['table'];
-			$viewName = $payload->parsedPayload['VIEW']['no_quotes']['parts'][0];
-			$destinationTableName = $payload->parsedPayload['VIEW']['to']['no_quotes']['parts'][0];
+			$sourceName = strtolower($payload->parsedPayload['FROM'][0]['table']);
+			$viewName = strtolower($payload->parsedPayload['VIEW']['no_quotes']['parts'][0]);
+			$destinationTableName = strtolower($payload->parsedPayload['VIEW']['to']['no_quotes']['parts'][0]);
 
 			if (isset($payload->parsedPayload['LIMIT'])) {
 				throw GenericError::create("Can't use query with limit");
