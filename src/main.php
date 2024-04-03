@@ -116,16 +116,15 @@ $server->beforeStart(
 	// We need to run it outside of couroutine so do it before
 	->beforeStart(
 		static function () use ($server) {
-			QueryProcessor::startPlugins(
+			$tickers = QueryProcessor::startPlugins(
 				static function ($p) use (&$server) {
 					$server->addProcess($p);
 				}
 			);
-		}
-	)
-	->beforeStop(
-		static function () {
-			QueryProcessor::stopPlugins();
+
+			foreach ($tickers as [$fn, $period]) {
+				$server->addTicker($fn, $period);
+			}
 		}
 	)
 	->beforeStart(

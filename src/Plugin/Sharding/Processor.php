@@ -20,13 +20,12 @@ final class Processor extends BaseProcessor {
 
 	/**
 	 * Start the processor
-	 * @return void
+	 * @return array<array{0:callable,1:int}>
 	 */
-	public function start(): void {
+	public function start(): array {
 		Buddy::debugv('Starting sharding processor');
 		$this->operator = new Operator($this->client, '');
-		parent::start();
-		$this->tickerId = $this->addTicker(fn() => $this->execute('ping'), 1);
+		return [[fn() => $this->execute('ping'), 1]];
 	}
 
 	/**
