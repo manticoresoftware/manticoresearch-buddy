@@ -118,7 +118,8 @@ final class CreateViewHandler extends BaseHandlerWithClient
 			$parsedQuery['FROM'][0]['no_quotes']['parts'] = [$bufferTableName];
 			$parsedQuery['FROM'][0]['base_expr'] = $bufferTableName;
 
-			$escapedQuery = str_replace("'", "\\'", (new PHPSQLCreator())->create($parsedQuery));
+			$query = (new PHPSQLCreator())->create($parsedQuery);
+			$escapedQuery = str_replace("'", "\\'", $query);
 			$escapedOriginalQuery = str_replace("'", "\\'", $originalQuery);
 
 			$sql = /** @lang ManticoreSearch */
@@ -132,7 +133,7 @@ final class CreateViewHandler extends BaseHandlerWithClient
 			}
 
 			$results[$sourceFullName]['destination_name'] = $destinationTableName;
-			$results[$sourceFullName]['query'] = $escapedQuery;
+			$results[$sourceFullName]['query'] = $query;
 		}
 
 		return $results;
