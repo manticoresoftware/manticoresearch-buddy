@@ -36,7 +36,7 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 		/**
 		 * @param string $name
 		 * @param string $type
-		 * @param array $fields
+		 * @param array<string> $fields
 		 * @param string $tableName
 		 * @param Client $manticoreClient
 		 * @return TaskResult
@@ -65,7 +65,7 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 
 			$rawResult = $rawResult->getResult();
 
-			if (empty($rawResult[0]['data'])) {
+			if (is_array($rawResult[0]) && empty($rawResult[0]['data'])) {
 				return TaskResult::none();
 			}
 
@@ -83,7 +83,7 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 				$resultData[$field] = $rawResult[0]['data'][0][$field];
 			}
 
-			return static::prepareTaskResult($resultData, $type, $fields);
+			return self::prepareTaskResult($resultData, $type, $fields);
 		};
 
 		return Task::create(
@@ -92,6 +92,12 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 		)->run();
 	}
 
+	/**
+	 * @param array<string, string> $resultData
+	 * @param string $type
+	 * @param array<string> $fields
+	 * @return TaskResult
+	 */
 	private static function prepareTaskResult(array $resultData, string $type, array $fields): TaskResult {
 		$taskResult = TaskResult::withData([$resultData])
 			->column($type, Column::String)
@@ -107,7 +113,10 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 		return $taskResult;
 	}
 
-	abstract protected function getFields();
+	/**
+	 * @return array<string>
+	 */
+	abstract protected function getFields(): array;
 
 	abstract protected function getName(Payload $payload): string;
 

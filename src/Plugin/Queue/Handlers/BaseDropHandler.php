@@ -30,6 +30,7 @@ abstract class BaseDropHandler extends BaseHandlerWithClient
 
 		/**
 		 * @param string $name
+		 * @param string $tableName
 		 * @return TaskResult
 		 */
 		$taskFn = function (string $name, string $tableName): TaskResult {
@@ -38,7 +39,7 @@ abstract class BaseDropHandler extends BaseHandlerWithClient
 				return TaskResult::none();
 			}
 
-			return TaskResult::withTotal($this->processDrop($name, $tableName, $manticoreClient));
+			return TaskResult::withTotal($this->processDrop($name, $tableName));
 		};
 
 		return Task::create(
