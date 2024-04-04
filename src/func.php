@@ -26,6 +26,7 @@ function buddy_metric(string $name, int|float $value) {
 	if (!is_telemetry_enabled()) {
 		return;
 	}
+
 	MetricThread::instance()->execute('add', [$name, $value]);
 }
 

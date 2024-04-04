@@ -52,7 +52,7 @@ final class Handler extends BaseHandlerWithClient {
 			$columnFnMap = [];
 			foreach ($descResult[0]['data'] as $n => ['Field' => $field, 'Type' => $type]) {
 				$columnFnMap[$n] = match ($type) {
-					'mva', 'mva64' => function ($v) {
+					'mva', 'mva64', 'float_vector' => function ($v) {
 						return '(' . trim((string)$v, "'") . ')';
 					},
 					default => function ($v) {

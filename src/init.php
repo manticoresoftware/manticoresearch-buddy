@@ -67,6 +67,7 @@ Pluggable::setCorePlugins(
 	'manticoresoftware/buddy-plugin-knn',
 	'manticoresoftware/buddy-plugin-replace',
 	'manticoresoftware/buddy-plugin-queue',
+	'manticoresoftware/buddy-plugin-sharding',
 	]
 );
 MetricThread::setContainer($container);

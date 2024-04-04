@@ -79,7 +79,9 @@ final class Metric {
 		$this->telemetry = new TelemetryMetric($labels);
 		$this->snapshotTime = time();
 		[$this->dataDir, $this->binlogDir] = $this->getVolumeDirs();
-		$this->collectVolumeMetrics = !!$this->dataDir;
+
+		// Currently we do not have datadir available inside Docker on Windows
+		$this->collectVolumeMetrics = is_dir($this->dataDir) && is_readable($this->dataDir);
 	}
 
 	/**

@@ -46,6 +46,7 @@ final class Handler extends BaseHandlerWithClient
 			static::checkStoredFields($fields);
 
 			$baseValues = static::getRecordValues($client, $payload, $fields);
+			$payload->set = self::removeBackticks($payload->set);
 			if ($payload->type === RequestFormat::JSON->value) {
 				$payload->set = self::morphValuesByFieldType($payload->set, $fields);
 			}
@@ -77,9 +78,13 @@ final class Handler extends BaseHandlerWithClient
 	 */
 	private static function getFields(Client $manticoreClient, string $table): array {
 		$descResult = $manticoreClient
-			->sendRequest('DESC ' . $table)
-			->getResult();
+			->sendRequest('DESC ' . $table);
 
+		if ($descResult->hasError()) {
+			throw ManticoreSearchClientError::create((string)$descResult->getError());
+		}
+
+		$descResult = $descResult->getResult();
 		if (is_array($descResult[0])) {
 			$fields = [];
 			/** @var array{Type:string, Properties:string, Field:string} $field */
@@ -157,6 +162,24 @@ final class Handler extends BaseHandlerWithClient
 
 		/** @var array<string, bool|float|int|string> */
 		return $records;
+	}
+
+	/**
+	 * @param array<string, bool|float|int|string> $data
+	 * @return array<string, bool|float|int|string>
+	 */
+	private static function removeBackticks(array $data): array {
+
+		foreach ($data as $fieldName => $row) {
+			if ($fieldName[0] !== '`') {
+				continue;
+			}
+
+			unset($data[$fieldName]);
+			$data[trim($fieldName, " \n\r\t\v\0`")] = $row;
+		}
+
+		return $data;
 	}
 
 	/**

@@ -66,6 +66,16 @@ final class Payload extends BasePayload {
 			case ActionType::Show:
 				// Actually we should do nothing in this case and nothing to parse from query
 				break;
+			// We got disable buddy plugin query
+			case ActionType::Disable:
+			case ActionType::Enable:
+				$regex = '/^(?:DISABLE|ENABLE) BUDDY PLUGIN (\S+)$/ius';
+
+				if (!preg_match($regex, $request->payload, $matches)) {
+					throw new QueryParseError('Failed to parse query');
+				}
+				$self->package = $matches[1];
+				break;
 		}
 
 		$self->path = $request->path;
@@ -80,7 +90,9 @@ final class Payload extends BasePayload {
 		return stripos($request->payload, 'create plugin') === 0
 			|| stripos($request->payload, 'create buddy plugin') === 0
 			|| stripos($request->payload, 'delete buddy plugin') === 0
-			|| strtolower($request->payload) === 'show buddy plugins';
+			|| strtolower($request->payload) === 'show buddy plugins'
+			|| stripos($request->payload, 'disable buddy plugin') === 0
+			|| stripos($request->payload, 'enable buddy plugin') === 0;
 	}
 
 	/**
@@ -93,6 +105,8 @@ final class Payload extends BasePayload {
 			'create' => ActionType::Create,
 			'show' => ActionType::Show,
 			'delete' => ActionType::Delete,
+			'disable' => ActionType::Disable,
+			'enable' => ActionType::Enable,
 			default => throw new Exception("Failed to detect action type from query: $query"),
 		};
 	}

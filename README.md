@@ -169,9 +169,13 @@ Add to the `Payload` info that your plugin has processors
 
 ```php
 public static function getProcessors(): array {
-  return [
-    new Processor(),
-  ];
+  static $processors;
+  // To ensure the object reference remains unchanged,
+  // create it as static and keep track of it.
+  if (!$processors) {
+    $processors = [new Processor()];
+  }
+  return $processors;
 }
 ````
 
