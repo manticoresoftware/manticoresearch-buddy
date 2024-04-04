@@ -68,7 +68,6 @@ class View
 			array_unshift($fields, 'id');
 		}
 
-		Buddy::debugv("=============3=====>".json_encode($fields));
 		$keys = implode(', ', $fields);
 
 		$insertEntities = [];
