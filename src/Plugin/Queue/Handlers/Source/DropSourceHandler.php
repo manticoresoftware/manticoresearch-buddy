@@ -22,7 +22,6 @@ final class DropSourceHandler extends BaseDropHandler
 	/**
 	 * @param string $name
 	 * @param string $tableName
-	 * @param Client $manticoreClient
 	 * @return int
 	 * @throws ManticoreSearchClientError
 	 */
@@ -35,23 +34,27 @@ final class DropSourceHandler extends BaseDropHandler
 		$result = $manticoreClient->sendRequest($sql);
 
 		if ($result->hasError()) {
-			throw ManticoreSearchClientError::create($result->getError());
+			throw ManticoreSearchClientError::create((string)$result->getError());
 		}
 
 		$removed = 0;
-		foreach ($result->getResult()[0]['data'] as $sourceRow) {
-			$this->payload::$processor
-				->execute('stopWorkerById', [$sourceRow['full_name']]);
+		$result = $result->getResult();
+		if (is_array($result[0])) {
+			foreach ($result[0]['data'] as $sourceRow) {
+				$this->payload::$processor
+					->execute('stopWorkerById', [$sourceRow['full_name']]);
 
-			self::removeSourceRowData($sourceRow, $manticoreClient);
-			$removed++;
+				self::removeSourceRowData($sourceRow, $manticoreClient);
+				$removed++;
+			}
 		}
+
 
 		return $removed;
 	}
 
 	/**
-	 * @param array $sourceRow
+	 * @param array<string, string> $sourceRow
 	 * @param Client $client
 	 * @throws ManticoreSearchClientError
 	 */
@@ -69,7 +72,7 @@ final class DropSourceHandler extends BaseDropHandler
 		foreach ($queries as $query) {
 			$request = $client->sendRequest($query);
 			if ($request->hasError()) {
-				throw ManticoreSearchClientError::create($request->getError());
+				throw ManticoreSearchClientError::create((string)$request->getError());
 			}
 		}
 	}

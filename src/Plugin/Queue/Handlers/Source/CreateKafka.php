@@ -96,8 +96,15 @@ final class CreateKafka extends BaseCreateSourceHandler
 			throw ManticoreSearchClientError::create((string)$request->getError());
 		}
 
-		$views = $request->getResult()[0]['data'];
+		$result = $request->getResult();
+
+		if (!is_array($result[0])) {
+			return;
+		}
+
+		$views = $result[0]['data'];
 		$viewsCount = sizeof($views);
+
 
 		if ($viewsCount > 0 && $viewsCount < $maxIndex) {
 			$originalQuery = (string)$views[0]['original_query'];
@@ -125,13 +132,18 @@ final class CreateKafka extends BaseCreateSourceHandler
 				"DELETE FROM $viewsTable WHERE id in ($ids)";
 			$rawResult = $client->sendRequest($sql);
 			if ($rawResult->hasError()) {
-				throw ManticoreSearchClientError::create($rawResult->getError());
+				throw ManticoreSearchClientError::create((string)$rawResult->getError());
 			}
 		}
 	}
 
-
-	public static function getOrphanIds($views, $sourceName, $maxIndex): array {
+	/**
+	 * @param array<int, array<string>> $views
+	 * @param string $sourceName
+	 * @param int $maxIndex
+	 * @return array<string>
+	 */
+	public static function getOrphanIds(array $views, string $sourceName, int $maxIndex): array {
 		$ids = [];
 		foreach ($views as $orphanView) {
 			$viewSourceName = explode('_', $orphanView['source_name']);

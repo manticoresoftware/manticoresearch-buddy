@@ -41,7 +41,7 @@ final class GetSourceHandler extends BaseGetHandler
 		return $payload->parsedPayload['SHOW'][1]['no_quotes']['parts'][0];
 	}
 
-	#[\Override] protected function getFields() {
+	#[\Override] protected function getFields(): array {
 		return [];
 	}
 }

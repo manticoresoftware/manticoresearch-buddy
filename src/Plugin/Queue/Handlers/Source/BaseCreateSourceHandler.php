@@ -18,7 +18,8 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
-abstract class BaseCreateSourceHandler extends BaseHandlerWithClient {
+abstract class BaseCreateSourceHandler extends BaseHandlerWithClient
+{
 	const SOURCE_TYPE_KAFKA = 'kafka';
 
 	/**
@@ -67,7 +68,7 @@ abstract class BaseCreateSourceHandler extends BaseHandlerWithClient {
 
 		$request = $manticoreClient->sendRequest($sql);
 		if ($request->hasError()) {
-			throw ManticoreSearchClientError::create($request->getError());
+			throw ManticoreSearchClientError::create((string)$request->getError());
 		}
 	}
 

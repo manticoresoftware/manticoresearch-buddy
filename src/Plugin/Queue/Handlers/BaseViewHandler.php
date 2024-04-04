@@ -9,8 +9,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
-abstract class BaseViewHandler extends BaseHandlerWithClient
-{
+abstract class BaseViewHandler extends BaseHandlerWithClient {
 
 	/**
 	 * Initialize the executor
@@ -46,7 +45,7 @@ abstract class BaseViewHandler extends BaseHandlerWithClient
 				"SELECT name FROM $tableName GROUP BY name";
 			$result = $manticoreClient->sendRequest($sql);
 			if ($result->hasError()) {
-				throw ManticoreSearchClientError::create($result->getError());
+				throw ManticoreSearchClientError::create((string)$result->getError());
 			}
 
 			return TaskResult::raw($result->getResult());
