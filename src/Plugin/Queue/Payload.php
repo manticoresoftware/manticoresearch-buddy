@@ -107,16 +107,12 @@ final class Payload extends BasePayload
 		 *
 		 * CREATE TABLE destination_kafka (id bigint, name text, short_name text, received_at text, size multi);
 		 *
-		 * CREATE MATERIALIZED VIEW view_table TO destination_kafka AS SELECT id, term as name, abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka WHERE match('is');
+		 * CREATE mv view_table TO destination_kafka AS SELECT id, term as name, abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka WHERE match('is');
 		 */
 
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
 
 		echo json_encode($parsedPayload) . "\n";
-
-		// TODO Aliases
-		// TODO batch option isn't parsed in create smth query
-
 
 		return (
 			self::isCreateSourceMatch($parsedPayload) ||
