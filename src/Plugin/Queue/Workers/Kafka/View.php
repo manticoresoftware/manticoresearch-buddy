@@ -5,6 +5,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 use Manticoresearch\Buddy\Base\Plugin\Queue\StringFunctionsTrait;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 class View
 {
@@ -17,42 +18,28 @@ class View
 	private string $buffer;
 	private string $destination;
 
-	private int $batchSize;
-
-	public function __construct(Client $client, string $buffer, string $destination, string $query, int $batchSize) {
+	public function __construct(Client $client, string $buffer, string $destination, string $query) {
 		$this->client = $client;
 		$this->buffer = $buffer;
 		$this->destination = $destination;
 		$this->query = $query;
-		$this->batchSize = $batchSize;
-
 		$this->getFields($client, $destination);
-		if (stripos($query, ' limit ') !== false) {
-			throw GenericError::create("Can't use query with limit");
-		}
 	}
 
+	/**
+	 * @throws GenericError
+	 */
 	public function run(): bool {
 
-		$errors = 0;
-		while (true) {
-			$batch = $this->read();
-			if ($batch === []) {
-				break;
-			}
-
-			$batch = $this->prepareValues($batch);
-			if ($this->insert($batch)) {
-				continue;
-			}
-			$errors++;
+		if ($this->insert($this->prepareValues($this->read()))) {
+			return true;
 		}
 
-		return $errors === 0;
+		return false;
 	}
 
 	private function read(): array {
-		$sql = "$this->query LIMIT $this->batchSize";
+		$sql = "$this->query";
 		$readBuffer = $this->client->sendRequest($sql);
 
 		if ($readBuffer->hasError()) {
@@ -76,27 +63,24 @@ class View
 		$values = [];
 		$keys = implode(', ', array_keys($batch[0]));
 
-		$ids = [];
 		foreach ($batch as $row) {
-			$ids[$row['id']] = 1;
 			$values[] = '(' . implode(',', array_values($row)) . ')';
 		}
 		$values = implode(',', $values);
 		unset($batch);
 
-		$sql = "INSERT INTO $this->destination ($keys) VALUES $values";
+		$sql = "REPLACE INTO $this->destination ($keys) VALUES $values";
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {
-			return false;
+			Buddy::debugv('----> Error during inserting to destination table. ' . $request->getError());
 		}
-
-		$ids = implode(',', array_keys($ids));
-		$sql = "DELETE FROM $this->buffer WHERE id in($ids)";
+		$sql = "TRUNCATE TABLE $this->buffer";
 
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {
+			Buddy::debugv('----> Error truncating buffer table table. ' . $request->getError());
 			return false;
 		}
 
