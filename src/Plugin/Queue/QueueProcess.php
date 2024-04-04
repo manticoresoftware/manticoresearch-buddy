@@ -17,9 +17,10 @@ class QueueProcess extends BaseProcessor
 	 * @throws ManticoreSearchClientError
 	 * @throws GenericError
 	 */
-	public function start(): void {
+	public function start(): array {
 		parent::start();
 		$this->execute('runPool');
+		return [];
 	}
 
 	public function stop(): void {
