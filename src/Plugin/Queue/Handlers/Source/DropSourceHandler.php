@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseDropHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
-use Manticoresearch\Buddy\Base\Plugin\Queue\QueueProcess;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 

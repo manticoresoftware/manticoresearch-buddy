@@ -125,7 +125,8 @@ final class CreateViewHandler extends BaseHandlerWithClient
 			$sql = /** @lang ManticoreSearch */
 				'INSERT INTO ' . Payload::VIEWS_TABLE_NAME .
 				'(id, name, source_name, destination_name, query, original_query, suspended) VALUES ' .
-				"(0,'$viewName','$sourceFullName', '$destinationTableName','$escapedQuery','$escapedOriginalQuery', $suspended)";
+				"(0,'$viewName','$sourceFullName', '$destinationTableName',".
+				"'$escapedQuery','$escapedOriginalQuery', $suspended)";
 
 			$response = $client->sendRequest($sql);
 			if ($response->hasError()) {

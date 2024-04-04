@@ -94,25 +94,13 @@ final class Payload extends BasePayload
 		return $self;
 	}
 
-	/**
-	 * @param Request $request
-	 * @return bool
-	 */
-	public static function hasMatch(Request $request): bool {
+	/** @codingStandardsIgnoreStart */
+	public static function hasMatch(
+		Request $request
+		/** @codingStandardsIgnoreEnd */
+	): bool {
 
-		/**
-		 * @example
-		 *
-		 * CREATE SOURCE kafka (id bigint, term text, abbrev text, GlossDef json) type='kafka' broker_list='kafka:9092' topic_list='my-data' consumer_group='manticore' num_consumers='2' batch=50;
-		 *
-		 * CREATE TABLE destination_kafka (id bigint, name text, short_name text, received_at text, size multi);
-		 *
-		 * CREATE mv view_table TO destination_kafka AS SELECT id, term as name, abbrev as short_name, UTC_TIMESTAMP() as received_at, GlossDef.size as size FROM kafka WHERE match('is');
-		 */
-
-		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
-
-		echo json_encode($parsedPayload) . "\n";
+		$parsedPayload = Payload::$sqlQueryParser::getParsedPayload();
 
 		return (
 			self::isCreateSourceMatch($parsedPayload) ||
@@ -335,16 +323,20 @@ final class Payload extends BasePayload
 				self::REQUEST_TYPE_CREATE . self::TYPE_SOURCE => self::parseSourceType(
 					static::$sqlQueryParser::getParsedPayload()['SOURCE']['options']
 				),
-				self::REQUEST_TYPE_CREATE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\CreateViewHandler',
+				self::REQUEST_TYPE_CREATE . self::TYPE_MATERLIALIZED .
+				self::TYPE_VIEW => 'Handlers\\View\\CreateViewHandler',
 				self::REQUEST_TYPE_VIEW . self::TYPE_SOURCES => 'Handlers\\Source\\ViewSourceHandler',
-				self::REQUEST_TYPE_VIEW . self::TYPE_MATERLIALIZED . self::TYPE_VIEWS => 'Handlers\\View\\ViewViewsHandler',
+				self::REQUEST_TYPE_VIEW . self::TYPE_MATERLIALIZED .
+				self::TYPE_VIEWS => 'Handlers\\View\\ViewViewsHandler',
 				self::REQUEST_TYPE_GET . self::TYPE_SOURCES => 'Handlers\\Source\\GetSourceHandler',
 				self::REQUEST_TYPE_GET . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\GetViewHandler',
 				self::REQUEST_TYPE_DELETE . self::TYPE_SOURCE => 'Handlers\\Source\\DropSourceHandler',
-				self::REQUEST_TYPE_DELETE . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\DropViewHandler',
-				self::REQUEST_TYPE_ALTER . self::TYPE_MATERLIALIZED . self::TYPE_VIEW => 'Handlers\\View\\AlterViewHandler',
+				self::REQUEST_TYPE_DELETE . self::TYPE_MATERLIALIZED .
+				self::TYPE_VIEW => 'Handlers\\View\\DropViewHandler',
+				self::REQUEST_TYPE_ALTER . self::TYPE_MATERLIALIZED .
+				self::TYPE_VIEW => 'Handlers\\View\\AlterViewHandler',
 				default => throw new Exception('Cannot find handler for request type: ' . static::$type),
-			};
+		};
 		Buddy::debugv("Handler class: $handlerClassName");
 		return $handlerClassName;
 	}

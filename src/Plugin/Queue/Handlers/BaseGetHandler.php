@@ -42,7 +42,13 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 		 * @return TaskResult
 		 * @throws ManticoreSearchClientError
 		 */
-		$taskFn = static function (string $name, string $type, array $fields, string $tableName, Client $manticoreClient): TaskResult {
+		$taskFn = static function (
+			string $name,
+			string $type,
+			array  $fields,
+			string $tableName,
+			Client $manticoreClient
+		): TaskResult {
 
 			if (!$manticoreClient->hasTable($tableName)) {
 				return TaskResult::none();
@@ -54,7 +60,7 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 				"SELECT $stringFields FROM $tableName WHERE match('@name \"$name\"') LIMIT 1";
 			$rawResult = $manticoreClient->sendRequest($sql);
 			if ($rawResult->hasError()) {
-				throw ManticoreSearchClientError::create($rawResult->getError());
+				throw ManticoreSearchClientError::create((string)$rawResult->getError());
 			}
 
 			$rawResult = $rawResult->getResult();
@@ -77,24 +83,28 @@ abstract class BaseGetHandler extends BaseHandlerWithClient
 				$resultData[$field] = $rawResult[0]['data'][0][$field];
 			}
 
-			$taskResult = TaskResult::withData([$resultData])
-				->column($type, Column::String)
-				->column('Create Table', Column::String);
-
-			foreach ($fields as $field) {
-				if ($field === 'original_query') {
-					continue;
-				}
-				$taskResult = $taskResult->column($field, Column::String);
-			}
-
-			return $taskResult;
+			return static::prepareTaskResult($resultData, $type, $fields);
 		};
 
 		return Task::create(
 			$taskFn,
 			[$name, $type, $fields, $tableName, $this->manticoreClient]
 		)->run();
+	}
+
+	private static function prepareTaskResult(array $resultData, string $type, array $fields): TaskResult {
+		$taskResult = TaskResult::withData([$resultData])
+			->column($type, Column::String)
+			->column('Create Table', Column::String);
+
+		foreach ($fields as $field) {
+			if ($field === 'original_query') {
+				continue;
+			}
+			$taskResult = $taskResult->column($field, Column::String);
+		}
+
+		return $taskResult;
 	}
 
 	abstract protected function getFields();
