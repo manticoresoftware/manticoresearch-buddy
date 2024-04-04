@@ -60,14 +60,27 @@ class View
 
 	private function insert(array $batch): bool {
 
-		$values = [];
-		$keys = implode(', ', array_keys($batch[0]));
+		$fields = array_keys($batch[0]);
 
-		foreach ($batch as $row) {
-			$values[] = '(' . implode(',', array_values($row)) . ')';
+		$needAppendId = false;
+		if (!in_array('id', array_map('strtolower', $fields))) {
+			$needAppendId = true;
+			array_unshift($fields, 'id');
 		}
-		$values = implode(',', $values);
-		unset($batch);
+
+		Buddy::debugv("=============3=====>".json_encode($fields));
+		$keys = implode(', ', $fields);
+
+		$insertEntities = [];
+		foreach ($batch as $row) {
+			$rowValues = array_values($row);
+			if ($needAppendId) {
+				array_unshift($rowValues, '0');
+			}
+			$insertEntities[] = '(' . implode(',', $rowValues) . ')';
+		}
+		$values = implode(',', $insertEntities);
+		unset($batch, $insertEntities);
 
 		$sql = "REPLACE INTO $this->destination ($keys) VALUES $values";
 		$request = $this->client->sendRequest($sql);
