@@ -33,7 +33,7 @@ final class GetViewHandler extends BaseGetHandler
 		return Payload::VIEWS_TABLE_NAME;
 	}
 
-	#[\Override] protected function getFields() {
+	#[\Override] protected function getFields(): array {
 		return ['suspended'];
 	}
 }

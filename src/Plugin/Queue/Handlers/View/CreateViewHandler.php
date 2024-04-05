@@ -18,7 +18,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
+use PHPSQLParser\exceptions\UnsupportedFeatureException;
 use PHPSQLParser\PHPSQLCreator;
 
 final class CreateViewHandler extends BaseHandlerWithClient
@@ -69,20 +69,21 @@ final class CreateViewHandler extends BaseHandlerWithClient
 
 			$sourceRecords = $manticoreClient->sendRequest($sql)->getResult();
 
-			if (is_array($sourceRecords) && empty($sourceRecords[0]['data'])) {
+			if (is_array($sourceRecords[0]) && empty($sourceRecords[0]['data'])) {
 				throw ManticoreSearchClientError::create('Chosen source not exist');
 			}
 
 			unset($payload->parsedPayload['CREATE'], $payload->parsedPayload['VIEW']);
 
+			$sourceRecords = $sourceRecords[0]['data'];
 
 			$newViews = self::createViewRecords(
 				$manticoreClient, $viewName, $payload->parsedPayload,
 				$sourceName, $payload->originQuery,
-				$destinationTableName, sizeof($sourceRecords[0]['data'])
+				$destinationTableName, sizeof($sourceRecords)
 			);
 
-			foreach ($sourceRecords[0]['data'] as $source) {
+			foreach ($sourceRecords as $source) {
 				$source['destination_name'] = $newViews[$source['full_name']]['destination_name'];
 				$source['query'] = $newViews[$source['full_name']]['query'];
 				$this->payload::$processor->execute('runWorker', [$source]);
@@ -95,6 +96,20 @@ final class CreateViewHandler extends BaseHandlerWithClient
 		return Task::create($taskFn)->run();
 	}
 
+	/**
+	 * @param Client $client
+	 * @param string $viewName
+	 * @param array<string, array<int, string>> $parsedQuery
+	 * @param string $sourceName
+	 * @param string $originalQuery
+	 * @param string $destinationTableName
+	 * @param int $iterations
+	 * @param int $startFrom
+	 * @param int $suspended
+	 * @return array<string, array<string, string>>
+	 * @throws ManticoreSearchClientError
+	 * @throws UnsupportedFeatureException
+	 */
 	public static function createViewRecords(
 		Client $client,
 		string $viewName,
@@ -103,13 +118,12 @@ final class CreateViewHandler extends BaseHandlerWithClient
 		string $originalQuery,
 		string $destinationTableName,
 		int    $iterations,
-		$startFrom = 0,
-		$suspended = 0
-	) {
+		int    $startFrom = 0,
+		int $suspended = 0
+	): array {
 
 		$results = [];
 
-		Buddy::debugv("$startFrom -> $iterations");
 		for ($i = $startFrom; $i < $iterations; $i++) {
 			$bufferTableName = "_buffer_{$sourceName}_$i";
 			$sourceFullName = "{$sourceName}_$i";
@@ -125,12 +139,12 @@ final class CreateViewHandler extends BaseHandlerWithClient
 			$sql = /** @lang ManticoreSearch */
 				'INSERT INTO ' . Payload::VIEWS_TABLE_NAME .
 				'(id, name, source_name, destination_name, query, original_query, suspended) VALUES ' .
-				"(0,'$viewName','$sourceFullName', '$destinationTableName',".
+				"(0,'$viewName','$sourceFullName', '$destinationTableName'," .
 				"'$escapedQuery','$escapedOriginalQuery', $suspended)";
 
 			$response = $client->sendRequest($sql);
 			if ($response->hasError()) {
-				throw ManticoreSearchClientError::create($response->getError());
+				throw ManticoreSearchClientError::create((string)$response->getError());
 			}
 
 			$results[$sourceFullName]['destination_name'] = $destinationTableName;

@@ -55,17 +55,22 @@ final class AlterViewHandler extends BaseHandlerWithClient
 				"SELECT * FROM $viewsTable WHERE match('@name \"$name\"')";
 			$rawResult = $this->manticoreClient->sendRequest($sql);
 			if ($rawResult->hasError()) {
-				throw ManticoreSearchClientError::create($rawResult->getError());
+				throw ManticoreSearchClientError::create((string)$rawResult->getError());
 			}
 
-			return TaskResult::withTotal(sizeof($this->processAlter($rawResult, $viewsTable)));
+			return $this->processAlter($rawResult, $viewsTable);
 		};
 
 		return Task::create($taskFn)->run();
 	}
 
-
-	private function processAlter(Response $rawResult, string $viewsTable) {
+	/**
+	 * @param Response $rawResult
+	 * @param string $viewsTable
+	 * @return TaskResult
+	 * @throws ManticoreSearchClientError
+	 */
+	private function processAlter(Response $rawResult, string $viewsTable): TaskResult {
 
 		$option = strtolower($this->payload->parsedPayload['VIEW']['options'][0]['sub_tree'][0]['base_expr']);
 		$value = $this->payload->parsedPayload['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
@@ -73,43 +78,45 @@ final class AlterViewHandler extends BaseHandlerWithClient
 
 		$ids = [];
 
-		foreach ($rawResult->getResult()[0]['data'] as $row) {
-			$ids[] = $row['id'];
+		if (is_array($rawResult->getResult())) {
+			foreach ($rawResult->getResult()[0]['data'] as $row) {
+				$ids[] = $row['id'];
 
-			$sourceQuery /** @lang Manticore */ = 'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
-				" WHERE match('@full_name \"{$row['source_name']}\"')";
-			$instance = $this->manticoreClient->sendRequest($sourceQuery);
-			if ($instance->hasError()) {
-				throw ManticoreSearchClientError::create($instance->getError());
+				$sourceQuery /** @lang Manticore */ = 'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
+					" WHERE match('@full_name \"{$row['source_name']}\"')";
+				$instance = $this->manticoreClient->sendRequest($sourceQuery);
+				if ($instance->hasError()) {
+					throw ManticoreSearchClientError::create((string)$instance->getError());
+				}
+
+				$instance = $instance->getResult();
+				if (is_array($instance[0]) && empty($instance[0]['data'])) {
+					return TaskResult::withError(
+						"Can't ALTER view without referred source. Create source ({$row['source_name']}) first"
+					);
+				}
+
+				if ($value === '0') {
+					$instance = $instance[0]['data'][0];
+					$instance['destination_name'] = $row['destination_name'];
+					$instance['query'] = $row['query'];
+
+					$this->payload::$processor->execute('runWorker', [$instance]);
+				} else {
+					$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
+				}
 			}
 
-			if (empty($instance->getResult()[0]['data'])) {
-				return TaskResult::withError(
-					"Can't ALTER view without referred source. Create source ({$row['source_name']}) first"
-				);
-			}
-
-			if ($value === '0') {
-				$instance = $instance->getResult()[0]['data'][0];
-				$instance['destination_name'] = $row['destination_name'];
-				$instance['query'] = $row['query'];
-
-				$this->payload::$processor->execute('runWorker', [$instance]);
-			} else {
-				$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
+			if ($ids !== []) {
+				$stringIds = implode(',', $ids);
+				$sql = /** @lang manticore */
+					"UPDATE $viewsTable SET $option = $value WHERE id in ($stringIds)";
+				$rawResult = $this->manticoreClient->sendRequest($sql);
+				if ($rawResult->hasError()) {
+					throw ManticoreSearchClientError::create((string)$rawResult->getError());
+				}
 			}
 		}
-
-		if ($ids !== []) {
-			$stringIds = implode(',', $ids);
-			$sql = /** @lang manticore */
-				"UPDATE $viewsTable SET $option = $value WHERE id in ($stringIds)";
-			$rawResult = $this->manticoreClient->sendRequest($sql);
-			if ($rawResult->hasError()) {
-				throw ManticoreSearchClientError::create($rawResult->getError());
-			}
-		}
-
-		return $ids;
+		return TaskResult::withTotal(sizeof($ids));
 	}
 }

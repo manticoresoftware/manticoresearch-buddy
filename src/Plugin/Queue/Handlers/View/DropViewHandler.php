@@ -29,21 +29,23 @@ final class DropViewHandler extends BaseDropHandler
 		$result = $manticoreClient->sendRequest($sql);
 
 		if ($result->hasError()) {
-			throw ManticoreSearchClientError::create($result->getError());
+			throw ManticoreSearchClientError::create((string)$result->getError());
 		}
 
 		$removed = 0;
-		foreach ($result->getResult()[0]['data'] as $row) {
-			$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
+		if (is_array($result->getResult()[0])){
+			foreach ($result->getResult()[0]['data'] as $row) {
+				$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
 
-			$sql = /** @lang Manticore */
-				"DELETE FROM $tableName WHERE id = " . $row['id'];
-			$request = $manticoreClient->sendRequest($sql);
-			if ($request->hasError()) {
-				throw ManticoreSearchClientError::create($request->getError());
+				$sql = /** @lang Manticore */
+					"DELETE FROM $tableName WHERE id = " . $row['id'];
+				$request = $manticoreClient->sendRequest($sql);
+				if ($request->hasError()) {
+					throw ManticoreSearchClientError::create((string)$request->getError());
+				}
+
+				$removed++;
 			}
-
-			$removed++;
 		}
 
 		return $removed;
