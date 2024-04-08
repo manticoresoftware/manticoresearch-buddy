@@ -9,8 +9,14 @@ class Batch
 {
 	protected int $batchSize;
 
+	/**
+	 * @var array<int, mixed>
+	 */
 	private array $batch = [];
 
+	/**
+	 * @var Closure(array<int, string>): bool $closure
+	 */
 	private Closure $callback;
 
 	private int $lastCallTime = 0;
@@ -23,7 +29,11 @@ class Batch
 		$this->batchSize = $batchSize;
 	}
 
-	public function setCallback(callable $closure): void {
+	/**
+	 * @param Closure(array<int, string>): bool $closure
+	 * @return void
+	 */
+	public function setCallback(Closure $closure): void {
 		$this->callback = $closure;
 	}
 
