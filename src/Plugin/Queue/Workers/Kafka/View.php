@@ -38,6 +38,11 @@ class View
 		return false;
 	}
 
+	/**
+* @return array<int, array<string, string>>
+* @throws GenericError
+* @throws \Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError
+	 */
 	private function read(): array {
 		$sql = "$this->query";
 		$readBuffer = $this->client->sendRequest($sql);
@@ -46,9 +51,18 @@ class View
 			throw GenericError::create("Can't read from buffer. " . $readBuffer->getError());
 		}
 		$readBuffer = $readBuffer->getResult();
-		return $readBuffer[0]['data'];
+
+		$result = [];
+		if (is_array($readBuffer[0])) {
+			$result = $readBuffer[0]['data'];
+		}
+		return $result;
 	}
 
+	/**
+* @param array<int, array<string, string>> $batch
+* @return array<int, array<string, mixed>>
+	 */
 	private function prepareValues(array $batch): array {
 		foreach ($batch as $k => $row) {
 			foreach ($row as $name => $value) {
@@ -58,6 +72,11 @@ class View
 		return $batch;
 	}
 
+	/**
+* @param array<int, array<string, mixed>> $batch
+* @return bool
+* @throws \Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError
+	 */
 	private function insert(array $batch): bool {
 
 		$fields = array_keys($batch[0]);
@@ -81,7 +100,7 @@ class View
 		$values = implode(',', $insertEntities);
 		unset($batch, $insertEntities);
 
-		$sql = "REPLACE INTO $this->destination ($keys) VALUES $values";
+		$sql /** @lang Manticore */ = "REPLACE INTO $this->destination ($keys) VALUES $values";
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {

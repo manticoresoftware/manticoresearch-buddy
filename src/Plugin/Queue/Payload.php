@@ -51,7 +51,13 @@ final class Payload extends BasePayload
 	public Endpoint $endpointBundle;
 	public static QueueProcess $processor;
 	public string $originQuery = '';
-	public array $parsedPayload = [];
+
+	/**
+	 * @var array<string, array{name:string, create-def:array{base_expr:string},
+	 *   options: array<int, array{sub_tree:array<int, array{base_expr:string}>}>}
+	 *   >|null $parsedPayload
+	 */
+	public ?array $parsedPayload = [];
 
 	/**
 	 * @param Request $request
