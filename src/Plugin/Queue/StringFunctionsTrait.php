@@ -31,6 +31,11 @@ trait StringFunctionsTrait
 		return $this->fields[$field];
 	}
 
+	/**
+* @param mixed $fieldValue
+* @param string $fieldType
+* @return mixed
+	 */
 	protected function morphValuesByFieldType(mixed $fieldValue, string $fieldType): mixed {
 		return match ($fieldType) {
 			Fields::TYPE_INT, Fields::TYPE_BIGINT, Fields::TYPE_TIMESTAMP => (int)$fieldValue,

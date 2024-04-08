@@ -7,6 +7,7 @@ use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use RdKafka\Conf;
 use RdKafka\Exception;
 use RdKafka\KafkaConsumer;
 
@@ -18,6 +19,8 @@ class KafkaWorker
 
 	private string $name;
 	private string $brokerList;
+
+	/** @var array|string[] */
 	private array $topicList;
 	private string $consumerGroup;
 
@@ -28,6 +31,14 @@ class KafkaWorker
 
 
 	/**
+	 * @param Client $client
+	 * @param array{
+	 *   full_name:string,
+	 *   buffer_table:string,
+	 *   destination_name:string,
+	 *   query:string,
+	 *   attrs:string } $instance
+	 *
 	 * @throws GenericError
 	 */
 	public function __construct(
@@ -35,6 +46,7 @@ class KafkaWorker
 		array  $instance
 	) {
 
+		/** @var array{group:string, broker:string, topic:string, batch:string } $attrs */
 		$attrs = json_decode($instance['attrs'], true);
 
 		$this->name = $instance['full_name'];
@@ -53,9 +65,12 @@ class KafkaWorker
 		$this->getFields($this->client, $this->bufferTable);
 	}
 
+	/**
+	 * @return Conf
+	 */
 
-	private function initKafkaConfig() {
-		$conf = new \RdKafka\Conf();
+	private function initKafkaConfig(): Conf {
+		$conf = new Conf();
 		$conf->set('group.id', $this->consumerGroup);
 		$conf->set('metadata.broker.list', $this->brokerList);
 		$conf->set('enable.auto.commit', 'false');
@@ -91,9 +106,10 @@ class KafkaWorker
 	}
 
 	/**
+	 * @return void
 	 * @throws Exception
 	 */
-	public function run() {
+	public function run(): void {
 		Buddy::debugv('------->> Start consuming ' . $this->name);
 
 		$batch = new Batch($this->batchSize);
@@ -133,6 +149,11 @@ class KafkaWorker
 		}
 	}
 
+	/**
+	 * @param array<int, string> $batch
+	 * @return bool
+	 * @throws GenericError
+	 */
 	public function processBatch(array $batch): bool {
 		if ($this->insertToBuffer($this->mapMessages($batch))
 			&& $this->view->run()) {
@@ -142,10 +163,20 @@ class KafkaWorker
 	}
 
 
+	/**
+	 * @param array<int, string> $batch
+	 * @return array<int, array<string, mixed>>
+	 */
 	private function mapMessages(array $batch): array {
 		$results = [];
 		foreach ($batch as $message) {
-			$message = array_change_key_case(json_decode($message, true));
+			$parsedMessage = json_decode($message, true);
+			if (is_array($parsedMessage)) {
+				$message = array_change_key_case($parsedMessage);
+			} else {
+				$message = [];
+			}
+
 			$row = [];
 			foreach ($this->fields as $fieldName => $fieldType) {
 				if (isset($message[$fieldName])) {
@@ -170,6 +201,11 @@ class KafkaWorker
 		return $results;
 	}
 
+	/**
+	 * @param array<int, array<string, mixed>> $batch
+	 * @return bool
+	 * @throws \Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError
+	 */
 	private function insertToBuffer(array $batch): bool {
 
 		$fields = implode(', ', array_keys($batch[0]));
@@ -184,8 +220,7 @@ class KafkaWorker
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {
-			Buddy::debugv($sql);
-			Buddy::debug($request->getError());
+			Buddy::debug((string)$request->getError());
 			return false;
 		}
 		return true;
