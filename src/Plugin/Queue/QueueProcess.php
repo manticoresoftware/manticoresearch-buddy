@@ -13,10 +13,7 @@ use Throwable;
 
 class QueueProcess extends BaseProcessor
 {
-	/**
-	 * @throws ManticoreSearchClientError
-	 * @throws GenericError
-	 */
+
 	public function start(): array {
 		parent::start();
 		$this->execute('runPool');
@@ -56,6 +53,10 @@ class QueueProcess extends BaseProcessor
 			return;
 		}
 
+		if (!is_array($results->getResult()[0])) {
+			return;
+		}
+
 		foreach ($results->getResult()[0]['data'] as $instance) {
 			$sql = /** @lang ManticoreSearch */
 				'SELECT * FROM ' . Payload::VIEWS_TABLE_NAME .
@@ -67,7 +68,7 @@ class QueueProcess extends BaseProcessor
 			}
 
 			$results = $results->getResult();
-			if (!isset($results[0]['data'][0])) {
+			if (is_array($results[0]) && !isset($results[0]['data'][0])) {
 				Buddy::debugv("Can't find view with source_name {$instance['full_name']}");
 				continue;
 			}
@@ -79,17 +80,25 @@ class QueueProcess extends BaseProcessor
 
 			$instance['destination_name'] = $results[0]['data'][0]['destination_name'];
 			$instance['query'] = $results[0]['data'][0]['query'];
-			echo '++++++++++++++++ '. $instance['full_name']."\n";
+			echo '++++++++++++++++ ' . $instance['full_name'] . "\n";
 			$this->runWorker($instance);
 		}
 	}
 
-	// TODO: declare type and info
-	// This method also can be called with execute method of the processor from the Handler
 	/**
+	 * TODO: declare type and info
+	 * This method also can be called with execute method of the processor from the Handler
+	 *
+	 * @param array{
+	 *    full_name:string,
+	 *    buffer_table:string,
+	 *    destination_name:string,
+	 *    query:string,
+	 *    attrs:string } $instance
+	 * @param bool $shouldStart
 	 * @throws \Exception
 	 */
-	public function runWorker(array $instance, $shouldStart = true): void {
+	public function runWorker(array $instance, bool $shouldStart = true): void {
 		$workerFn = function () use ($instance): void {
 			Buddy::debugv('------->> Start worker ' . $instance['full_name']);
 			$kafkaWorker = new KafkaWorker($this->client, $instance);
