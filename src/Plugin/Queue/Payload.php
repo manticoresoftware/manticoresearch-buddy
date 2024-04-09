@@ -18,8 +18,6 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
-use Psr\Container\ContainerExceptionInterface;
-use Psr\Container\NotFoundExceptionInterface;
 
 /**
  * This is simple do nothing request that handle empty queries
@@ -49,15 +47,171 @@ final class Payload extends BasePayload
 	public static string $sourceType;
 
 	public Endpoint $endpointBundle;
+
 	public static QueueProcess $processor;
 	public string $originQuery = '';
 
-	/**
-	 * @var array<string, array{name:string, create-def:array{base_expr:string},
-	 *   options: array<int, array{sub_tree:array<int, array{base_expr:string}>}>}
-	 *   >|null $parsedPayload
+	/** @var array{
+	 *       CREATE: array{
+	 *           expr_type: string,
+	 *           not-exists: bool,
+	 *           base_expr: string,
+	 *           sub_tree: array{
+	 *               expr_type: string,
+	 *               base_expr: string
+	 *           }[]
+	 *       },
+	 *       SOURCE: array{
+	 *           base_expr: string,
+	 *           name: string,
+	 *           no_quotes: array{
+	 *               delim: bool,
+	 *               parts: string[]
+	 *           },
+	 *           create-def: array{
+	 *               expr_type: string,
+	 *               base_expr: string,
+	 *               sub_tree: array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       base_expr: string,
+	 *                       sub_tree: array{
+	 *                           expr_type: string,
+	 *                           base_expr: string
+	 *                       }[]
+	 *                   }[]
+	 *               }[]
+	 *           },
+	 *           options: array{
+	 *               expr_type: string,
+	 *               base_expr: string,
+	 *               delim: string,
+	 *               sub_tree: array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   delim: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       base_expr: string
+	 *                   }[]
+	 *               }[]
+	 *           }[]
+	 *       },
+	 *       VIEW: array{
+	 *           base_expr: string,
+	 *           name: string,
+	 *           no_quotes: array{
+	 *               delim: bool,
+	 *               parts: string[]
+	 *           },
+	 *           create-def: bool,
+	 *           options: bool|array{
+	 *               expr_type: string,
+	 *               base_expr: string,
+	 *               delim: string,
+	 *               sub_tree: array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   delim: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       base_expr: string
+	 *                   }[]
+	 *               }[]
+	 *           },
+	 *           to: array{
+	 *               expr_type: string,
+	 *               table: string,
+	 *               base_expr: string,
+	 *               no_quotes: array{
+	 *                   delim: bool,
+	 *                   parts: string[]
+	 *               }
+	 *           }
+	 *       },
+	 *       SELECT: array{
+	 *           array{
+	 *               expr_type: string,
+	 *               alias: bool|array{
+	 *                   as: bool,
+	 *                   name: string,
+	 *                   base_expr: string,
+	 *                   no_quotes: array{
+	 *                       delim: bool,
+	 *                       parts: string[]
+	 *                   }
+	 *               },
+	 *               base_expr: string,
+	 *               no_quotes: array{
+	 *                   delim: bool,
+	 *                   parts: string[]
+	 *               },
+	 *               sub_tree: mixed,
+	 *               delim: bool|string
+	 *           }[]
+	 *       },
+	 *       FROM: array{
+	 *           array{
+	 *               expr_type: string,
+	 *               table: string,
+	 *               no_quotes: array{
+	 *                   delim: bool,
+	 *                   parts: string[]
+	 *               },
+	 *               alias: bool,
+	 *               hints: bool,
+	 *               join_type: string,
+	 *               ref_type: bool,
+	 *               ref_clause: bool,
+	 *               base_expr: string,
+	 *               sub_tree: bool|array{}
+	 *           }[]
+	 *       },
+	 *       SHOW: array{
+	 *           array{
+	 *               expr_type: string,
+	 *               base_expr: string
+	 *           }[]
+	 *       },
+	 *       DROP: array{
+	 *           expr_type: string,
+	 *           option: bool,
+	 *           if-exists: bool,
+	 *           sub_tree: array{
+	 *               array{
+	 *                   expr_type: string,
+	 *                   base_expr: string
+	 *               },
+	 *               array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       base_expr: string,
+	 *                       sub_tree: array{
+	 *                           expr_type: string,
+	 *                           table: string,
+	 *                           no_quotes: array{
+	 *                               delim: bool,
+	 *                               parts: string[]
+	 *                           },
+	 *                           alias: bool,
+	 *                           base_expr: string,
+	 *                           delim: bool
+	 *                       }[]
+	 *                   }
+	 *               }
+	 *           }[]
+	 *       },
+	 *       ALTER: array{
+	 *           base_expr: string,
+	 *           sub_tree: mixed[]
+	 *       }
+	 *   } $parsedPayload
 	 */
-	public ?array $parsedPayload = [];
+	public mixed $parsedPayload = [];
 
 	/**
 	 * @param Request $request
@@ -71,7 +225,171 @@ final class Payload extends BasePayload
 
 		if ($self->endpointBundle === Endpoint::Sql) {
 			$self->originQuery = $request->payload;
-			$self->parsedPayload = static::$sqlQueryParser::getParsedPayload();
+
+
+			/** @var array{
+			 *       CREATE: array{
+			 *           expr_type: string,
+			 *           not-exists: bool,
+			 *           base_expr: string,
+			 *           sub_tree: array{
+			 *               expr_type: string,
+			 *               base_expr: string
+			 *           }[]
+			 *       },
+			 *       SOURCE: array{
+			 *           base_expr: string,
+			 *           name: string,
+			 *           no_quotes: array{
+			 *               delim: bool,
+			 *               parts: string[]
+			 *           },
+			 *           create-def: array{
+			 *               expr_type: string,
+			 *               base_expr: string,
+			 *               sub_tree: array{
+			 *                   expr_type: string,
+			 *                   base_expr: string,
+			 *                   sub_tree: array{
+			 *                       expr_type: string,
+			 *                       base_expr: string,
+			 *                       sub_tree: array{
+			 *                           expr_type: string,
+			 *                           base_expr: string
+			 *                       }[]
+			 *                   }[]
+			 *               }[]
+			 *           },
+			 *           options: array{
+			 *               expr_type: string,
+			 *               base_expr: string,
+			 *               delim: string,
+			 *               sub_tree: array{
+			 *                   expr_type: string,
+			 *                   base_expr: string,
+			 *                   delim: string,
+			 *                   sub_tree: array{
+			 *                       expr_type: string,
+			 *                       base_expr: string
+			 *                   }[]
+			 *               }[]
+			 *           }[]
+			 *       },
+			 *       VIEW: array{
+			 *           base_expr: string,
+			 *           name: string,
+			 *           no_quotes: array{
+			 *               delim: bool,
+			 *               parts: string[]
+			 *           },
+			 *           create-def: bool,
+			 *           options: bool|array{
+			 *               expr_type: string,
+			 *               base_expr: string,
+			 *               delim: string,
+			 *               sub_tree: array{
+			 *                   expr_type: string,
+			 *                   base_expr: string,
+			 *                   delim: string,
+			 *                   sub_tree: array{
+			 *                       expr_type: string,
+			 *                       base_expr: string
+			 *                   }[]
+			 *               }[]
+			 *           },
+			 *           to: array{
+			 *               expr_type: string,
+			 *               table: string,
+			 *               base_expr: string,
+			 *               no_quotes: array{
+			 *                   delim: bool,
+			 *                   parts: string[]
+			 *               }
+			 *           }
+			 *       },
+			 *       SELECT: array{
+			 *           array{
+			 *               expr_type: string,
+			 *               alias: bool|array{
+			 *                   as: bool,
+			 *                   name: string,
+			 *                   base_expr: string,
+			 *                   no_quotes: array{
+			 *                       delim: bool,
+			 *                       parts: string[]
+			 *                   }
+			 *               },
+			 *               base_expr: string,
+			 *               no_quotes: array{
+			 *                   delim: bool,
+			 *                   parts: string[]
+			 *               },
+			 *               sub_tree: mixed,
+			 *               delim: bool|string
+			 *           }[]
+			 *       },
+			 *       FROM: array{
+			 *           array{
+			 *               expr_type: string,
+			 *               table: string,
+			 *               no_quotes: array{
+			 *                   delim: bool,
+			 *                   parts: string[]
+			 *               },
+			 *               alias: bool,
+			 *               hints: bool,
+			 *               join_type: string,
+			 *               ref_type: bool,
+			 *               ref_clause: bool,
+			 *               base_expr: string,
+			 *               sub_tree: bool|array{}
+			 *           }[]
+			 *       },
+			 *       SHOW: array{
+			 *           array{
+			 *               expr_type: string,
+			 *               base_expr: string
+			 *           }[]
+			 *       },
+			 *       DROP: array{
+			 *           expr_type: string,
+			 *           option: bool,
+			 *           if-exists: bool,
+			 *           sub_tree: array{
+			 *               array{
+			 *                   expr_type: string,
+			 *                   base_expr: string
+			 *               },
+			 *               array{
+			 *                   expr_type: string,
+			 *                   base_expr: string,
+			 *                   sub_tree: array{
+			 *                       expr_type: string,
+			 *                       base_expr: string,
+			 *                       sub_tree: array{
+			 *                           expr_type: string,
+			 *                           table: string,
+			 *                           no_quotes: array{
+			 *                               delim: bool,
+			 *                               parts: string[]
+			 *                           },
+			 *                           alias: bool,
+			 *                           base_expr: string,
+			 *                           delim: bool
+			 *                       }[]
+			 *                   }
+			 *               }
+			 *           }[]
+			 *       },
+			 *       ALTER: array{
+			 *           base_expr: string,
+			 *           sub_tree: mixed[]
+			 *       }
+			 *   } $parsedPayload
+			 */
+
+			$parsedPayload = static::$sqlQueryParser::getParsedPayload();
+			$self->parsedPayload = $parsedPayload;
 
 
 			if (self::isCreateSourceMatch($self->parsedPayload)) {
@@ -106,6 +424,167 @@ final class Payload extends BasePayload
 		/** @codingStandardsIgnoreEnd */
 	): bool {
 
+		/** @var array{
+		 *       CREATE: array{
+		 *           expr_type: string,
+		 *           not-exists: bool,
+		 *           base_expr: string,
+		 *           sub_tree: array{
+		 *               expr_type: string,
+		 *               base_expr: string
+		 *           }[]
+		 *       },
+		 *       SOURCE: array{
+		 *           base_expr: string,
+		 *           name: string,
+		 *           no_quotes: array{
+		 *               delim: bool,
+		 *               parts: string[]
+		 *           },
+		 *           create-def: array{
+		 *               expr_type: string,
+		 *               base_expr: string,
+		 *               sub_tree: array{
+		 *                   expr_type: string,
+		 *                   base_expr: string,
+		 *                   sub_tree: array{
+		 *                       expr_type: string,
+		 *                       base_expr: string,
+		 *                       sub_tree: array{
+		 *                           expr_type: string,
+		 *                           base_expr: string
+		 *                       }[]
+		 *                   }[]
+		 *               }[]
+		 *           },
+		 *           options: array{
+		 *               expr_type: string,
+		 *               base_expr: string,
+		 *               delim: string,
+		 *               sub_tree: array{
+		 *                   expr_type: string,
+		 *                   base_expr: string,
+		 *                   delim: string,
+		 *                   sub_tree: array{
+		 *                       expr_type: string,
+		 *                       base_expr: string
+		 *                   }[]
+		 *               }[]
+		 *           }[]
+		 *       },
+		 *       VIEW: array{
+		 *           base_expr: string,
+		 *           name: string,
+		 *           no_quotes: array{
+		 *               delim: bool,
+		 *               parts: string[]
+		 *           },
+		 *           create-def: bool,
+		 *           options: bool|array{
+		 *               expr_type: string,
+		 *               base_expr: string,
+		 *               delim: string,
+		 *               sub_tree: array{
+		 *                   expr_type: string,
+		 *                   base_expr: string,
+		 *                   delim: string,
+		 *                   sub_tree: array{
+		 *                       expr_type: string,
+		 *                       base_expr: string
+		 *                   }[]
+		 *               }[]
+		 *           },
+		 *           to: array{
+		 *               expr_type: string,
+		 *               table: string,
+		 *               base_expr: string,
+		 *               no_quotes: array{
+		 *                   delim: bool,
+		 *                   parts: string[]
+		 *               }
+		 *           }
+		 *       },
+		 *       SELECT: array{
+		 *           array{
+		 *               expr_type: string,
+		 *               alias: bool|array{
+		 *                   as: bool,
+		 *                   name: string,
+		 *                   base_expr: string,
+		 *                   no_quotes: array{
+		 *                       delim: bool,
+		 *                       parts: string[]
+		 *                   }
+		 *               },
+		 *               base_expr: string,
+		 *               no_quotes: array{
+		 *                   delim: bool,
+		 *                   parts: string[]
+		 *               },
+		 *               sub_tree: mixed,
+		 *               delim: bool|string
+		 *           }[]
+		 *       },
+		 *       FROM: array{
+		 *           array{
+		 *               expr_type: string,
+		 *               table: string,
+		 *               no_quotes: array{
+		 *                   delim: bool,
+		 *                   parts: string[]
+		 *               },
+		 *               alias: bool,
+		 *               hints: bool,
+		 *               join_type: string,
+		 *               ref_type: bool,
+		 *               ref_clause: bool,
+		 *               base_expr: string,
+		 *               sub_tree: bool|array{}
+		 *           }[]
+		 *       },
+		 *       SHOW: array{
+		 *           array{
+		 *               expr_type: string,
+		 *               base_expr: string
+		 *           }[]
+		 *       },
+		 *       DROP: array{
+		 *           expr_type: string,
+		 *           option: bool,
+		 *           if-exists: bool,
+		 *           sub_tree: array{
+		 *               array{
+		 *                   expr_type: string,
+		 *                   base_expr: string
+		 *               },
+		 *               array{
+		 *                   expr_type: string,
+		 *                   base_expr: string,
+		 *                   sub_tree: array{
+		 *                       expr_type: string,
+		 *                       base_expr: string,
+		 *                       sub_tree: array{
+		 *                           expr_type: string,
+		 *                           table: string,
+		 *                           no_quotes: array{
+		 *                               delim: bool,
+		 *                               parts: string[]
+		 *                           },
+		 *                           alias: bool,
+		 *                           base_expr: string,
+		 *                           delim: bool
+		 *                       }[]
+		 *                   }
+		 *               }
+		 *           }[]
+		 *       },
+		 *       ALTER: array{
+		 *           base_expr: string,
+		 *           sub_tree: mixed[]
+		 *       }
+		 *   } $parsedPayload
+		 */
+
 		$parsedPayload = Payload::$sqlQueryParser::getParsedPayload();
 
 		return (
@@ -125,7 +604,55 @@ final class Payload extends BasePayload
 	/**
 	 * Should match CREATE SOURCE {name} (field type) option=value
 	 *
-	 * @param array $parsedPayload
+	 * @param array{
+	 *      CREATE: array{
+	 *          expr_type: string,
+	 *          not-exists: bool,
+	 *          base_expr: string,
+	 *          sub_tree: array{
+	 *              expr_type: string,
+	 *              base_expr: string
+	 *          }[]
+	 *      },
+	 *      SOURCE: array{
+	 *          base_expr: string,
+	 *          name: string,
+	 *          no_quotes: array{
+	 *              delim: bool,
+	 *              parts: string[]
+	 *          },
+	 *          create-def: array{
+	 *              expr_type: string,
+	 *              base_expr: string,
+	 *              sub_tree: array{
+	 *                  expr_type: string,
+	 *                  base_expr: string,
+	 *                  sub_tree: array{
+	 *                      expr_type: string,
+	 *                      base_expr: string,
+	 *                      sub_tree: array{
+	 *                          expr_type: string,
+	 *                          base_expr: string
+	 *                      }[]
+	 *                  }[]
+	 *              }[]
+	 *          },
+	 *          options: array{
+	 *              expr_type: string,
+	 *              base_expr: string,
+	 *              delim: string,
+	 *              sub_tree: array{
+	 *                  expr_type: string,
+	 *                  base_expr: string,
+	 *                  delim: string,
+	 *                  sub_tree: array{
+	 *                      expr_type: string,
+	 *                      base_expr: string
+	 *                  }[]
+	 *              }[]
+	 *          }[]
+	 *      }
+	 *  } $parsedPayload
 	 * @return bool
 	 * @example {"CREATE":{"expr_type":"source","not-exists":false,"base_expr":"SOURCE","sub_tree":[{"expr_type":
 	 * "reserved","base_expr":"SOURCE"}]},"SOURCE":{"base_expr":"kafka","name":"kafka","no_quotes":{"delim":false,
@@ -169,7 +696,69 @@ final class Payload extends BasePayload
 	/**
 	 * Should match CREATE MATERIALIZED VIEW view_table.....
 	 *
-	 * @param array $parsedPayload
+	 * @param array{
+	 *      CREATE: array{
+	 *          base_expr: string,
+	 *          sub_tree: mixed[]
+	 *      },
+	 *      VIEW: array{
+	 *          base_expr: string,
+	 *          name: string,
+	 *          no_quotes: array{
+	 *              delim: bool,
+	 *              parts: string[]
+	 *          },
+	 *          create-def: bool,
+	 *          options: bool,
+	 *          to: array{
+	 *              expr_type: string,
+	 *              table: string,
+	 *              base_expr: string,
+	 *              no_quotes: array{
+	 *                  delim: bool,
+	 *                  parts: string[]
+	 *              }
+	 *          }
+	 *      },
+	 *      SELECT: array{
+	 *          array{
+	 *              expr_type: string,
+	 *              alias: bool|array{
+	 *                  as: bool,
+	 *                  name: string,
+	 *                  base_expr: string,
+	 *                  no_quotes: array{
+	 *                      delim: bool,
+	 *                      parts: string[]
+	 *                  }
+	 *              },
+	 *              base_expr: string,
+	 *              no_quotes: array{
+	 *                  delim: bool,
+	 *                  parts: string[]
+	 *              },
+	 *              sub_tree: mixed,
+	 *              delim: bool|string
+	 *          }[]
+	 *      },
+	 *      FROM: array{
+	 *          array{
+	 *              expr_type: string,
+	 *              table: string,
+	 *              no_quotes: array{
+	 *                  delim: bool,
+	 *                  parts: string[]
+	 *              },
+	 *              alias: bool,
+	 *              hints: bool,
+	 *              join_type: string,
+	 *              ref_type: bool,
+	 *              ref_clause: bool,
+	 *              base_expr: string,
+	 *              sub_tree: bool|array{}
+	 *          }[]
+	 *      }
+	 *  } $parsedPayload
 	 * @return bool
 	 * @example {"CREATE":{"base_expr":"MATERIALIZED VIEW","sub_tree":[]},"VIEW":{"base_expr":"view_table",
 	 * "name":"view_table","no_quotes":{"delim":false,"parts":["view_table"]},"create-def":false,"options":false,
@@ -202,7 +791,14 @@ final class Payload extends BasePayload
 	/**
 	 * Should match SHOW MATERIALIZED VIEWS
 	 *
-	 * @param array $parsedPayload
+	 * @param array{
+	 *      SHOW: array{
+	 *          array{
+	 *              expr_type: string,
+	 *              base_expr: string
+	 *          }[]
+	 *      }
+	 *  } $parsedPayload
 	 * @return bool
 	 * @example {"SHOW":[{"expr_type":"reserved","base_expr":"materialized"},{"expr_type":"reserved","base_expr":"views"}]}
 	 */
@@ -216,7 +812,14 @@ final class Payload extends BasePayload
 	/**
 	 * Should match SHOW MATERIALIZED VIEW {name}
 	 *
-	 * @param array $parsedPayload
+	 * @param array{
+	 *      SHOW: array{
+	 *          array{
+	 *              expr_type: string,
+	 *              base_expr: string
+	 *          }[]
+	 *      }
+	 *  } $parsedPayload
 	 * @return bool
 	 * @example {"SHOW":[{"expr_type":"reserved","base_expr":"materialized"},{"expr_type":"reserved","base_expr":"view"},
 	 * {"expr_type":"view","view":"view_table","no_quotes":{"delim":false,"parts":["view_table"]},
@@ -234,7 +837,14 @@ final class Payload extends BasePayload
 	/**
 	 * Should match SHOW SOURCES
 	 *
-	 * @param array $parsedPayload
+	 * @param array{
+	 *      SHOW: array{
+	 *          array{
+	 *              expr_type: string,
+	 *              base_expr: string
+	 *          }[]
+	 *      }
+	 *  } $parsedPayload
 	 * @return bool
 	 * @example {"SHOW":[{"expr_type":"reserved","base_expr":"sources"}]}
 	 */
@@ -246,7 +856,14 @@ final class Payload extends BasePayload
 	/**
 	 * Should match SHOW SOURCE {name}
 	 *
-	 * @param array $parsedPayload
+	 * @param array{
+	 *      SHOW: array{
+	 *          array{
+	 *              expr_type: string,
+	 *              base_expr: string
+	 *          }[]
+	 *      }
+	 *  } $parsedPayload
 	 * @return bool
 	 * @example {"SHOW":[{"expr_type":"reserved","base_expr":"source"},
 	 * {"expr_type":"source","source":"kafka","no_quotes":{"delim":false,"parts":["kafka"]},"base_expr":"kafka"}]}
@@ -262,7 +879,38 @@ final class Payload extends BasePayload
 	/**
 	 * Should match DROP SOURCE {name}
 	 *
-	 * @param array $parsedPayload
+	 * @param array{
+	 *      DROP: array{
+	 *          expr_type: string,
+	 *          option: bool,
+	 *          if-exists: bool,
+	 *          sub_tree: array{
+	 *              array{
+	 *                  expr_type: string,
+	 *                  base_expr: string
+	 *              },
+	 *              array{
+	 *                  expr_type: string,
+	 *                  base_expr: string,
+	 *                  sub_tree: array{
+	 *                      expr_type: string,
+	 *                      base_expr: string,
+	 *                      sub_tree: array{
+	 *                          expr_type: string,
+	 *                          table: string,
+	 *                          no_quotes: array{
+	 *                              delim: bool,
+	 *                              parts: string[]
+	 *                          },
+	 *                          alias: bool,
+	 *                          base_expr: string,
+	 *                          delim: bool
+	 *                      }[]
+	 *                  }
+	 *              }
+	 *          }[]
+	 *      }
+	 *  } $parsedPayload
 	 * @return bool
 	 * @example {"DROP":{"expr_type":"source","option":false,"if-exists":false,
 	 * "sub_tree":[{"expr_type":"reserved","base_expr":"source"},
@@ -280,7 +928,38 @@ final class Payload extends BasePayload
 	/**
 	 * Should match DROP MATERIALIZED VIEW {name}
 	 *
-	 * @param array $parsedPayload
+	 * @param array{
+	 *      DROP: array{
+	 *          expr_type: string,
+	 *          option: bool,
+	 *          if-exists: bool,
+	 *          sub_tree: array{
+	 *              array{
+	 *                  expr_type: string,
+	 *                  base_expr: string
+	 *              },
+	 *              array{
+	 *                  expr_type: string,
+	 *                  base_expr: string,
+	 *                  sub_tree: array{
+	 *                      expr_type: string,
+	 *                      base_expr: string,
+	 *                      sub_tree: array{
+	 *                          expr_type: string,
+	 *                          table: string,
+	 *                          no_quotes: array{
+	 *                              delim: bool,
+	 *                              parts: string[]
+	 *                          },
+	 *                          alias: bool,
+	 *                          base_expr: string,
+	 *                          delim: bool
+	 *                      }[]
+	 *                  }
+	 *              }
+	 *          }[]
+	 *      }
+	 *  } $parsedPayload
 	 * @return bool
 	 * @example {"DROP":{"expr_type":"view","option":false,"if-exists":false,"sub_tree":[
 	 * {"expr_type":"reserved","base_expr":"materialized"},
@@ -302,7 +981,35 @@ final class Payload extends BasePayload
 	/**
 	 * Should match ALTER MATERIALIZED VIEW {name} suspended=0;
 	 *
-	 * @param array $parsedPayload
+	 * @param array{
+	 *      ALTER: array{
+	 *          base_expr: string,
+	 *          sub_tree: mixed[]
+	 *      },
+	 *      VIEW: array{
+	 *          base_expr: string,
+	 *          name: string,
+	 *          no_quotes: array{
+	 *              delim: bool,
+	 *              parts: string[]
+	 *          },
+	 *          create-def: bool,
+	 *          options: array{
+	 *              expr_type: string,
+	 *              base_expr: string,
+	 *              delim: string,
+	 *              sub_tree: array{
+	 *                  expr_type: string,
+	 *                  base_expr: string,
+	 *                  delim: string,
+	 *                  sub_tree: array{
+	 *                      expr_type: string,
+	 *                      base_expr: string
+	 *                  }[]
+	 *              }[]
+	 *          }[]
+	 *      }
+	 *  } $parsedPayload
 	 * @return bool
 	 *
 	 * @example {"ALTER":{"base_expr":"materialized view","sub_tree":[]},"VIEW":{"base_expr":"view_table",
@@ -347,6 +1054,9 @@ final class Payload extends BasePayload
 		return $handlerClassName;
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public static function parseSourceType(array $options): string {
 		foreach ($options as $option) {
 			if (isset($option['sub_tree'][0]['base_expr'])
@@ -359,10 +1069,6 @@ final class Payload extends BasePayload
 		throw new Exception('Cannot find handler for request type: ' . static::$type);
 	}
 
-	/**
-	 * @throws ContainerExceptionInterface
-	 * @throws NotFoundExceptionInterface
-	 */
 	public static function getProcessors(): array {
 		static::$processor = new QueueProcess();
 		return [static::$processor];
