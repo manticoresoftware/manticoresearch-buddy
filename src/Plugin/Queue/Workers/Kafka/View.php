@@ -4,6 +4,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\StringFunctionsTrait;
 use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
@@ -18,6 +19,10 @@ class View
 	private string $buffer;
 	private string $destination;
 
+	/**
+	 * @throws GenericError
+	 * @throws ManticoreSearchClientError
+	 */
 	public function __construct(Client $client, string $buffer, string $destination, string $query) {
 		$this->client = $client;
 		$this->buffer = $buffer;
@@ -39,9 +44,9 @@ class View
 	}
 
 	/**
-* @return array<int, array<string, string>>
-* @throws GenericError
-* @throws \Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError
+	 * @return array<int, array<string, string>>
+	 * @throws GenericError
+	 * @throws ManticoreSearchClientError
 	 */
 	private function read(): array {
 		$sql = "$this->query";
@@ -60,8 +65,8 @@ class View
 	}
 
 	/**
-* @param array<int, array<string, string>> $batch
-* @return array<int, array<string, mixed>>
+	 * @param array<int, array<string, string>> $batch
+	 * @return array<int, array<string, mixed>>
 	 */
 	private function prepareValues(array $batch): array {
 		foreach ($batch as $k => $row) {
@@ -73,9 +78,9 @@ class View
 	}
 
 	/**
-* @param array<int, array<string, mixed>> $batch
-* @return bool
-* @throws \Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError
+	 * @param array<int, array<string, mixed>> $batch
+	 * @return bool
+	 * @throws ManticoreSearchClientError
 	 */
 	private function insert(array $batch): bool {
 
