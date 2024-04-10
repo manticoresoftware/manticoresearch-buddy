@@ -28,6 +28,11 @@ final class Payload extends BasePayload {
 	public static string $requestTarget;
 
 	/**
+	 * @var string $requestError
+	 */
+	public static string $requestError;
+
+	/**
 	 * @var array<string,array{properties?:array<mixed>,type?:string,fields?:array<mixed>,
 	 * dimension?:int,method?:array<mixed>}> $columnInfo
 	 */
@@ -35,6 +40,9 @@ final class Payload extends BasePayload {
 
 	/** @var ?string $table */
 	public ?string $table;
+
+	/** @var ?string $body */
+	public ?string $body;
 
 	/** @var string $path */
 	public string $path;
@@ -57,8 +65,25 @@ final class Payload extends BasePayload {
 
 		$pathParts = explode('/', ltrim($request->path, '/'));
 		static::$requestTarget = end($pathParts);
+		// As of now, we process all telemetry-related requests from Kibana in the same way
+		if (str_ends_with(static::$requestTarget, 'telemetry')) {
+			static::$requestTarget = 'telemetry';
+		}
+		$self->path = $request->path;
 		switch (static::$requestTarget) {
 			case '_license':
+			case '_nodes':
+			case '_xpack':
+			case '.kibana':
+			case '.kibana_task_manager':
+			case '_update_by_query':
+			case 'settings':
+			case 'stats':
+				break;
+			case '_search':
+				static::$requestError = $request->error;
+				$self->table = $pathParts[0];
+				$self->body = $request->payload;
 				break;
 			case '_mapping':
 				/**
@@ -72,7 +97,6 @@ final class Payload extends BasePayload {
 				}
 				$self->columnInfo = $requestBody['properties'];
 				$self->table = $pathParts[0];
-				$self->path = $request->path;
 				break;
 			default:
 				if ($pathParts[0] === '_index_template') {
@@ -97,11 +121,31 @@ final class Payload extends BasePayload {
 	/**
 	 * @return string
 	 */
+	public static function getKibanaRequestHandler(): string {
+		if (str_starts_with(static::$requestError, '"_source" property should be')) {
+			return 'InvalidSourceKibanaHandler';
+		}
+		if (!isset(static::$requestError)) {
+			throw new Exception("Error type is not defined");
+		}
+		throw new Exception('Cannot find handler for error: ' . static::$requestError);
+	}
+
+	/**
+	 * @return string
+	 */
 	public function getHandlerClassName(): string {
 		$namespace = __NAMESPACE__ . '\\';
 		$handlerName = match (static::$requestTarget) {
 			'_license' => 'LicenseHandler',
+			'_nodes' => 'NodesInfoKibanaHandler',
+			'_xpack' => 'XpackInfoKibanaHandler',
+			'.kibana' => 'SettingsKibanaHandler',
 			'_mapping' => 'CreateTableHandler',
+			'.kibana_task_manager', '_update_by_query' => 'ManagerSettingsKibanaHandler',
+			'settings', 'stats' => 'ClusterKibanaHandler',
+			'telemetry' => 'TelemetryKibanaHandler',
+			'_search' => self::getKibanaRequestHandler(),
 			default => throw new Exception('Cannot find handler for request type: ' . static::$requestTarget),
 		};
 

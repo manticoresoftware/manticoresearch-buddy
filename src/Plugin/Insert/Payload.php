@@ -49,6 +49,7 @@ final class Payload extends BasePayload {
 		if ($request->endpointBundle === ManticoreEndpoint::Bulk) {
 			$self->path = '_bulk';
 			$request->payload = trim($request->payload) . "\n";
+			file_put_contents("/tmp/test.txt", $request->payload);
 		}
 		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->payload));
 		$self->queries[] = $request->payload;

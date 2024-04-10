@@ -107,7 +107,7 @@ class CreateTableHandler extends BaseHandlerWithClient {
 			$colType = $dataTypeMap[$dataType];
 			$dataTypeOptions = match (true) {
 				($dataType === 'knn_vector') => self::buildKnnFieldSettings($colInfo),
-				($colType === 'text' && isset($colInfo['fields'], $colInfo['fields']['keyword'])) => ' indexed',
+				($colType === 'text' && isset($colInfo['fields'], $colInfo['fields']['keyword'])) => ' indexed stored',
 				default => '',
 			};
 			$colDefs[] = "$colName $colType" . $dataTypeOptions;

@@ -18,6 +18,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 /**
@@ -61,6 +62,7 @@ class Handler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 			for ($i = 0, $maxI = sizeof($payload->queries) - 1; $i <= $maxI; $i++) {
 				$query = $payload->queries[$i];
+				Buddy::debug("TEST: $query");
 				$resp = $manticoreClient->sendRequest($query, $i === 0 ? null : $payload->path);
 			}
 

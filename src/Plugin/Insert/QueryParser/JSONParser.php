@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser;
 
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 abstract class JSONParser extends BaseParser implements JSONParserInterface {
 
@@ -33,11 +34,14 @@ abstract class JSONParser extends BaseParser implements JSONParserInterface {
 			foreach ($queries as $query) {
 				$row = json_decode($query, true);
 				if (!is_array($row)) {
+					Buddy::debug("TEST1" . $query);
+					Buddy::debug("ERR" . $row);
 					throw new QueryParseError('Invalid JSON in query');
 				}
 				$this->isNdJSON = true;
 				$this->parseJSONRow($row);
 			}
+			Buddy::debug("TEST3");
 		} else {
 			$this->parseJSONRow($row);
 		}
