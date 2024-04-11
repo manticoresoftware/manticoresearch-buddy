@@ -60,8 +60,8 @@ final class Cluster {
 		}
 
 		// TODO: the pass is the subject to remove
-		$galera_options = static::GALERA_OPTIONS;
-		$query = "CREATE CLUSTER {$this->name} '{$this->name}' as path, '{$galera_options}' as options";
+		$galeraOptions = static::GALERA_OPTIONS;
+		$query = "CREATE CLUSTER {$this->name} '{$this->name}' as path, '{$galeraOptions}' as options";
 		return $this->runQuery($queue, $query);
 	}
 
