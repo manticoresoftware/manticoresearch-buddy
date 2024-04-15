@@ -11,6 +11,9 @@ final class Cluster {
 	// Name of the cluster that we use to store meta data
 	// TODO: not in use yet
 	const SYSTEM_NAME = 'system';
+	const GALERA_OPTIONS = 'evs.send_window=8;'
+		. 'evs.user_send_window=4;gcs.max_throttle=0.5;'
+		. 'gcs.fc_limit=64;gcs.fc_factor=0.9;gmcast.peer_timeout=PT5S';
 
 	/** @var Set<string> $nodes set of all nodes that belong the the cluster */
 	protected Set $nodes;
@@ -66,7 +69,8 @@ final class Cluster {
 		}
 
 		// TODO: the pass is the subject to remove
-		$query = "CREATE CLUSTER {$this->name} '{$this->name}' as path";
+		$galeraOptions = static::GALERA_OPTIONS;
+		$query = "CREATE CLUSTER {$this->name} '{$this->name}' as path, '{$galeraOptions}' as options";
 		return $this->runQuery($queue, $query);
 	}
 
