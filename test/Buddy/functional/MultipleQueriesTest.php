@@ -12,7 +12,8 @@
 use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
 use PHPUnit\Framework\TestCase;
 
-class MultipleQueriesTest extends TestCase {
+class MultipleQueriesTest extends TestCase
+{
 
 	use TestFunctionalTrait;
 
@@ -170,7 +171,7 @@ class MultipleQueriesTest extends TestCase {
 
 		$query = "INSERT into {$this->testTable1}(col1,col2) VALUES(1,2);SHOW QUERIES";
 		$out = static::runSqlQuery($query);
-		$expectedFields = ['id', 'query', 'protocol', 'host'];
+		$expectedFields = ['id', 'query', 'time', 'protocol', 'host'];
 		$realFields = array_values(array_filter(array_map('trim', explode('|', $out[1]))));
 		$this->assertEquals($expectedFields, $realFields);
 		$selectResult = [
