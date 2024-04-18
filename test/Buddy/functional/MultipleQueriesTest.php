@@ -12,8 +12,7 @@
 use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
 use PHPUnit\Framework\TestCase;
 
-class MultipleQueriesTest extends TestCase
-{
+class MultipleQueriesTest extends TestCase {
 
 	use TestFunctionalTrait;
 
