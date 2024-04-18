@@ -96,7 +96,7 @@ class CliTableTest extends TestCase {
 			"\+-+\+-+\+-+\+-+\+-+\+\n".
 			"\| \d+ \| select\s+\| \d+us ago\s+\| http\s+\| 127\.0\.0\.1:\d+ \|\n".
 			"\+-+\+-+\+-+\+-+\+-+\+\n".
-			"2 rows in set \(\d\.\d{3} sec\)\n/";
+			"1 row in set \(\d\.\d{3} sec\)\n/";
 		$this->assertMatchesRegularExpression($pattern, $out[0]['columns']);
 	}
 }
