@@ -62,8 +62,8 @@ class MultipleQueriesTest extends TestCase {
 		];
 		$query = "INSERT into {$this->testTable2}(col1,col2) VALUES(1,2);SHOW QUERIES";
 		$out = static::runSqlQuery($query);
-		$first = '+------+--------------+----------+----------+-----------------+';
-		$second = '| id   | query        | time     | protocol | host            |';
+		$first = '+------+--------------+-----------+----------+-----------------+';
+		$second = '| id   | query        | time      | protocol | host            |';
 		$this->assertEquals($first, $out[0]);
 		$this->assertEquals($second, $out[1]);
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable2}");
