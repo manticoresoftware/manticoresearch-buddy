@@ -25,7 +25,7 @@ class ShowQueriesTest extends TestCase {
 		echo "\nTesting the execution of SQL SHOW QUERIES statement\n";
 		$query = 'SHOW QUERIES';
 		$out = static::runSqlQuery($query);
-		$expectedFields = ['id', 'query', 'protocol', 'host'];
+		$expectedFields = ['id', 'query', 'time', 'protocol', 'host'];
 
 		$realFields = array_values(array_filter(array_map('trim', explode('|', $out[1]))));
 		$this->assertEquals($expectedFields, $realFields);
@@ -54,6 +54,7 @@ class ShowQueriesTest extends TestCase {
 		$resultColumns = [
 			['id' => ['type' => 'long long']],
 			['query' => ['type' => 'string']],
+			['time' => ['type' => 'string']],
 			['protocol' => ['type' => 'string']],
 			['host' => ['type' => 'string']],
 		];
