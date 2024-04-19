@@ -31,7 +31,7 @@ class ShowQueriesHandlerTest extends TestCase {
 		$respBody = json_decode(
 			"[{\n"
 			. '"columns":[{"id":{"type":"long long"}},{"query":{"type":"string"}},'
-			. '{"protocol":{"type":"string"}},{"host":{"type":"string"}}],'
+			. '{"time":{"type":"string"}},{"protocol":{"type":"string"}},{"host":{"type":"string"}}],'
 			. "\n"
 			. '"data":[{"protocol":"http","host":"127.0.0.1:584","id":19,"query":"select"}'
 			. "\n],\n"

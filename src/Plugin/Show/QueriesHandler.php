@@ -26,6 +26,7 @@ class QueriesHandler extends BaseHandlerWithTableFormatter {
 	const COL_MAP = [
 		'connid' => 'id',
 		'last cmd' => 'query',
+		'last cmd time' => 'time',
 		'proto' => 'protocol',
 		'host' => 'host',
 	];
@@ -94,6 +95,10 @@ class QueriesHandler extends BaseHandlerWithTableFormatter {
 					'type' => 'string',
 				],
 				],
+				['time' => [
+					'type' => 'string',
+				],
+				],
 				['protocol' => [
 					'type' => 'string',
 				],
@@ -144,6 +149,7 @@ class QueriesHandler extends BaseHandlerWithTableFormatter {
 			$data[] = [
 				'id' => $task['id'],
 				'query' => $task['body'],
+				'time' => '0us',
 				'protocol' => 'http',
 				'host' => $task['host'],
 			];

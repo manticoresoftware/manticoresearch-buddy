@@ -62,10 +62,10 @@ class MultipleQueriesTest extends TestCase {
 		];
 		$query = "INSERT into {$this->testTable2}(col1,col2) VALUES(1,2);SHOW QUERIES";
 		$out = static::runSqlQuery($query);
-		$first = '+------+--------------+----------+-----------------+';
-		$second = '| id   | query        | protocol | host            |';
-		$this->assertEquals($first, $out[0]);
-		$this->assertEquals($second, $out[1]);
+		$first = '/\+-+\+-+\+-+\+-+\+-+/';
+		$second = '/\| id\s+\| query\s+\| time\s+\| protocol\s+\| host\s+\|/';
+		$this->assertMatchesRegularExpression($first, $out[0]);
+		$this->assertMatchesRegularExpression($second, $out[1]);
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable2}");
 		$this->assertEquals($selectResult, $out);
 	}
@@ -170,7 +170,7 @@ class MultipleQueriesTest extends TestCase {
 
 		$query = "INSERT into {$this->testTable1}(col1,col2) VALUES(1,2);SHOW QUERIES";
 		$out = static::runSqlQuery($query);
-		$expectedFields = ['id', 'query', 'protocol', 'host'];
+		$expectedFields = ['id', 'query', 'time', 'protocol', 'host'];
 		$realFields = array_values(array_filter(array_map('trim', explode('|', $out[1]))));
 		$this->assertEquals($expectedFields, $realFields);
 		$selectResult = [

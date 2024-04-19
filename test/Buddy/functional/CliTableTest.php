@@ -90,16 +90,13 @@ class CliTableTest extends TestCase {
 		if (!isset($out[0]['columns'])) {
 			return;
 		}
-		$result = preg_match(
-			"/\+-+\+-+\+-+\+-+\+\n"
-			. "\| id\s+\| query\s+\| protocol \| host\s+\|\n"
-			. "\+-+\+-+\+-+\+-+\+\n"
-			. "\| \d+ | select \| http\s+\| 127\.0\.0\.1:\d+ \|\n"
-			. "\| [a-z0-9\.]+ | SHOW QUERIES \| http\s+\| 127\.0\.0\.1:\d+ \|\n"
-			. "\+-+\+-+\+-+\+-+\+\n"
-			. "2 rows in set \(\d\.\d{3} sec\)\n/s",
-			$out[0]['columns']
-		);
-		$this->assertEquals(1, $result);
+
+		$pattern = "/\+-+\+-+\+-+\+-+\+-+\+\n".
+			"\| id\s+\| query\s+\| time\s+\| protocol \| host\s+\|\n".
+			"\+-+\+-+\+-+\+-+\+-+\+\n".
+			"\| \d+ \| select\s+\| \d+us ago\s+\| http\s+\| 127\.0\.0\.1:\d+ \|\n".
+			"\+-+\+-+\+-+\+-+\+-+\+\n".
+			"1 row in set \(\d\.\d{3} sec\)\n/";
+		$this->assertMatchesRegularExpression($pattern, $out[0]['columns']);
 	}
 }
