@@ -7,4 +7,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 class ShowSourceModel extends Model
 {
 
+	#[\Override] public function getHandlerClass(): string {
+		return 'Handlers\\Source\\GetSourceHandler';
+	}
 }

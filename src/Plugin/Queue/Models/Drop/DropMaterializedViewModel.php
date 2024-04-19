@@ -7,4 +7,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 class DropMaterializedViewModel extends Model
 {
 
+	#[\Override] public function getHandlerClass(): string {
+		return 'Handlers\\View\\DropViewHandler';
+	}
 }

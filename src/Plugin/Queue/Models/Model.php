@@ -2,7 +2,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Models;
 
-class Model
+abstract class Model
 {
 	private array $parsedPayload;
 
@@ -13,4 +13,6 @@ class Model
 	final public function getPayload(): array {
 		return $this->parsedPayload;
 	}
+
+	abstract public function getHandlerClass(): string;
 }

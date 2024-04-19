@@ -2,8 +2,8 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Models\Factories;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Create\DropMaterializedViewModel;
-use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Create\DropSourceModel;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Drop\DropMaterializedViewModel;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Drop\DropSourceModel;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
