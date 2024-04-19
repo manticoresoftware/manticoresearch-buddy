@@ -11,6 +11,32 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
 class ShowFactory
 {
+
+	/**
+	 * @param array{
+	 *     SHOW: array{
+	 *         0: array{
+	 *             expr_type: string,
+	 *             base_expr: string
+	 *         },
+	 *         1: array{
+	 *             expr_type: string,
+	 *             base_expr: string
+	 *         },
+	 *         2: array{
+	 *             expr_type: string,
+	 *             view: string,
+	 *             no_quotes: array{
+	 *                 delim: bool,
+	 *                 parts: array<string>
+	 *             },
+	 *             base_expr: string
+	 *         }
+	 *     }
+	 * } $parsedPayload
+	 * @return Model|null
+	 */
+
 	public static function create(array $parsedPayload): ?Model {
 
 		$model = null;
@@ -40,10 +66,14 @@ class ShowFactory
 	 *
 	 * @param array{
 	 *      SHOW: array{
-	 *          array{
+	 *          0: array{
 	 *              expr_type: string,
-	 *              base_expr: string
-	 *          }[]
+	 *              base_expr?: string
+	 *          },
+	 *          1: array{
+	 *              expr_type: string,
+	 *              base_expr?: string
+	 *          }
 	 *      }
 	 *  } $parsedPayload
 	 * @return bool
@@ -62,10 +92,23 @@ class ShowFactory
 	 *
 	 * @param array{
 	 *      SHOW: array{
-	 *          array{
+	 *          0: array{
 	 *              expr_type: string,
+	 *              base_expr?: string
+	 *          },
+	 *          1: array{
+	 *              expr_type: string,
+	 *              base_expr?: string
+	 *          },
+	 *          2: array{
+	 *              expr_type: string,
+	 *              view: string,
+	 *              no_quotes: array{
+	 *                  delim: bool,
+	 *                  parts: array<string>
+	 *              },
 	 *              base_expr: string
-	 *          }[]
+	 *          }
 	 *      }
 	 *  } $parsedPayload
 	 * @return bool
@@ -87,10 +130,10 @@ class ShowFactory
 	 *
 	 * @param array{
 	 *      SHOW: array{
-	 *          array{
+	 *          0: array{
 	 *              expr_type: string,
-	 *              base_expr: string
-	 *          }[]
+	 *              base_expr?: string
+	 *          }
 	 *      }
 	 *  } $parsedPayload
 	 * @return bool
@@ -106,10 +149,28 @@ class ShowFactory
 	 *
 	 * @param array{
 	 *      SHOW: array{
-	 *          array{
+	 *          0: array{
 	 *              expr_type: string,
+	 *              base_expr?: string
+	 *          },
+	 *          1: array{
+	 *              expr_type: string,
+	 *              view?: string,
+	 *              no_quotes?: array{
+	 *                  delim: bool,
+	 *                  parts: array<string>
+	 *              },
+	 *              base_expr?: string
+	 *          },
+	 *          2: array{
+	 *              expr_type: string,
+	 *              view: string,
+	 *              no_quotes: array{
+	 *                  delim: bool,
+	 *                  parts: array<string>
+	 *              },
 	 *              base_expr: string
-	 *          }[]
+	 *          }
 	 *      }
 	 *  } $parsedPayload
 	 * @return bool
