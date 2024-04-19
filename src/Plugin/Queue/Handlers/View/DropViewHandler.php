@@ -33,7 +33,7 @@ final class DropViewHandler extends BaseDropHandler
 		}
 
 		$removed = 0;
-		if (is_array($result->getResult()[0])){
+		if (is_array($result->getResult()[0])) {
 			foreach ($result->getResult()[0]['data'] as $row) {
 				$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
 

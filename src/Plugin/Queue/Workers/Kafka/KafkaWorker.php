@@ -7,6 +7,7 @@ use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\BuddyTest\Lib\BuddyRequestError;
 use RdKafka\Conf;
 use RdKafka\Exception;
 use RdKafka\KafkaConsumer;
@@ -166,6 +167,7 @@ class KafkaWorker
 	/**
 	 * @param array<int, string> $batch
 	 * @return array<int, array<string, mixed>>
+	 * @throws BuddyRequestError
 	 */
 	private function mapMessages(array $batch): array {
 		$results = [];
@@ -177,28 +179,35 @@ class KafkaWorker
 				$message = [];
 			}
 
-			$row = [];
-			foreach ($this->fields as $fieldName => $fieldType) {
-				if (isset($message[$fieldName])) {
-					$row[$fieldName] = $this->morphValuesByFieldType($message[$fieldName], $fieldType);
-				} else {
-					if (in_array(
-						$fieldType, [Fields::TYPE_INT,
-							Fields::TYPE_BIGINT,
-							Fields::TYPE_TIMESTAMP,
-							Fields::TYPE_BOOL,
-							Fields::TYPE_FLOAT]
-					)) {
-						$row[$fieldName] = 0;
-					} else {
-						$row[$fieldName] = "''";
-					}
-				}
-			}
-			$results[] = $row;
+			$results[] = $this->handleRow($message);
 		}
 
 		return $results;
+	}
+
+	/**
+	 * @throws BuddyRequestError
+	 */
+	private function handleRow(array $message): array {
+		$row = [];
+		foreach ($this->fields as $fieldName => $fieldType) {
+			if (isset($message[$fieldName])) {
+				$row[$fieldName] = $this->morphValuesByFieldType($message[$fieldName], $fieldType);
+			} else {
+				if (in_array(
+					$fieldType, [Fields::TYPE_INT,
+						Fields::TYPE_BIGINT,
+						Fields::TYPE_TIMESTAMP,
+						Fields::TYPE_BOOL,
+						Fields::TYPE_FLOAT]
+				)) {
+					$row[$fieldName] = 0;
+				} else {
+					$row[$fieldName] = "''";
+				}
+			}
+		}
+		return $row;
 	}
 
 	/**

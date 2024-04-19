@@ -59,7 +59,7 @@ final class AlterViewHandler extends BaseHandlerWithClient
 				throw ManticoreSearchClientError::create((string)$rawResult->getError());
 			}
 
-			return $this->processAlter($rawResult, $viewsTable);
+			return $this->processAlter($rawResult);
 		};
 
 		return Task::create($taskFn)->run();
@@ -67,17 +67,10 @@ final class AlterViewHandler extends BaseHandlerWithClient
 
 	/**
 	 * @param Response $rawResult
-	 * @param string $viewsTable
 	 * @return TaskResult
 	 * @throws ManticoreSearchClientError
 	 */
-	private function processAlter(Response $rawResult, string $viewsTable): TaskResult {
-
-		$parsedPayload = $this->payload->model->getPayload();
-
-		$option = strtolower($parsedPayload['VIEW']['options'][0]['sub_tree'][0]['base_expr']);
-		$value = $parsedPayload['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
-
+	private function processAlter(Response $rawResult): TaskResult {
 
 		$ids = [];
 
@@ -98,28 +91,46 @@ final class AlterViewHandler extends BaseHandlerWithClient
 						"Can't ALTER view without referred source. Create source ({$row['source_name']}) first"
 					);
 				}
-
-				if ($value === '0') {
-					$instance = $instance[0]['data'][0];
-					$instance['destination_name'] = $row['destination_name'];
-					$instance['query'] = $row['query'];
-
-					$this->payload::$processor->execute('runWorker', [$instance]);
-				} else {
-					$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
-				}
+				$this->handleProcessWorkers($instance, $row);
 			}
 
 			if ($ids !== []) {
-				$stringIds = implode(',', $ids);
-				$sql = /** @lang manticore */
-					"UPDATE $viewsTable SET $option = $value WHERE id in ($stringIds)";
-				$rawResult = $this->manticoreClient->sendRequest($sql);
-				if ($rawResult->hasError()) {
-					throw ManticoreSearchClientError::create((string)$rawResult->getError());
-				}
+				$this->updateViewsStatus($ids);
 			}
 		}
 		return TaskResult::withTotal(sizeof($ids));
+	}
+
+	private function getParsedPayload(): array {
+		return $this->payload->model->getPayload();
+	}
+
+	private function handleProcessWorkers(array $instance, array $row): void {
+
+		$value = $this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
+
+		if ($value === '0') {
+			$instance = $instance[0]['data'][0];
+			$instance['destination_name'] = $row['destination_name'];
+			$instance['query'] = $row['query'];
+
+			$this->payload::$processor->execute('runWorker', [$instance]);
+		} else {
+			$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
+		}
+	}
+
+	private function updateViewsStatus(array $ids): void {
+		$option = strtolower($this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][0]['base_expr']);
+		$value = $this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
+		$viewsTable = Payload::VIEWS_TABLE_NAME;
+
+		$stringIds = implode(',', $ids);
+		$sql = /** @lang manticore */
+			"UPDATE $viewsTable SET $option = $value WHERE id in ($stringIds)";
+		$rawResult = $this->manticoreClient->sendRequest($sql);
+		if ($rawResult->hasError()) {
+			throw ManticoreSearchClientError::create((string)$rawResult->getError());
+		}
 	}
 }

@@ -18,8 +18,8 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use PHPSQLParser\exceptions\UnsupportedFeatureException;
 use PHPSQLParser\PHPSQLCreator;
+use PHPSQLParser\exceptions\UnsupportedFeatureException;
 
 final class CreateViewHandler extends BaseHandlerWithClient
 {
@@ -121,7 +121,7 @@ final class CreateViewHandler extends BaseHandlerWithClient
 		string $destinationTableName,
 		int    $iterations,
 		int    $startFrom = 0,
-		int $suspended = 0
+		int    $suspended = 0
 	): array {
 
 		$results = [];

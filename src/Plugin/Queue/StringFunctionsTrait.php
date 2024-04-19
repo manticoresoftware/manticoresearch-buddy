@@ -87,7 +87,7 @@ trait StringFunctionsTrait
 		}
 
 
-		if (is_array($fieldValue)){
+		if (is_array($fieldValue)) {
 			return implode(',', $fieldValue);
 		}
 
