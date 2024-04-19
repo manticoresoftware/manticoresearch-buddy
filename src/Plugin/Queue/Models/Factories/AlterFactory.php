@@ -2,7 +2,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Models\Factories;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Create\CreateSourceModel;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Alter\AlterMaterializedViewModel;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
@@ -13,7 +13,7 @@ class AlterFactory
 		$model = null;
 
 		if (self::isAlterMaterializedViewMatch($parsedPayload)) {
-			$model = new CreateSourceModel($parsedPayload);
+			$model = new AlterMaterializedViewModel($parsedPayload);
 		}
 
 

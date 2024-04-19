@@ -12,6 +12,7 @@ class SqlModelsHandler
 
 	public static function handle(array $parsed): ?Model {
 
+		// Order here is important !!!
 		if (isset($parsed['ALTER'])) {
 			return AlterFactory::create($parsed);
 		}
