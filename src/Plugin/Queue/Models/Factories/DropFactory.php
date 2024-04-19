@@ -9,7 +9,6 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
 class DropFactory
 {
-
 	/**
 	 * @param array{
 	 *     DROP: array{
@@ -17,50 +16,50 @@ class DropFactory
 	 *         option: bool,
 	 *         if-exists: bool,
 	 *         sub_tree: array{
-	 *              0:array{
-	 *                  expr_type: string,
-	 *                  base_expr: string
-	 *              },
-	 *              1:array{
-	 *                  expr_type: string,
-	 *                  base_expr: string
-	 *              }|array{
-	 *                   expr_type: string,
-	 *                   base_expr: string,
-	 *                   sub_tree: array{
+	 *             array{
+	 *                 expr_type: string,
+	 *                 base_expr: string
+	 *             },
+	 *             array{
+	 *                 expr_type: string,
+	 *                 base_expr: string,
+	 *                 sub_tree?: array{
+	 *                      array{
 	 *                       expr_type: string,
 	 *                       table: string,
 	 *                       no_quotes: array{
 	 *                           delim: bool,
-	 *                           parts: string[]
+	 *                           parts: array<string>
 	 *                       },
 	 *                       alias: bool,
 	 *                       base_expr: string,
 	 *                       delim: bool
-	 *                   }
-	 *               },
-	 *              2?:array{
+	 *                      }
+	 *                  }
+	 *             },
+	 *             array{
 	 *                  expr_type: string,
 	 *                  base_expr: string,
-	 *                  sub_tree: array{
-	 *                      expr_type: string,
-	 *                      table: string,
-	 *                      no_quotes: array{
-	 *                          delim: bool,
-	 *                          parts: string[]
-	 *                      },
-	 *                      alias: bool,
-	 *                      base_expr: string,
-	 *                      delim: bool
-	 *                  }
+	 *                  sub_tree?: array{
+	 *                       array{
+	 *                        expr_type: string,
+	 *                        table: string,
+	 *                        no_quotes: array{
+	 *                            delim: bool,
+	 *                            parts: array<string>
+	 *                        },
+	 *                        alias: bool,
+	 *                        base_expr: string,
+	 *                        delim: bool
+	 *                       }
+	 *                   }
 	 *              }
-	 *          }
+	 *         }
 	 *     }
 	 * } $parsedPayload
 	 * @return Model|null
 	 */
 	public static function create(array $parsedPayload): ?Model {
-
 		$model = null;
 
 		if (self::isDropSourceMatch($parsedPayload)) {
@@ -83,26 +82,28 @@ class DropFactory
 	 *          option: bool,
 	 *          if-exists: bool,
 	 *          sub_tree: array{
-	 *               0:array{
-	 *                   expr_type: string,
-	 *                   base_expr: string
-	 *               },
-	 *               1:array{
-	 *                   expr_type: string,
-	 *                   base_expr: string,
-	 *                   sub_tree: array{
+	 *              array{
+	 *                  expr_type: string,
+	 *                  base_expr: string
+	 *              },
+	 *              array{
+	 *                  expr_type: string,
+	 *                  base_expr: string,
+	 *                  sub_tree?: array{
+	 *                     array{
 	 *                       expr_type: string,
 	 *                       table: string,
 	 *                       no_quotes: array{
 	 *                           delim: bool,
-	 *                           parts: string[]
+	 *                           parts: array<string>
 	 *                       },
 	 *                       alias: bool,
 	 *                       base_expr: string,
 	 *                       delim: bool
-	 *                   }
-	 *               }
-	 *           }
+	 *                     }
+	 *                  }
+	 *              }
+	 *          }
 	 *      }
 	 *  } $parsedPayload
 	 * @return bool
@@ -124,30 +125,45 @@ class DropFactory
 	 *          option: bool,
 	 *          if-exists: bool,
 	 *          sub_tree: array{
-	 *               0:array{
-	 *                   expr_type: string,
-	 *                   base_expr: string
-	 *               },
-	 *               1:array{
-	 *                   expr_type: string,
-	 *                   base_expr: string
-	 *               },
-	 *               2:array{
+	 *              ?array{
+	 *                  expr_type: string,
+	 *                  base_expr: string
+	 *              },
+	 *              ?array{
+	 *                  expr_type: string,
+	 *                  base_expr: string,
+	 *                  sub_tree?: array{
+	 *                       array{
+	 *                        expr_type: string,
+	 *                        table: string,
+	 *                        no_quotes: array{
+	 *                            delim: bool,
+	 *                            parts: array<string>
+	 *                        },
+	 *                        alias: bool,
+	 *                        base_expr: string,
+	 *                        delim: bool
+	 *                       }
+	 *                   }
+	 *              },
+	 *              ?array{
 	 *                   expr_type: string,
 	 *                   base_expr: string,
-	 *                   sub_tree: array{
-	 *                       expr_type: string,
-	 *                       table: string,
-	 *                       no_quotes: array{
-	 *                           delim: bool,
-	 *                           parts: string[]
-	 *                       },
-	 *                       alias: bool,
-	 *                       base_expr: string,
-	 *                       delim: bool
-	 *                   }
+	 *                   sub_tree?: array{
+	 *                        array{
+	 *                         expr_type: string,
+	 *                         table: string,
+	 *                         no_quotes: array{
+	 *                             delim: bool,
+	 *                             parts: array<string>
+	 *                         },
+	 *                         alias: bool,
+	 *                         base_expr: string,
+	 *                         delim: bool
+	 *                        }
+	 *                    }
 	 *               }
-	 *           }
+	 *          }
 	 *      }
 	 *  } $parsedPayload
 	 * @return bool
@@ -156,7 +172,7 @@ class DropFactory
 		return (
 			isset($parsedPayload['DROP']['sub_tree'][0]) &&
 			isset($parsedPayload['DROP']['sub_tree'][1]) &&
-			!empty($parsedPayload['DROP']['sub_tree'][2]['sub_tree'][0]['no_quotes']['parts']) &&
+			isset($parsedPayload['DROP']['sub_tree'][2]['sub_tree'][0]['no_quotes']['parts'][0]) &&
 			strtolower($parsedPayload['DROP']['sub_tree'][0]['base_expr']) === Payload::TYPE_MATERLIALIZED &&
 			strtolower($parsedPayload['DROP']['sub_tree'][1]['base_expr']) === Payload::TYPE_VIEW
 		);
