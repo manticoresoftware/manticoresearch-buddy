@@ -18,7 +18,8 @@ final class GetViewHandler extends BaseGetHandler
 {
 
 	#[\Override] protected function getName(Payload $payload): string {
-		return $payload->parsedPayload['SHOW'][2]['no_quotes']['parts'][0];
+		$parsedPayload = $payload->model->getPayload();
+		return $parsedPayload['SHOW'][2]['no_quotes']['parts'][0];
 	}
 
 	#[\Override] protected static function formatResult(string $query): string {

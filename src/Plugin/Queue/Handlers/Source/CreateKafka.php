@@ -163,10 +163,11 @@ final class CreateKafka extends BaseCreateSourceHandler
 	public static function parseOptions(Payload $payload): \stdClass {
 		$result = new \stdClass();
 
-		$result->name = strtolower($payload->parsedPayload['SOURCE']['name']);
-		$result->schema = strtolower($payload->parsedPayload['SOURCE']['create-def']['base_expr']);
+		$parsedPayload = $payload->model->getPayload();
+		$result->name = strtolower($parsedPayload['SOURCE']['name']);
+		$result->schema = strtolower($parsedPayload['SOURCE']['create-def']['base_expr']);
 
-		foreach ($payload->parsedPayload['SOURCE']['options'] as $option) {
+		foreach ($parsedPayload['SOURCE']['options'] as $option) {
 			if (!isset($option['sub_tree'][0]['base_expr'])) {
 				continue;
 			}

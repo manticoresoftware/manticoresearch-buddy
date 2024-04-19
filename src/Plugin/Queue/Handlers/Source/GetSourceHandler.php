@@ -38,7 +38,8 @@ final class GetSourceHandler extends BaseGetHandler
 	}
 
 	#[\Override] protected function getName(Payload $payload): string {
-		return $payload->parsedPayload['SHOW'][1]['no_quotes']['parts'][0];
+		$parsedPayload = $payload->model->getPayload();
+		return $parsedPayload['SHOW'][1]['no_quotes']['parts'][0];
 	}
 
 	#[\Override] protected function getFields(): array {

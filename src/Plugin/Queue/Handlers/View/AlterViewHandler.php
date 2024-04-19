@@ -49,7 +49,8 @@ final class AlterViewHandler extends BaseHandlerWithClient
 				return TaskResult::none();
 			}
 
-			$name = strtolower($this->payload->parsedPayload['VIEW']['no_quotes']['parts'][0] ?? '');
+			$parsedPayload = $this->payload->model->getPayload();
+			$name = strtolower($parsedPayload['VIEW']['no_quotes']['parts'][0] ?? '');
 
 			$sql = /** @lang manticore */
 				"SELECT * FROM $viewsTable WHERE match('@name \"$name\"')";
@@ -72,8 +73,10 @@ final class AlterViewHandler extends BaseHandlerWithClient
 	 */
 	private function processAlter(Response $rawResult, string $viewsTable): TaskResult {
 
-		$option = strtolower($this->payload->parsedPayload['VIEW']['options'][0]['sub_tree'][0]['base_expr']);
-		$value = $this->payload->parsedPayload['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
+		$parsedPayload = $this->payload->model->getPayload();
+
+		$option = strtolower($parsedPayload['VIEW']['options'][0]['sub_tree'][0]['base_expr']);
+		$value = $parsedPayload['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
 
 
 		$ids = [];

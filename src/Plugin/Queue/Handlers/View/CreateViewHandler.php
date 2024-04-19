@@ -45,12 +45,14 @@ final class CreateViewHandler extends BaseHandlerWithClient
 		 */
 		$taskFn = function (): TaskResult {
 			$payload = $this->payload;
-			$manticoreClient = $this->manticoreClient;
-			$sourceName = strtolower($payload->parsedPayload['FROM'][0]['table']);
-			$viewName = strtolower($payload->parsedPayload['VIEW']['no_quotes']['parts'][0]);
-			$destinationTableName = strtolower($payload->parsedPayload['VIEW']['to']['no_quotes']['parts'][0]);
+			$parsedPayload = $payload->model->getPayload();
 
-			if (isset($payload->parsedPayload['LIMIT'])) {
+			$manticoreClient = $this->manticoreClient;
+			$sourceName = strtolower($parsedPayload['FROM'][0]['table']);
+			$viewName = strtolower($parsedPayload['VIEW']['no_quotes']['parts'][0]);
+			$destinationTableName = strtolower($parsedPayload['VIEW']['to']['no_quotes']['parts'][0]);
+
+			if (isset($parsedPayloadd['LIMIT'])) {
 				throw GenericError::create("Can't use query with limit");
 			}
 
@@ -73,12 +75,12 @@ final class CreateViewHandler extends BaseHandlerWithClient
 				throw ManticoreSearchClientError::create('Chosen source not exist');
 			}
 
-			unset($payload->parsedPayload['CREATE'], $payload->parsedPayload['VIEW']);
+			unset($parsedPayload['CREATE'], $parsedPayload['VIEW']);
 
 			$sourceRecords = $sourceRecords[0]['data'];
 
 			$newViews = self::createViewRecords(
-				$manticoreClient, $viewName, $payload->parsedPayload,
+				$manticoreClient, $viewName, $parsedPayload,
 				$sourceName, $payload->originQuery,
 				$destinationTableName, sizeof($sourceRecords)
 			);

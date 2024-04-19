@@ -33,14 +33,7 @@ final class Payload extends BasePayload
 	const TYPE_VIEW = 'view';
 	const TYPE_SOURCES = 'sources';
 	const TYPE_VIEWS = 'views';
-
 	const TYPE_MATERLIALIZED = 'materialized';
-
-	const REQUEST_TYPE_GET = 'get';
-	const REQUEST_TYPE_VIEW = 'view';
-	const REQUEST_TYPE_CREATE = 'create';
-	const REQUEST_TYPE_ALTER = 'alter';
-	const REQUEST_TYPE_DELETE = 'drop';
 
 	public static string $sourceType;
 
@@ -63,7 +56,6 @@ final class Payload extends BasePayload
 
 		if ($self->endpointBundle === Endpoint::Sql) {
 			$self->originQuery = $request->payload;
-
 			$self->model = SqlModelsHandler::handle(static::$sqlQueryParser::getParsedPayload());
 		}
 

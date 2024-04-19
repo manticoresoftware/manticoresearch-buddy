@@ -78,7 +78,8 @@ final class DropSourceHandler extends BaseDropHandler
 	}
 
 	#[\Override] protected function getName(Payload $payload): string {
-		return $payload->parsedPayload['DROP']['sub_tree'][1]['sub_tree'][0]['no_quotes']['parts'][0];
+		$parsedPayload = $payload->model->getPayload();
+		return $parsedPayload['DROP']['sub_tree'][1]['sub_tree'][0]['no_quotes']['parts'][0];
 	}
 
 	#[\Override] protected function getTableName(): string {
