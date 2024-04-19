@@ -10,6 +10,11 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Factories\ShowFactory;
 class SqlModelsHandler
 {
 
+	/**
+	 * TODO how to maintain this? What if we decide add new query?
+	 * @param array $parsed
+	 * @return Model|null
+	 */
 	public static function handle(array $parsed): ?Model {
 
 		// Order here is important !!!

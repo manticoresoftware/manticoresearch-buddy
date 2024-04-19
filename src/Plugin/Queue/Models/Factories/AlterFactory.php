@@ -8,6 +8,38 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
 class AlterFactory
 {
+	/**
+	 * @param array{
+	 *       ALTER: array{
+	 *           base_expr: string,
+	 *           sub_tree: mixed[]
+	 *       },
+	 *       VIEW: array{
+	 *           base_expr: string,
+	 *           name: string,
+	 *           no_quotes: array{
+	 *               delim: bool,
+	 *               parts: string[]
+	 *           },
+	 *           create-def: bool,
+	 *           options: array{
+	 *               expr_type: string,
+	 *               base_expr: string,
+	 *               delim: string,
+	 *               sub_tree: array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   delim: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       base_expr: string
+	 *                   }[]
+	 *               }[]
+	 *           }[]
+	 *       }
+	 *   } $parsedPayload
+	 * @return Model|null
+	 */
 	public static function create(array $parsedPayload): ?Model {
 
 		$model = null;
@@ -25,11 +57,11 @@ class AlterFactory
 	 * Should match ALTER MATERIALIZED VIEW {name} suspended=0;
 	 *
 	 * @param array{
-	 *      ALTER: array{
+	 *      ALTER?: array{
 	 *          base_expr: string,
 	 *          sub_tree: mixed[]
 	 *      },
-	 *      VIEW: array{
+	 *      VIEW?: array{
 	 *          base_expr: string,
 	 *          name: string,
 	 *          no_quotes: array{
@@ -55,11 +87,6 @@ class AlterFactory
 	 *  } $parsedPayload
 	 * @return bool
 	 *
-	 * @example {"ALTER":{"base_expr":"materialized view","sub_tree":[]},"VIEW":{"base_expr":"view_table",
-	 * "name":"view_table","no_quotes":{"delim":false,"parts":["view_table"]},"create-def":false,
-	 * "options":[{"expr_type":"expression","base_expr":"suspended=0","delim":" ","sub_tree":[{"expr_type":
-	 * "reserved","base_expr":"suspended"},{"expr_type":"operator","base_expr":"="},
-	 * {"expr_type":"const","base_expr":"0"}]}]}}
 	 */
 	private static function isAlterMaterializedViewMatch(array $parsedPayload): bool {
 		return (

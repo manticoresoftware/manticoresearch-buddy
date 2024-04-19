@@ -9,6 +9,56 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
 class DropFactory
 {
+
+	/**
+	 * @param array{
+	 *     DROP: array{
+	 *         expr_type: string,
+	 *         option: bool,
+	 *         if-exists: bool,
+	 *         sub_tree: array{
+	 *              0:array{
+	 *                  expr_type: string,
+	 *                  base_expr: string
+	 *              },
+	 *              1:array{
+	 *                  expr_type: string,
+	 *                  base_expr: string
+	 *              }|array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       table: string,
+	 *                       no_quotes: array{
+	 *                           delim: bool,
+	 *                           parts: string[]
+	 *                       },
+	 *                       alias: bool,
+	 *                       base_expr: string,
+	 *                       delim: bool
+	 *                   }
+	 *               },
+	 *              2?:array{
+	 *                  expr_type: string,
+	 *                  base_expr: string,
+	 *                  sub_tree: array{
+	 *                      expr_type: string,
+	 *                      table: string,
+	 *                      no_quotes: array{
+	 *                          delim: bool,
+	 *                          parts: string[]
+	 *                      },
+	 *                      alias: bool,
+	 *                      base_expr: string,
+	 *                      delim: bool
+	 *                  }
+	 *              }
+	 *          }
+	 *     }
+	 * } $parsedPayload
+	 * @return Model|null
+	 */
 	public static function create(array $parsedPayload): ?Model {
 
 		$model = null;
@@ -29,41 +79,33 @@ class DropFactory
 	 *
 	 * @param array{
 	 *      DROP: array{
-	 *          expr_type: string,
+	 *          expr_type?: string,
 	 *          option: bool,
 	 *          if-exists: bool,
 	 *          sub_tree: array{
-	 *              array{
-	 *                  expr_type: string,
-	 *                  base_expr: string
-	 *              },
-	 *              array{
-	 *                  expr_type: string,
-	 *                  base_expr: string,
-	 *                  sub_tree: array{
-	 *                      expr_type: string,
-	 *                      base_expr: string,
-	 *                      sub_tree: array{
-	 *                          expr_type: string,
-	 *                          table: string,
-	 *                          no_quotes: array{
-	 *                              delim: bool,
-	 *                              parts: string[]
-	 *                          },
-	 *                          alias: bool,
-	 *                          base_expr: string,
-	 *                          delim: bool
-	 *                      }[]
-	 *                  }
-	 *              }
-	 *          }[]
+	 *               0:array{
+	 *                   expr_type: string,
+	 *                   base_expr: string
+	 *               },
+	 *               1:array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       table: string,
+	 *                       no_quotes: array{
+	 *                           delim: bool,
+	 *                           parts: string[]
+	 *                       },
+	 *                       alias: bool,
+	 *                       base_expr: string,
+	 *                       delim: bool
+	 *                   }
+	 *               }
+	 *           }
 	 *      }
 	 *  } $parsedPayload
 	 * @return bool
-	 * @example {"DROP":{"expr_type":"source","option":false,"if-exists":false,
-	 * "sub_tree":[{"expr_type":"reserved","base_expr":"source"},
-	 * {"expr_type":"expression","base_expr":"kafka","sub_tree":[{"expr_type":"source","table":"kafka","no_quotes":
-	 * {"delim":false,"parts":["kafka"]},"alias":false,"base_expr":"kafka","delim":false}]}]}}
 	 */
 	private static function isDropSourceMatch(array $parsedPayload): bool {
 		return (
@@ -82,39 +124,33 @@ class DropFactory
 	 *          option: bool,
 	 *          if-exists: bool,
 	 *          sub_tree: array{
-	 *              array{
-	 *                  expr_type: string,
-	 *                  base_expr: string
-	 *              },
-	 *              array{
-	 *                  expr_type: string,
-	 *                  base_expr: string,
-	 *                  sub_tree: array{
-	 *                      expr_type: string,
-	 *                      base_expr: string,
-	 *                      sub_tree: array{
-	 *                          expr_type: string,
-	 *                          table: string,
-	 *                          no_quotes: array{
-	 *                              delim: bool,
-	 *                              parts: string[]
-	 *                          },
-	 *                          alias: bool,
-	 *                          base_expr: string,
-	 *                          delim: bool
-	 *                      }[]
-	 *                  }
-	 *              }
-	 *          }[]
+	 *               0:array{
+	 *                   expr_type: string,
+	 *                   base_expr: string
+	 *               },
+	 *               1:array{
+	 *                   expr_type: string,
+	 *                   base_expr: string
+	 *               },
+	 *               2:array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       table: string,
+	 *                       no_quotes: array{
+	 *                           delim: bool,
+	 *                           parts: string[]
+	 *                       },
+	 *                       alias: bool,
+	 *                       base_expr: string,
+	 *                       delim: bool
+	 *                   }
+	 *               }
+	 *           }
 	 *      }
 	 *  } $parsedPayload
 	 * @return bool
-	 * @example {"DROP":{"expr_type":"view","option":false,"if-exists":false,"sub_tree":[
-	 * {"expr_type":"reserved","base_expr":"materialized"},
-	 * {"expr_type":"reserved","base_expr":"view"}
-	 * {"expr_type":"expression","base_expr":"view_table","sub_tree":[
-	 * {"expr_type":"view","table":"view_table","no_quotes":{"delim":false,"parts":["view_table"]},
-	 * "alias":false,"base_expr":"view_table","delim":false}]}]}}
 	 */
 	private static function isDropMaterializedViewMatch(array $parsedPayload): bool {
 		return (
