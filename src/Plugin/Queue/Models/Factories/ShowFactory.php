@@ -13,28 +13,9 @@ class ShowFactory
 {
 
 	/**
-	 * @param array{
-	 *     SHOW: array{
-	 *         0: array{
-	 *             expr_type: string,
-	 *             base_expr: string
-	 *         },
-	 *         1: array{
-	 *             expr_type: string,
-	 *             base_expr: string
-	 *         },
-	 *         2: array{
-	 *             expr_type: string,
-	 *             view: string,
-	 *             no_quotes: array{
-	 *                 delim: bool,
-	 *                 parts: array<string>
-	 *             },
-	 *             base_expr: string
-	 *         }
-	 *     }
-	 * } $parsedPayload
-	 * @return Model|null
+	 * @template T of array
+	 * @phpstan-param T $parsedPayload
+	 * @phpstan-return Model<T>|null
 	 */
 
 	public static function create(array $parsedPayload): ?Model {
@@ -57,6 +38,7 @@ class ShowFactory
 			$model = new ShowSourceModel($parsedPayload);
 		}
 
+		/** @var Model<T>|null $model */
 		return $model;
 	}
 
@@ -65,7 +47,7 @@ class ShowFactory
 	 * Should match SHOW MATERIALIZED VIEWS
 	 *
 	 * @param array{
-	 *      SHOW: array{
+	 *      SHOW?: array{
 	 *          0: array{
 	 *              expr_type: string,
 	 *              base_expr?: string
@@ -91,7 +73,7 @@ class ShowFactory
 	 * Should match SHOW MATERIALIZED VIEW {name}
 	 *
 	 * @param array{
-	 *      SHOW: array{
+	 *      SHOW?: array{
 	 *          0: array{
 	 *              expr_type: string,
 	 *              base_expr?: string
@@ -129,7 +111,7 @@ class ShowFactory
 	 * Should match SHOW SOURCES
 	 *
 	 * @param array{
-	 *      SHOW: array{
+	 *      SHOW?: array{
 	 *          0: array{
 	 *              expr_type: string,
 	 *              base_expr?: string
@@ -148,7 +130,7 @@ class ShowFactory
 	 * Should match SHOW SOURCE {name}
 	 *
 	 * @param array{
-	 *      SHOW: array{
+	 *      SHOW?: array{
 	 *          0: array{
 	 *              expr_type: string,
 	 *              base_expr?: string

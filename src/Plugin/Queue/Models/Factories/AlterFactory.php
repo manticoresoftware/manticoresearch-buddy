@@ -9,36 +9,9 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 class AlterFactory
 {
 	/**
-	 * @param array{
-	 *       ALTER: array{
-	 *           base_expr: string,
-	 *           sub_tree: mixed[]
-	 *       },
-	 *       VIEW: array{
-	 *           base_expr: string,
-	 *           name: string,
-	 *           no_quotes: array{
-	 *               delim: bool,
-	 *               parts: string[]
-	 *           },
-	 *           create-def: bool,
-	 *           options: array{
-	 *               expr_type: string,
-	 *               base_expr: string,
-	 *               delim: string,
-	 *               sub_tree: array{
-	 *                   expr_type: string,
-	 *                   base_expr: string,
-	 *                   delim: string,
-	 *                   sub_tree: array{
-	 *                       expr_type: string,
-	 *                       base_expr: string
-	 *                   }[]
-	 *               }[]
-	 *           }[]
-	 *       }
-	 *   } $parsedPayload
-	 * @return Model|null
+	 * @template T of array
+	 * @phpstan-param T $parsedPayload
+	 * @phpstan-return Model<T>|null
 	 */
 	public static function create(array $parsedPayload): ?Model {
 
@@ -48,7 +21,7 @@ class AlterFactory
 			$model = new AlterMaterializedViewModel($parsedPayload);
 		}
 
-
+		/** @var Model<T>|null $model */
 		return $model;
 	}
 

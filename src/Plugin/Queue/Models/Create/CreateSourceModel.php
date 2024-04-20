@@ -6,6 +6,10 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 
+/**
+ * @template T of array
+ * @extends Model<T>
+ */
 class CreateSourceModel extends Model
 {
 

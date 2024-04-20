@@ -10,54 +10,9 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 class DropFactory
 {
 	/**
-	 * @param array{
-	 *     DROP: array{
-	 *         expr_type: string,
-	 *         option: bool,
-	 *         if-exists: bool,
-	 *         sub_tree: array{
-	 *             array{
-	 *                 expr_type: string,
-	 *                 base_expr: string
-	 *             },
-	 *             array{
-	 *                 expr_type: string,
-	 *                 base_expr: string,
-	 *                 sub_tree?: array{
-	 *                      array{
-	 *                       expr_type: string,
-	 *                       table: string,
-	 *                       no_quotes: array{
-	 *                           delim: bool,
-	 *                           parts: array<string>
-	 *                       },
-	 *                       alias: bool,
-	 *                       base_expr: string,
-	 *                       delim: bool
-	 *                      }
-	 *                  }
-	 *             },
-	 *             array{
-	 *                  expr_type: string,
-	 *                  base_expr: string,
-	 *                  sub_tree?: array{
-	 *                       array{
-	 *                        expr_type: string,
-	 *                        table: string,
-	 *                        no_quotes: array{
-	 *                            delim: bool,
-	 *                            parts: array<string>
-	 *                        },
-	 *                        alias: bool,
-	 *                        base_expr: string,
-	 *                        delim: bool
-	 *                       }
-	 *                   }
-	 *              }
-	 *         }
-	 *     }
-	 * } $parsedPayload
-	 * @return Model|null
+	 * @template T of array
+	 * @phpstan-param T $parsedPayload
+	 * @phpstan-return Model<T>|null
 	 */
 	public static function create(array $parsedPayload): ?Model {
 		$model = null;
@@ -70,6 +25,7 @@ class DropFactory
 			$model = new DropMaterializedViewModel($parsedPayload);
 		}
 
+		/** @var Model<T>|null $model */
 		return $model;
 	}
 
@@ -77,7 +33,7 @@ class DropFactory
 	 * Should match DROP SOURCE {name}
 	 *
 	 * @param array{
-	 *      DROP: array{
+	 *      DROP?: array{
 	 *          expr_type?: string,
 	 *          option: bool,
 	 *          if-exists: bool,
@@ -120,7 +76,7 @@ class DropFactory
 	 * Should match DROP MATERIALIZED VIEW {name}
 	 *
 	 * @param array{
-	 *      DROP: array{
+	 *      DROP?: array{
 	 *          expr_type: string,
 	 *          option: bool,
 	 *          if-exists: bool,

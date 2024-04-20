@@ -4,6 +4,10 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Models\Drop;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 
+/**
+ * @template T of array
+ * @extends Model<T>
+ */
 class DropSourceModel extends Model
 {
 

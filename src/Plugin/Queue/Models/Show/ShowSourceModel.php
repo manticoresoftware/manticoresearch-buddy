@@ -4,6 +4,10 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Models\Show;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 
+/**
+ * @template T of array
+ * @extends Model<T>
+ */
 class ShowSourceModel extends Model
 {
 

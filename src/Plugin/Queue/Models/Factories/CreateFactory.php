@@ -8,116 +8,11 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 
 class CreateFactory
 {
-
 	/**
-	 * @param array{
-	 *        CREATE: array{
-	 *            expr_type: string,
-	 *            not-exists: bool,
-	 *            base_expr: string,
-	 *            sub_tree: array{
-	 *                expr_type: string,
-	 *                base_expr: string
-	 *            }[]
-	 *        },
-	 *        SOURCE: array{
-	 *            base_expr: string,
-	 *            name: string,
-	 *            no_quotes: array{
-	 *                delim: bool,
-	 *                parts: string[]
-	 *            },
-	 *            create-def: array{
-	 *                expr_type: string,
-	 *                base_expr: string,
-	 *                sub_tree: array{
-	 *                    expr_type: string,
-	 *                    base_expr: string,
-	 *                    sub_tree: array{
-	 *                        expr_type: string,
-	 *                        base_expr: string,
-	 *                        sub_tree: array{
-	 *                            expr_type: string,
-	 *                            base_expr: string
-	 *                        }[]
-	 *                    }[]
-	 *                }[]
-	 *            },
-	 *            options: array{
-	 *                expr_type: string,
-	 *                base_expr: string,
-	 *                delim: string,
-	 *                sub_tree: array{
-	 *                    expr_type: string,
-	 *                    base_expr: string,
-	 *                    delim: string,
-	 *                    sub_tree: array{
-	 *                        expr_type: string,
-	 *                        base_expr: string
-	 *                    }[]
-	 *                }[]
-	 *            }[]
-	 *        },
-	 *        VIEW: array{
-	 *            base_expr: string,
-	 *            name: string,
-	 *            no_quotes: array{
-	 *                delim: bool,
-	 *                parts: string[]
-	 *            },
-	 *            create-def: bool,
-	 *            options: bool,
-	 *            to: array{
-	 *                expr_type: string,
-	 *                table: string,
-	 *                base_expr: string,
-	 *                no_quotes: array{
-	 *                    delim: bool,
-	 *                    parts: string[]
-	 *                }
-	 *            }
-	 *        },
-	 *        SELECT: array{
-	 *            array{
-	 *                expr_type: string,
-	 *                alias: bool|array{
-	 *                    as: bool,
-	 *                    name: string,
-	 *                    base_expr: string,
-	 *                    no_quotes: array{
-	 *                        delim: bool,
-	 *                        parts: string[]
-	 *                    }
-	 *                },
-	 *                base_expr: string,
-	 *                no_quotes: array{
-	 *                    delim: bool,
-	 *                    parts: string[]
-	 *                },
-	 *                sub_tree: mixed,
-	 *                delim: bool|string
-	 *            }[]
-	 *        },
-	 *        FROM: array{
-	 *            array{
-	 *                expr_type: string,
-	 *                table: string,
-	 *                no_quotes: array{
-	 *                    delim: bool,
-	 *                    parts: string[]
-	 *                },
-	 *                alias: bool,
-	 *                hints: bool,
-	 *                join_type: string,
-	 *                ref_type: bool,
-	 *                ref_clause: bool,
-	 *                base_expr: string,
-	 *                sub_tree: bool|array{}
-	 *            }[]
-	 *        }
-	 *    } $parsedPayload
+	 * @template T of array
+	 * @phpstan-param T $parsedPayload
+	 * @phpstan-return Model<T>|null
 	 */
-
 	public static function create(array $parsedPayload): ?Model {
 
 		$model = null;
@@ -130,12 +25,15 @@ class CreateFactory
 			$model = new CreateMaterializedViewModel($parsedPayload);
 		}
 
+		/** @var Model<T>|null $model */
 		return $model;
 	}
 
 	/**
+	 *
+	 *
 	 * @param array{
-	 *       CREATE: array{
+	 *       CREATE?: array{
 	 *           expr_type: string,
 	 *           not-exists: bool,
 	 *           base_expr: string,
@@ -144,7 +42,7 @@ class CreateFactory
 	 *               base_expr: string
 	 *           }[]
 	 *       },
-	 *       SOURCE: array{
+	 *       SOURCE?: array{
 	 *           base_expr: string,
 	 *           name: string,
 	 *           no_quotes?: array{
@@ -197,7 +95,7 @@ class CreateFactory
 
 	/**
 	 * @param array{
-	 *       CREATE: array{
+	 *       CREATE?: array{
 	 *           base_expr: string,
 	 *           sub_tree: array{
 	 *                expr_type: string,
