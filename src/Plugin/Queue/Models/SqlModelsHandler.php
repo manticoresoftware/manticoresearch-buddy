@@ -11,27 +11,35 @@ class SqlModelsHandler
 {
 
 	/**
-	 * TODO how to maintain this? What if we decide add new query?
-	 * @param array $parsed
-	 * @return Model|null
+	 * @template T of array
+	 * @phpstan-param T $parsed
+	 * @phpstan-return Model<T>|null
 	 */
 	public static function handle(array $parsed): ?Model {
 
 		// Order here is important !!!
 		if (isset($parsed['ALTER'])) {
-			return AlterFactory::create($parsed);
+			/** @var Model<T>|null $result */
+			$result = AlterFactory::create($parsed);
+			return $result;
 		}
 
 		if (isset($parsed['CREATE'])) {
-			return CreateFactory::create($parsed);
+			/** @var Model<T>|null $result */
+			$result = CreateFactory::create($parsed);
+			return $result;
 		}
 
 		if (isset($parsed['DROP'])) {
-			return DropFactory::create($parsed);
+			/** @var Model<T>|null $result */
+			$result = DropFactory::create($parsed);
+			return $result;
 		}
 
 		if (isset($parsed['SHOW'])) {
-			return ShowFactory::create($parsed);
+			/** @var Model<T>|null $result */
+			$result = ShowFactory::create($parsed);
+			return $result;
 		}
 
 		return null;

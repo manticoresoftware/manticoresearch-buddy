@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
+use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
@@ -91,7 +92,7 @@ final class AlterViewHandler extends BaseHandlerWithClient
 						"Can't ALTER view without referred source. Create source ({$row['source_name']}) first"
 					);
 				}
-				$this->handleProcessWorkers($instance, $row);
+				$this->handleProcessWorkers($instance[0]['data'][0], $row);
 			}
 
 			if ($ids !== []) {
@@ -101,16 +102,59 @@ final class AlterViewHandler extends BaseHandlerWithClient
 		return TaskResult::withTotal(sizeof($ids));
 	}
 
+
+	/**
+	 * @return array{
+	 *       ALTER: array{
+	 *           base_expr: string,
+	 *           sub_tree: mixed[]
+	 *       },
+	 *       VIEW: array{
+	 *           base_expr: string,
+	 *           name: string,
+	 *           no_quotes: array{
+	 *               delim: bool,
+	 *               parts: string[]
+	 *           },
+	 *           create-def: bool,
+	 *           options: array{
+	 *               expr_type: string,
+	 *               base_expr: string,
+	 *               delim: string,
+	 *               sub_tree: array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   delim: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       base_expr: string
+	 *                   }[]
+	 *               }[]
+	 *           }[]
+	 *       }
+	 *   }
+	 */
 	private function getParsedPayload(): array {
-		return $this->payload->model->getPayload();
+
+		/** @var Model<array{ALTER: array{base_expr: string,sub_tree: mixed[]},
+		 *   VIEW: array{base_expr: string,name: string,no_quotes: array{delim: bool,parts: string[]},
+		 *   create-def: bool,options: array{expr_type: string,base_expr: string,delim: string,
+		 *   sub_tree: array{expr_type: string,base_expr: string,delim: string,
+		 *   sub_tree: array{expr_type: string,base_expr: string}[]}[]}[]}}> $model */
+		$model = $this->payload->model;
+		return $model->getPayload();
 	}
 
+	/**
+	 * @param array<string, string> $instance
+	 * @param array<string, string> $row
+	 * @return void
+	 */
 	private function handleProcessWorkers(array $instance, array $row): void {
 
 		$value = $this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
 
 		if ($value === '0') {
-			$instance = $instance[0]['data'][0];
 			$instance['destination_name'] = $row['destination_name'];
 			$instance['query'] = $row['query'];
 
@@ -120,6 +164,11 @@ final class AlterViewHandler extends BaseHandlerWithClient
 		}
 	}
 
+	/**
+	 * @param array<string> $ids
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 */
 	private function updateViewsStatus(array $ids): void {
 		$option = strtolower($this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][0]['base_expr']);
 		$value = $this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
