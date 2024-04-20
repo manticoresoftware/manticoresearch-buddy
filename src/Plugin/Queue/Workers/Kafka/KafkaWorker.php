@@ -186,6 +186,8 @@ class KafkaWorker
 	}
 
 	/**
+	 * @param array<string, string> $message
+	 * @return array<string, bool|float|int|string>
 	 * @throws BuddyRequestError
 	 */
 	private function handleRow(array $message): array {
