@@ -14,6 +14,16 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseViewHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
+/**
+* @extends BaseViewHandler<array{
+ *       SHOW: array{
+ *           0: array{
+ *               expr_type: string,
+ *               base_expr?: string
+ *           }
+ *       }
+ *   }>
+ */
 final class ViewSourceHandler extends BaseViewHandler
 {
 	#[\Override] protected function getTableName(): string {
