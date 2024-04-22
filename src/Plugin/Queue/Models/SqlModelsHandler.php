@@ -15,7 +15,7 @@ class SqlModelsHandler
 	 * @phpstan-param T $parsed
 	 * @phpstan-return Model<T>|null
 	 */
-	public static function handle(array $parsed): ?Model {
+	public static function handle(?array $parsed): ?Model {
 
 		// Order here is important !!!
 		if (isset($parsed['ALTER'])) {
