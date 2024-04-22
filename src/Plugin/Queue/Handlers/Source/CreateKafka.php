@@ -20,9 +20,109 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use PHPSQLParser\PHPSQLParser;
 
+/**
+* @extends BaseCreateSourceHandler<array{
+ *        CREATE: array{
+ *            expr_type: string,
+ *            not-exists: bool,
+ *            base_expr: string,
+ *            sub_tree: array{
+ *                expr_type: string,
+ *                base_expr: string
+ *            }[]
+ *        },
+ *        SOURCE: array{
+ *            base_expr: string,
+ *            name: string,
+ *            no_quotes?: array{
+ *                delim: bool,
+ *                parts: string[]
+ *            },
+ *            create-def: array{
+ *                expr_type: string,
+ *                base_expr: string,
+ *                sub_tree: array{
+ *                    expr_type: string,
+ *                    base_expr: string,
+ *                    sub_tree: array{
+ *                        expr_type: string,
+ *                        base_expr: string,
+ *                        sub_tree: array{
+ *                            expr_type: string,
+ *                            base_expr: string
+ *                        }[]
+ *                    }[]
+ *                }[]
+ *            },
+ *            options: array{
+ *                expr_type: string,
+ *                base_expr: string,
+ *                delim: string,
+ *                sub_tree: array{
+ *                    expr_type: string,
+ *                    base_expr: string,
+ *                    delim: string,
+ *                    sub_tree: array{
+ *                        expr_type: string,
+ *                        base_expr: string
+ *                    }[]
+ *                }[]
+ *            }[]
+ *        }
+ *    }>
+ */
 final class CreateKafka extends BaseCreateSourceHandler
 {
 	/**
+	 * @param Payload<array{
+	 *         CREATE: array{
+	 *             expr_type: string,
+	 *             not-exists: bool,
+	 *             base_expr: string,
+	 *             sub_tree: array{
+	 *                 expr_type: string,
+	 *                 base_expr: string
+	 *             }[]
+	 *         },
+	 *         SOURCE: array{
+	 *             base_expr: string,
+	 *             name: string,
+	 *             no_quotes?: array{
+	 *                 delim: bool,
+	 *                 parts: string[]
+	 *             },
+	 *             create-def: array{
+	 *                 expr_type: string,
+	 *                 base_expr: string,
+	 *                 sub_tree: array{
+	 *                     expr_type: string,
+	 *                     base_expr: string,
+	 *                     sub_tree: array{
+	 *                         expr_type: string,
+	 *                         base_expr: string,
+	 *                         sub_tree: array{
+	 *                             expr_type: string,
+	 *                             base_expr: string
+	 *                         }[]
+	 *                     }[]
+	 *                 }[]
+	 *             },
+	 *             options: array{
+	 *                 expr_type: string,
+	 *                 base_expr: string,
+	 *                 delim: string,
+	 *                 sub_tree: array{
+	 *                     expr_type: string,
+	 *                     base_expr: string,
+	 *                     delim: string,
+	 *                     sub_tree: array{
+	 *                         expr_type: string,
+	 *                         base_expr: string
+	 *                     }[]
+	 *                 }[]
+	 *             }[]
+	 *         }
+	 *     }> $payload
 	 * @throws ManticoreSearchClientError
 	 */
 	public static function handle(Payload $payload, Client $manticoreClient): TaskResult {
@@ -160,6 +260,58 @@ final class CreateKafka extends BaseCreateSourceHandler
 		return $ids;
 	}
 
+	/**
+* @param Payload<array{
+	 *         CREATE: array{
+	 *             expr_type: string,
+	 *             not-exists: bool,
+	 *             base_expr: string,
+	 *             sub_tree: array{
+	 *                 expr_type: string,
+	 *                 base_expr: string
+	 *             }[]
+	 *         },
+	 *         SOURCE: array{
+	 *             base_expr: string,
+	 *             name: string,
+	 *             no_quotes?: array{
+	 *                 delim: bool,
+	 *                 parts: string[]
+	 *             },
+	 *             create-def: array{
+	 *                 expr_type: string,
+	 *                 base_expr: string,
+	 *                 sub_tree: array{
+	 *                     expr_type: string,
+	 *                     base_expr: string,
+	 *                     sub_tree: array{
+	 *                         expr_type: string,
+	 *                         base_expr: string,
+	 *                         sub_tree: array{
+	 *                             expr_type: string,
+	 *                             base_expr: string
+	 *                         }[]
+	 *                     }[]
+	 *                 }[]
+	 *             },
+	 *             options: array{
+	 *                 expr_type: string,
+	 *                 base_expr: string,
+	 *                 delim: string,
+	 *                 sub_tree: array{
+	 *                     expr_type: string,
+	 *                     base_expr: string,
+	 *                     delim: string,
+	 *                     sub_tree: array{
+	 *                         expr_type: string,
+	 *                         base_expr: string
+	 *                     }[]
+	 *                 }[]
+	 *             }[]
+	 *         }
+	 *     }> $payload
+* @return \stdClass
+	 */
 	public static function parseOptions(Payload $payload): \stdClass {
 		$result = new \stdClass();
 
