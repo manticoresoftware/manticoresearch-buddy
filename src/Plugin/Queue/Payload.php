@@ -14,7 +14,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 use Exception;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\SqlModelsHandler;
-use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -22,6 +21,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 /**
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
+ *
+ * @template T of array
  */
 final class Payload extends BasePayload
 {
@@ -42,12 +43,14 @@ final class Payload extends BasePayload
 	public static QueueProcess $processor;
 	public string $originQuery = '';
 
+	/**
+	 * @var Model<T> $model
+	 */
 	public Model $model;
 
 	/**
 	 * @param Request $request
 	 * @return static
-	 * @throws GenericError
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static();
@@ -56,7 +59,12 @@ final class Payload extends BasePayload
 
 		if ($self->endpointBundle === Endpoint::Sql) {
 			$self->originQuery = $request->payload;
-			$self->model = SqlModelsHandler::handle(static::$sqlQueryParser::getParsedPayload());
+
+			/** @var T $parsedPayload */
+			$parsedPayload = static::$sqlQueryParser::getParsedPayload();
+			/** @var Model<T> $model */
+			$model = SqlModelsHandler::handle($parsedPayload);
+			$self->model = $model;
 		}
 
 		return $self;
@@ -67,7 +75,11 @@ final class Payload extends BasePayload
 		Request $request
 		/** @codingStandardsIgnoreEnd */
 	): bool {
-		return SqlModelsHandler::handle(Payload::$sqlQueryParser::getParsedPayload()) !== null;
+
+		/** @var T $parsedPayload */
+		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
+
+		return SqlModelsHandler::handle($parsedPayload) !== null;
 	}
 
 	/**

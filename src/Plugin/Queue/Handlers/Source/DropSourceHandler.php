@@ -16,6 +16,38 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 
+/**
+ * @extends BaseDropHandler<array{
+ *       DROP: array{
+ *           expr_type?: string,
+ *           option: bool,
+ *           if-exists: bool,
+ *           sub_tree: array{
+ *               array{
+ *                   expr_type: string,
+ *                   base_expr: string
+ *               },
+ *               array{
+ *                   expr_type: string,
+ *                   base_expr: string,
+ *                   sub_tree: array{
+ *                      array{
+ *                        expr_type: string,
+ *                        table: string,
+ *                        no_quotes: array{
+ *                            delim: bool,
+ *                            parts: array<string>
+ *                        },
+ *                        alias: bool,
+ *                        base_expr: string,
+ *                        delim: bool
+ *                      }
+ *                   }
+ *               }
+ *           }
+ *       }
+ *   }>
+ */
 final class DropSourceHandler extends BaseDropHandler
 {
 
@@ -77,6 +109,39 @@ final class DropSourceHandler extends BaseDropHandler
 		}
 	}
 
+	/**
+	 * @param Payload<array{
+	 *       DROP: array{
+	 *           expr_type?: string,
+	 *           option: bool,
+	 *           if-exists: bool,
+	 *           sub_tree: array{
+	 *               array{
+	 *                   expr_type: string,
+	 *                   base_expr: string
+	 *               },
+	 *               array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   sub_tree: array{
+	 *                      array{
+	 *                        expr_type: string,
+	 *                        table: string,
+	 *                        no_quotes: array{
+	 *                            delim: bool,
+	 *                            parts: array<string>
+	 *                        },
+	 *                        alias: bool,
+	 *                        base_expr: string,
+	 *                        delim: bool
+	 *                      }
+	 *                   }
+	 *               }
+	 *           }
+	 *       }
+	 *   }> $payload
+	 * @return string
+	 */
 	#[\Override] protected function getName(Payload $payload): string {
 		$parsedPayload = $payload->model->getPayload();
 		return $parsedPayload['DROP']['sub_tree'][1]['sub_tree'][0]['no_quotes']['parts'][0];

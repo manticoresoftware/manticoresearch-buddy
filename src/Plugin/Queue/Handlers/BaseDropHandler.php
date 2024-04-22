@@ -7,13 +7,16 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
+/**
+ * @template T of array
+ */
 abstract class BaseDropHandler extends BaseHandlerWithClient
 {
 
 	/**
 	 * Initialize the executor
 	 *
-	 * @param Payload $payload
+	 * @param Payload<T> $payload
 	 * @return void
 	 */
 	public function __construct(public Payload $payload) {
@@ -51,6 +54,10 @@ abstract class BaseDropHandler extends BaseHandlerWithClient
 
 	abstract protected function processDrop(string $name, string $tableName): int;
 
+	/**
+	 * @param Payload<T> $payload
+	 * @return string
+	 */
 	abstract protected function getName(Payload $payload): string;
 
 	abstract protected function getTableName(): string;

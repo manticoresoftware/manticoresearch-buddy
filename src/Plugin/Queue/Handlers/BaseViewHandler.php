@@ -9,12 +9,15 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
+/**
+ * @template T of array
+ */
 abstract class BaseViewHandler extends BaseHandlerWithClient {
 
 	/**
 	 * Initialize the executor
 	 *
-	 * @param Payload $payload
+	 * @param Payload<T> $payload
 	 * @return void
 	 */
 	public function __construct(public Payload $payload) {

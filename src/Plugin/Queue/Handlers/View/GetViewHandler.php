@@ -14,9 +14,56 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseGetHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
+/**
+ * @extends BaseGetHandler<array{
+ *       SHOW: array{
+ *           0: array{
+ *               expr_type: string,
+ *               base_expr: string
+ *           },
+ *           1: array{
+ *               expr_type: string,
+ *               base_expr: string
+ *           },
+ *           2: array{
+ *               expr_type: string,
+ *               view: string,
+ *               no_quotes: array{
+ *                   delim: bool,
+ *                   parts: array<string>
+ *               },
+ *               base_expr: string
+ *           }
+ *       }
+ *   }>
+ */
 final class GetViewHandler extends BaseGetHandler
 {
 
+	/**
+	 * @param Payload<array{
+	 *        SHOW: array{
+	 *            0: array{
+	 *                expr_type: string,
+	 *                base_expr: string
+	 *            },
+	 *            1: array{
+	 *                expr_type: string,
+	 *                base_expr: string
+	 *            },
+	 *            2: array{
+	 *                expr_type: string,
+	 *                view: string,
+	 *                no_quotes: array{
+	 *                    delim: bool,
+	 *                    parts: array<string>
+	 *                },
+	 *                base_expr: string
+	 *            }
+	 *        }
+	 *    }> $payload
+	 * @return string
+	 */
 	#[\Override] protected function getName(Payload $payload): string {
 		$parsedPayload = $payload->model->getPayload();
 		return $parsedPayload['SHOW'][2]['no_quotes']['parts'][0];

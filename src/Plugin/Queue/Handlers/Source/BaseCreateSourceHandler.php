@@ -18,6 +18,9 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
+/**
+ * @template T of array
+ */
 abstract class BaseCreateSourceHandler extends BaseHandlerWithClient
 {
 	const SOURCE_TYPE_KAFKA = 'kafka';
@@ -25,7 +28,7 @@ abstract class BaseCreateSourceHandler extends BaseHandlerWithClient
 	/**
 	 * Initialize the executor
 	 *
-	 * @param Payload $payload
+	 * @param Payload<T> $payload
 	 * @return void
 	 */
 	public function __construct(public Payload $payload) {
@@ -72,5 +75,10 @@ abstract class BaseCreateSourceHandler extends BaseHandlerWithClient
 		}
 	}
 
+	/**
+	 * @param Payload<T> $payload
+	 * @param Client $manticoreClient
+	 * @return TaskResult
+	 */
 	abstract public static function handle(Payload $payload, Client $manticoreClient): TaskResult;
 }
