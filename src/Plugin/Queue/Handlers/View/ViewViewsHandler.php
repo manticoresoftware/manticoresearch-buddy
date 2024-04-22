@@ -28,8 +28,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
  *       }
  *   }>
  */
-final class ViewViewsHandler extends BaseViewHandler
-{
+final class ViewViewsHandler extends BaseViewHandler {
 
 
 	#[\Override] protected function getTableName(): string {

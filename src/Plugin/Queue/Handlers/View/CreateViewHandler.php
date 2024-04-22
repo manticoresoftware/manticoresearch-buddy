@@ -21,8 +21,7 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 use PHPSQLParser\PHPSQLCreator;
 use PHPSQLParser\exceptions\UnsupportedFeatureException;
 
-final class CreateViewHandler extends BaseHandlerWithClient
-{
+final class CreateViewHandler extends BaseHandlerWithClient {
 
 	/**
 	 * Initialize the executor

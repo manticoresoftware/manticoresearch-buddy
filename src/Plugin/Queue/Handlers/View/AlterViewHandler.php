@@ -19,8 +19,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
-final class AlterViewHandler extends BaseHandlerWithClient
-{
+final class AlterViewHandler extends BaseHandlerWithClient {
 
 	/**
 	 * Initialize the executor

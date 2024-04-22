@@ -64,8 +64,7 @@ use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
  *       }
  *   }>
  */
-final class DropViewHandler extends BaseDropHandler
-{
+final class DropViewHandler extends BaseDropHandler {
 
 	/**
 	 * @throws ManticoreSearchClientError

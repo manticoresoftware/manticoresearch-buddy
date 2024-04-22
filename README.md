@@ -159,7 +159,7 @@ final class Processor extends BaseProcessor {
     parent::stop();
   }
 
-  public function test(string $text): void {
+  public static function test(string $text): void {
     var_dump($text);
   }
 }

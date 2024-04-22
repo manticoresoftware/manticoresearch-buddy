@@ -71,8 +71,7 @@ use PHPSQLParser\PHPSQLParser;
  *        }
  *    }>
  */
-final class CreateKafka extends BaseCreateSourceHandler
-{
+final class CreateKafka extends BaseCreateSourceHandler {
 	/**
 	 * @param Payload<array{
 	 *         CREATE: array{

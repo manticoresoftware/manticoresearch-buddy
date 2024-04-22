@@ -21,8 +21,7 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 /**
  * @template T of array
  */
-abstract class BaseCreateSourceHandler extends BaseHandlerWithClient
-{
+abstract class BaseCreateSourceHandler extends BaseHandlerWithClient {
 	const SOURCE_TYPE_KAFKA = 'kafka';
 
 	/**

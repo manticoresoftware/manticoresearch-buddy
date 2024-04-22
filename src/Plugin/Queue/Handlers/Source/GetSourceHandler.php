@@ -42,8 +42,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
  *       }
  *   }>
  */
-final class GetSourceHandler extends BaseGetHandler
-{
+final class GetSourceHandler extends BaseGetHandler {
 
 	#[\Override] protected static function formatResult(string $query): string {
 

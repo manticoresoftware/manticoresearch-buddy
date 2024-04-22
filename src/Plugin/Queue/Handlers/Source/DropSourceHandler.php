@@ -48,8 +48,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
  *       }
  *   }>
  */
-final class DropSourceHandler extends BaseDropHandler
-{
+final class DropSourceHandler extends BaseDropHandler {
 
 	/**
 	 * @param string $name

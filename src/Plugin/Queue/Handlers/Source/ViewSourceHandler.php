@@ -24,8 +24,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
  *       }
  *   }>
  */
-final class ViewSourceHandler extends BaseViewHandler
-{
+final class ViewSourceHandler extends BaseViewHandler {
 	#[\Override] protected function getTableName(): string {
 		return Payload::SOURCE_TABLE_NAME;
 	}

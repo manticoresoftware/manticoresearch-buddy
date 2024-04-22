@@ -37,8 +37,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
  *       }
  *   }>
  */
-final class GetViewHandler extends BaseGetHandler
-{
+final class GetViewHandler extends BaseGetHandler {
 
 	/**
 	 * @param Payload<array{
