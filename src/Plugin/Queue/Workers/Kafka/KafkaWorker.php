@@ -26,7 +26,6 @@ class KafkaWorker {
 
 	private Client $client;
 
-	private string $name;
 	private string $brokerList;
 
 	/** @var array|string[] */
@@ -58,7 +57,6 @@ class KafkaWorker {
 		/** @var array{group:string, broker:string, topic:string, batch:string } $attrs */
 		$attrs = json_decode($instance['attrs'], true);
 
-		$this->name = $instance['full_name'];
 		$this->client = $client;
 		$this->consumerGroup = $attrs['group'];
 		$this->brokerList = $attrs['broker'];
@@ -234,7 +232,7 @@ class KafkaWorker {
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {
-			Buddy::debug("Error inserting to buffer table $this->bufferTable. Reason: ".$request->getError());
+			Buddy::debug("Error inserting to buffer table $this->bufferTable. Reason: " . $request->getError());
 			return false;
 		}
 		return true;

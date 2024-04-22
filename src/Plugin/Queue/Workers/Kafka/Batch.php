@@ -12,9 +12,9 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
 use Closure;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
-class Batch {
+class Batch
+{
 	protected int $batchSize;
 
 	/**
