@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\BuddyTest\Lib\BuddyRequestError;
 
 class View {
 	use StringFunctionsTrait;
@@ -75,6 +76,7 @@ class View {
 	/**
 	 * @param array<int, array<string, string>> $batch
 	 * @return array<int, array<string, mixed>>
+	 * @throws BuddyRequestError
 	 */
 	private function prepareValues(array $batch): array {
 		foreach ($batch as $k => $row) {
@@ -117,14 +119,14 @@ class View {
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {
-			Buddy::debugv('----> Error during inserting to destination table. ' . $request->getError());
+			Buddy::debug('Error occurred during inserting to destination table. Reason:' . $request->getError());
 		}
 		$sql = "TRUNCATE TABLE $this->buffer";
 
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {
-			Buddy::debugv('----> Error truncating buffer table table. ' . $request->getError());
+			Buddy::debug('Error truncating buffer table. Reason:' . $request->getError());
 			return false;
 		}
 

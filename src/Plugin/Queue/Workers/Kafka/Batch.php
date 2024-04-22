@@ -63,7 +63,6 @@ class Batch {
 		if (empty($this->batch)) {
 			return false;
 		}
-		Buddy::debugv('-----> KafkaWorker start batch processing. Size: ' . sizeof($this->batch));
 		$run = call_user_func($this->callback, $this->batch);
 		$this->batch = [];
 		return $run;

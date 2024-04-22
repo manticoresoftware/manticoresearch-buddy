@@ -42,12 +42,12 @@ class QueueProcess extends BaseProcessor {
 	public function runPool(): void {
 
 		if (!$this->client->hasTable(Payload::SOURCE_TABLE_NAME)) {
-			Buddy::debugv('Queue source table not exist. Exit queue process pool');
+			Buddy::debug('Queue source table not exist. Exit queue process pool');
 			return;
 		}
 
 		if (!$this->client->hasTable(Payload::VIEWS_TABLE_NAME)) {
-			Buddy::debugv('Queue views table not exist. Exit queue process pool');
+			Buddy::debug('Queue views table not exist. Exit queue process pool');
 			return;
 		}
 
@@ -77,7 +77,7 @@ class QueueProcess extends BaseProcessor {
 
 			$results = $results->getResult();
 			if (is_array($results[0]) && !isset($results[0]['data'][0])) {
-				Buddy::debugv("Can't find view with source_name {$instance['full_name']}");
+				Buddy::debug("Can't find view with source_name {$instance['full_name']}");
 				continue;
 			}
 
@@ -88,7 +88,6 @@ class QueueProcess extends BaseProcessor {
 
 			$instance['destination_name'] = $results[0]['data'][0]['destination_name'];
 			$instance['query'] = $results[0]['data'][0]['query'];
-			echo '++++++++++++++++ ' . $instance['full_name'] . "\n";
 			$this->runWorker($instance);
 		}
 	}
@@ -108,7 +107,7 @@ class QueueProcess extends BaseProcessor {
 	 */
 	public function runWorker(array $instance, bool $shouldStart = true): void {
 		$workerFn = function () use ($instance): void {
-			Buddy::debugv('------->> Start worker ' . $instance['full_name']);
+			Buddy::debugv('Start worker ' . $instance['full_name']);
 			$kafkaWorker = new KafkaWorker($this->client, $instance);
 			$kafkaWorker->run();
 		};

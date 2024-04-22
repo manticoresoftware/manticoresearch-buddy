@@ -97,12 +97,10 @@ class KafkaWorker {
 			function (KafkaConsumer $kafka, $err, array $partitions = null) {
 				switch ($err) {
 					case RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS:
-						Buddy::debugv('-----> KafkaWorker worker -> Assign: ' . json_encode($partitions));
 						$kafka->assign($partitions);
 						break;
 
 					case RD_KAFKA_RESP_ERR__REVOKE_PARTITIONS:
-						Buddy::debugv('-----> KafkaWorker worker -> Revoke: ' . json_encode($partitions));
 						$kafka->assign(null);
 						break;
 
@@ -119,8 +117,6 @@ class KafkaWorker {
 	 * @throws Exception
 	 */
 	public function run(): void {
-		Buddy::debugv('------->> Start consuming ' . $this->name);
-
 		$batch = new Batch($this->batchSize);
 		$batch->setCallback(
 			function ($batch) {
@@ -145,7 +141,6 @@ class KafkaWorker {
 					}
 					break;
 				case RD_KAFKA_RESP_ERR__PARTITION_EOF:
-					Buddy::debugv('-----> KafkaWorker worker -> No more messages; will wait for more ');
 					break;
 				case RD_KAFKA_RESP_ERR__TIMED_OUT:
 					if ($batch->checkProcessingTimeout() && $batch->process() && $lastFullMessage !== null) {
@@ -239,7 +234,7 @@ class KafkaWorker {
 		$request = $this->client->sendRequest($sql);
 
 		if ($request->hasError()) {
-			Buddy::debug((string)$request->getError());
+			Buddy::debug("Error inserting to buffer table $this->bufferTable. Reason: ".$request->getError());
 			return false;
 		}
 		return true;

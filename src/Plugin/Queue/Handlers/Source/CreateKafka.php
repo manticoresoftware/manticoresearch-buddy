@@ -226,7 +226,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 			}
 
 			$ids = implode(',', $ids);
-			Buddy::debugv("Remove orphan views records ids ($ids)");
+			Buddy::debug("Remove orphan views records ids ($ids)");
 			$sql = /** @lang manticore */
 				"DELETE FROM $viewsTable WHERE id in ($ids)";
 			$rawResult = $client->sendRequest($sql);
