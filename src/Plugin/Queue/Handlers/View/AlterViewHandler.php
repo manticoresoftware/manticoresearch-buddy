@@ -25,7 +25,35 @@ final class AlterViewHandler extends BaseHandlerWithClient
 	/**
 	 * Initialize the executor
 	 *
-	 * @param Payload $payload
+	 * @param Payload<array{
+	 *       ALTER: array{
+	 *           base_expr: string,
+	 *           sub_tree: mixed[]
+	 *       },
+	 *       VIEW: array{
+	 *           base_expr: string,
+	 *           name: string,
+	 *           no_quotes: array{
+	 *               delim: bool,
+	 *               parts: string[]
+	 *           },
+	 *           create-def: bool,
+	 *           options: array{
+	 *               expr_type: string,
+	 *               base_expr: string,
+	 *               delim: string,
+	 *               sub_tree: array{
+	 *                   expr_type: string,
+	 *                   base_expr: string,
+	 *                   delim: string,
+	 *                   sub_tree: array{
+	 *                       expr_type: string,
+	 *                       base_expr: string
+	 *                   }[]
+	 *               }[]
+	 *           }[]
+	 *       }
+	 *   }> $payload
 	 * @return void
 	 */
 	public function __construct(public Payload $payload) {
@@ -140,7 +168,8 @@ final class AlterViewHandler extends BaseHandlerWithClient
 		 *   VIEW: array{base_expr: string,name: string,no_quotes: array{delim: bool,parts: string[]},
 		 *   create-def: bool,options: array{expr_type: string,base_expr: string,delim: string,
 		 *   sub_tree: array{expr_type: string,base_expr: string,delim: string,
-		 *   sub_tree: array{expr_type: string,base_expr: string}[]}[]}[]}}> $model */
+		 *   sub_tree: array{expr_type: string,base_expr: string}[]}[]}[]}}> $model
+		 */
 		$model = $this->payload->model;
 		return $model->getPayload();
 	}
