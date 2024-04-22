@@ -27,7 +27,73 @@ final class CreateViewHandler extends BaseHandlerWithClient
 	/**
 	 * Initialize the executor
 	 *
-	 * @param Payload $payload
+	 * @param Payload<array{
+	 *        CREATE: array{
+	 *            base_expr: string,
+	 *            sub_tree: array{
+	 *                 expr_type: string,
+	 *                 base_expr: string
+	 *             }[]
+	 *        },
+	 *        VIEW: array{
+	 *            base_expr: string,
+	 *            name: string,
+	 *            no_quotes: array{
+	 *                delim: bool,
+	 *                parts: string[]
+	 *            },
+	 *            create-def: bool,
+	 *            options: bool,
+	 *            to: array{
+	 *                expr_type: string,
+	 *                table: string,
+	 *                base_expr: string,
+	 *                no_quotes: array{
+	 *                    delim: bool,
+	 *                    parts: string[]
+	 *                }
+	 *            }
+	 *        },
+	 *        SELECT: array{
+	 *            array{
+	 *                expr_type: string,
+	 *                alias: bool|array{
+	 *                    as: bool,
+	 *                    name: string,
+	 *                    base_expr: string,
+	 *                    no_quotes: array{
+	 *                        delim: bool,
+	 *                        parts: string[]
+	 *                    }
+	 *                },
+	 *                base_expr: string,
+	 *                no_quotes: array{
+	 *                    delim: bool,
+	 *                    parts: string[]
+	 *                },
+	 *                sub_tree: mixed,
+	 *                delim: bool|string
+	 *            }[]
+	 *        },
+	 *        FROM: array{
+	 *            array{
+	 *                expr_type: string,
+	 *                table: string,
+	 *                no_quotes: array{
+	 *                    delim: bool,
+	 *                    parts: string[]
+	 *                },
+	 *                alias: bool,
+	 *                hints: bool,
+	 *                join_type: string,
+	 *                ref_type: bool,
+	 *                ref_clause: bool,
+	 *                base_expr: string,
+	 *                sub_tree: bool|array{}
+	 *            }[]
+	 *        },
+	 *        LIMIT?: string
+	 *    }> $payload
 	 * @return void
 	 */
 	public function __construct(public Payload $payload) {
@@ -45,10 +111,16 @@ final class CreateViewHandler extends BaseHandlerWithClient
 		 */
 		$taskFn = function (): TaskResult {
 			$payload = $this->payload;
+
+
 			$parsedPayload = $payload->model->getPayload();
 
+			/**
+			 * @var string $tableName
+			 */
+			$tableName = $parsedPayload['FROM'][0]['table'];
 			$manticoreClient = $this->manticoreClient;
-			$sourceName = strtolower($parsedPayload['FROM'][0]['table']);
+			$sourceName = strtolower($tableName);
 			$viewName = strtolower($parsedPayload['VIEW']['no_quotes']['parts'][0]);
 			$destinationTableName = strtolower($parsedPayload['VIEW']['to']['no_quotes']['parts'][0]);
 
@@ -101,7 +173,7 @@ final class CreateViewHandler extends BaseHandlerWithClient
 	/**
 	 * @param Client $client
 	 * @param string $viewName
-	 * @param array<string, array<int, string>> $parsedQuery
+	 * @param array<string, array<int, array<array<string, mixed>>>|string> $parsedQuery
 	 * @param string $sourceName
 	 * @param string $originalQuery
 	 * @param string $destinationTableName
