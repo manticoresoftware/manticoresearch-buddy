@@ -41,8 +41,6 @@ final class Payload extends BasePayload
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static();
-		$self->path = $request->path;
-		$self->type = $request->format->value;
 
 		/**
 		 * @var array{
