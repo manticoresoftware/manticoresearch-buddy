@@ -51,11 +51,6 @@ final class Handler extends BaseHandlerWithClient
 			try {
 				$freezeResult = self::freezeTable($payload->sourceTableName, $client);
 				$dataDirPath = self::parseTablePath($payload->sourceTableName, $freezeResult);
-
-				if ($dataDirPath === null) {
-					throw GenericError::create('Unfreeze call');
-				}
-
 				$destinationTablePath = $dataDirPath . $payload->sourceTableName .
 					DIRECTORY_SEPARATOR . $payload->sourceTableName;
 				self::importTable($payload->destinationTableName, $destinationTablePath, $client);
@@ -74,10 +69,10 @@ final class Handler extends BaseHandlerWithClient
 	/**
 	 * @param string $tableName
 	 * @param Client $client
-	 * @return array
+	 * @return mixed
 	 * @throws ManticoreSearchClientError|GenericError
 	 */
-	private static function freezeTable(string $tableName, Client $client): array {
+	private static function freezeTable(string $tableName, Client $client): mixed {
 		$sql = "FREEZE $tableName";
 		$result = $client->sendRequest($sql);
 		if ($result->hasError()) {
@@ -88,12 +83,16 @@ final class Handler extends BaseHandlerWithClient
 
 	/**
 	 * @param string $tableName
-	 * @param array $freezeResult
-	 * @return string|null
+	 * @param mixed $freezeResult
+	 * @return string
 	 * @throws GenericError
 	 */
-	private static function parseTablePath(string $tableName, array $freezeResult): ?string {
-		if (!isset($freezeResult[0]['data'][0]['normalized'])) {
+	private static function parseTablePath(string $tableName, mixed $freezeResult): string {
+
+		if ($tableName === '') {
+			throw GenericError::create("Table name can't be empty");
+		}
+		if (!is_array($freezeResult) || !isset($freezeResult[0]['data'][0]['normalized'])) {
 			throw GenericError::create('No normalized result in freeze response');
 		}
 

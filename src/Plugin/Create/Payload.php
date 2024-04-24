@@ -44,6 +44,46 @@ final class Payload extends BasePayload
 		$self->path = $request->path;
 		$self->type = $request->format->value;
 
+		/**
+		 * @var array{
+		 *       CREATE: array{
+		 *           expr_type: string,
+		 *           not-exists: bool,
+		 *           base_expr: string,
+		 *           sub_tree?: array<array{
+		 *               expr_type: string,
+		 *               base_expr: string
+		 *           }>
+		 *       },
+		 *       TABLE: array{
+		 *           base_expr: string,
+		 *           name?: string,
+		 *           no_quotes: array{
+		 *               delim: bool,
+		 *               parts: array<string>
+		 *           },
+		 *           create-def?: bool,
+		 *           options?: array<array{
+		 *               expr_type: string,
+		 *               base_expr: string,
+		 *               delim: string,
+		 *               sub_tree?: array<array{
+		 *                   expr_type: string,
+		 *                   base_expr: string
+		 *               }>
+		 *           }>
+		 *       },
+		 *       LIKE: array{
+		 *           expr_type: string,
+		 *           table?: string,
+		 *           base_expr: string,
+		 *           no_quotes: array{
+		 *               delim: bool,
+		 *               parts: array<string>
+		 *           }
+		 *       }
+		 *   } $payload
+		 */
 		$payload = self::parsePayload($request->payload);
 
 		$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
@@ -111,9 +151,9 @@ final class Payload extends BasePayload
 	 *              parts: array<string>
 	 *          }
 	 *      }
-	 *  }
+	 *  }|null
 	 */
-	public static function parsePayload(string $stringPayload): array {
+	public static function parsePayload(string $stringPayload): ?array {
 		/**
 		 * @var array{
 		 *       CREATE: array{
@@ -152,9 +192,14 @@ final class Payload extends BasePayload
 		 *               parts: array<string>
 		 *           }
 		 *       }
-		 *   } $payload
+		 *   }|null $payload
 		 */
-		return static::$sqlQueryParser::parse($stringPayload);
+
+		$payload = Payload::$sqlQueryParser::parse($stringPayload);
+		if (is_array($payload)) {
+			return $payload;
+		}
+		return null;
 	}
 
 }
