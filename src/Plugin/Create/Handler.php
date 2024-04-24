@@ -19,8 +19,7 @@ use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient
-{
+final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * Initialize the executor
