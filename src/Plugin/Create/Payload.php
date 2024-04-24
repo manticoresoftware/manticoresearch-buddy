@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Create;
 
-use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
@@ -45,14 +44,10 @@ final class Payload extends BasePayload
 		$self->path = $request->path;
 		$self->type = $request->format->value;
 
-		if ($request->format->value === RequestFormat::SQL->value) {
-			$payload = self::parsePayload($request->payload);
+		$payload = self::parsePayload($request->payload);
 
-			$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
-			$self->sourceTableName = $payload['LIKE']['no_quotes']['parts'][0];
-		} else {
-			// TODO check http request
-		}
+		$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
+		$self->sourceTableName = $payload['LIKE']['no_quotes']['parts'][0];
 		return $self;
 	}
 
@@ -62,22 +57,19 @@ final class Payload extends BasePayload
 	 */
 	public static function hasMatch(Request $request): bool {
 
-		if ($request->format->value === RequestFormat::SQL->value) {
-			$payload = self::parsePayload($request->payload);
 
-			if (isset($payload['CREATE'])
-				&& isset($payload['TABLE']['no_quotes']['parts'][0])
-				&& isset($payload['LIKE']['no_quotes']['parts'][0])
-				&& isset($payload['TABLE']['options'][0]['base_expr'])
-				&& $payload['TABLE']['options'][0]['base_expr'] === 'WITH DATA'
-			) {
-				return true;
-			}
+		$payload = self::parsePayload($request->payload);
 
-			return false;
+		if (isset($payload['CREATE'])
+			&& isset($payload['TABLE']['no_quotes']['parts'][0])
+			&& isset($payload['LIKE']['no_quotes']['parts'][0])
+			&& isset($payload['TABLE']['options'][0]['base_expr'])
+			&& $payload['TABLE']['options'][0]['base_expr'] === 'WITH DATA'
+		) {
+			return true;
 		}
 
-		return str_contains($request->path, '/_update/');
+		return false;
 	}
 
 	/**
