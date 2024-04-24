@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 /**
@@ -39,6 +40,7 @@ class CreateTableHandler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
+			Buddy::debug('TEST2 ');
 			$columnExpr = static::buildColumnExpr($payload->columnInfo);
 			$query = "CREATE TABLE IF NOT EXISTS {$payload->table} ($columnExpr)";
 			/** @var array{error?:string} $queryResult */

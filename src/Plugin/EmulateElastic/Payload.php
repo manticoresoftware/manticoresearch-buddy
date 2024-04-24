@@ -10,6 +10,7 @@
 */
 
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 use Exception;
 use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
@@ -62,12 +63,15 @@ final class Payload extends BasePayload {
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static();
-
+		Buddy::debug('TEST0: ' . $request->path);
 		$pathParts = explode('/', ltrim($request->path, '/'));
 		static::$requestTarget = end($pathParts);
-		// As of now, we process all telemetry-related requests from Kibana in the same way
+		Buddy::debug('TEST0: ' . static::$requestTarget);
+		// As of now, we process all telemetry/metric related requests from Kibana in the same way
 		if (str_ends_with(static::$requestTarget, 'telemetry')) {
 			static::$requestTarget = 'telemetry';
+		} elseif (str_starts_with(static::$requestTarget, 'ui-metric')) {
+			static::$requestTarget = 'metric';
 		}
 		$self->path = $request->path;
 		switch (static::$requestTarget) {
@@ -77,7 +81,9 @@ final class Payload extends BasePayload {
 			case '.kibana':
 			case '.kibana_task_manager':
 			case '_update_by_query':
+			case 'metric':
 			case 'settings':
+			case 'telemetry':
 			case 'stats':
 				break;
 			case '_search':
@@ -91,8 +97,10 @@ final class Payload extends BasePayload {
 				 * properties?:array<string,array{properties?:array<mixed>,type?:string,fields?:array<mixed>}>
 				 * } $requestBody
 				 */
+				Buddy::debug('TEST1: ' . $request->payload);
 				$requestBody = (array)json_decode($request->payload, true);
 				if ($requestBody === [] || !isset($requestBody['properties'])) {
+					Buddy::debug('TEST3');
 					throw new Exception("Unvalid request body in {$request->path}: $request->payload");
 				}
 				$self->columnInfo = $requestBody['properties'];
@@ -144,6 +152,7 @@ final class Payload extends BasePayload {
 			'_mapping' => 'CreateTableHandler',
 			'.kibana_task_manager', '_update_by_query' => 'ManagerSettingsKibanaHandler',
 			'settings', 'stats' => 'ClusterKibanaHandler',
+			'metric' => 'MetricKibanaHandler',
 			'telemetry' => 'TelemetryKibanaHandler',
 			'_search' => self::getKibanaRequestHandler(),
 			default => throw new Exception('Cannot find handler for request type: ' . static::$requestTarget),
