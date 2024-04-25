@@ -16,9 +16,9 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 /**
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
+ * @extends BasePayload<array>
  */
-final class Payload extends BasePayload
-{
+final class Payload extends BasePayload {
 	public string $path;
 
 	public string $destinationTableName;
@@ -42,44 +42,44 @@ final class Payload extends BasePayload
 		$self = new static();
 
 		/**
-		 * @var array{
-		 *        ALTER: array{
-		 *            expr_type: string,
-		 *            base_expr: string,
-		 *            sub_tree: array<
-		 *            array{
-		 *                expr_type: string,
-		 *                base_expr: string
-		 *            }>
-		 *        },
-		 *        TABLE: array{
-		 *            base_expr: string,
-		 *            name: string,
-		 *            no_quotes: array{
-		 *                delim: bool,
-		 *                parts: array<string>
-		 *            },
-		 *            create-def: bool,
-		 *            options: bool
-		 *        },
-		 *        RENAME: array{
-		 *            expr_type: string,
-		 *            sub_tree: array<
-		 *            array{
-		 *                destination: array{
-		 *                    expr_type: string,
-		 *                    table: string,
-		 *                    no_quotes: array{
-		 *                        delim: bool,
-		 *                        parts: array<string>
-		 *                    },
-		 *                    base_expr: string
-		 *                }
-		 *            }>
-		 *        }
-		 *    } $payload
+		 * @phpstan-var array{
+		 *           ALTER: array{
+		 *               expr_type: string,
+		 *               base_expr: string,
+		 *               sub_tree: array<
+		 *               array{
+		 *                   expr_type: string,
+		 *                   base_expr: string
+		 *               }>
+		 *           },
+		 *           TABLE: array{
+		 *               base_expr: string,
+		 *               name: string,
+		 *               no_quotes: array{
+		 *                   delim: bool,
+		 *                   parts: array<string>
+		 *               },
+		 *               create-def: bool,
+		 *               options: bool
+		 *           },
+		 *           RENAME: array{
+		 *               expr_type: string,
+		 *               sub_tree: array<
+		 *               array{
+		 *                   destination: array{
+		 *                       expr_type: string,
+		 *                       table: string,
+		 *                       no_quotes: array{
+		 *                           delim: bool,
+		 *                           parts: array<string>
+		 *                       },
+		 *                       base_expr: string
+		 *                   }
+		 *               }>
+		 *           }
+		 *       } $payload
 		 */
-		$payload = self::parsePayload($request->payload);
+		$payload = Payload::$sqlQueryParser::parse($request->payload);
 
 		$self->destinationTableName = $payload['RENAME']['sub_tree'][0]['destination']['no_quotes']['parts'][0];
 		$self->sourceTableName = $payload['TABLE']['no_quotes']['parts'][0];
@@ -92,8 +92,45 @@ final class Payload extends BasePayload
 	 */
 	public static function hasMatch(Request $request): bool {
 
-
-		$payload = self::parsePayload($request->payload);
+		/**
+		 * @phpstan-var array{
+		 *           ALTER: array{
+		 *               expr_type: string,
+		 *               base_expr?: string,
+		 *               sub_tree: array<
+		 *               array{
+		 *                   expr_type: string,
+		 *                   base_expr: string
+		 *               }>
+		 *           },
+		 *           TABLE?: array{
+		 *               base_expr: string,
+		 *               name: string,
+		 *               no_quotes: array{
+		 *                   delim: bool,
+		 *                   parts: array<string>
+		 *               },
+		 *               create-def: bool,
+		 *               options: bool
+		 *           },
+		 *           RENAME?: array{
+		 *               expr_type: string,
+		 *               sub_tree: array<
+		 *               array{
+		 *                   destination: array{
+		 *                       expr_type: string,
+		 *                       table: string,
+		 *                       no_quotes: array{
+		 *                           delim: bool,
+		 *                           parts: array<string>
+		 *                       },
+		 *                       base_expr: string
+		 *                   }
+		 *               }>
+		 *           }
+		 *       } $payload
+		 */
+		$payload = Payload::$sqlQueryParser::parse($request->payload);
 
 		if (isset($payload['ALTER']['base_expr'])
 			&& isset($payload['TABLE']['no_quotes']['parts'][0])
@@ -106,90 +143,5 @@ final class Payload extends BasePayload
 		return false;
 	}
 
-	/**
-	 * @param string $stringPayload
-	 * @return array{
-	 *       ALTER: array{
-	 *           expr_type: string,
-	 *           base_expr: string,
-	 *           sub_tree: array<
-	 *           array{
-	 *               expr_type: string,
-	 *               base_expr: string
-	 *           }>
-	 *       },
-	 *       TABLE: array{
-	 *           base_expr: string,
-	 *           name: string,
-	 *           no_quotes: array{
-	 *               delim: bool,
-	 *               parts: array<string>
-	 *           },
-	 *           create-def: bool,
-	 *           options: bool
-	 *       },
-	 *       RENAME: array{
-	 *           expr_type: string,
-	 *           sub_tree: array<
-	 *           array{
-	 *               destination: array{
-	 *                   expr_type: string,
-	 *                   table: string,
-	 *                   no_quotes: array{
-	 *                       delim: bool,
-	 *                       parts: array<string>
-	 *                   },
-	 *                   base_expr: string
-	 *               }
-	 *           }>
-	 *       }
-	 *   }|null
-	 */
-	public static function parsePayload(string $stringPayload): ?array {
-		/**
-		 * @var array{
-		 *      ALTER: array{
-		 *          expr_type: string,
-		 *          base_expr: string,
-		 *          sub_tree: array<
-		 *          array{
-		 *              expr_type: string,
-		 *              base_expr: string
-		 *          }>
-		 *      },
-		 *      TABLE: array{
-		 *          base_expr: string,
-		 *          name: string,
-		 *          no_quotes: array{
-		 *              delim: bool,
-		 *              parts: array<string>
-		 *          },
-		 *          create-def: bool,
-		 *          options: bool
-		 *      },
-		 *      RENAME: array{
-		 *          expr_type: string,
-		 *          sub_tree: array<
-		 *          array{
-		 *              destination: array{
-		 *                  expr_type: string,
-		 *                  table: string,
-		 *                  no_quotes: array{
-		 *                      delim: bool,
-		 *                      parts: array<string>
-		 *                  },
-		 *                  base_expr: string
-		 *              }
-		 *          }>
-		 *      }
-		 *  }|null $payload
-		 */
-
-		$payload = Payload::$sqlQueryParser::parse($stringPayload);
-		if (is_array($payload)) {
-			return $payload;
-		}
-		return null;
-	}
 
 }
