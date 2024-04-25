@@ -19,7 +19,8 @@ use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient {
+final class Handler extends BaseHandlerWithClient
+{
 
 	/**
 	 * Initialize the executor
@@ -48,6 +49,7 @@ final class Handler extends BaseHandlerWithClient {
 			}
 
 			try {
+				self::flushRamchunk($payload->sourceTableName, $client);
 				$freezeResult = self::freezeTable($payload->sourceTableName, $client);
 				$dataDirPath = self::parseTablePath($payload->sourceTableName, $freezeResult);
 				$destinationTablePath = $dataDirPath . $payload->sourceTableName .
@@ -63,6 +65,21 @@ final class Handler extends BaseHandlerWithClient {
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
 		)->run();
+	}
+
+
+	/**
+	 * @param string $tableName
+	 * @param Client $client
+	 * @throws GenericError
+	 * @throws ManticoreSearchClientError
+	 */
+	private static function flushRamchunk(string $tableName, Client $client): void {
+		$sql = "flush ramchunk $tableName";
+		$result = $client->sendRequest($sql);
+		if ($result->hasError()) {
+			throw GenericError::create("Can't flush ramchunk for $tableName. Reason: " . $result->getError());
+		}
 	}
 
 	/**
