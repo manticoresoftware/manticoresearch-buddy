@@ -90,7 +90,7 @@ final class Handler extends BaseHandlerWithClient {
 					return '(' . trim((string)$v, "'") . ')';
 				},
 				'json' => function ($v) {
-					return $v === 'NULL' ? "'$v'" : $v;
+					return $v === 'NULL' ? "''" : $v;
 				},
 				default => function ($v) {
 					return $v;
