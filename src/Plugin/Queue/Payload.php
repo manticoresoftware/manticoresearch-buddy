@@ -22,7 +22,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
  *
- * @template T of array
+ * @phpstan-template T of array
+ * @extends BasePayload<T>
  */
 final class Payload extends BasePayload {
 
