@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 /**
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
+ * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
 	/** @var string $table */

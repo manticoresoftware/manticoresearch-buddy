@@ -19,6 +19,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 /**
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
+ * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
 	public string $path;
@@ -40,6 +41,7 @@ final class Payload extends BasePayload {
 	/**
 	 * @param Request $request
 	 * @return static
+	 * @throws ManticoreSearchClientError
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static();

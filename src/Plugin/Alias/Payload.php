@@ -8,11 +8,15 @@
   version. You should have received a copy of the GPL license along with this
   program; if you did not, you can find it at http://www.gnu.org/
 */
+
 namespace Manticoresearch\Buddy\Base\Plugin\Alias;
 
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
+/**
+ * @phpstan-extends BasePayload<array>
+ */
 final class Payload extends BasePayload {
 	/** @var string */
 	public string $path;
@@ -23,7 +27,7 @@ final class Payload extends BasePayload {
 	public function __construct() {
 	}
 
-  /**
+	/**
 	 * @param Request $request
 	 * @return static
 	 */
@@ -44,8 +48,7 @@ final class Payload extends BasePayload {
 			|| (
 				str_contains($request->error, "expecting \$end near '")
 				&& str_contains($request->error, " t'")
-			)
-		;
+			);
 
 		$hasMatch = str_contains($request->payload, ' t.')
 			|| str_ends_with($request->payload, ' t');

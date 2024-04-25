@@ -157,16 +157,16 @@
         },
         {
             "name": "composer/composer",
-            "version": "2.7.2",
+            "version": "2.7.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/composer/composer.git",
-                "reference": "b826edb791571ab1eaf281eb1bd6e181a1192adc"
+                "reference": "a625e50598e12171d3f60b1149eb530690c43474"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/composer/composer/zipball/b826edb791571ab1eaf281eb1bd6e181a1192adc",
-                "reference": "b826edb791571ab1eaf281eb1bd6e181a1192adc",
+                "url": "https://api.github.com/repos/composer/composer/zipball/a625e50598e12171d3f60b1149eb530690c43474",
+                "reference": "a625e50598e12171d3f60b1149eb530690c43474",
                 "shasum": ""
             },
             "require": {
@@ -251,7 +251,7 @@
                 "irc": "ircs://irc.libera.chat:6697/composer",
                 "issues": "https://github.com/composer/composer/issues",
                 "security": "https://github.com/composer/composer/security/policy",
-                "source": "https://github.com/composer/composer/tree/2.7.2"
+                "source": "https://github.com/composer/composer/tree/2.7.4"
             },
             "funding": [
                 {
@@ -267,7 +267,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-03-11T16:12:18+00:00"
+            "time": "2024-04-22T19:17:03+00:00"
         },
         {
             "name": "composer/metadata-minifier",
@@ -815,17 +815,17 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "aeb438445c27ecebc2b4c78ee60a06aeb76c43e9"
+                "reference": "b6d5320de2457474f337a5b327affc643d1b3b10"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/aeb438445c27ecebc2b4c78ee60a06aeb76c43e9",
-                "reference": "aeb438445c27ecebc2b4c78ee60a06aeb76c43e9",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/b6d5320de2457474f337a5b327affc643d1b3b10",
+                "reference": "b6d5320de2457474f337a5b327affc643d1b3b10",
                 "shasum": ""
             },
             "require": {
                 "composer/composer": "^2.5",
-                "manticoresoftware/php-sql-parser": "v4.6.0-patch4",
+                "manticoresoftware/php-sql-parser": "v4.6.0-patch7",
                 "php-ds/php-ds": "^1.4",
                 "symfony/console": "^6.2",
                 "symfony/dependency-injection": "^6.1"
@@ -859,7 +859,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2024-04-15T10:05:22+00:00"
+            "time": "2024-04-25T14:52:03+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -975,16 +975,16 @@
         },
         {
             "name": "manticoresoftware/php-sql-parser",
-            "version": "v4.6.0-patch4",
+            "version": "v4.6.0-patch7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/PHP-SQL-Parser.git",
-                "reference": "0034db8c6e2ec62267c5b10d4aa2009eb2787956"
+                "reference": "4544fc6d068f822f319285425fc8e7f7f2c61c4e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/0034db8c6e2ec62267c5b10d4aa2009eb2787956",
-                "reference": "0034db8c6e2ec62267c5b10d4aa2009eb2787956",
+                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/4544fc6d068f822f319285425fc8e7f7f2c61c4e",
+                "reference": "4544fc6d068f822f319285425fc8e7f7f2c61c4e",
                 "shasum": ""
             },
             "require": {
@@ -1031,7 +1031,7 @@
                 "issues": "https://github.com/greenlion/PHP-SQL-Parser/issues",
                 "source": "https://github.com/greenlion/PHP-SQL-Parser"
             },
-            "time": "2024-03-28T13:51:47+00:00"
+            "time": "2024-04-24T22:46:22+00:00"
         },
         {
             "name": "manticoresoftware/telemetry",
@@ -5178,16 +5178,16 @@
         },
         {
             "name": "squizlabs/php_codesniffer",
-            "version": "3.9.1",
+            "version": "3.9.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPCSStandards/PHP_CodeSniffer.git",
-                "reference": "267a4405fff1d9c847134db3a3c92f1ab7f77909"
+                "reference": "aac1f6f347a5c5ac6bc98ad395007df00990f480"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPCSStandards/PHP_CodeSniffer/zipball/267a4405fff1d9c847134db3a3c92f1ab7f77909",
-                "reference": "267a4405fff1d9c847134db3a3c92f1ab7f77909",
+                "url": "https://api.github.com/repos/PHPCSStandards/PHP_CodeSniffer/zipball/aac1f6f347a5c5ac6bc98ad395007df00990f480",
+                "reference": "aac1f6f347a5c5ac6bc98ad395007df00990f480",
                 "shasum": ""
             },
             "require": {
@@ -5254,7 +5254,7 @@
                     "type": "open_collective"
                 }
             ],
-            "time": "2024-03-31T21:03:09+00:00"
+            "time": "2024-04-23T20:25:34+00:00"
         },
         {
             "name": "theseer/tokenizer",
