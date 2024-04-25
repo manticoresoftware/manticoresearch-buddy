@@ -296,7 +296,9 @@ class QueryProcessor {
 				/** @var BasePayload $pluginPayloadClass */
 				$pluginPayloadClass = "$pluginPrefix\\Payload";
 				$pluginPayloadClass::setParser(static::$sqlQueryParser);
-				if (!$pluginPayloadClass::hasMatch($request)) {
+				$hasMatch = $pluginPayloadClass::hasMatch($request);
+				Buddy::debugv('matching: ' . $plugin['short'] . ' - ' . ($hasMatch ? 'yes' : 'no'));
+				if (!$hasMatch) {
 					continue;
 				}
 

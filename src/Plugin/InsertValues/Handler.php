@@ -8,7 +8,7 @@
   version. You should have received a copy of the GPL license along with this
   program; if you did not, you can find it at http://www.gnu.org/
 */
-namespace Manticoresearch\Buddy\Base\Plugin\InsertMva;
+namespace Manticoresearch\Buddy\Base\Plugin\InsertValues;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
@@ -49,18 +49,7 @@ final class Handler extends BaseHandlerWithClient {
 			}
 			/** @var array<array{data:array<array{Field:string,Type:string}>}> $descResult */
 			$columnCount = sizeof($descResult[0]['data']);
-			$columnFnMap = [];
-			foreach ($descResult[0]['data'] as $n => ['Field' => $field, 'Type' => $type]) {
-				$columnFnMap[$n] = match ($type) {
-					'mva', 'mva64', 'float_vector' => function ($v) {
-						return '(' . trim((string)$v, "'") . ')';
-					},
-					default => function ($v) {
-						return $v;
-					},
-				};
-			}
-
+			$columnFnMap = static::getColumnFnMap($descResult[0]['data']);
 			$query = "INSERT INTO `{$payload->table}` VALUES ";
 			$total = (int)(sizeof($payload->values) / $columnCount);
 			for ($i = 0; $i < $total; $i++) {
@@ -85,5 +74,29 @@ final class Handler extends BaseHandlerWithClient {
 		return Task::create(
 			$taskFn, [$encodedPayload, $this->manticoreClient]
 		)->run();
+	}
+
+	/**
+	 * Helper to get column map function that will mutate the original values to proper one for insert
+	 *
+	 * @param array<array{Field:string,Type:string}> $data
+	 * @return array<callable>
+	 */
+	protected static function getColumnFnMap(array $data): array {
+		$columnFnMap = [];
+		foreach ($data as $n => ['Field' => $field, 'Type' => $type]) {
+			$columnFnMap[$n] = match ($type) {
+				'mva', 'mva64', 'float_vector' => function ($v) {
+					return '(' . trim((string)$v, "'") . ')';
+				},
+				'json' => function ($v) {
+					return $v === 'NULL' ? "''" : $v;
+				},
+				default => function ($v) {
+					return $v;
+				},
+			};
+		}
+		return $columnFnMap;
 	}
 }
