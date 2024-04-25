@@ -8,6 +8,7 @@
   version. You should have received a copy of the GPL license along with this
   program; if you did not, you can find it at http://www.gnu.org/
 */
+
 namespace Manticoresearch\Buddy\Base\Plugin\Plugin;
 
 use Exception;
@@ -15,6 +16,9 @@ use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
+/**
+ * @phpstan-extends BasePayload<array>
+ */
 final class Payload extends BasePayload {
 	public string $path;
 
@@ -34,9 +38,10 @@ final class Payload extends BasePayload {
 			. ' and `show buddy plugins`';
 	}
 
-  /**
+	/**
 	 * @param Request $request
 	 * @return static
+	 * @throws QueryParseError
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static(static::getActionType($request->payload));
@@ -99,6 +104,7 @@ final class Payload extends BasePayload {
 	 * Helper to get ActionType enum value from the query
 	 * @param string $query
 	 * @return ActionType
+	 * @throws Exception
 	 */
 	protected static function getActionType(string $query): ActionType {
 		return match (strtok(strtolower($query), ' ')) {

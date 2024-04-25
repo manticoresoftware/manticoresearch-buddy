@@ -8,6 +8,7 @@
   version. You should have received a copy of the GPL license along with this
   program; if you did not, you can find it at http://www.gnu.org/
 */
+
 namespace Manticoresearch\Buddy\Base\Plugin\Select;
 
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
@@ -16,6 +17,9 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
+/**
+ * @phpstan-extends BasePayload<array>
+ */
 final class Payload extends BasePayload {
 	// HANDLED_TABLES value defines if we actually process the request and return some data (1)
 	// or just return an empty result (0)
@@ -104,7 +108,7 @@ final class Payload extends BasePayload {
 			if (!str_contains($request->error, "unsupported filter type 'string' on attribute")
 				&& !isset(static::HANDLED_TABLES[$self->table])
 				&& !str_starts_with($self->table, 'manticore')
-				) {
+			) {
 				throw QueryParseError::create('Failed to handle your select query', true);
 			}
 		} else {
@@ -142,7 +146,7 @@ final class Payload extends BasePayload {
 
 	/**
 	 * Handle no table matches from select query
-	 * @param  array<string>  $matches
+	 * @param array<string> $matches
 	 * @return static
 	 */
 	protected function handleNoTableMatches(array $matches): static {
@@ -151,8 +155,8 @@ final class Payload extends BasePayload {
 		} elseif (isset($matches[4])) {
 			$this->fields[] = $matches[4];
 		} elseif (stripos($this->originalQuery, 'database()') !== false
-		&& stripos($this->originalQuery, 'schema()') !== false
-		&& stripos($this->originalQuery, 'left(user()') !== false) {
+			&& stripos($this->originalQuery, 'schema()') !== false
+			&& stripos($this->originalQuery, 'left(user()') !== false) {
 			$this->fields = [
 				'database',
 				'schema',
@@ -240,7 +244,7 @@ final class Payload extends BasePayload {
 
 		if (str_contains($request->error, "unexpected identifier, expecting ',' or ')' near")
 			&& (stripos($request->payload, 'date(') !== false
-			|| stripos($request->payload, 'quarter') !== false)) {
+				|| stripos($request->payload, 'quarter') !== false)) {
 			return true;
 		}
 

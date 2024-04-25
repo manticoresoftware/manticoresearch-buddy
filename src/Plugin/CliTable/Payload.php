@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
 /**
  * Request for CliTable command
+ * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
 	public string $query;
