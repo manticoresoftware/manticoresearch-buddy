@@ -48,7 +48,7 @@ final class Handler extends BaseHandlerWithClient
 			}
 			self::createTableLike($payload->sourceTableName, $payload->destinationTableName, $client);
 
-			$result = self::attachTable($payload->sourceTableName, $payload->destinationTableName, $client);
+			$result = (array)self::attachTable($payload->sourceTableName, $payload->destinationTableName, $client);
 
 			self::dropTable($payload->sourceTableName, $client);
 
