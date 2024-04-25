@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
- namespace Manticoresearch\Buddy\Base\Plugin\Insert;
+namespace Manticoresearch\Buddy\Base\Plugin\Insert;
 
 use Exception;
 use Manticoresearch\Buddy\Base\Plugin\Insert\Error\AutoSchemaDisabledError;

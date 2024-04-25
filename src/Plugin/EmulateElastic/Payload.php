@@ -19,6 +19,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
+ * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
 

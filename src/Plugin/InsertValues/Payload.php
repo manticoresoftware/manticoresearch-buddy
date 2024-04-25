@@ -8,7 +8,7 @@
   version. You should have received a copy of the GPL license along with this
   program; if you did not, you can find it at http://www.gnu.org/
 */
-namespace Manticoresearch\Buddy\Base\Plugin\InsertMva;
+namespace Manticoresearch\Buddy\Base\Plugin\InsertValues;
 
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\Network\Request;
@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 /**
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
+ * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
 	/** @var string $table */
@@ -33,7 +34,7 @@ final class Payload extends BasePayload {
 	 * @return string
 	 */
 	public static function getInfo(): string {
-		return 'Manages the restoration of MVA fields with mysqldump';
+		return 'Manages the restoration of NULLs and MVA fields with mysqldump';
 	}
 
   /**
@@ -59,9 +60,8 @@ final class Payload extends BasePayload {
 		}
 
 		$values = $matches[1];
-		$pattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'|\\d+(?:\\.\\d+)?|\\{(?:[^{}]|\\{[^{}]*\\})*\\}/";
+		$pattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\}/";
 		preg_match_all($pattern, $values, $matches);
-
 		$self->values = array_map(trim(...), $matches[0] ?? []);
 		$self->path = $request->path;
 		return $self;
@@ -73,9 +73,21 @@ final class Payload extends BasePayload {
 	 */
 	public static function hasMatch(Request $request): bool {
 		$isInsertQuery = stripos($request->payload, 'insert into') === 0;
+		if (!$isInsertQuery) {
+			return false;
+		}
+
 		// ERROR 1064 (42000): row 1, column 3: non-MVA value specified for a MVA column
 		$isMVAError = str_contains($request->error, 'non-MVA value specified for a MVA column');
+		if ($isMVAError) {
+			return true;
+		}
+		// ERROR 1064 (42000) at line 77: P01: syntax error, unexpected NULL near
+		$isNullError = str_contains($request->error, 'unexpected NULL near');
+		if ($isNullError) {
+			return true;
+		}
 
-		return $isInsertQuery && $isMVAError;
+		return false;
 	}
 }

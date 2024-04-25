@@ -18,6 +18,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
+ * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
 
@@ -59,6 +60,7 @@ final class Payload extends BasePayload {
 	/**
 	 * @param Request $request
 	 * @return static
+	 * @throws QueryParseError
 	 */
 	public static function fromRequest(Request $request): static {
 		return match (static::$type) {
@@ -75,6 +77,7 @@ final class Payload extends BasePayload {
 	/**
 	 * @param Request $request
 	 * @return static
+	 * @throws QueryParseError
 	 */
 	protected static function fromFullTablesRequest(Request $request): static {
 		$pattern = '#^'
@@ -111,6 +114,7 @@ final class Payload extends BasePayload {
 	/**
 	 * @param Request $request
 	 * @return static
+	 * @throws QueryParseError
 	 */
 	protected static function fromCreateTableRequest(Request $request): static {
 		$pattern = '/(?:SHOW\s+CREATE\s+TABLE\s+`?)([\w]+)(?:`?\.)`?([\w]+)(?:`?)/i';
@@ -151,6 +155,7 @@ final class Payload extends BasePayload {
 	/**
 	 * @param Request $request
 	 * @return static
+	 * @throws QueryParseError
 	 */
 	protected static function fromColumnsRequest(Request $request): static {
 		$pattern = '/(?:SHOW\s+FULL\s+COLUMNS\s+FROM\s+`?)([\w]+)(?:`?\s+FROM\s+`?)([\w]+)(?:`?\s+LIKE\s+\'%\'?)/i';
@@ -244,6 +249,7 @@ final class Payload extends BasePayload {
 
 	/**
 	 * @return string
+	 * @throws Exception
 	 */
 	public function getHandlerClassName(): string {
 		return __NAMESPACE__ . '\\' . match (static::$type) {

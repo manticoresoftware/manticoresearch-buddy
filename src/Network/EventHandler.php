@@ -57,7 +57,6 @@ final class EventHandler {
 			$response->end(Response::none());
 			return;
 		}
-
 		$requestId = $request->header['Request-ID'] ?? uniqid(more_entropy: true);
 		$body = $request->rawContent() ?: '';
 		Buddy::debug("[$requestId] request data: $body");
