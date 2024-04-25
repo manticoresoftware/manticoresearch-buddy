@@ -10,6 +10,8 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\RenameTable;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -36,7 +38,21 @@ final class Handler extends BaseHandlerWithClient
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $client): TaskResult {
-			return TaskResult::none();
+
+			if (!$client->hasTable($payload->sourceTableName)) {
+				throw GenericError::create("Source table $payload->sourceTableName not exists");
+			}
+
+			if ($client->hasTable($payload->destinationTableName)) {
+				throw GenericError::create("Destination table $payload->destinationTableName already exists");
+			}
+			self::createTableLike($payload->sourceTableName, $payload->destinationTableName, $client);
+
+			$result = self::attachTable($payload->sourceTableName, $payload->destinationTableName, $client);
+
+			self::dropTable($payload->sourceTableName, $client);
+
+			return TaskResult::raw($result);
 		};
 
 		return Task::create(
@@ -44,4 +60,72 @@ final class Handler extends BaseHandlerWithClient
 		)->run();
 	}
 
+
+	/**
+	 * @param string $sourceTableName
+	 * @param string $destinationTableName
+	 * @param Client $client
+	 * @return void
+	 * @throws GenericError
+	 * @throws ManticoreSearchClientError
+	 */
+	private static function createTableLike(
+		string $sourceTableName,
+		string $destinationTableName,
+		Client $client
+	): void {
+
+		$sql = /** @lang ManticoreSearch */
+			"create table $destinationTableName like $sourceTableName";
+		$result = $client->sendRequest($sql);
+		if ($result->hasError()) {
+			throw GenericError::create(
+				"Can't create $destinationTableName table like $sourceTableName. " .
+				'Reason: ' . $result->getError()
+			);
+		}
+	}
+
+
+	/**
+	 * @param string $sourceTableName
+	 * @param string $destinationTableName
+	 * @param Client $client
+	 * @return mixed
+	 * @throws GenericError
+	 * @throws ManticoreSearchClientError
+	 */
+	private static function attachTable(
+		string $sourceTableName,
+		string $destinationTableName,
+		Client $client
+	): mixed {
+
+		$sql = /** @lang ManticoreSearch */
+			"ATTACH TABLE $sourceTableName TO TABLE $destinationTableName";
+		$result = $client->sendRequest($sql);
+		if ($result->hasError()) {
+			throw GenericError::create(
+				"Can't attach $sourceTableName table to $destinationTableName. " .
+				'Reason: ' . $result->getError()
+			);
+		}
+		return $result->getResult();
+	}
+
+
+	/**
+	 * @param string $tableName
+	 * @param Client $client
+	 * @throws GenericError
+	 * @throws ManticoreSearchClientError
+	 */
+	private static function dropTable(string $tableName, Client $client): void {
+		$sql = /** @lang ManticoreSearch */
+			"drop table $tableName";
+		$result = $client->sendRequest($sql);
+		if ($result->hasError()) {
+			throw GenericError::create("Can't drop table $tableName. Reason: " . $result->getError());
+		}
+	}
 }

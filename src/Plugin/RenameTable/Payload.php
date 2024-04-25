@@ -17,7 +17,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
  */
-final class Payload extends BasePayload {
+final class Payload extends BasePayload
+{
 	public string $path;
 
 	public string $destinationTableName;
@@ -30,7 +31,7 @@ final class Payload extends BasePayload {
 	 * @return string
 	 */
 	public static function getInfo(): string {
-		return 'Enables partial replaces';
+		return 'Enables alter table rename';
 	}
 
 	/**
@@ -42,48 +43,46 @@ final class Payload extends BasePayload {
 
 		/**
 		 * @var array{
-		 *       CREATE: array{
-		 *           expr_type: string,
-		 *           not-exists: bool,
-		 *           base_expr: string,
-		 *           sub_tree?: array<array{
-		 *               expr_type: string,
-		 *               base_expr: string
-		 *           }>
-		 *       },
-		 *       TABLE: array{
-		 *           base_expr: string,
-		 *           name?: string,
-		 *           no_quotes: array{
-		 *               delim: bool,
-		 *               parts: array<string>
-		 *           },
-		 *           create-def?: bool,
-		 *           options?: array<array{
-		 *               expr_type: string,
-		 *               base_expr: string,
-		 *               delim: string,
-		 *               sub_tree?: array<array{
-		 *                   expr_type: string,
-		 *                   base_expr: string
-		 *               }>
-		 *           }>
-		 *       },
-		 *       LIKE: array{
-		 *           expr_type: string,
-		 *           table?: string,
-		 *           base_expr: string,
-		 *           no_quotes: array{
-		 *               delim: bool,
-		 *               parts: array<string>
-		 *           }
-		 *       }
-		 *   } $payload
+		 *        ALTER: array{
+		 *            expr_type: string,
+		 *            base_expr: string,
+		 *            sub_tree: array<
+		 *            array{
+		 *                expr_type: string,
+		 *                base_expr: string
+		 *            }>
+		 *        },
+		 *        TABLE: array{
+		 *            base_expr: string,
+		 *            name: string,
+		 *            no_quotes: array{
+		 *                delim: bool,
+		 *                parts: array<string>
+		 *            },
+		 *            create-def: bool,
+		 *            options: bool
+		 *        },
+		 *        RENAME: array{
+		 *            expr_type: string,
+		 *            sub_tree: array<
+		 *            array{
+		 *                destination: array{
+		 *                    expr_type: string,
+		 *                    table: string,
+		 *                    no_quotes: array{
+		 *                        delim: bool,
+		 *                        parts: array<string>
+		 *                    },
+		 *                    base_expr: string
+		 *                }
+		 *            }>
+		 *        }
+		 *    } $payload
 		 */
 		$payload = self::parsePayload($request->payload);
 
-		$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
-		$self->sourceTableName = $payload['LIKE']['no_quotes']['parts'][0];
+		$self->destinationTableName = $payload['RENAME']['sub_tree'][0]['destination']['no_quotes']['parts'][0];
+		$self->sourceTableName = $payload['TABLE']['no_quotes']['parts'][0];
 		return $self;
 	}
 
@@ -96,11 +95,10 @@ final class Payload extends BasePayload {
 
 		$payload = self::parsePayload($request->payload);
 
-		if (isset($payload['CREATE'])
+		if (isset($payload['ALTER']['base_expr'])
 			&& isset($payload['TABLE']['no_quotes']['parts'][0])
-			&& isset($payload['LIKE']['no_quotes']['parts'][0])
-			&& isset($payload['TABLE']['options'][0]['base_expr'])
-			&& $payload['TABLE']['options'][0]['base_expr'] === 'WITH DATA'
+			&& isset($payload['RENAME']['sub_tree'][0]['destination']['no_quotes']['parts'][0])
+			&& $payload['ALTER']['base_expr'] === 'TABLE'
 		) {
 			return true;
 		}
@@ -111,84 +109,80 @@ final class Payload extends BasePayload {
 	/**
 	 * @param string $stringPayload
 	 * @return array{
-	 *      CREATE?: array{
-	 *          expr_type: string,
-	 *          not-exists: bool,
-	 *          base_expr: string,
-	 *          sub_tree?: array<array{
-	 *              expr_type: string,
-	 *              base_expr: string
-	 *          }>
-	 *      },
-	 *      TABLE?: array{
-	 *          base_expr: string,
-	 *          name?: string,
-	 *          no_quotes: array{
-	 *              delim: bool,
-	 *              parts: array<string>
-	 *          },
-	 *          create-def?: bool,
-	 *          options?: array<array{
-	 *              expr_type: string,
-	 *              base_expr: string,
-	 *              delim: string,
-	 *              sub_tree?: array<array{
-	 *                  expr_type: string,
-	 *                  base_expr: string
-	 *              }>
-	 *          }>
-	 *      },
-	 *      LIKE?: array{
-	 *          expr_type: string,
-	 *          table?: string,
-	 *          base_expr: string,
-	 *          no_quotes: array{
-	 *              delim: bool,
-	 *              parts: array<string>
-	 *          }
-	 *      }
-	 *  }|null
+	 *       ALTER: array{
+	 *           expr_type: string,
+	 *           base_expr: string,
+	 *           sub_tree: array<
+	 *           array{
+	 *               expr_type: string,
+	 *               base_expr: string
+	 *           }>
+	 *       },
+	 *       TABLE: array{
+	 *           base_expr: string,
+	 *           name: string,
+	 *           no_quotes: array{
+	 *               delim: bool,
+	 *               parts: array<string>
+	 *           },
+	 *           create-def: bool,
+	 *           options: bool
+	 *       },
+	 *       RENAME: array{
+	 *           expr_type: string,
+	 *           sub_tree: array<
+	 *           array{
+	 *               destination: array{
+	 *                   expr_type: string,
+	 *                   table: string,
+	 *                   no_quotes: array{
+	 *                       delim: bool,
+	 *                       parts: array<string>
+	 *                   },
+	 *                   base_expr: string
+	 *               }
+	 *           }>
+	 *       }
+	 *   }|null
 	 */
 	public static function parsePayload(string $stringPayload): ?array {
 		/**
 		 * @var array{
-		 *       CREATE: array{
-		 *           expr_type: string,
-		 *           not-exists: bool,
-		 *           base_expr: string,
-		 *           sub_tree?: array<array{
-		 *               expr_type: string,
-		 *               base_expr: string
-		 *           }>
-		 *       },
-		 *       TABLE: array{
-		 *           base_expr: string,
-		 *           name?: string,
-		 *           no_quotes: array{
-		 *               delim: bool,
-		 *               parts: array<string>
-		 *           },
-		 *           create-def?: bool,
-		 *           options?: array<array{
-		 *               expr_type: string,
-		 *               base_expr: string,
-		 *               delim: string,
-		 *               sub_tree?: array<array{
-		 *                   expr_type: string,
-		 *                   base_expr: string
-		 *               }>
-		 *           }>
-		 *       },
-		 *       LIKE: array{
-		 *           expr_type: string,
-		 *           table?: string,
-		 *           base_expr: string,
-		 *           no_quotes: array{
-		 *               delim: bool,
-		 *               parts: array<string>
-		 *           }
-		 *       }
-		 *   }|null $payload
+		 *      ALTER: array{
+		 *          expr_type: string,
+		 *          base_expr: string,
+		 *          sub_tree: array<
+		 *          array{
+		 *              expr_type: string,
+		 *              base_expr: string
+		 *          }>
+		 *      },
+		 *      TABLE: array{
+		 *          base_expr: string,
+		 *          name: string,
+		 *          no_quotes: array{
+		 *              delim: bool,
+		 *              parts: array<string>
+		 *          },
+		 *          create-def: bool,
+		 *          options: bool
+		 *      },
+		 *      RENAME: array{
+		 *          expr_type: string,
+		 *          sub_tree: array<
+		 *          array{
+		 *              destination: array{
+		 *                  expr_type: string,
+		 *                  table: string,
+		 *                  no_quotes: array{
+		 *                      delim: bool,
+		 *                      parts: array<string>
+		 *                  },
+		 *                  base_expr: string
+		 *              }
+		 *          }>
+		 *      }
+		 *  }|null $payload
 		 */
 
 		$payload = Payload::$sqlQueryParser::parse($stringPayload);
