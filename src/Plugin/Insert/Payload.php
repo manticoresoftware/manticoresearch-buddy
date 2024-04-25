@@ -16,6 +16,9 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
+/**
+ * @phpstan-extends BasePayload<array>
+ */
 final class Payload extends BasePayload {
 	/** @var array<string> */
 	public array $queries = [];
@@ -97,8 +100,8 @@ final class Payload extends BasePayload {
 		$isInsertHTTPQuery = match ($request->endpointBundle) {
 			ManticoreEndpoint::Insert => true,
 			ManticoreEndpoint::Bulk => str_starts_with($queryLowercase, '"insert"')
-			|| str_starts_with($queryLowercase, '"create"')
-			|| str_starts_with($queryLowercase, '"index"'),
+				|| str_starts_with($queryLowercase, '"create"')
+				|| str_starts_with($queryLowercase, '"index"'),
 			default => false,
 		};
 		$isInsertError = str_contains($request->error, 'no such index')

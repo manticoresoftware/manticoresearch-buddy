@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base\Lib;
 
-use Exception;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Base\Plugin\Sharding\Payload as ShardingPayload;
 use Manticoresearch\Buddy\Core\Error\GenericError;
@@ -28,9 +27,12 @@ use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use Manticoresearch\Buddy\Core\Tool\Strings;
 use Psr\Container\ContainerInterface;
 
+/**
+ * @phpstan-template T of array
+ */
 class QueryProcessor {
-  /** @var ContainerInterface */
-  // We set this on initialization (init.php) so we are sure we have it in class
+	/** @var ContainerInterface */
+	// We set this on initialization (init.php) so we are sure we have it in class
 	protected static ContainerInterface $container;
 
 	/** @var bool */
@@ -54,6 +56,9 @@ class QueryProcessor {
 	/** @var array<string,true> Here we keep disabled plugins map */
 	protected static array $disabledPlugins = [];
 
+	/**
+	 * @var SqlQueryParser<T>
+	 */
 	protected static SqlQueryParser $sqlQueryParser;
 
 	/**
@@ -72,14 +77,14 @@ class QueryProcessor {
 		$pluginName = substr($pluginPrefix, strrpos($pluginPrefix, '\\') + 1);
 		Buddy::debug("[$request->id] Plugin: $pluginName");
 		buddy_metric('plugin_' . Strings::camelcaseToUnderscore($pluginName), 1);
-		/** @var BasePayload $payloadClassName */
+		/** @var BasePayload<T> $payloadClassName */
 		$payloadClassName = "{$pluginPrefix}\\Payload";
 		$payloadClassName::setParser(static::$sqlQueryParser);
 		$pluginPayload = $payloadClassName::fromRequest($request);
 		$pluginPayload->setSettings(static::$settings);
 		Buddy::debug("[$request->id] $pluginName payload: " . json_encode($pluginPayload));
 		$handlerClassName = $pluginPayload->getHandlerClassName();
-	  /** @var BaseHandler */
+		/** @var BaseHandler $handler */
 		$handler = new $handlerClassName($pluginPayload);
 		foreach ($handler->getProps() as $prop) {
 			$handler->{'set' . ucfirst($prop)}(static::getObjFromContainer($prop));
@@ -91,6 +96,7 @@ class QueryProcessor {
 	 * We should invoke this function before we do anything else with the request.
 	 * TODO: think about moving this code into init stage of Settings class itself
 	 * @return void
+	 * @throws \Exception
 	 */
 	public static function init(): void {
 		// We have tests that going into private properties and change it
@@ -107,7 +113,9 @@ class QueryProcessor {
 		}
 
 		if (!isset(static::$sqlQueryParser)) {
-			static::$sqlQueryParser = SqlQueryParser::getInstance();
+			/** @phpstan-var SqlQueryParser<T> $instance */
+			$instance = SqlQueryParser::getInstance();
+			static::$sqlQueryParser = $instance;
 		}
 
 		static::$pluggable = new Pluggable(
@@ -127,6 +135,7 @@ class QueryProcessor {
 	 * @param ?callable $fn
 	 * @param array<string> $filter
 	 * @return array<array{0:callable,1:integer}>>
+	 * @throws GenericError
 	 */
 	public static function startPlugins(?callable $fn = null, array $filter = []): array {
 		/** @var HTTPClient $client ] */
@@ -172,7 +181,7 @@ class QueryProcessor {
 	}
 
 	/**
-	 * @param  callable $fn
+	 * @param callable $fn
 	 * @param array<string> $filter If we pass name we filter only for this plugin
 	 * @return void
 	 */
@@ -194,6 +203,7 @@ class QueryProcessor {
 			}
 		}
 	}
+
 	/**
 	 * Helper to set settings when we need it before calling to init
 	 * @param Settings $settings
@@ -204,11 +214,12 @@ class QueryProcessor {
 	}
 
 	/**
-	 * Extractd logic to fetch manticore settings and store it in class property
+	 * Extract logic to fetch manticore settings and store it in class property
 	 * @return ManticoreSettings
+	 * @throws GenericError
 	 */
 	protected static function fetchManticoreSettings(): ManticoreSettings {
-		/** @var HTTPClient */
+		/** @var HTTPClient $manticoreClient */
 		$manticoreClient = static::getObjFromContainer('manticoreClient');
 		return $manticoreClient->getSettings();
 	}
@@ -230,7 +241,7 @@ class QueryProcessor {
 		foreach (['core', 'local', 'extra'] as $type) {
 			$method = 'get' . ucfirst($type) . 'Plugins';
 			$plugins = array_map(
-				fn ($v) => $v['short'],
+				fn($v) => $v['short'],
 				QueryProcessor::$method()
 			);
 			$pluginsLine = implode(', ', $plugins) . PHP_EOL;
@@ -262,29 +273,30 @@ class QueryProcessor {
 		return static::$extraPlugins;
 	}
 
-  /**
-   * Retrieve object from the DI container
-   *
-   * @param string $objName
-   * @return object
-   */
+	/**
+	 * Retrieve object from the DI container
+	 *
+	 * @param string $objName
+	 * @return object
+	 * @throws GenericError
+	 */
 	protected static function getObjFromContainer(string $objName): object {
 		if (!self::$container->has($objName)) {
-			throw new Exception("Failed to find '$objName' in container");
+			throw new GenericError("Failed to find '$objName' in container");
 		}
 
-	  /** @var object */
+		/** @var object */
 		return self::$container->get($objName);
 	}
 
-  /**
-   * This method extracts all supported prefixes from input query
-   * that buddy able to handle
-   *
-   * @param Request $request
-   * @return string
-   * @throws SQLQueryCommandNotSupported
-   */
+	/**
+	 * This method extracts all supported prefixes from input query
+	 * that buddy able to handle
+	 *
+	 * @param Request $request
+	 * @return string
+	 * @throws SQLQueryCommandNotSupported|GenericError
+	 */
 	public static function detectPluginPrefixFromRequest(Request $request): string {
 		$list = [
 			Pluggable::CORE_NS_PREFIX => static::$corePlugins,
@@ -293,10 +305,12 @@ class QueryProcessor {
 		foreach ($list as $prefix => $plugins) {
 			foreach ($plugins as $plugin) {
 				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
-				/** @var BasePayload $pluginPayloadClass */
+				/** @var BasePayload<T> $pluginPayloadClass */
 				$pluginPayloadClass = "$pluginPrefix\\Payload";
 				$pluginPayloadClass::setParser(static::$sqlQueryParser);
-				if (!$pluginPayloadClass::hasMatch($request)) {
+				$hasMatch = $pluginPayloadClass::hasMatch($request);
+				Buddy::debugv('matching: ' . $plugin['short'] . ' - ' . ($hasMatch ? 'yes' : 'no'));
+				if (!$hasMatch) {
 					continue;
 				}
 
