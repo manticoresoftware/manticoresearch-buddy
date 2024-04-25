@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 /**
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
+ * @extends BasePayload<array>
  */
 final class Payload extends BasePayload {
 	public string $path;
@@ -81,7 +82,7 @@ final class Payload extends BasePayload {
 		 *       }
 		 *   } $payload
 		 */
-		$payload = self::parsePayload($request->payload);
+		$payload = Payload::$sqlQueryParser::parse($request->payload);
 
 		$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
 		$self->sourceTableName = $payload['LIKE']['no_quotes']['parts'][0];
@@ -94,66 +95,9 @@ final class Payload extends BasePayload {
 	 */
 	public static function hasMatch(Request $request): bool {
 
-
-		$payload = self::parsePayload($request->payload);
-
-		if (isset($payload['CREATE'])
-			&& isset($payload['TABLE']['no_quotes']['parts'][0])
-			&& isset($payload['LIKE']['no_quotes']['parts'][0])
-			&& isset($payload['TABLE']['options'][0]['base_expr'])
-			&& $payload['TABLE']['options'][0]['base_expr'] === 'WITH DATA'
-		) {
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
-	 * @param string $stringPayload
-	 * @return array{
-	 *      CREATE?: array{
-	 *          expr_type: string,
-	 *          not-exists: bool,
-	 *          base_expr: string,
-	 *          sub_tree?: array<array{
-	 *              expr_type: string,
-	 *              base_expr: string
-	 *          }>
-	 *      },
-	 *      TABLE?: array{
-	 *          base_expr: string,
-	 *          name?: string,
-	 *          no_quotes: array{
-	 *              delim: bool,
-	 *              parts: array<string>
-	 *          },
-	 *          create-def?: bool,
-	 *          options?: array<array{
-	 *              expr_type: string,
-	 *              base_expr: string,
-	 *              delim: string,
-	 *              sub_tree?: array<array{
-	 *                  expr_type: string,
-	 *                  base_expr: string
-	 *              }>
-	 *          }>
-	 *      },
-	 *      LIKE?: array{
-	 *          expr_type: string,
-	 *          table?: string,
-	 *          base_expr: string,
-	 *          no_quotes: array{
-	 *              delim: bool,
-	 *              parts: array<string>
-	 *          }
-	 *      }
-	 *  }|null
-	 */
-	public static function parsePayload(string $stringPayload): ?array {
 		/**
-		 * @var array{
-		 *       CREATE: array{
+		 * @phpstan-var array{
+		 *       CREATE?: array{
 		 *           expr_type: string,
 		 *           not-exists: bool,
 		 *           base_expr: string,
@@ -162,7 +106,7 @@ final class Payload extends BasePayload {
 		 *               base_expr: string
 		 *           }>
 		 *       },
-		 *       TABLE: array{
+		 *       TABLE?: array{
 		 *           base_expr: string,
 		 *           name?: string,
 		 *           no_quotes: array{
@@ -180,7 +124,7 @@ final class Payload extends BasePayload {
 		 *               }>
 		 *           }>
 		 *       },
-		 *       LIKE: array{
+		 *       LIKE?: array{
 		 *           expr_type: string,
 		 *           table?: string,
 		 *           base_expr: string,
@@ -189,14 +133,19 @@ final class Payload extends BasePayload {
 		 *               parts: array<string>
 		 *           }
 		 *       }
-		 *   }|null $payload
+		 *   } $payload
 		 */
+		$payload = Payload::$sqlQueryParser::parse($request->payload);
 
-		$payload = Payload::$sqlQueryParser::parse($stringPayload);
-		if (is_array($payload)) {
-			return $payload;
+		if (isset($payload['CREATE'])
+			&& isset($payload['TABLE']['no_quotes']['parts'][0])
+			&& isset($payload['LIKE']['no_quotes']['parts'][0])
+			&& isset($payload['TABLE']['options'][0]['base_expr'])
+			&& $payload['TABLE']['options'][0]['base_expr'] === 'WITH DATA'
+		) {
+			return true;
 		}
-		return null;
-	}
 
+		return false;
+	}
 }
