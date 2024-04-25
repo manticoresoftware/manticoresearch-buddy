@@ -24,7 +24,8 @@ use Symfony\Component\DependencyInjection\Reference;
 include_once __DIR__ . DIRECTORY_SEPARATOR
 	. '..' . DIRECTORY_SEPARATOR
 	. 'vendor' . DIRECTORY_SEPARATOR
-	. 'autoload.php';
+	. 'autoload.php'
+;
 
 // Set error reporting with excluding warnings
 error_reporting(E_ALL & ~E_WARNING);
@@ -50,22 +51,22 @@ putenv("LISTEN={$opts['listen']}");
 Pluggable::setContainer($container);
 Pluggable::setCorePlugins(
 	[
-		'manticoresoftware/buddy-plugin-empty-string',
-		'manticoresoftware/buddy-plugin-backup',
-		'manticoresoftware/buddy-plugin-emulate-elastic',
-		'manticoresoftware/buddy-plugin-insert',
-		'manticoresoftware/buddy-plugin-alias',
-		'manticoresoftware/buddy-plugin-select',
-		'manticoresoftware/buddy-plugin-show',
-		'manticoresoftware/buddy-plugin-cli-table',
-		'manticoresoftware/buddy-plugin-plugin',
-		'manticoresoftware/buddy-plugin-test',
-		'manticoresoftware/buddy-plugin-insert-mva',
-		'manticoresoftware/buddy-plugin-rename-table',
-		'manticoresoftware/buddy-plugin-modify-table',
-		'manticoresoftware/buddy-plugin-knn',
-		'manticoresoftware/buddy-plugin-replace',
-		'manticoresoftware/buddy-plugin-sharding',
+	'manticoresoftware/buddy-plugin-empty-string',
+	'manticoresoftware/buddy-plugin-backup',
+	'manticoresoftware/buddy-plugin-emulate-elastic',
+	'manticoresoftware/buddy-plugin-insert',
+	'manticoresoftware/buddy-plugin-insert-values',
+	'manticoresoftware/buddy-plugin-alias',
+	'manticoresoftware/buddy-plugin-select',
+	'manticoresoftware/buddy-plugin-show',
+	'manticoresoftware/buddy-plugin-cli-table',
+	'manticoresoftware/buddy-plugin-plugin',
+	'manticoresoftware/buddy-plugin-test',
+	'manticoresoftware/buddy-plugin-rename-table',
+	'manticoresoftware/buddy-plugin-modify-table',
+	'manticoresoftware/buddy-plugin-knn',
+	'manticoresoftware/buddy-plugin-replace',
+	'manticoresoftware/buddy-plugin-sharding',
 	]
 );
 MetricThread::setContainer($container);
