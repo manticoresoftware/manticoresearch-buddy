@@ -191,10 +191,13 @@ final class Queue {
 		/** @var array{0:array{data:array<array<mixed>>}} */
 		$res = $this->client->sendRequest($query)->getResult();
 		$queries = new Vector;
+
+		if (!isset($res[0]['data'])) {
+			return $queries;
+		}
 		foreach ($res[0]['data'] as $row) {
 			$queries->push($row);
 		}
-
 		return $queries;
 	}
 
