@@ -188,7 +188,7 @@ final class Queue {
 			ORDER BY `id` ASC
 		";
 
-		/** @var array{0:array{data:array<array<mixed>>}} */
+		/** @var array{0?:array{data?:array<array<mixed>>}} */
 		$res = $this->client->sendRequest($query)->getResult();
 		$queries = new Vector;
 
