@@ -27,7 +27,7 @@ final class Payload extends BasePayload
 	public ?string $k = null;
 	public ?string $docId = null;
 
-	/** @var array<string> $select*/
+	/** @var array<string> $select */
 	public array $select = [];
 
 	/** @var ?string $table */
@@ -126,11 +126,15 @@ final class Payload extends BasePayload
 			}
 		}
 
+		if (!self::hasMatchPreprocessor($request)) {
+			return false;
+		}
+
 		$payload = static::$sqlQueryParser::parse($request->payload);
 		if (isset($payload['WHERE'])) {
 			foreach ($payload['WHERE'] as $expression) {
 				if ($expression['expr_type'] === 'function'
-				&& $expression['base_expr'] === 'knn'
+					&& $expression['base_expr'] === 'knn'
 					&& isset($expression['sub_tree'][2])
 					&& is_numeric($expression['sub_tree'][2]['base_expr'])
 				) {
@@ -141,4 +145,20 @@ final class Payload extends BasePayload
 
 		return false;
 	}
+
+	/**
+	 * Small preprocessing. Allow us to not call hard $sqlQueryParser::parse method
+	 *
+	 * @param Request $request
+	 * @return bool
+	 */
+	private static function hasMatchPreprocessor(Request $request): bool {
+		if (!str_contains($request->error, "P01: syntax error, unexpected integer, expecting '(' near")
+			|| stripos($request->payload, 'knn') === false
+			|| !preg_match('/\(?\s?knn\s?\(/usi', $request->payload)) {
+			return false;
+		}
+		return true;
+	}
+
 }
