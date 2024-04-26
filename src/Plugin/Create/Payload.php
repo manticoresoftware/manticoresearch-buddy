@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
@@ -19,7 +19,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * which can be as a result of only comments in it that we strip
  * @extends BasePayload<array>
  */
-final class Payload extends BasePayload {
+final class Payload extends BasePayload
+{
 	public string $path;
 
 	public string $destinationTableName;
@@ -94,6 +95,16 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
+
+		if ($request->error !== "P03: syntax error, unexpected tablename, expecting \$end near 'WITH DATA'"
+			|| stripos($request->payload, 'create') === false
+			|| stripos($request->payload, 'table') === false
+			|| stripos($request->payload, 'like') === false
+			|| stripos($request->payload, 'with') === false
+			|| stripos($request->payload, 'data') === false
+		) {
+			return false;
+		}
 
 		/**
 		 * @phpstan-var array{
