@@ -88,6 +88,11 @@ final class Payload extends BasePayload {
 			return true;
 		}
 
+		$isKnnError = str_contains($request->error, 'KNN error: data has 0 values');
+		if ($isKnnError) {
+			return true;
+		}
+
 		return false;
 	}
 }
