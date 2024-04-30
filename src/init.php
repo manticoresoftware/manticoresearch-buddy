@@ -56,7 +56,6 @@ Pluggable::setCorePlugins(
 	'manticoresoftware/buddy-plugin-emulate-elastic',
 	'manticoresoftware/buddy-plugin-create',
 	'manticoresoftware/buddy-plugin-insert',
-	'manticoresoftware/buddy-plugin-insert-values',
 	'manticoresoftware/buddy-plugin-alias',
 	'manticoresoftware/buddy-plugin-select',
 	'manticoresoftware/buddy-plugin-show',
