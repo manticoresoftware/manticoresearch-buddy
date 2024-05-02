@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Knn;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -94,8 +95,6 @@ final class Payload extends BasePayload
 	 * @return void
 	 */
 	private static function parseSqlRequest(self $payload): void {
-
-
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
 		$payload->table = $parsedPayload['FROM'][0]['table'] ?? null;
 
@@ -117,6 +116,7 @@ final class Payload extends BasePayload
 	/**
 	 * @param Request $request
 	 * @return bool
+	 * @throws GenericError
 	 */
 	public static function hasMatch(Request $request): bool {
 		if ($request->endpointBundle === Endpoint::Search) {
@@ -126,7 +126,7 @@ final class Payload extends BasePayload
 			}
 		}
 
-		if (!self::hasMatchPreprocessor($request)) {
+		if (!self::checkMatchPreprocessor($request)) {
 			return false;
 		}
 
@@ -152,13 +152,13 @@ final class Payload extends BasePayload
 	 * @param Request $request
 	 * @return bool
 	 */
-	private static function hasMatchPreprocessor(Request $request): bool {
-		if (!str_contains($request->error, "P01: syntax error, unexpected integer, expecting '(' near")
-			|| stripos($request->payload, 'knn') === false
-			|| !preg_match('/\(?\s?knn\s?\(/usi', $request->payload)) {
-			return false;
-		}
-		return true;
+	private static function checkMatchPreprocessor(Request $request): bool {
+		return (static::$sqlQueryParser::checkMatchPreprocessed(
+			fn($request) => (str_contains($request->error, "P01: syntax error, unexpected integer, expecting '(' near")
+				&& stripos($request->payload, 'knn') !== false
+				&& preg_match('/\(?\s?knn\s?\(/usi', $request->payload)),
+			$request
+		));
 	}
 
 }
