@@ -70,12 +70,11 @@ final class Payload extends BasePayload {
 		return $self;
 	}
 
-	/** @codingStandardsIgnoreStart */
-	public static function hasMatch(
-		Request $request
-		/** @codingStandardsIgnoreEnd */
-	): bool {
+	public static function hasMatch(Request $request): bool {
 
+		if (!preg_match('/(create|show|alter|drop)\s+(source|mv|materialized)/usi', $request->payload)) {
+			return false;
+		}
 		/** @var T $parsedPayload */
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
 
