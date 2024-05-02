@@ -21,7 +21,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * which can be as a result of only comments in it that we strip
  * @phpstan-extends BasePayload<array>
  */
-final class Payload extends BasePayload {
+final class Payload extends BasePayload
+{
 	public string $path;
 
 	public string $table;
@@ -82,6 +83,14 @@ final class Payload extends BasePayload {
 	public static function hasMatch(Request $request): bool {
 
 		if ($request->format->value === RequestFormat::SQL->value) {
+			// Small preprocessing. Allow us to not call hard $sqlQueryParser::parse method
+			if (!str_contains($request->error, "P01: syntax error, unexpected SET, expecting VALUES near '")
+				|| stripos($request->payload, 'replace') === false
+				|| stripos($request->payload, 'set') === false
+				|| stripos($request->payload, 'where') === false) {
+				return false;
+			}
+
 			$payload = static::$sqlQueryParser::parse($request->payload);
 
 			if (isset($payload['REPLACE'])

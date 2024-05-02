@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Lib;
 
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\Strings;
 use Psr\Container\ContainerInterface;
 use Swoole\Process;
 
@@ -83,6 +84,8 @@ final class MetricThread {
 	public static function create(): self {
 		$process = new Process(
 			static function (Process $worker) {
+				$name = Buddy::getProcessName(Strings::classNameToIdentifier(static::class));
+				swoole_set_process_name($name);
 				chdir(sys_get_temp_dir());
 
 				Metric::setContainer(static::$container);
