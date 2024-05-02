@@ -1,8 +1,9 @@
-version: "2"
+version: "3"
 
 services:
   kafka:
     image: docker.io/bitnami/kafka:3.7
+    profiles: [queues]
     container_name: kafka
     networks:
       - app-network

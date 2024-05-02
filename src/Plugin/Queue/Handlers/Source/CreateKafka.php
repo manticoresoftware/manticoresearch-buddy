@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
@@ -21,7 +21,7 @@ use Manticoresearch\Buddy\Core\Tool\SqlQueryParser;
 use PHPSQLParser\PHPSQLParser;
 
 /**
-* @extends BaseCreateSourceHandler<array{
+ * @extends BaseCreateSourceHandler<array{
  *        CREATE: array{
  *            expr_type: string,
  *            not-exists: bool,
@@ -122,7 +122,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 	 *             }[]
 	 *         }
 	 *     }> $payload
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|\PHPSQLParser\exceptions\UnsupportedFeatureException
 	 */
 	public static function handle(Payload $payload, Client $manticoreClient): TaskResult {
 
@@ -159,7 +159,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 			}
 
 			$escapedPayload = str_replace("'", "\\'", $payload->originQuery);
-			/** @l $query */
+
 			$query = /** @lang ManticoreSearch */
 				'INSERT INTO ' . Payload::SOURCE_TABLE_NAME .
 				' (id, type, name, full_name, buffer_table, attrs, original_query) VALUES ' .
@@ -178,7 +178,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 	}
 
 	/**
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|\PHPSQLParser\exceptions\UnsupportedFeatureException
 	 */
 	public static function handleOrphanViews(string $sourceName, int $maxIndex, Client $client): void {
 		$viewsTable = Payload::VIEWS_TABLE_NAME;
@@ -260,7 +260,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 	}
 
 	/**
-* @param Payload<array{
+	 * @param Payload<array{
 	 *         CREATE: array{
 	 *             expr_type: string,
 	 *             not-exists: bool,
@@ -309,7 +309,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 	 *             }[]
 	 *         }
 	 *     }> $payload
-* @return \stdClass
+	 * @return \stdClass
 	 */
 	public static function parseOptions(Payload $payload): \stdClass {
 		$result = new \stdClass();

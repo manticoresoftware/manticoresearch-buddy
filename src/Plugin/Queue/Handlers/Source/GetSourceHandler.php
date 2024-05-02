@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
@@ -44,7 +44,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
  */
 final class GetSourceHandler extends BaseGetHandler {
 
-	#[\Override] protected static function formatResult(string $query): string {
+	protected static function formatResult(string $query): string {
 
 		$formatted = str_replace(
 			['(', ')'], ["\n(", ")\n"],
@@ -56,11 +56,11 @@ final class GetSourceHandler extends BaseGetHandler {
 		return implode(")\n", $formatted);
 	}
 
-	#[\Override] protected function getType(): string {
+	protected function getType(): string {
 		return 'Source';
 	}
 
-	#[\Override] protected function getTableName(): string {
+	protected function getTableName(): string {
 		return Payload::SOURCE_TABLE_NAME;
 	}
 
@@ -93,12 +93,12 @@ final class GetSourceHandler extends BaseGetHandler {
 	 *    }> $payload
 	 * @return string
 	 */
-	#[\Override] protected function getName(Payload $payload): string {
+	protected function getName(Payload $payload): string {
 		$parsedPayload = $payload->model->getPayload();
 		return $parsedPayload['SHOW'][1]['no_quotes']['parts'][0];
 	}
 
-	#[\Override] protected function getFields(): array {
+	protected function getFields(): array {
 		return [];
 	}
 }

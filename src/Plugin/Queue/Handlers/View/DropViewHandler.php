@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
@@ -69,7 +69,7 @@ final class DropViewHandler extends BaseDropHandler {
 	/**
 	 * @throws ManticoreSearchClientError
 	 */
-	#[\Override] protected function processDrop(string $name, string $tableName): int {
+	protected function processDrop(string $name, string $tableName): int {
 		$manticoreClient = $this->manticoreClient;
 		$sql = /** @lang Manticore */
 			"SELECT * FROM $tableName WHERE match('@name \"$name\"')";
@@ -150,12 +150,12 @@ final class DropViewHandler extends BaseDropHandler {
 * @return string
 	 */
 
-	#[\Override] protected function getName(Payload $payload): string {
+	protected function getName(Payload $payload): string {
 		$parsedPayload = $payload->model->getPayload();
 		return $parsedPayload['DROP']['sub_tree'][2]['sub_tree'][0]['no_quotes']['parts'][0];
 	}
 
-	#[\Override] protected function getTableName(): string {
+	protected function getTableName(): string {
 		return Payload::VIEWS_TABLE_NAME;
 	}
 }

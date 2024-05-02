@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
@@ -21,7 +21,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 class CreateMaterializedViewModel extends Model {
 
 
-	#[\Override] public function getHandlerClass(): string {
+	public function getHandlerClass(): string {
 		return 'Handlers\\View\\CreateViewHandler';
 	}
 }

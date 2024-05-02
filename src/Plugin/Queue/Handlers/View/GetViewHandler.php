@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
@@ -63,24 +63,24 @@ final class GetViewHandler extends BaseGetHandler {
 	 *    }> $payload
 	 * @return string
 	 */
-	#[\Override] protected function getName(Payload $payload): string {
+	protected function getName(Payload $payload): string {
 		$parsedPayload = $payload->model->getPayload();
 		return $parsedPayload['SHOW'][2]['no_quotes']['parts'][0];
 	}
 
-	#[\Override] protected static function formatResult(string $query): string {
+	protected static function formatResult(string $query): string {
 		return str_replace("\n", '', $query);
 	}
 
-	#[\Override] protected function getType(): string {
+	protected function getType(): string {
 		return 'View';
 	}
 
-	#[\Override] protected function getTableName(): string {
+	protected function getTableName(): string {
 		return Payload::VIEWS_TABLE_NAME;
 	}
 
-	#[\Override] protected function getFields(): array {
+	protected function getFields(): array {
 		return ['suspended'];
 	}
 }

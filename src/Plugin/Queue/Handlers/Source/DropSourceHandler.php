@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
@@ -141,12 +141,12 @@ final class DropSourceHandler extends BaseDropHandler {
 	 *   }> $payload
 	 * @return string
 	 */
-	#[\Override] protected function getName(Payload $payload): string {
+	protected function getName(Payload $payload): string {
 		$parsedPayload = $payload->model->getPayload();
 		return $parsedPayload['DROP']['sub_tree'][1]['sub_tree'][0]['no_quotes']['parts'][0];
 	}
 
-	#[\Override] protected function getTableName(): string {
+	protected function getTableName(): string {
 		return Payload::SOURCE_TABLE_NAME;
 	}
 }

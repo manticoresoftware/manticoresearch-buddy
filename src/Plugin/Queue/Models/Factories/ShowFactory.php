@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
@@ -26,7 +26,6 @@ class ShowFactory {
 	 * @phpstan-param T $parsedPayload
 	 * @phpstan-return Model<T>|null
 	 */
-
 	public static function create(array $parsedPayload): ?Model {
 
 		$model = null;
@@ -50,7 +49,6 @@ class ShowFactory {
 		/** @var Model<T>|null $model */
 		return $model;
 	}
-
 
 	/**
 	 * Should match SHOW MATERIALIZED VIEWS
@@ -76,7 +74,6 @@ class ShowFactory {
 			strtolower($parsedPayload['SHOW'][0]['base_expr']) === Payload::TYPE_MATERLIALIZED &&
 			strtolower($parsedPayload['SHOW'][1]['base_expr']) === Payload::TYPE_VIEWS);
 	}
-
 
 	/**
 	 * Should match SHOW MATERIALIZED VIEW {name}
@@ -114,7 +111,6 @@ class ShowFactory {
 			strtolower($parsedPayload['SHOW'][0]['base_expr']) === Payload::TYPE_MATERLIALIZED &&
 			strtolower($parsedPayload['SHOW'][1]['base_expr']) === Payload::TYPE_VIEW);
 	}
-
 
 	/**
 	 * Should match SHOW SOURCES
@@ -175,6 +171,4 @@ class ShowFactory {
 			!empty($parsedPayload['SHOW'][1]['no_quotes']['parts'][0])
 		);
 	}
-
-
 }
