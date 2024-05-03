@@ -1,0 +1,40 @@
+version: "3"
+
+services:
+  kafka:
+    image: docker.io/bitnami/kafka:3.7
+    profiles: [queues]
+    container_name: kafka
+    networks:
+      - app-network
+    volumes:
+      - ./test/Kafka/import.sh:/import.sh
+      - ./test/Kafka/dump.json:/tmp/dump.json
+    environment:
+      # KRaft settings
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      # Listeners
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+  buddy:
+    image: ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
+    container_name: manticore-buddy
+    privileged: true
+    tty: true
+    entrypoint:
+      - "/bin/sh"
+      - "-c"
+      - "grep buddy_path /etc/manticoresearch/manticore.conf > /dev/null 2>&1 || sed -i '/searchd {/a \\    buddy_path = manticore-executor /workdir/src/main.php --debugv' /etc/manticoresearch/manticore.conf; exec /bin/bash"
+    working_dir: "/workdir"
+    networks:
+      - app-network
+    volumes:
+      - ./:/workdir/
+networks :
+  app-network :
+    driver : bridge
