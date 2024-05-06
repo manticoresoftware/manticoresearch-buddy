@@ -48,7 +48,7 @@ class Handler extends BaseHandler {
 				/** @phpstan-ignore-next-line */
 				[$payload] = unserialize($args);
 				$config = new ManticoreConfig($payload->configPath);
-				$client = new ManticoreClient($config);
+				$client = new ManticoreClient([$config]);
 				$storage = new FileStorage(
 					$payload->path,
 					$payload->options['compress'] ?? false
