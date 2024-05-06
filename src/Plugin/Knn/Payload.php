@@ -126,11 +126,11 @@ final class Payload extends BasePayload
 			}
 		}
 
-		if (!self::checkMatchPreprocessor($request)) {
+		$payload = self::getParsedPayload($request);
+
+		if (!$payload) {
 			return false;
 		}
-
-		$payload = static::$sqlQueryParser::parse($request->payload);
 		if (isset($payload['WHERE'])) {
 			foreach ($payload['WHERE'] as $expression) {
 				if ($expression['expr_type'] === 'function'
@@ -150,15 +150,18 @@ final class Payload extends BasePayload
 	 * Small preprocessing. Allow us to not call hard $sqlQueryParser::parse method
 	 *
 	 * @param Request $request
-	 * @return bool
+	 * @return array{WHERE?: array<int, array{expr_type:string, base_expr:string,
+	 *   sub_tree: array<int,array{base_expr:string, expr_type:string}>}>}|null
+	 * @throws GenericError
 	 */
-	private static function checkMatchPreprocessor(Request $request): bool {
-		return (static::$sqlQueryParser::checkMatchPreprocessed(
+	private static function getParsedPayload(Request $request): ?array {
+		return static::$sqlQueryParser::parse(
+			$request->payload,
 			fn($request) => (str_contains($request->error, "P01: syntax error, unexpected integer, expecting '(' near")
 				&& stripos($request->payload, 'knn') !== false
 				&& preg_match('/\(?\s?knn\s?\(/usi', $request->payload)),
 			$request
-		));
+		);
 	}
 
 }

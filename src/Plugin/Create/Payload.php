@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Create;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
@@ -42,7 +43,8 @@ final class Payload extends BasePayload
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static();
-
+		/** Say hi to phpstan */
+		unset($request);
 		/**
 		 * @var array{
 		 *       CREATE: array{
@@ -83,7 +85,7 @@ final class Payload extends BasePayload
 		 *       }
 		 *   } $payload
 		 */
-		$payload = Payload::$sqlQueryParser::parse($request->payload);
+		$payload = Payload::$sqlQueryParser::getParsedPayload();
 
 		$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
 		$self->sourceTableName = $payload['LIKE']['no_quotes']['parts'][0];
@@ -93,60 +95,24 @@ final class Payload extends BasePayload
 	/**
 	 * @param Request $request
 	 * @return bool
+	 * @throws GenericError
 	 */
 	public static function hasMatch(Request $request): bool {
+		$payload = Payload::$sqlQueryParser::parse(
+			$request->payload,
+			fn($request) => (
+				$request->error === "P03: syntax error, unexpected tablename, expecting \$end near 'WITH DATA'"
+				&& stripos($request->payload, 'create') !== false
+				&& stripos($request->payload, 'table') !== false
+				&& stripos($request->payload, 'like') !== false
+				&& stripos($request->payload, 'with') !== false
+				&& stripos($request->payload, 'data') !== false
+			), $request
+		);
 
-		if ($request->error !== "P03: syntax error, unexpected tablename, expecting \$end near 'WITH DATA'"
-			|| stripos($request->payload, 'create') === false
-			|| stripos($request->payload, 'table') === false
-			|| stripos($request->payload, 'like') === false
-			|| stripos($request->payload, 'with') === false
-			|| stripos($request->payload, 'data') === false
-		) {
+		if (!$payload) {
 			return false;
 		}
-
-		/**
-		 * @phpstan-var array{
-		 *       CREATE?: array{
-		 *           expr_type: string,
-		 *           not-exists: bool,
-		 *           base_expr: string,
-		 *           sub_tree?: array<array{
-		 *               expr_type: string,
-		 *               base_expr: string
-		 *           }>
-		 *       },
-		 *       TABLE?: array{
-		 *           base_expr: string,
-		 *           name?: string,
-		 *           no_quotes: array{
-		 *               delim: bool,
-		 *               parts: array<string>
-		 *           },
-		 *           create-def?: bool,
-		 *           options?: array<array{
-		 *               expr_type: string,
-		 *               base_expr: string,
-		 *               delim: string,
-		 *               sub_tree?: array<array{
-		 *                   expr_type: string,
-		 *                   base_expr: string
-		 *               }>
-		 *           }>
-		 *       },
-		 *       LIKE?: array{
-		 *           expr_type: string,
-		 *           table?: string,
-		 *           base_expr: string,
-		 *           no_quotes: array{
-		 *               delim: bool,
-		 *               parts: array<string>
-		 *           }
-		 *       }
-		 *   } $payload
-		 */
-		$payload = Payload::$sqlQueryParser::parse($request->payload);
 
 		if (isset($payload['CREATE'])
 			&& isset($payload['TABLE']['no_quotes']['parts'][0])
