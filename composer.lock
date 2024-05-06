@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e7b66b88a52bc7b446df2b34d6d02774",
+    "content-hash": "1895f90bca4ad1ac4bbfade753c8aa16",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -572,16 +572,16 @@
         },
         {
             "name": "composer/xdebug-handler",
-            "version": "3.0.4",
+            "version": "3.0.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/composer/xdebug-handler.git",
-                "reference": "4f988f8fdf580d53bdb2d1278fe93d1ed5462255"
+                "reference": "6c1925561632e83d60a44492e0b344cf48ab85ef"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/composer/xdebug-handler/zipball/4f988f8fdf580d53bdb2d1278fe93d1ed5462255",
-                "reference": "4f988f8fdf580d53bdb2d1278fe93d1ed5462255",
+                "url": "https://api.github.com/repos/composer/xdebug-handler/zipball/6c1925561632e83d60a44492e0b344cf48ab85ef",
+                "reference": "6c1925561632e83d60a44492e0b344cf48ab85ef",
                 "shasum": ""
             },
             "require": {
@@ -618,7 +618,7 @@
             "support": {
                 "irc": "ircs://irc.libera.chat:6697/composer",
                 "issues": "https://github.com/composer/xdebug-handler/issues",
-                "source": "https://github.com/composer/xdebug-handler/tree/3.0.4"
+                "source": "https://github.com/composer/xdebug-handler/tree/3.0.5"
             },
             "funding": [
                 {
@@ -634,7 +634,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-03-26T18:29:49+00:00"
+            "time": "2024-05-06T16:37:16+00:00"
         },
         {
             "name": "evenement/evenement",
@@ -811,16 +811,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-feat/sql-check-preprocessor",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "5db39bcd1691ab5156c96095e881935978763e63"
+                "reference": "6dd4a7e0ee028a4f8746495e026983658b8a6b6e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/5db39bcd1691ab5156c96095e881935978763e63",
-                "reference": "5db39bcd1691ab5156c96095e881935978763e63",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/6dd4a7e0ee028a4f8746495e026983658b8a6b6e",
+                "reference": "6dd4a7e0ee028a4f8746495e026983658b8a6b6e",
                 "shasum": ""
             },
             "require": {
@@ -836,6 +836,7 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -856,9 +857,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/feat/sql-check-preprocessor"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2024-05-06T13:48:09+00:00"
+            "time": "2024-05-06T17:16:50+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
