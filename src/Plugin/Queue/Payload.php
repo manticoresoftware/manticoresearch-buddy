@@ -25,7 +25,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * @phpstan-template T of array
  * @extends BasePayload<T>
  */
-final class Payload extends BasePayload {
+final class Payload extends BasePayload
+{
 
 	const SOURCE_TABLE_NAME = '_sources';
 	const VIEWS_TABLE_NAME = '_views';
@@ -74,7 +75,7 @@ final class Payload extends BasePayload {
 		/** @var T $parsedPayload */
 		$parsedPayload = static::$sqlQueryParser::parse(
 			$request->payload,
-			fn($payload)=>(preg_match('/(create|show|alter|drop)\s+(source|mv|materialized)/usi', $payload)),
+			fn($payload) => (preg_match('/(create|show|alter|drop)\s+(source|mv|materialized)/usi', $payload)),
 			$request->payload
 		);
 
