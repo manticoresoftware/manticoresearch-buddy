@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "81543680f44659ee63dee5274a60fc3b",
+    "content-hash": "1895f90bca4ad1ac4bbfade753c8aa16",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -811,21 +811,21 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-feat/sql-check-preprocessor",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "e12de9176c073f3725d273567349849156a8fa3b"
+                "reference": "fcf13e1019f1fd5550d4f449925774345ff0129c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/e12de9176c073f3725d273567349849156a8fa3b",
-                "reference": "e12de9176c073f3725d273567349849156a8fa3b",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/fcf13e1019f1fd5550d4f449925774345ff0129c",
+                "reference": "fcf13e1019f1fd5550d4f449925774345ff0129c",
                 "shasum": ""
             },
             "require": {
                 "composer/composer": "^2.5",
-                "manticoresoftware/php-sql-parser": "v4.6.0-patch8",
+                "manticoresoftware/php-sql-parser": "v4.6.0-patch7",
                 "php-ds/php-ds": "^1.4",
                 "symfony/console": "^6.2",
                 "symfony/dependency-injection": "^6.1"
@@ -836,6 +836,7 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -856,9 +857,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/feat/sql-check-preprocessor"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2024-05-02T10:03:21+00:00"
+            "time": "2024-04-29T07:05:32+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -974,16 +975,16 @@
         },
         {
             "name": "manticoresoftware/php-sql-parser",
-            "version": "v4.6.0-patch8",
+            "version": "v4.6.0-patch7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/PHP-SQL-Parser.git",
-                "reference": "2e0901fc73211316b94f5685998b0c2643cfd2c6"
+                "reference": "4544fc6d068f822f319285425fc8e7f7f2c61c4e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/2e0901fc73211316b94f5685998b0c2643cfd2c6",
-                "reference": "2e0901fc73211316b94f5685998b0c2643cfd2c6",
+                "url": "https://api.github.com/repos/manticoresoftware/PHP-SQL-Parser/zipball/4544fc6d068f822f319285425fc8e7f7f2c61c4e",
+                "reference": "4544fc6d068f822f319285425fc8e7f7f2c61c4e",
                 "shasum": ""
             },
             "require": {
@@ -1030,7 +1031,7 @@
                 "issues": "https://github.com/greenlion/PHP-SQL-Parser/issues",
                 "source": "https://github.com/greenlion/PHP-SQL-Parser"
             },
-            "time": "2024-04-30T20:48:10+00:00"
+            "time": "2024-04-24T22:46:22+00:00"
         },
         {
             "name": "manticoresoftware/telemetry",
@@ -3387,6 +3388,44 @@
             "time": "2022-12-30T00:23:10+00:00"
         },
         {
+            "name": "kwn/php-rdkafka-stubs",
+            "version": "v2.2.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/kwn/php-rdkafka-stubs.git",
+                "reference": "23b865d6b3e8fe1f080aa7371dc1da3339361996"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/kwn/php-rdkafka-stubs/zipball/23b865d6b3e8fe1f080aa7371dc1da3339361996",
+                "reference": "23b865d6b3e8fe1f080aa7371dc1da3339361996",
+                "shasum": ""
+            },
+            "require": {
+                "ext-rdkafka": ">=4.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^8.2.4"
+            },
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Karol Wnuk",
+                    "email": "k.wnuk@ascetic.pl"
+                }
+            ],
+            "description": "Rdkafka extension stubs for your IDE",
+            "support": {
+                "issues": "https://github.com/kwn/php-rdkafka-stubs/issues",
+                "source": "https://github.com/kwn/php-rdkafka-stubs/tree/v2.2.1"
+            },
+            "time": "2022-08-16T15:27:51+00:00"
+        },
+        {
             "name": "myclabs/deep-copy",
             "version": "1.11.1",
             "source": {
@@ -5255,6 +5294,38 @@
                 }
             ],
             "time": "2024-04-23T20:25:34+00:00"
+        },
+        {
+            "name": "swoole/ide-helper",
+            "version": "5.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/swoole/ide-helper.git",
+                "reference": "4b6e615cb27c251b6248b8bd9501edbd02a45c18"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/swoole/ide-helper/zipball/4b6e615cb27c251b6248b8bd9501edbd02a45c18",
+                "reference": "4b6e615cb27c251b6248b8bd9501edbd02a45c18",
+                "shasum": ""
+            },
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
+                {
+                    "name": "Team Swoole",
+                    "email": "team@swoole.com"
+                }
+            ],
+            "description": "IDE help files for Swoole.",
+            "support": {
+                "issues": "https://github.com/swoole/ide-helper/issues",
+                "source": "https://github.com/swoole/ide-helper/tree/5.0.3"
+            },
+            "time": "2023-04-28T22:20:18+00:00"
         },
         {
             "name": "theseer/tokenizer",
