@@ -21,8 +21,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * which can be as a result of only comments in it that we strip
  * @phpstan-extends BasePayload<array>
  */
-final class Payload extends BasePayload
-{
+final class Payload extends BasePayload {
 	public string $path;
 
 	public string $table;

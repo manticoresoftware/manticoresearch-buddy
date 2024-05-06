@@ -34,7 +34,7 @@ final class Payload extends BasePayload
 	 * @return string
 	 */
 	public static function getInfo(): string {
-		return 'Enables partial replaces';
+		return 'Enables tables copying';
 	}
 
 	/**
@@ -101,7 +101,10 @@ final class Payload extends BasePayload
 		$payload = Payload::$sqlQueryParser::parse(
 			$request->payload,
 			fn($request) => (
-				$request->error === "P03: syntax error, unexpected tablename, expecting \$end near 'WITH DATA'"
+				stripos(
+					$request->error,
+					"P03: syntax error, unexpected tablename, expecting \$end near 'with data'"
+				) !== false
 				&& stripos($request->payload, 'create') !== false
 				&& stripos($request->payload, 'table') !== false
 				&& stripos($request->payload, 'like') !== false
@@ -118,7 +121,7 @@ final class Payload extends BasePayload
 			&& isset($payload['TABLE']['no_quotes']['parts'][0])
 			&& isset($payload['LIKE']['no_quotes']['parts'][0])
 			&& isset($payload['TABLE']['options'][0]['base_expr'])
-			&& $payload['TABLE']['options'][0]['base_expr'] === 'WITH DATA'
+			&& strtolower($payload['TABLE']['options'][0]['base_expr']) === 'with data'
 		) {
 			return true;
 		}
