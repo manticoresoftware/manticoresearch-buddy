@@ -107,14 +107,29 @@ class QueueProcess extends BaseProcessor {
 	 * @throws \Exception
 	 */
 	public function runWorker(array $instance, bool $shouldStart = true): void {
-		$workerFn = function () use ($instance): void {
-			Buddy::debugv('Start worker ' . $instance['full_name']);
-			$kafkaWorker = new KafkaWorker($this->client, $instance);
+
+		Buddy::debugv('Start worker ' . $instance['full_name']);
+		$kafkaWorker = new KafkaWorker($this->client, $instance);
+
+		$workerFn = function () use ($kafkaWorker): void {
 			$kafkaWorker->run();
 		};
 
+		$worker = Process::createWorker($workerFn, $instance['full_name']);
+
+		$worker->onStop(
+			function () use ($kafkaWorker) {
+				$kafkaWorker->stopConsuming();
+				for ($i = 0; $i < 30; $i++) {
+					if ($kafkaWorker->isConsumeFinished()) {
+						break;
+					}
+					sleep(1);
+				}
+			}
+		);
 		// Add worker to the pool and automatically start it
-		$this->process->addWorker(Process::createWorker($workerFn, $instance['full_name']), $shouldStart);
+		$this->process->addWorker($worker, $shouldStart);
 
 		// When we need to use this method from the Handler
 		// we simply get processor and execute method with parameters

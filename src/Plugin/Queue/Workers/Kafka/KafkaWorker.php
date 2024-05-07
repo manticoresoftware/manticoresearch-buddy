@@ -21,7 +21,8 @@ use RdKafka\Conf;
 use RdKafka\Exception;
 use RdKafka\KafkaConsumer;
 
-class KafkaWorker {
+class KafkaWorker
+{
 	use StringFunctionsTrait;
 
 	private Client $client;
@@ -34,6 +35,8 @@ class KafkaWorker {
 
 	private string $bufferTable;
 	private int $batchSize;
+	private bool $consuming = true;
+	private bool $consumeFinished = false;
 
 	private View $view;
 
@@ -129,8 +132,12 @@ class KafkaWorker {
 		$consumer->subscribe($this->topicList);
 
 		$lastFullMessage = null;
-		while (true) {
+		while ($this->consuming) {
+			Buddy::debugv('---- consume ---- ' . ($this->consuming ? 'yes' : 'no'));
 			$message = $consumer->consume(1000);
+			Buddy::debugv('---- consume2 (before sleep) ---- ' . ($this->consuming ? 'yes' : 'no'));
+			sleep(5);
+			Buddy::debugv('---- consume3 (after sleep) ---- ' . ($this->consuming ? 'yes' : 'no'));
 			switch ($message->err) {
 				case RD_KAFKA_RESP_ERR_NO_ERROR:
 					$lastFullMessage = $message;
@@ -146,9 +153,24 @@ class KafkaWorker {
 					}
 					break;
 				default:
+					Buddy::debugv('---- exception++++ ---- ' . $this->consuming);
 					throw new \Exception($message->errstr(), $message->err);
 			}
+			Buddy::debugv('---- End consume ---- ' . $this->consuming);
 		}
+
+		$this->consumeFinished = true;
+		Buddy::debugv('==============+++++++++++++++===========================================');
+	}
+
+	public function stopConsuming() {
+		Buddy::debugv('------> Stop consuming ' . ($this->consuming ? 'yes' : 'no'));
+		$this->consuming = false;
+	}
+
+	public function isConsumeFinished() {
+		Buddy::debugv('------> Check is consume finished ' . ($this->consumeFinished ? 'yes' : 'no'));
+		return $this->consumeFinished;
 	}
 
 	/**
