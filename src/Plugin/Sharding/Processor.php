@@ -24,7 +24,6 @@ final class Processor extends BaseProcessor {
 	 */
 	public function start(): array {
 		Buddy::debugv('Starting sharding processor');
-		$this->operator = new Operator($this->client, '');
 		return [[fn() => $this->execute('ping'), 1]];
 	}
 
@@ -42,7 +41,7 @@ final class Processor extends BaseProcessor {
 	 * @return bool
 	 */
 	public function ping(): bool {
-		$operator = $this->operator;
+		$operator = $this->getOperator();
 		$nodeId = $operator->node->id;
 		$hasSharding = $operator->hasSharding();
 		$sharded = $hasSharding ? 'yes' : 'no';
@@ -87,7 +86,7 @@ final class Processor extends BaseProcessor {
 	 */
 	public function shard(mixed ...$args): void {
 		/** @var array{table:array{cluster:string,name:string,structure:string,extra:string},shardCount:int,replicationFactor:int} $args */
-		$this->operator->shard(...$args);
+		$this->getOperator()->shard(...$args);
 	}
 
 	/**
@@ -97,9 +96,20 @@ final class Processor extends BaseProcessor {
 	 */
 	public function status(string $table): bool {
 		// Do nothing, if we have no sharding
-		if (!$this->operator->hasSharding()) {
+		if (!$this->getOperator()->hasSharding()) {
 			return true;
 		}
-		return $this->operator->checkTableStatus($table);
+		return $this->getOperator()->checkTableStatus($table);
+	}
+
+	/**
+	 * Lazy loader for operator that creates it on the first run and returns its instance
+	 * @return Operator
+	 */
+	protected function getOperator(): Operator {
+		if (!isset($this->operator)) {
+			$this->operator = new Operator($this->client, '');
+		}
+		return $this->operator;
 	}
 }

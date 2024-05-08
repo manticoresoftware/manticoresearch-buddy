@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1895f90bca4ad1ac4bbfade753c8aa16",
+    "content-hash": "7f3693adc0d04366247b8cf909ddc80a",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -811,16 +811,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-fix/concurrency",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "f6ff597b976b728192a3a71d314abef2202f770b"
+                "reference": "c58ef0d162ec5e316d6b1c6b8077d1642f1cffff"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/f6ff597b976b728192a3a71d314abef2202f770b",
-                "reference": "f6ff597b976b728192a3a71d314abef2202f770b",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/c58ef0d162ec5e316d6b1c6b8077d1642f1cffff",
+                "reference": "c58ef0d162ec5e316d6b1c6b8077d1642f1cffff",
                 "shasum": ""
             },
             "require": {
@@ -836,7 +836,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -857,9 +856,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/concurrency"
             },
-            "time": "2024-05-09T11:35:19+00:00"
+            "time": "2024-05-08T09:52:26+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -5391,5 +5390,5 @@
     "platform-overrides": {
         "php": "8.1.0"
     },
-    "plugin-api-version": "2.2.0"
+    "plugin-api-version": "2.6.0"
 }

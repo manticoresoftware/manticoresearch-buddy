@@ -20,10 +20,10 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 // Init autoload first
 include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
 
-// We buffer it here cuz we need to expect listen address first
-// We made in in onStart closure, but this is just workaround
+// We buffer it here because we need to expect the listen address first
+// We made it in the onStart closure, but this is just a workaround
 // to make parallels work with external plugins
-// this is defintely need to think how we can better, it's very complex now
+// This definitely needs to be thought through on how we can improve it, as it's very complex now
 ob_start();
 try {
 	QueryProcessor::init();
@@ -44,7 +44,7 @@ $server = Server::create(
 	[
 	'daemonize' => 0,
 	'max_request' => 0,
-	'dispatch_mode' => 3,
+	'dispatch_mode' => 2,
 	'enable_coroutine' => true,
 	'task_enable_coroutine' => false,
 	'task_max_request' => 0,
@@ -76,14 +76,14 @@ $server = Server::create(
 	'max_wait_time' => 5,
 	]
 );
-$server->beforeStart(
+$server->onStart(
 	static function () use ($initBuffer) {
 		echo $initBuffer;
 		$settings = QueryProcessor::getSettings();
 		putenv("PLUGIN_DIR={$settings->commonPluginDir}");
 
 		Task::setSettings(QueryProcessor::getSettings());
-		// Dispay all loaded plugins
+		// Display all loaded plugins
 		QueryProcessor::printPluginsInfo();
 	}
 )
