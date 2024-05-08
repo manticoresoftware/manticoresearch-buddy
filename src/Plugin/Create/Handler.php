@@ -50,13 +50,14 @@ final class Handler extends BaseHandlerWithClient
 
 			try {
 				self::flushRamchunk($payload->sourceTableName, $client);
-				$freezeResult = self::freezeTable($payload->sourceTableName, $client);
-				$dataDirPath = self::parseTablePath($payload->sourceTableName, $freezeResult);
-				$destinationTablePath = $dataDirPath . $payload->sourceTableName .
+				self::freezeTable($payload->sourceTableName, $client);
+				$destinationTablePath = self::getDataDirPath($client) .
+					DIRECTORY_SEPARATOR . $payload->sourceTableName .
 					DIRECTORY_SEPARATOR . $payload->sourceTableName;
 				self::importTable($payload->destinationTableName, $destinationTablePath, $client);
 			} catch (GenericError $exception) {
 				self::unfreezeTable($payload->sourceTableName, $client);
+				throw GenericError::create($exception->getResponseError());
 			}
 
 			return TaskResult::none();
@@ -66,7 +67,6 @@ final class Handler extends BaseHandlerWithClient
 			$taskFn, [$this->payload, $this->manticoreClient]
 		)->run();
 	}
-
 
 	/**
 	 * @param string $tableName
@@ -85,36 +85,24 @@ final class Handler extends BaseHandlerWithClient
 	/**
 	 * @param string $tableName
 	 * @param Client $client
-	 * @return mixed
+	 * @return void
 	 * @throws ManticoreSearchClientError|GenericError
 	 */
-	private static function freezeTable(string $tableName, Client $client): mixed {
+	private static function freezeTable(string $tableName, Client $client): void {
 		$sql = "FREEZE $tableName";
 		$result = $client->sendRequest($sql);
 		if ($result->hasError()) {
 			throw GenericError::create("Can't freeze table $tableName. Reason: " . $result->getError());
 		}
-		return $result->getResult();
 	}
 
 	/**
-	 * @param string $tableName
-	 * @param mixed $freezeResult
-	 * @return string
-	 * @throws GenericError
+	 * @param Client $client
+	 * @return string|null
 	 */
-	private static function parseTablePath(string $tableName, mixed $freezeResult): string {
-
-		if ($tableName === '') {
-			throw GenericError::create("Table name can't be empty");
-		}
-		if (!is_array($freezeResult) || !isset($freezeResult[0]['data'][0]['normalized'])) {
-			throw GenericError::create('No normalized result in freeze response');
-		}
-
-		$explodedPath = explode($tableName, $freezeResult[0]['data'][0]['normalized']);
-
-		return $explodedPath[0];
+	public static function getDataDirPath(Client $client): ?string {
+		$settings = $client->getSettings();
+		return $settings->searchdDataDir;
 	}
 
 	/**
@@ -130,7 +118,6 @@ final class Handler extends BaseHandlerWithClient
 			throw GenericError::create("Can't unfreeze table $tableName. Reason: " . $result->getError());
 		}
 	}
-
 
 	/**
 	 * @param string $tableName
