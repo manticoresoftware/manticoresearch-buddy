@@ -123,7 +123,7 @@ final class Handler extends BaseHandlerWithClient
 			// Removing requested doc from result set
 			$filteredResults = [];
 			foreach ($result['hits']['hits'] as $v) {
-				if ($v['_id'] === $payload->docId) {
+				if ($v['_id'] === (int)$payload->docId) {
 					continue;
 				}
 
