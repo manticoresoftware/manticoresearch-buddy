@@ -110,9 +110,9 @@ class CliTableTest extends TestCase {
 		$pattern = "/\+-+\+-+\+-+\+-+\+-+\+\n".
 			"\| id\s+\| query\s+\| time\s+\| protocol \| host\s+\|\n".
 			"\+-+\+-+\+-+\+-+\+-+\+\n".
-			"\| \d+ \| select\s+\| \d+us ago\s+\| http\s+\| 127\.0\.0\.1:\d+ \|\n".
+			"(\| \d+\s+\| [^\s]+\s+\| \d+us( ago)?\s+\| http\s+\| 127\.0\.0\.1:\d+ \|\n)+?".
 			"\+-+\+-+\+-+\+-+\+-+\+\n".
-			"1 row in set \(\d\.\d{3} sec\)\n/";
+			"\d row(s)? in set \(\d\.\d{3} sec\)\n/";
 		$this->assertMatchesRegularExpression($pattern, $out[0]['columns']);
 	}
 }
