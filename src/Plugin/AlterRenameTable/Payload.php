@@ -1,15 +1,16 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2023, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
   version. You should have received a copy of the GPL license along with this
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\RenameTable;
+namespace Manticoresearch\Buddy\Base\Plugin\AlterRenameTable;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
@@ -40,7 +41,8 @@ final class Payload extends BasePayload {
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static();
-
+		/** phpstan fix */
+		unset($request);
 		/**
 		 * @phpstan-var array{
 		 *           ALTER: array{
@@ -79,7 +81,7 @@ final class Payload extends BasePayload {
 		 *           }
 		 *       } $payload
 		 */
-		$payload = Payload::$sqlQueryParser::parse($request->payload);
+		$payload = Payload::$sqlQueryParser::getParsedPayload();
 
 		$self->destinationTableName = $payload['RENAME']['sub_tree'][0]['destination']['no_quotes']['parts'][0];
 		$self->sourceTableName = $payload['TABLE']['no_quotes']['parts'][0];
@@ -89,6 +91,7 @@ final class Payload extends BasePayload {
 	/**
 	 * @param Request $request
 	 * @return bool
+	 * @throws GenericError
 	 */
 	public static function hasMatch(Request $request): bool {
 
@@ -128,9 +131,23 @@ final class Payload extends BasePayload {
 		 *                   }
 		 *               }>
 		 *           }
-		 *       } $payload
+		 *       }|false $payload
 		 */
-		$payload = Payload::$sqlQueryParser::parse($request->payload);
+
+		$payload = Payload::$sqlQueryParser::parse(
+			$request->payload,
+			fn(Request $request) => (
+				strpos($request->error, 'P03: syntax error, unexpected tablename') === 0
+				&& stripos($request->payload, 'alter') !== false
+				&& stripos($request->payload, 'table') !== false
+				&& stripos($request->payload, 'rename') !== false
+			),
+			$request
+		);
+
+		if (!$payload) {
+			return false;
+		}
 
 		if (isset($payload['ALTER']['base_expr'])
 			&& isset($payload['TABLE']['no_quotes']['parts'][0])
@@ -142,6 +159,4 @@ final class Payload extends BasePayload {
 
 		return false;
 	}
-
-
 }
