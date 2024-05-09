@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Knn;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -27,7 +28,7 @@ final class Payload extends BasePayload
 	public ?string $k = null;
 	public ?string $docId = null;
 
-	/** @var array<string> $select*/
+	/** @var array<string> $select */
 	public array $select = [];
 
 	/** @var ?string $table */
@@ -94,8 +95,6 @@ final class Payload extends BasePayload
 	 * @return void
 	 */
 	private static function parseSqlRequest(self $payload): void {
-
-
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
 		$payload->table = $parsedPayload['FROM'][0]['table'] ?? null;
 
@@ -117,6 +116,7 @@ final class Payload extends BasePayload
 	/**
 	 * @param Request $request
 	 * @return bool
+	 * @throws GenericError
 	 */
 	public static function hasMatch(Request $request): bool {
 		if ($request->endpointBundle === Endpoint::Search) {
@@ -126,11 +126,15 @@ final class Payload extends BasePayload
 			}
 		}
 
-		$payload = static::$sqlQueryParser::parse($request->payload);
+		$payload = self::getParsedPayload($request);
+
+		if (!$payload) {
+			return false;
+		}
 		if (isset($payload['WHERE'])) {
 			foreach ($payload['WHERE'] as $expression) {
 				if ($expression['expr_type'] === 'function'
-				&& $expression['base_expr'] === 'knn'
+					&& $expression['base_expr'] === 'knn'
 					&& isset($expression['sub_tree'][2])
 					&& is_numeric($expression['sub_tree'][2]['base_expr'])
 				) {
@@ -141,4 +145,23 @@ final class Payload extends BasePayload
 
 		return false;
 	}
+
+	/**
+	 * Small preprocessing. Allow us to not call hard $sqlQueryParser::parse method
+	 *
+	 * @param Request $request
+	 * @return array{WHERE?: array<int, array{expr_type:string, base_expr:string,
+	 *   sub_tree: array<int,array{base_expr:string, expr_type:string}>}>}|null
+	 * @throws GenericError
+	 */
+	private static function getParsedPayload(Request $request): ?array {
+		return static::$sqlQueryParser::parse(
+			$request->payload,
+			fn($request) => (str_contains($request->error, "P01: syntax error, unexpected integer, expecting '(' near")
+				&& stripos($request->payload, 'knn') !== false
+				&& preg_match('/\(?\s?knn\s?\(/usi', $request->payload)),
+			$request
+		);
+	}
+
 }

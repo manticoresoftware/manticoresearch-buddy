@@ -423,6 +423,6 @@ trait TestFunctionalTrait {
 	 * @return void
 	 */
 	protected static function loadBuddyPid(): void {
-		static::$buddyPid = (int)shell_exec('pgrep -f manticore-executor | sort | head -n1');
+		static::$buddyPid = (int)shell_exec('pgrep -f manticoresearch-buddy | sort | head -n1');
 	}
 }

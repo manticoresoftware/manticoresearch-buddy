@@ -54,8 +54,8 @@ Pluggable::setCorePlugins(
 	'manticoresoftware/buddy-plugin-empty-string',
 	'manticoresoftware/buddy-plugin-backup',
 	'manticoresoftware/buddy-plugin-emulate-elastic',
+	'manticoresoftware/buddy-plugin-create',
 	'manticoresoftware/buddy-plugin-insert',
-	'manticoresoftware/buddy-plugin-insert-values',
 	'manticoresoftware/buddy-plugin-alias',
 	'manticoresoftware/buddy-plugin-select',
 	'manticoresoftware/buddy-plugin-show',
@@ -66,6 +66,7 @@ Pluggable::setCorePlugins(
 	'manticoresoftware/buddy-plugin-modify-table',
 	'manticoresoftware/buddy-plugin-knn',
 	'manticoresoftware/buddy-plugin-replace',
+	'manticoresoftware/buddy-plugin-queue',
 	'manticoresoftware/buddy-plugin-sharding',
 	]
 );

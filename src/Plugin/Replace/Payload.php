@@ -55,7 +55,7 @@ final class Payload extends BasePayload {
 			 *   SET:array<int, array{expr_type: string, sub_tree: array<int, array{base_expr: string}>}>,
 			 *   WHERE:array<int, array{base_expr: string}>} $payload
 			 */
-			$payload = static::$sqlQueryParser::parse($request->payload);
+			$payload = static::$sqlQueryParser::getParsedPayload();
 
 			$self->table = self::parseTable($payload['REPLACE']);
 			$self->set = self::parseSet($payload['SET']);
@@ -82,7 +82,15 @@ final class Payload extends BasePayload {
 	public static function hasMatch(Request $request): bool {
 
 		if ($request->format->value === RequestFormat::SQL->value) {
-			$payload = static::$sqlQueryParser::parse($request->payload);
+			$payload = static::$sqlQueryParser::parse(
+				$request->payload,
+				fn($request) => (
+					str_contains($request->error, "P01: syntax error, unexpected SET, expecting VALUES near '")
+					&& stripos($request->payload, 'replace') !== false
+					&& stripos($request->payload, 'set') !== false
+					&& stripos($request->payload, 'where') !== false),
+				$request
+			);
 
 			if (isset($payload['REPLACE'])
 				&& isset($payload['SET'])
