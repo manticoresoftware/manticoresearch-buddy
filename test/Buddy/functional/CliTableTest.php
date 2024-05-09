@@ -61,6 +61,21 @@ class CliTableTest extends TestCase {
 		$query = "INSERT INTO test(f) VALUES('$multiLineValue')";
 		$out = static::runHTTPQuery($query, true, 'cli');
 
+		$query = 'SELECT 1,2 FROM test';
+		$out = static::runHTTPQuery($query, true, 'cli');
+		if (isset($out[0]['columns'])) {
+			$result = preg_match(
+				"/\+-+\+-+\+\n"
+				. "\| 1\s+\| 2\s+\|\n"
+				. "\+-+\+-+\+\n"
+				. "\| 1\s+\| 2\s+\|\n"
+				. "\+-+\+-+\+\n"
+				. "1 row in set \(\d\.\d{3} sec\)\n/s",
+				$out[0]['columns']
+			);
+			$this->assertEquals(1, $result);
+		}
+
 		$query = 'SELECT * FROM test';
 		$out = static::runHTTPQuery($query, true, 'cli');
 		if (isset($out[0]['columns'])) {
