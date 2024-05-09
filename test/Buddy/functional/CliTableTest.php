@@ -69,8 +69,9 @@ class CliTableTest extends TestCase {
 				. "\| 1\s+\| 2\s+\|\n"
 				. "\+-+\+-+\+\n"
 				. "\| 1\s+\| 2\s+\|\n"
+				. "\| 1\s+\| 2\s+\|\n"
 				. "\+-+\+-+\+\n"
-				. "1 row in set \(\d\.\d{3} sec\)\n/s",
+				. "2 rows in set \(\d\.\d{3} sec\)\n/s",
 				$out[0]['columns']
 			);
 			$this->assertEquals(1, $result);
