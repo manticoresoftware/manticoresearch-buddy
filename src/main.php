@@ -76,7 +76,7 @@ $server = Server::create(
 	'max_wait_time' => 5,
 	]
 );
-$server->onStart(
+$server->beforeStart(
 	static function () use ($initBuffer) {
 		echo $initBuffer;
 		$settings = QueryProcessor::getSettings();
@@ -89,8 +89,6 @@ $server->onStart(
 )
 	->onStart(
 		static function () {
-			// Hack to fix issue with cut the output from manticore daemon
-			usleep(20000);
 			buddy_metric('invocation', 1);
 			$settings = QueryProcessor::getSettings();
 			$crashDetector = new CrashDetector($settings);
