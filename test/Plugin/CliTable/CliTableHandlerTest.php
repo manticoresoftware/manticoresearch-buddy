@@ -20,6 +20,7 @@ use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\Buddy\CoreTest\Trait\TestInEnvironmentTrait;
 use PHPUnit\Framework\TestCase;
+use Swoole\Coroutine;
 
 class CliTableHandlerTest extends TestCase {
 
@@ -62,10 +63,10 @@ class CliTableHandlerTest extends TestCase {
 		$refCls->getProperty('manticoreClient')->setValue($handler, $manticoreClient);
 		$refCls->getProperty('tableFormatter')->setValue($handler, $tableFormatter);
 
-		go(
+		$cid = go(
 			function () use ($handler, $respBody) {
 				$task = $handler->run();
-				$task->wait();
+				$task->wait(true);
 
 				$this->assertEquals(true, $task->isSucceed());
 				$result = $task->getResult()->getStruct();
@@ -74,5 +75,6 @@ class CliTableHandlerTest extends TestCase {
 				self::finishMockManticoreServer();
 			}
 		);
+		Coroutine::join([$cid]);
 	}
 }
