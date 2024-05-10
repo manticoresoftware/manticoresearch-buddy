@@ -62,6 +62,7 @@ Pluggable::setCorePlugins(
 	'manticoresoftware/buddy-plugin-cli-table',
 	'manticoresoftware/buddy-plugin-plugin',
 	'manticoresoftware/buddy-plugin-test',
+	'manticoresoftware/buddy-plugin-alter-rename-table',
 	'manticoresoftware/buddy-plugin-modify-table',
 	'manticoresoftware/buddy-plugin-knn',
 	'manticoresoftware/buddy-plugin-replace',
