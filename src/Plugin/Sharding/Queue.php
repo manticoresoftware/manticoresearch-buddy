@@ -98,8 +98,8 @@ final class Queue {
 	}
 
 	/**
-	 * Helper to check if we should skipp query in processing the queue
-	 * @param  array{id:int,query:string,wait_for_id:int,tries:int,status:string} $query
+	 * Helper to check if we should skip query in processing the queue
+	 * @param  array{id:int,query:string,wait_for_id:int,tries:int,status:string,updated_at:int} $query
 	 * @return bool
 	 */
 	protected function shouldSkipQuery(array $query): bool {
@@ -110,6 +110,14 @@ final class Queue {
 				return true;
 			}
 		}
+
+		// We try to keep it inside 30 second frame
+		$timeSinceLastAttempt = time() - $query['updated_at'];
+		$maxAttemptTime = ceil(pow(1.4, $query['tries']));
+		if ($timeSinceLastAttempt >= $maxAttemptTime) {
+			return true;
+		}
+
 		return !$this->attemptToUpdateStatus($query, 'processing', 0);
 	}
 
@@ -171,13 +179,13 @@ final class Queue {
 	 * We use this method for internal use only
 	 * and automatic handle returns of failed queries
 	 * @param  Node   $node
-	 * @return Vector<array{id:int,query:string,wait_for_id:int,tries:int,status:string}>
+	 * @return Vector<array{id:int,query:string,wait_for_id:int,tries:int,status:string,updated_at:int}>
 	 *  list of queries for request node
 	 */
 	protected function dequeue(Node $node): Vector {
 		$maxTries = static::MAX_TRIES;
 		$query = "
-			SELECT `id`, `query`, `wait_for_id`, `tries`
+		SELECT `id`, `query`, `wait_for_id`, `tries`, `updated_at`
 			FROM {$this->table}
 			WHERE
 				`node` = '{$node->id}'
