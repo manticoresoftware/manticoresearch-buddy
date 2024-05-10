@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1895f90bca4ad1ac4bbfade753c8aa16",
+    "content-hash": "620e245dc1089c6103688c7700334904",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -811,16 +811,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-fix/ci-sigkill-test",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "cb1f95139fd9159ef0cdff9461fffb0ab4ed65fd"
+                "reference": "d6d816a09fdf13124dd7e1ed93059ffc1630a3a5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/cb1f95139fd9159ef0cdff9461fffb0ab4ed65fd",
-                "reference": "cb1f95139fd9159ef0cdff9461fffb0ab4ed65fd",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/d6d816a09fdf13124dd7e1ed93059ffc1630a3a5",
+                "reference": "d6d816a09fdf13124dd7e1ed93059ffc1630a3a5",
                 "shasum": ""
             },
             "require": {
@@ -836,7 +836,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -857,9 +856,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/ci-sigkill-test"
             },
-            "time": "2024-05-09T12:46:11+00:00"
+            "time": "2024-05-10T13:02:01+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",

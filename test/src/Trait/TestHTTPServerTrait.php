@@ -106,7 +106,7 @@ trait TestHTTPServerTrait {
 		if (self::$mockServerProc === false || !is_resource(self::$mockServerProc)) {
 			return;
 		}
-		proc_terminate(self::$mockServerProc);
+		//proc_terminate(self::$mockServerProc);
 		self::$mockServerProc = false;
 	}
 
