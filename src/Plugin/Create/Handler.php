@@ -51,7 +51,7 @@ final class Handler extends BaseHandlerWithClient
 			try {
 				self::flushRamchunk($payload->sourceTableName, $client);
 				self::freezeTable($payload->sourceTableName, $client);
-				$destinationTablePath = self::getDataDirPath($client) .
+				$destinationTablePath = $payload->dataDirPath .
 					DIRECTORY_SEPARATOR . $payload->sourceTableName .
 					DIRECTORY_SEPARATOR . $payload->sourceTableName;
 				self::importTable($payload->destinationTableName, $destinationTablePath, $client);
@@ -94,15 +94,6 @@ final class Handler extends BaseHandlerWithClient
 		if ($result->hasError()) {
 			throw GenericError::create("Can't freeze table $tableName. Reason: " . $result->getError());
 		}
-	}
-
-	/**
-	 * @param Client $client
-	 * @return string|null
-	 */
-	public static function getDataDirPath(Client $client): ?string {
-		$settings = $client->getSettings();
-		return $settings->searchdDataDir;
 	}
 
 	/**

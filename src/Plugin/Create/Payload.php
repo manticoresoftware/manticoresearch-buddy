@@ -26,8 +26,7 @@ final class Payload extends BasePayload
 
 	public string $destinationTableName;
 	public string $sourceTableName;
-
-	public string $type;
+	public ?string $dataDirPath;
 
 	/**
 	 * Get description for this plugin
@@ -89,6 +88,7 @@ final class Payload extends BasePayload
 
 		$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
 		$self->sourceTableName = $payload['LIKE']['no_quotes']['parts'][0];
+		$self->dataDirPath = $self->getSettings()->searchdDataDir;
 		return $self;
 	}
 
