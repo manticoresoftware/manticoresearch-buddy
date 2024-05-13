@@ -94,7 +94,6 @@ final class Payload extends BasePayload
 		return __NAMESPACE__ . '\\' . $this->model->getHandlerClass();
 	}
 
-
 	public static function getProcessors(): array {
 		static::$processor = new QueueProcess();
 		return [static::$processor];

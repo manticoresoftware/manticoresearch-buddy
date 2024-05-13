@@ -21,13 +21,15 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Throwable;
 
 class QueueProcess extends BaseProcessor {
-
+	/** @return array{0: callable, 1: int}[]  */
 	public function start(): array {
 		parent::start();
+
 		$this->execute('runPool');
 		return [];
 	}
 
+	/** @return void  */
 	public function stop(): void {
 		parent::stop();
 	}
@@ -87,7 +89,7 @@ class QueueProcess extends BaseProcessor {
 
 			$instance['destination_name'] = $results[0]['data'][0]['destination_name'];
 			$instance['query'] = $results[0]['data'][0]['query'];
-			$this->runWorker($instance);
+			$this->execute('runWorker',	[$instance]);
 		}
 	}
 

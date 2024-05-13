@@ -62,7 +62,6 @@ class InsertQueryHandlerTest extends TestCase {
 
 		self::setBuddyVersion();
 		$manticoreClient = new HTTPClient(new ManticoreResponse(), $serverUrl);
-		$manticoreClient->setIsAsync(false);
 		$handler = new Handler($payload);
 		$handler->setManticoreClient($manticoreClient);
 		ob_flush();
