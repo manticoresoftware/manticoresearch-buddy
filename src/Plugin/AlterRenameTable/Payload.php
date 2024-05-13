@@ -152,7 +152,7 @@ final class Payload extends BasePayload {
 		if (isset($payload['ALTER']['base_expr'])
 			&& isset($payload['TABLE']['no_quotes']['parts'][0])
 			&& isset($payload['RENAME']['sub_tree'][0]['destination']['no_quotes']['parts'][0])
-			&& $payload['ALTER']['base_expr'] === 'TABLE'
+			&& strtolower($payload['ALTER']['base_expr']) === 'table'
 		) {
 			return true;
 		}
