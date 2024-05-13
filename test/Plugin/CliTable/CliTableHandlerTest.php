@@ -54,7 +54,6 @@ class CliTableHandlerTest extends TestCase {
 		self::setBuddyVersion();
 		$serverUrl = self::setUpMockManticoreServer(false);
 		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
-		$manticoreClient->setIsAsync(false);
 		$tableFormatter = new TableFormatter();
 		Payload::$type = 'queries';
 		$payload = Payload::fromRequest($request);

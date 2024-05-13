@@ -56,7 +56,6 @@ class ShowQueriesHandlerTest extends TestCase {
 		$serverUrl = self::setUpMockManticoreServer(false);
 		self::setBuddyVersion();
 		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
-		$manticoreClient->setIsAsync(false);
 		Payload::$type = 'queries';
 		$payload = Payload::fromRequest($request);
 
