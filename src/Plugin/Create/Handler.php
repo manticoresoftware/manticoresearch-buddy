@@ -51,7 +51,7 @@ final class Handler extends BaseHandlerWithClient
 			try {
 				self::flushRamchunk($payload->sourceTableName, $client);
 				self::freezeTable($payload->sourceTableName, $client);
-				$destinationTablePath = $payload->dataDirPath .
+				$destinationTablePath = $payload->getSettings()->searchdDataDir .
 					DIRECTORY_SEPARATOR . $payload->sourceTableName .
 					DIRECTORY_SEPARATOR . $payload->sourceTableName;
 				self::importTable($payload->destinationTableName, $destinationTablePath, $client);
