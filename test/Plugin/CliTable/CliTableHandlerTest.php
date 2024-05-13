@@ -54,6 +54,7 @@ class CliTableHandlerTest extends TestCase {
 		self::setBuddyVersion();
 		$serverUrl = self::setUpMockManticoreServer(false);
 		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
+		$manticoreClient->setIsAsync(false);
 		$tableFormatter = new TableFormatter();
 		Payload::$type = 'queries';
 		$payload = Payload::fromRequest($request);
@@ -61,11 +62,10 @@ class CliTableHandlerTest extends TestCase {
 		$refCls = new ReflectionClass($handler);
 		$refCls->getProperty('manticoreClient')->setValue($handler, $manticoreClient);
 		$refCls->getProperty('tableFormatter')->setValue($handler, $tableFormatter);
-
 		go(
 			function () use ($handler, $respBody) {
 				$task = $handler->run();
-				$task->wait();
+				$task->wait(true);
 
 				$this->assertEquals(true, $task->isSucceed());
 				$result = $task->getResult()->getStruct();
