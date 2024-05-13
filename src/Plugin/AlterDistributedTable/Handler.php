@@ -56,8 +56,8 @@ final class Handler extends BaseHandlerWithClient
 				throw ManticoreSearchResponseError::create("Table $payload->table doesn't exist");
 			}
 
+			self::checkAlterSyntax($payload->table, $payload->options, $manticoreClient);
 			self::dropTable($payload->table, $manticoreClient);
-
 			return self::createTable($payload->table, $payload->options, $manticoreClient);
 		};
 
@@ -70,7 +70,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public static function dropTable(string $tableName, Client $manticoreClient): void {
+	private static function dropTable(string $tableName, Client $manticoreClient): void {
 		$sql = /** @lang Manticore */
 			"DROP TABLE $tableName";
 		$request = $manticoreClient->sendRequest($sql);
@@ -87,7 +87,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public static function createTable(string $tableName, array $options, Client $manticoreClient): TaskResult {
+	private static function createTable(string $tableName, array $options, Client $manticoreClient): TaskResult {
 
 		$sql = /** @lang Manticore */
 			"CREATE TABLE $tableName type='distributed'";
@@ -103,5 +103,30 @@ final class Handler extends BaseHandlerWithClient
 		}
 
 		return TaskResult::raw($request->getResult());
+	}
+
+	/**
+	 * We need somehow validate alter request.
+	 * So we just create temporary distributed table and remove it after
+	 *
+	 * @param string $tableName
+	 * @param array<array<string, string>> $options
+	 * @param Client $manticoreClient
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	private static function checkAlterSyntax(string $tableName, array $options, Client $manticoreClient): void {
+		$microTime = str_replace('.', '_', (string)microtime(true));
+
+		try {
+			$tempTableName = "{$tableName}_$microTime";
+			self::createTable($tempTableName, $options, $manticoreClient);
+			self::dropTable($tempTableName, $manticoreClient);
+		} catch (ManticoreSearchResponseError $exception) {
+			$errorMessage = $exception->getResponseError();
+			$errorMessage = str_replace("_$microTime", '', $errorMessage);
+			throw ManticoreSearchResponseError::create($errorMessage);
+		}
 	}
 }
