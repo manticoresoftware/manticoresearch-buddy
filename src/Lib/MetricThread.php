@@ -90,7 +90,6 @@ final class MetricThread {
 
 				Metric::setContainer(static::$container);
 				$metric = Metric::instance();
-
 				while ($msg = $worker->read()) {
 					if (!is_string($msg)) {
 						throw new \Exception('Incorrect data received');
@@ -102,7 +101,7 @@ final class MetricThread {
 					[$method, $args] = $msg;
 					$metric->$method(...$args);
 				}
-			}, true, 2
+			}, true, 2, true
 		);
 		return new self($process);
 	}
