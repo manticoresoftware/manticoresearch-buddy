@@ -22,6 +22,8 @@ use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Swoole\Coroutine;
+use Swoole\Coroutine\Channel;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
 use Throwable;
@@ -59,13 +61,20 @@ final class EventHandler {
 		}
 		$requestId = $request->header['Request-ID'] ?? uniqid(more_entropy: true);
 		$body = $request->rawContent() ?: '';
-		Buddy::debug("[$requestId] request data: $body");
-		$result = (string)static::process($requestId, $body);
-		Buddy::debug("[$requestId] response data: $result");
-		// Send response
+		$channel = new Channel(1);
+		Coroutine::create(
+			static function () use ($requestId, $body, $channel) {
+				Buddy::debug("[$requestId] request data: $body");
+				$result = (string)static::process($requestId, $body);
+				Buddy::debug("[$requestId] response data: $result");
+				$channel->push($result);
+			}
+		);
+		/** @var string $result */
+		$result = $channel->pop();
 		$response->header('Content-Type', 'application/json');
 		$response->status(200);
-		$response->end((string)$result);
+		$response->end($result);
 	}
 
 	/**

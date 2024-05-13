@@ -58,7 +58,7 @@ class ShowQueriesTest extends TestCase {
 			['protocol' => ['type' => 'string']],
 			['host' => ['type' => 'string']],
 		];
-		$result = ['total' => 2, 'error' => ''];
+		$result = ['total' => 5, 'error' => ''];
 		if (!(isset($out[0]['columns'], $out[0]['total']))) {
 			$this->fail('Unexpected response from searchd');
 		}
