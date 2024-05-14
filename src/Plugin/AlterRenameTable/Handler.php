@@ -39,7 +39,20 @@ final class Handler extends BaseHandlerWithClient
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $client): TaskResult {
 
-			if (!$client->hasTable($payload->sourceTableName)) {
+			$hasTable = false;
+			$allDistributedTables = array_column(
+				iterator_to_array($client->getAllTables(['rt'])),
+				0
+			);
+
+			foreach ($allDistributedTables as $table) {
+				if ($table === $payload->sourceTableName) {
+					$hasTable = true;
+					break;
+				}
+			}
+
+			if (!$hasTable) {
 				throw GenericError::create("Source table $payload->sourceTableName not exists");
 			}
 
