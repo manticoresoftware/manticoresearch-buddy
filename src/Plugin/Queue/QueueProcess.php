@@ -110,24 +110,7 @@ class QueueProcess extends BaseProcessor {
 
 		Buddy::debugv('Start worker ' . $instance['full_name']);
 		$kafkaWorker = new KafkaWorker($this->client, $instance);
-
-		$workerFn = function () use ($kafkaWorker): void {
-			$kafkaWorker->run();
-		};
-
-		$worker = Process::createWorker($workerFn, $instance['full_name']);
-
-		$worker->onStop(
-			function () use ($kafkaWorker) {
-				$kafkaWorker->stopConsuming();
-				for ($i = 0; $i < 30; $i++) {
-					if ($kafkaWorker->isConsumeFinished()) {
-						break;
-					}
-					sleep(1);
-				}
-			}
-		);
+		$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
 		// Add worker to the pool and automatically start it
 		$this->process->addWorker($worker, $shouldStart);
 
