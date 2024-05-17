@@ -24,7 +24,7 @@ final class State {
 	public function __construct(
 		protected Client $client
 	) {
-		$this->table = 'sharding_state';
+		$this->table = '_sharding_state';
 	}
 
 	/**
