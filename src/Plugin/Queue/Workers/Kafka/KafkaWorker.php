@@ -15,14 +15,14 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\StringFunctionsTrait;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
+use Manticoresearch\Buddy\Core\Process\WorkerRunnerInterface;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\BuddyTest\Lib\BuddyRequestError;
 use RdKafka\Conf;
 use RdKafka\Exception;
 use RdKafka\KafkaConsumer;
 
-class KafkaWorker
-{
+class KafkaWorker implements WorkerRunnerInterface {
 	use StringFunctionsTrait;
 
 	private Client $client;
@@ -40,6 +40,8 @@ class KafkaWorker
 
 	private View $view;
 
+	private Batch $batch;
+	private KafkaConsumer $consumer;
 
 	/**
 	 * @param Client $client
@@ -115,41 +117,46 @@ class KafkaWorker
 
 	/**
 	 * @return void
-	 * @throws Exception
+	 * @throws \RdKafka\Exception
 	 */
-	public function run(): void {
-		$batch = new Batch($this->batchSize);
-		$batch->setCallback(
+	public function init(): void {
+		$this->batch = new Batch($this->batchSize);
+		$this->batch->setCallback(
 			function ($batch) {
 				return $this->processBatch($batch);
 			}
 		);
 
-
 		$conf = $this->initKafkaConfig();
 
-		$consumer = new KafkaConsumer($conf);
-		$consumer->subscribe($this->topicList);
+		$this->consumer = new KafkaConsumer($conf);
+		$this->consumer->subscribe($this->topicList);
+	}
 
+	/**
+	 * @return void
+	 * @throws Exception
+	 */
+	public function run(): void {
 		$lastFullMessage = null;
 		while ($this->consuming) {
 			Buddy::debugv('---- consume ---- ' . ($this->consuming ? 'yes' : 'no'));
-			$message = $consumer->consume(1000);
+			$message = $this->consumer->consume(1000);
 			Buddy::debugv('---- consume2 (before sleep) ---- ' . ($this->consuming ? 'yes' : 'no'));
 			sleep(5);
 			Buddy::debugv('---- consume3 (after sleep) ---- ' . ($this->consuming ? 'yes' : 'no'));
 			switch ($message->err) {
 				case RD_KAFKA_RESP_ERR_NO_ERROR:
 					$lastFullMessage = $message;
-					if ($batch->add($message->payload)) {
-						$consumer->commit($message);
+					if ($this->batch->add($message->payload)) {
+						$this->consumer->commit($message);
 					}
 					break;
 				case RD_KAFKA_RESP_ERR__PARTITION_EOF:
 					break;
 				case RD_KAFKA_RESP_ERR__TIMED_OUT:
-					if ($batch->checkProcessingTimeout() && $batch->process() && $lastFullMessage !== null) {
-						$consumer->commit($lastFullMessage);
+					if ($this->batch->checkProcessingTimeout() && $this->batch->process() && $lastFullMessage !== null) {
+						$this->consumer->commit($lastFullMessage);
 					}
 					break;
 				default:
@@ -163,7 +170,7 @@ class KafkaWorker
 		Buddy::debugv('==============+++++++++++++++===========================================');
 	}
 
-	public function stopConsuming() {
+	public function stop(): void {
 		Buddy::debugv('------> Stop consuming ' . ($this->consuming ? 'yes' : 'no'));
 		$this->consuming = false;
 	}

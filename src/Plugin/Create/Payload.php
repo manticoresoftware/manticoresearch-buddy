@@ -22,12 +22,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  */
 final class Payload extends BasePayload
 {
-	public string $path;
-
 	public string $destinationTableName;
 	public string $sourceTableName;
-
-	public string $type;
 
 	/**
 	 * Get description for this plugin

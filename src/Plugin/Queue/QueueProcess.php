@@ -20,15 +20,16 @@ use Manticoresearch\Buddy\Core\Process\Process;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Throwable;
 
-class QueueProcess extends BaseProcessor
-{
-
+class QueueProcess extends BaseProcessor {
+	/** @return array{0: callable, 1: int}[]  */
 	public function start(): array {
 		parent::start();
+
 		$this->execute('runPool');
 		return [];
 	}
 
+	/** @return void  */
 	public function stop(): void {
 		parent::stop();
 	}
@@ -88,7 +89,7 @@ class QueueProcess extends BaseProcessor
 
 			$instance['destination_name'] = $results[0]['data'][0]['destination_name'];
 			$instance['query'] = $results[0]['data'][0]['query'];
-			$this->runWorker($instance);
+			$this->execute('runWorker',	[$instance]);
 		}
 	}
 
@@ -109,24 +110,7 @@ class QueueProcess extends BaseProcessor
 
 		Buddy::debugv('Start worker ' . $instance['full_name']);
 		$kafkaWorker = new KafkaWorker($this->client, $instance);
-
-		$workerFn = function () use ($kafkaWorker): void {
-			$kafkaWorker->run();
-		};
-
-		$worker = Process::createWorker($workerFn, $instance['full_name']);
-
-		$worker->onStop(
-			function () use ($kafkaWorker) {
-				$kafkaWorker->stopConsuming();
-				for ($i = 0; $i < 30; $i++) {
-					if ($kafkaWorker->isConsumeFinished()) {
-						break;
-					}
-					sleep(1);
-				}
-			}
-		);
+		$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
 		// Add worker to the pool and automatically start it
 		$this->process->addWorker($worker, $shouldStart);
 
