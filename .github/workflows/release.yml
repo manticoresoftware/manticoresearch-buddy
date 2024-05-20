@@ -268,28 +268,9 @@ jobs:
       - deploy
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - name: Update deps
+        uses: manticoresoftware/manticoresearch/actions/update-deps@master
         with:
-          repository: "manticoresoftware/manticoresearch"
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update deps.txt
-        id: deps
-        run: |
-          version=${{ needs.vars.outputs.app_version }}
-          date=${{ needs.vars.outputs.app_date }}
-          commit=${{ needs.vars.outputs.app_commit }}
-
-          version_string="$version $date $commit"
-          echo "version_string=${version_string// /-}" >> $GITHUB_OUTPUT
-          sed -i '/^buddy\s/c\buddy '"$version_string" deps.txt
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
+          name: buddy
+          version: "${{ needs.vars.outputs.app_version }} ${{ needs.vars.outputs.app_date }} ${{ needs.vars.outputs.app_commit }}"
           token: ${{ secrets.PR_TOKEN }}
-          commit-message: "Bump buddy version to: ${{ steps.deps.outputs.version_string }}"
-          title: "Update buddy version"
-          body: "Updating buddy version to ${{ steps.deps.outputs.version_string }}"
-          branch: "update-buddy-version"
-          draft: false

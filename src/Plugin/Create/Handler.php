@@ -60,6 +60,7 @@ final class Handler extends BaseHandlerWithClient
 				throw GenericError::create($exception->getResponseError());
 			}
 
+			self::unfreezeTable($payload->sourceTableName, $client);
 			return TaskResult::none();
 		};
 

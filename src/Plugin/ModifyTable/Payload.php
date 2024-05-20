@@ -35,8 +35,7 @@ final class Payload extends BasePayload {
 	 */
 	public static function getInfo(): string {
 		return 'Assists in standardizing options in create and alter table statements'
-			. ' to show option=1 for integers. Also manages the logic'
-			. ' for creating sharded tables.';
+			. ' to show option=1 for integers.';
 	}
 
   /**
@@ -54,9 +53,8 @@ final class Payload extends BasePayload {
 
 		$options = [];
 		if ($matches['extra']) {
-			$pattern = '/(?P<key>[a-zA-Z_]+)\s*=\s*(?P<value>"[^"]+"|\'[^\']+\'|\S+)/';
-
 			// Perform the regex match
+			$pattern = '/(?P<key>[a-zA-Z_]+)\s*=\s*(?P<value>"[^"]+"|\'[^\']+\'|\S+)/';
 			if (!preg_match_all($pattern, $matches['extra'], $optionMatches, PREG_SET_ORDER)) {
 				QueryParseError::throw('Failed to parse options');
 			}
@@ -65,9 +63,6 @@ final class Payload extends BasePayload {
 				$key = strtolower($optionMatch['key']);
 				// Trim quotes if the value is quoted
 				$value = trim($optionMatch['value'], "\"'");
-				if (in_array($key, ['rf', 'shards'])) {
-					$value = (int)$value;
-				}
 				$options[$key] = $value;
 			}
 		}
@@ -76,12 +71,10 @@ final class Payload extends BasePayload {
 		// We just need to do something, but actually its' just for PHPstan
 		$self->path = $request->path;
 		$self->type = stripos($request->payload, 'create') === 0 ? 'create' : 'alter';
-		$self->cluster = $matches['cluster'] ?? '';
 		$self->table = $matches['table'];
 		$self->structure = $matches['structure'];
 		$self->options = $options;
 		$self->extra = static::buildExtra($self->options);
-		$self->validate();
 		return $self;
 	}
 
@@ -90,55 +83,31 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		return stripos($request->error, 'syntax error')
+		$hasMatch = stripos($request->error, 'syntax error')
 			&& strpos($request->error, 'P03') === 0
 			&& (
 				stripos($request->payload, 'create table') === 0
 					|| stripos($request->payload, 'alter table') === 0
 				)
 			;
-	}
-
-	/**
-	 * Run query parsed data validation
-	 * @return void
-	 */
-	protected function validate(): void {
-		if (!$this->cluster && $this->options['rf'] > 1) {
-			throw QueryParseError::create('You cannot set rf greater than 1 when creating single node sharded table.');
+		if (!$hasMatch) {
+			return false;
 		}
-	}
 
-	/**
-	 * Convert the current state into array
-	 * that we use for args in event
-	 * @return array{
-	 * table:array{cluster:string,name:string,structure:string,extra:string},
-	 * replicationFactor:int,
-	 * shardCount:int
-	 * }
-	 */
-	public function toShardArgs(): array {
-		return [
-			'table' => [
-				'cluster' => $this->cluster,
-				'name' => $this->table,
-				'structure' => $this->structure,
-				'extra' => $this->extra,
+		$payload = preg_replace(
+			[
+				'/(?P<key>rf|shards)\s*=\s*(?P<value>\d+)/',
+				'/(?P<key>[a-zA-Z_]+)\s*=\s*\'(?P<value>[^\']+)\'/',
 			],
-			'replicationFactor' => (int)($this->options['rf'] ?? 1),
-			'shardCount' => (int)($this->options['shards'] ?? 2),
-		];
-	}
-
-	/**
-	 * Validate that the current payload with sharding and should be processed
-	 * @return bool
-	 */
-	public function withSharding(): bool {
-		 return $this->type === 'create'
-				&& isset($this->options['rf'])
-				&& isset($this->options['shards']);
+			'', $request->payload
+		);
+		$payload = trim($payload ?? '', ' ;');
+		$lastChar = substr($payload, -1);
+		if ($lastChar !== ')' || strpos('0123456789', $lastChar) === false) {
+			return false;
+		}
+		$pattern = '/(?P<key>[A-Za-z_]+)\s*=\s*(?P<value>\'[^\']*\')/';
+		return substr($payload, -1) !== ')' && !preg_match($pattern, $payload);
 	}
 
 	/**
@@ -151,6 +120,7 @@ final class Payload extends BasePayload {
 		foreach ($options as $key => $value) {
 			// Skip sharding related info
 			if ($key === 'rf' || $key === 'shards') {
+				$extra .= "$key = $value ";
 				continue;
 			}
 			$extra .= "$key = '$value' ";

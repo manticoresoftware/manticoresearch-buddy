@@ -62,23 +62,22 @@ class InsertQueryHandlerTest extends TestCase {
 
 		self::setBuddyVersion();
 		$manticoreClient = new HTTPClient(new ManticoreResponse(), $serverUrl);
+		// Force sync mode to avoid coroutines issues
+		$manticoreClient->setForceSync(true);
 		$handler = new Handler($payload);
 		$handler->setManticoreClient($manticoreClient);
 		ob_flush();
-
 		go(
 			function () use ($handler, $resp) {
 				$task = $handler->run();
-				$task->wait();
-
+				$task->wait(true);
 				$this->assertEquals(true, $task->isSucceed());
 			/** @var Response */
 				$result = $task->getResult()->getStruct();
 				$this->assertEquals($resp, json_encode($result));
 			}
 		);
-
-		Swoole\Event::wait();
+		\Swoole\Event::wait();
 	}
 
 	public function testInsertQueryExecutesProperly(): void {
