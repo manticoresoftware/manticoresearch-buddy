@@ -23,7 +23,7 @@ final class Queue {
 		protected Cluster $cluster,
 		protected Client $client
 	) {
-		$this->table = 'sharding_queue';
+		$this->table = '_sharding_queue';
 	}
 
 	/**

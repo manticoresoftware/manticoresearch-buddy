@@ -16,11 +16,14 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 final class CliArgsProcessor {
 
 	private const LONG_OPTS  = [
-		'threads:', 'telemetry-period:', 'disable-telemetry', 'debug', 'debugv', 'version', 'help', 'listen:', 'bind:',
+		'threads:', 'telemetry-period:', 'disable-telemetry',
+		'debug', 'debugv', 'version', 'help', 'listen:', 'bind:',
+		'skip:',
 	];
 	private const DEFAULT_OPTS = [
 		'listen' => '127.0.0.1:9308',
 		'bind' => '127.0.0.1',
+		'skip' => [],
 	];
 
 	/**
@@ -30,7 +33,7 @@ final class CliArgsProcessor {
 	 */
 	private static function help(): string {
 		$script = $_SERVER['argv'][0];
-		// In case we run it manualy, and not with built release script, we should add executor
+		// In case we run it manually, and not with built release script, we should add executor
 		if (basename($script) === 'main.php') {
 			$script = 'manticore-executor src/main.php';
 		}
@@ -39,6 +42,8 @@ final class CliArgsProcessor {
 			. "Usage: $script [ARGUMENTS]\n\n"
 			. "Arguments are:\n"
 			. "--bind                 Which IP to bind. Default is 127.0.0.1\n"
+			. '--skip                 Skips the specified plugin by its fully qualified name;'
+				. " can be used multiple times\n"
 			. "--listen               HTTP endpoint to accept Manticore requests\n"
 			. "--version              display the current version of Buddy\n"
 			. "--help                 display this help message\n"
@@ -74,7 +79,8 @@ final class CliArgsProcessor {
 	 *  help?:bool,
 	 *  version?:bool,
 	 *  listen?:string,
-	 *  bind?:string
+	 *  bind?:string,
+	 *  skip?:string[]
 	 * } $opts
 	 * @return array{
 	 *  threads?:int,
@@ -84,7 +90,8 @@ final class CliArgsProcessor {
 	 *  help?:bool,
 	 *  version?:bool,
 	 *  listen:string,
-	 *  bind:string
+	 *  bind:string,
+	 *  skip:string[]
 	 * }
 	 */
 	public static function run(?array $opts = null): array {
@@ -99,7 +106,8 @@ final class CliArgsProcessor {
 		 *  help?:bool,
 		 *  version?:bool,
 		 *  listen:string,
-		 *  bind:string
+		 *  bind:string,
+		 *  skip:string[]
 		 * } $opts
 		 */
 		$opts = array_replace(self::DEFAULT_OPTS, $opts); // @phpstan-ignore-line
@@ -121,6 +129,7 @@ final class CliArgsProcessor {
 		static::parseTelemetryPeriod($opts);
 		static::parseListen($opts);
 		static::parseBind($opts);
+		$opts['skip'] = static::parseSkip($opts);
 
 		return $opts;
 	}
@@ -208,5 +217,13 @@ final class CliArgsProcessor {
 			putenv("BIND_PORT={$port}");
 		}
 		putenv("BIND_HOST={$host}");
+	}
+
+	/**
+	 * @param array{skip:string|string[]} $opts
+	 * @return string[]
+	 */
+	protected static function parseSkip(array $opts): array {
+		return (array)$opts['skip'];
 	}
 }
