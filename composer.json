@@ -34,7 +34,7 @@
 		"react/socket": "^1.12",
 		"manticoresoftware/telemetry": "^0.1.19",
 		"symfony/dependency-injection": "^6.1",
-		"manticoresoftware/buddy-core": "dev-feature/skip-plugin-arg",
+		"manticoresoftware/buddy-core": "dev-main",
 		"php-ds/php-ds": "^1.4",
 		"manticoresoftware/manticoresearch-backup": "^1.3"
 	},
