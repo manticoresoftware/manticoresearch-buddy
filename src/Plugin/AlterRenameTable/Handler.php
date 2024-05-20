@@ -12,6 +12,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\AlterRenameTable;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -40,13 +41,11 @@ final class Handler extends BaseHandlerWithClient
 		$taskFn = static function (Payload $payload, Client $client): TaskResult {
 
 			$hasTable = false;
-			$allDistributedTables = array_column(
-				iterator_to_array($client->getAllTables(['rt'])),
-				0
-			);
-
-			foreach ($allDistributedTables as $table) {
-				if ($table === $payload->sourceTableName) {
+			foreach (iterator_to_array($client->getAllTables()) as $tableInfo) {
+				if ($tableInfo[0] === $payload->sourceTableName) {
+					if ($tableInfo[1] !== 'rt') {
+						throw ManticoreSearchResponseError::create("Table $payload->sourceTableName should be RT");
+					}
 					$hasTable = true;
 					break;
 				}
