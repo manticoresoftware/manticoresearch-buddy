@@ -40,13 +40,12 @@ final class Handler extends BaseHandlerWithClient
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 
 			$hasTable = false;
-			$allDistributedTables = array_column(
-				iterator_to_array($manticoreClient->getAllTables(['distributed'])),
-				0
-			);
 
-			foreach ($allDistributedTables as $table) {
-				if ($table === $payload->table) {
+			foreach (iterator_to_array($manticoreClient->getAllTables()) as $tableInfo) {
+				if ($tableInfo[0] === $payload->table) {
+					if ($tableInfo[1] !== 'distributed') {
+						throw ManticoreSearchResponseError::create("Table $payload->table should be distributed");
+					}
 					$hasTable = true;
 					break;
 				}
