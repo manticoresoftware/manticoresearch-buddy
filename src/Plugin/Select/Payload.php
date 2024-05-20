@@ -82,7 +82,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->path = $request->path;
 		$self->originalQuery = str_replace("\n", ' ', $request->payload);
-		$self->mySQLTool = $request->mySQLTool;
+		$self->mySQLTool = $request->mySQLTool ?? null;
 		// Match fields
 		preg_match(
 			'/^SELECT\s+(?:(.*?)\s+FROM\s+(`?[a-z][a-z\_\-0-9]*`?(\.`?[a-z][a-z\_\-0-9]*`?)?)'

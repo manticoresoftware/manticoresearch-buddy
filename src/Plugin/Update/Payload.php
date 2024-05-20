@@ -63,7 +63,7 @@ final class Payload extends BasePayload
 	 */
 	public static function hasMatch(Request $request): bool {
 		// As of now, we use the plugin to handle only incorrect UPDATEs that come from MySQL tools
-		if ($request->mySQLTool === null) {
+		if (!isset($request->mySQLTool) || $request->mySQLTool === null) {
 			return false;
 		}
 
