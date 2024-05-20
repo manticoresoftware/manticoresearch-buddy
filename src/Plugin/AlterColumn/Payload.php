@@ -8,7 +8,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\AlterRenameTable;
+namespace Manticoresearch\Buddy\Base\Plugin\AlterColumn;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Network\Request;
@@ -20,19 +20,18 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * @extends BasePayload<array>
  */
 final class Payload extends BasePayload {
-	public string $path;
 
 	public string $destinationTableName;
-	public string $sourceTableName;
 
-	public string $type;
+	public string $columnName;
+	public string $columnDatatype;
 
 	/**
 	 * Get description for this plugin
 	 * @return string
 	 */
 	public static function getInfo(): string {
-		return 'Enables alter table rename';
+		return 'Enables adding/dropping table fields(columns)';
 	}
 
 	/**
@@ -45,16 +44,7 @@ final class Payload extends BasePayload {
 		unset($request);
 		/**
 		 * @phpstan-var array{
-		 *           ALTER: array{
-		 *               expr_type: string,
-		 *               base_expr: string,
-		 *               sub_tree: array<
-		 *               array{
-		 *                   expr_type: string,
-		 *                   base_expr: string
-		 *               }>
-		 *           },
-		 *           TABLE?: array{
+		 *           TABLE: array{
 		 *               base_expr: string,
 		 *               name: string,
 		 *               no_quotes: array{
@@ -64,42 +54,36 @@ final class Payload extends BasePayload {
 		 *               create-def: bool,
 		 *               options: bool
 		 *           },
-		 *           RENAME: array{
+		 *           ADD?: array{
 		 *               expr_type: string,
 		 *               sub_tree: array<
 		 *               array{
-		 *                   destination: array{
-		 *                       expr_type: string,
-		 *                       table: string,
-		 *                       no_quotes: array{
-		 *                           delim: bool,
-		 *                           parts: array<string>
-		 *                       },
+		 *                   sub_tree: array<
+		 *                   array{
 		 *                       base_expr: string
-		 *                   },
-		 *                   source: array{
-		 *                       expr_type: string,
-		 *                       table: string,
-		 *                       no_quotes: array{
-		 *                           delim: bool,
-		 *                           parts: array<string>
-		 *                       },
+		 *                   }>
+		 *               }>
+		 *           },
+		 *           DROP?: array{
+		 *               expr_type: string,
+		 *               sub_tree: array<
+		 *               array{
+		 *                   sub_tree: array<
+		 *                   array{
 		 *                       base_expr: string
-		 *                   }
+		 *                   }>
 		 *               }>
 		 *           }
 		 *       } $payload
 		 */
 		$payload = Payload::$sqlQueryParser::getParsedPayload();
 
-		if (isset($payload['TABLE'])) {
-			$self->destinationTableName = $payload['RENAME']['sub_tree'][0]['destination']['no_quotes']['parts'][0];
-			$self->sourceTableName = $payload['TABLE']['no_quotes']['parts'][0];
-		} else {
-			$self->destinationTableName =
-				(string)array_pop($payload['RENAME']['sub_tree'][1]['destination']['no_quotes']['parts']);
-			$self->sourceTableName =
-				(string)array_pop($payload['RENAME']['sub_tree'][1]['source']['no_quotes']['parts']);
+		$self->destinationTableName = (string)array_pop($payload['TABLE']['no_quotes']['parts']);
+		if (isset($payload['ADD'])) {
+			$self->columnName = $payload['ADD']['sub_tree'][0]['sub_tree'][0]['base_expr'];
+			$self->columnDatatype = $payload['ADD']['sub_tree'][0]['sub_tree'][1]['base_expr'];
+		} elseif (isset($payload['DROP'])) {
+			$self->columnName = $payload['DROP']['sub_tree'][0]['sub_tree'][1]['base_expr'];
 		}
 
 		return $self;
@@ -111,7 +95,6 @@ final class Payload extends BasePayload {
 	 * @throws GenericError
 	 */
 	public static function hasMatch(Request $request): bool {
-
 		/**
 		 * @phpstan-var array{
 		 *           ALTER: array{
@@ -123,7 +106,7 @@ final class Payload extends BasePayload {
 		 *                   base_expr: string
 		 *               }>
 		 *           },
-		 *           TABLE?: array{
+		 *           TABLE: array{
 		 *               base_expr: string,
 		 *               name: string,
 		 *               no_quotes: array{
@@ -133,49 +116,40 @@ final class Payload extends BasePayload {
 		 *               create-def: bool,
 		 *               options: bool
 		 *           },
-		 *           RENAME?: array{
+		 *           ADD?: array{
 		 *               expr_type: string,
 		 *               sub_tree: array<
 		 *               array{
-		 *                   destination: array{
-		 *                       expr_type: string,
-		 *                       table: string,
-		 *                       no_quotes: array{
-		 *                           delim: bool,
-		 *                           parts: array<string>
-		 *                       },
+		 *                   sub_tree: array<
+		 *                   array{
 		 *                       base_expr: string
-		 *                   }
+		 *                   }>
+		 *               }>
+		 *           },
+		 *           DROP?: array{
+		 *               expr_type: string,
+		 *               sub_tree: array<
+		 *               array{
+		 *                   sub_tree: array<
+		 *                   array{
+		 *                       base_expr: string
+		 *                   }>
 		 *               }>
 		 *           }
 		 *       }|false $payload
 		 */
-
 		$payload = Payload::$sqlQueryParser::parse(
 			$request->payload,
 			fn(Request $request) => (
-				((strpos($request->error, 'P03: syntax error, unexpected tablename') === 0
-					&& stripos($request->payload, 'alter') !== false)
-					|| strpos($request->error, "P01: syntax error, unexpected identifier near 'RENAME TABLE") === 0)
-				&& stripos($request->payload, 'table') !== false
-				&& stripos($request->payload, 'rename') !== false
+				(stripos($request->payload, 'add') !== false || stripos($request->payload, 'drop') !== false)
+				&& strpos($request->error, "P01: syntax error, unexpected identifier near 'ALTER TABLE") === 0
 			),
 			$request
 		);
 
-		if (!$payload) {
-			return false;
-		}
-
-		if ((isset($payload['ALTER']['base_expr'])
-			&& isset($payload['TABLE']['no_quotes']['parts'][0])
-			&& isset($payload['RENAME']['sub_tree'][0]['destination']['no_quotes']['parts'][0])
-			&& strtolower($payload['ALTER']['base_expr']) === 'table')
-			|| (isset($payload['RENAME']['expr_type']) && $payload['RENAME']['expr_type'] === 'table')
-		) {
-			return true;
-		}
-
-		return false;
+		return ($payload && isset($payload['ALTER']['base_expr'], $payload['TABLE']['no_quotes']['parts'][0])
+			&& $payload['ALTER']['base_expr'] === 'TABLE'
+		);
 	}
+
 }

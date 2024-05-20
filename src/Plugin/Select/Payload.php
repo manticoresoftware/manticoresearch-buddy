@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Select;
 
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\MySQLTool;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Task\Column;
@@ -57,6 +58,9 @@ final class Payload extends BasePayload {
 	/** @var array<string,array{operator:string,value:int|string|bool}> */
 	public array $where = [];
 
+	/** @var ?MySQLTool */
+	public ?MySQLTool $mySQLTool = null;
+
 	public function __construct() {
 	}
 
@@ -78,7 +82,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->path = $request->path;
 		$self->originalQuery = str_replace("\n", ' ', $request->payload);
-
+		$self->mySQLTool = $request->mySQLTool;
 		// Match fields
 		preg_match(
 			'/^SELECT\s+(?:(.*?)\s+FROM\s+(`?[a-z][a-z\_\-0-9]*`?(\.`?[a-z][a-z\_\-0-9]*`?)?)'
@@ -231,13 +235,10 @@ final class Payload extends BasePayload {
 		}
 
 		if (str_contains($request->error, "unexpected '('")
-			&& stripos($request->payload, 'coalesce') !== false
-		) {
-			return true;
-		}
-
-		if (str_contains($request->error, "unexpected '('")
-			&& stripos($request->payload, 'contains') !== false
+			&& (stripos($request->payload, 'coalesce') !== false
+				|| stripos($request->payload, 'contains') !== false
+				|| str_contains($request->error, "expecting \$end near ')'")
+			)
 		) {
 			return true;
 		}
@@ -252,8 +253,7 @@ final class Payload extends BasePayload {
 			return true;
 		}
 
-		if (str_contains($request->error, "unexpected '('")
-			&& str_contains($request->error, "expecting \$end near ')'")) {
+		if (str_contains($request->error, 'unexpected $undefined near \'.*')) {
 			return true;
 		}
 		return false;

@@ -12,6 +12,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Select;
 
 use Exception;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\MySQLTool;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -29,6 +30,7 @@ final class Handler extends BaseHandler {
 		'extra' => ['static', ''],
 		'generation_expression' => ['static', ''],
 		'column_name' => ['field', 'Field'],
+		'column_type' => ['field', 'Type'],
 		'data_type' => ['field', 'Type'],
 	];
 
@@ -245,8 +247,14 @@ final class Handler extends BaseHandler {
 		string $field,
 		string $value,
 		array &$fields,
-		array &$dataRow
+		array &$dataRow,
+		?MySQLTool $mySQLTool,
 	): void {
+		$dataTypeMap = [
+			'string' => 'VARCHAR',
+			'uint' => 'INT UNSIGNED',
+			'boolean' => 'BOOL',
+		];
 		foreach (static::COLUMNS_FIELD_MAP as $mapKey => $mapInfo) {
 			$mapKey = strtoupper($mapKey);
 			if ($mapInfo[1] !== $field) {
@@ -255,22 +263,28 @@ final class Handler extends BaseHandler {
 			if (!in_array($mapKey, $fields)) {
 				array_push($fields, $mapKey);
 			}
+			//  We need to map Manticore data types to respective MySQL types to avoid problems with MYSQL tools
+			//  Also, the HeidiSQL tool doesn't recognize lowercase data types so we add this extra transformation
+			if ($mySQLTool && ($mapKey === 'DATA_TYPE' || $mapKey === 'COLUMN_TYPE')) {
+				$value = strtoupper($dataTypeMap[$value] ?? $value);
+			}
 			$dataRow[$mapKey] = $value;
 		}
+
+		if ($mySQLTool === null || $mySQLTool !== MySQLTool::HEIDI) {
+			return;
+		}
 		// Adding the character set columns with fake data since they're mandatory for HeidiSQL
-		$extraColumns = [
-			'CHARACTER_SET_NAME',
-			'COLLATION_NAME',
-			'IS_NULLABLE',
-			'COLUMN_DEFAULT',
+		$extraColumnMap = [
+			'CHARACTER_SET_NAME' => 'utf8_general_ci',
+			'COLLATION_NAME' => 'utf8mb4',
+			'IS_NULLABLE' => 'YES',
+			'COLUMN_DEFAULT' => 'NULL',
 		];
 		if (!in_array('CHARACTER_SET_NAME', $fields)) {
-			array_push($fields, ...$extraColumns);
+			array_push($fields, ...array_keys($extraColumnMap));
 		}
-		$dataRow['CHARACTER_SET_NAME'] = 'utf8_general_ci';
-		$dataRow['COLLATION_NAME'] = 'utf8mb4';
-		$dataRow['IS_NULLABLE'] = 'YES';
-		$dataRow['COLUMN_DEFAULT'] = 'NULL';
+		$dataRow += $extraColumnMap;
 	}
 
 	/**
@@ -279,7 +293,13 @@ final class Handler extends BaseHandler {
 	 * @return TaskResult
 	 */
 	protected static function handleSelectFromColumns(Client $manticoreClient, Payload $payload): TaskResult {
-		$table = $payload->where['table_name']['value'] ?? $payload->where['TABLE_NAME']['value'] ?? null;
+		$table = match (true) {
+			isset($payload->where['table_name']['value']) => $payload->where['table_name']['value'],
+			isset($payload->where['TABLE_NAME']['value']) => $payload->where['TABLE_NAME']['value'],
+			isset($payload->where['table_schema']['value']) => $payload->where['table_schema']['value'],
+			default => null,
+		};
+
 		// As for now, if an original query does not contain a table name we definitely can stop further processing
 		if ($table === null) {
 			return $payload->getTaskResult();
@@ -299,7 +319,7 @@ final class Handler extends BaseHandler {
 			$data[$i] = [];
 			if ($areAllColumnsSelected) {
 				foreach ($row as $field => $value) {
-					self::addSelectRowData($field, $value, $payload->fields, $data[$i]);
+					self::addSelectRowData($field, $value, $payload->fields, $data[$i], $payload->mySQLTool);
 				}
 			} else {
 				foreach ($payload->fields as $field) {
@@ -351,7 +371,6 @@ final class Handler extends BaseHandler {
 		if (!$selectQuery) {
 			throw new Exception('Failed to parse coalesce or contains from the query');
 		}
-
 		$query = "DESC {$table}";
 		/** @var array<array{data:array<array<string,string>>}> */
 		$descResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
@@ -443,10 +462,9 @@ final class Handler extends BaseHandler {
 	 * Remove table alias syntax from query if exists
 	 *
 	 * @param Payload $payload
-	 * @param string $query
 	 * @return void
 	 */
-	protected static function checkQueryForAliasSyntax(Payload &$payload, string &$query): void {
+	protected static function checkQueryForAliasSyntax(Payload &$payload): void {
 		$alias = false;
 		if ($payload->fields) {
 			$i = 0;
@@ -455,7 +473,7 @@ final class Handler extends BaseHandler {
 				if (str_ends_with($field, '.*')) {
 					$alias = str_replace('.*', '', $field);
 					$payload->fields[$i] = '*';
-					$query = str_replace("$field", '*', $query);
+					$payload->originalQuery = str_replace("$field", '*', $payload->originalQuery);
 				}
 				$i++;
 			} while ($alias === false && $i < sizeof($payload->fields));
@@ -463,7 +481,11 @@ final class Handler extends BaseHandler {
 		if ($alias === false) {
 			return;
 		}
-		$query = preg_replace("/{$payload->table}\s+$alias\s+/i", $payload->table . ' ', $query);
+		$payload->originalQuery = (string)preg_replace(
+			"/{$payload->table}\s+$alias\s+/is",
+			$payload->table . ' ',
+			$payload->originalQuery
+		);
 	}
 
 	/**
@@ -472,6 +494,7 @@ final class Handler extends BaseHandler {
 	 * @return TaskResult
 	 */
 	protected static function handleSelectDatabasePrefixed(Client $manticoreClient, Payload $payload): TaskResult {
+		self::checkQueryForAliasSyntax($payload);
 		$query = str_ireplace(
 			['`Manticore`.', 'Manticore.'],
 			'',

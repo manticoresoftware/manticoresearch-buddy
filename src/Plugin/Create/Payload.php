@@ -22,6 +22,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  */
 final class Payload extends BasePayload
 {
+	public static ?string $requestTarget;
+
 	public string $destinationTableName;
 	public string $sourceTableName;
 
@@ -30,7 +32,7 @@ final class Payload extends BasePayload
 	 * @return string
 	 */
 	public static function getInfo(): string {
-		return 'Enables tables copying';
+		return 'Enables tables copying; handles CREATE statements with MySQL options not supported by Manticore';
 	}
 
 	/**
@@ -83,8 +85,16 @@ final class Payload extends BasePayload
 		 */
 		$payload = Payload::$sqlQueryParser::getParsedPayload();
 
-		$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
-		$self->sourceTableName = $payload['LIKE']['no_quotes']['parts'][0];
+		switch (static::$requestTarget) {
+			case 'Handler':
+				$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
+				$self->sourceTableName = $payload['LIKE']['no_quotes']['parts'][0];
+				break;
+			case 'WithEngineHandler':
+				$self->destinationTableName = (string)array_pop($payload['TABLE']['no_quotes']['parts']);
+				break;
+		}
+
 		return $self;
 	}
 
@@ -94,34 +104,96 @@ final class Payload extends BasePayload
 	 * @throws GenericError
 	 */
 	public static function hasMatch(Request $request): bool {
+		/**
+		 * @var array{
+		 *       CREATE?: array{
+		 *           expr_type: string,
+		 *           not-exists: bool,
+		 *           base_expr: string,
+		 *           sub_tree?: array<array{
+		 *               expr_type: string,
+		 *               base_expr: string
+		 *           }>
+		 *       },
+		 *       TABLE: array{
+		 *           base_expr: string,
+		 *           name?: string,
+		 *           no_quotes: array{
+		 *               delim: bool,
+		 *               parts: array<string>
+		 *           },
+		 *           create-def?: bool,
+		 *           options?: array<array{
+		 *               expr_type: string,
+		 *               base_expr: string,
+		 *               delim: string,
+		 *               sub_tree?: array<array{
+		 *                   expr_type: string,
+		 *                   base_expr: string
+		 *               }>
+		 *           }>
+		 *       },
+		 *       LIKE: array{
+		 *           expr_type: string,
+		 *           table?: string,
+		 *           base_expr: string,
+		 *           no_quotes: array{
+		 *               delim: bool,
+		 *               parts: array<string>
+		 *           }
+		 *       }
+		 *   }|false $payload
+		 */
 		$payload = Payload::$sqlQueryParser::parse(
 			$request->payload,
 			fn($request) => (
-				stripos(
-					$request->error,
-					"P03: syntax error, unexpected tablename, expecting \$end near 'with data'"
-				) !== false
-				&& stripos($request->payload, 'create') !== false
+				stripos($request->payload, 'create') !== false
 				&& stripos($request->payload, 'table') !== false
-				&& stripos($request->payload, 'like') !== false
-				&& stripos($request->payload, 'with') !== false
-				&& stripos($request->payload, 'data') !== false
+				&& (
+					(
+						stripos(
+							$request->error,
+							"P03: syntax error, unexpected tablename, expecting \$end near 'with data'"
+						) !== false
+						&& stripos($request->payload, 'like') !== false
+						&& stripos($request->payload, 'with') !== false
+						&& stripos($request->payload, 'data') !== false
+					) || (
+						stripos(
+							$request->error,
+							'P01: syntax error, unexpected CREATE near'
+						) !== false
+						&& stripos($request->payload, 'engine') !== false
+					)
+				)
 			), $request
 		);
 
-		if (!$payload) {
+		if (!$payload || !isset(
+			$payload['CREATE'],
+			$payload['TABLE']['no_quotes']['parts'][0],
+			$payload['TABLE']['options'][0]['base_expr']
+		)) {
 			return false;
 		}
 
-		if (isset($payload['CREATE'])
-			&& isset($payload['TABLE']['no_quotes']['parts'][0])
-			&& isset($payload['LIKE']['no_quotes']['parts'][0])
-			&& isset($payload['TABLE']['options'][0]['base_expr'])
-			&& strtolower($payload['TABLE']['options'][0]['base_expr']) === 'with data'
-		) {
-			return true;
-		}
+		static::$requestTarget = match (true) {
+			(isset($payload['LIKE']['no_quotes']['parts'][0])
+				&& strtolower($payload['TABLE']['options'][0]['base_expr']) === 'with data') => 'Handler',
+			(isset($payload['TABLE']['options'][0]['sub_tree'][0]['base_expr'])
+				&& strtolower($payload['TABLE']['options'][0]['sub_tree'][0]['base_expr']) === 'engine')
+				=> 'WithEngineHandler',
+			default => null,
+		};
 
-		return false;
+		return (static::$requestTarget !== null);
 	}
+
+	/**
+	 * @return string
+	 */
+	public function getHandlerClassName(): string {
+		return __NAMESPACE__ . '\\' . (string)static::$requestTarget;
+	}
+
 }
