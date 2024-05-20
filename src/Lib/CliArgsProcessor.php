@@ -42,7 +42,8 @@ final class CliArgsProcessor {
 			. "Usage: $script [ARGUMENTS]\n\n"
 			. "Arguments are:\n"
 			. "--bind                 Which IP to bind. Default is 127.0.0.1\n"
-			. "--skip                 Skips the specified plugin by its fully qualified name; can be used multiple times\n"
+			. '--skip                 Skips the specified plugin by its fully qualified name;'
+				. " can be used multiple times\n"
 			. "--listen               HTTP endpoint to accept Manticore requests\n"
 			. "--version              display the current version of Buddy\n"
 			. "--help                 display this help message\n"
