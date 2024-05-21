@@ -69,7 +69,11 @@ final class Payload extends BasePayload
 
 		$payload = static::$sqlQueryParser::parse(
 			$request->payload,
-			fn($request) => preg_match('/attribute \S+ not found/', $request->error),
+			fn($request) => (
+				strpos($request->payload, 'UPDATE') !== false
+				&& strpos($request->payload, 'WHERE') !== false
+				&& preg_match('/attribute \S+ not found/', $request->error)
+			),
 			$request
 		);
 

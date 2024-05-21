@@ -21,6 +21,8 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  */
 final class Payload extends BasePayload {
 
+	public string $type;
+
 	public string $destinationTableName;
 
 	public string $columnName;
@@ -80,9 +82,11 @@ final class Payload extends BasePayload {
 
 		$self->destinationTableName = (string)array_pop($payload['TABLE']['no_quotes']['parts']);
 		if (isset($payload['ADD'])) {
+			$self->type = 'add';
 			$self->columnName = $payload['ADD']['sub_tree'][0]['sub_tree'][0]['base_expr'];
 			$self->columnDatatype = $payload['ADD']['sub_tree'][0]['sub_tree'][1]['base_expr'];
 		} elseif (isset($payload['DROP'])) {
+			$self->type = 'drop';
 			$self->columnName = $payload['DROP']['sub_tree'][0]['sub_tree'][1]['base_expr'];
 		}
 
@@ -141,8 +145,8 @@ final class Payload extends BasePayload {
 		$payload = Payload::$sqlQueryParser::parse(
 			$request->payload,
 			fn(Request $request) => (
-				(stripos($request->payload, 'add') !== false || stripos($request->payload, 'drop') !== false)
-				&& strpos($request->error, "P01: syntax error, unexpected identifier near 'ALTER TABLE") === 0
+				strpos($request->error, "P01: syntax error, unexpected identifier near 'ALTER TABLE") === 0
+				&& (stripos($request->payload, 'add') !== false || stripos($request->payload, 'drop') !== false)
 			),
 			$request
 		);

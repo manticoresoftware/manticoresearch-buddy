@@ -37,19 +37,27 @@ final class Handler extends BaseHandlerWithClient
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $client): TaskResult {
-			if (!isset($payload->columnDatatype)) {
+			if (!isset($payload->type)) {
+				throw GenericError::create(
+					'No operation is given'
+				);
+			}
+			if ($payload->type === 'drop') {
 				$sql = "ALTER TABLE {$payload->destinationTableName} DROP COLUMN {$payload->columnName}";
-				$op = 'create';
-			} else {
+			} elseif ($payload->type === 'add') {
 				$columnDatatype = static::getManticoreDatatype($payload->columnDatatype);
 				$sql = "ALTER TABLE {$payload->destinationTableName} "
 					. "ADD COLUMN {$payload->columnName} $columnDatatype";
-				$op = 'drop';
+			} else {
+				throw GenericError::create(
+					"Only add/drop operations are supported, {$payload->type} operation is given"
+				);
 			}
 			$result = $client->sendRequest($sql);
 			if ($result->hasError()) {
 				throw GenericError::create(
-					"Can't $op table {$payload->destinationTableName}. Reason: " . $result->getError()
+					"Can't {$payload->type} column in table {$payload->destinationTableName}. Reason: "
+						. $result->getError()
 				);
 			}
 

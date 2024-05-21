@@ -153,17 +153,17 @@ final class Payload extends BasePayload
 					(
 						stripos(
 							$request->error,
+							'P01: syntax error, unexpected CREATE near'
+						) !== false
+						&& stripos($request->payload, 'engine') !== false
+					) || (
+						stripos(
+							$request->error,
 							"P03: syntax error, unexpected tablename, expecting \$end near 'with data'"
 						) !== false
 						&& stripos($request->payload, 'like') !== false
 						&& stripos($request->payload, 'with') !== false
 						&& stripos($request->payload, 'data') !== false
-					) || (
-						stripos(
-							$request->error,
-							'P01: syntax error, unexpected CREATE near'
-						) !== false
-						&& stripos($request->payload, 'engine') !== false
 					)
 				)
 			), $request
