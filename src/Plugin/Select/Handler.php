@@ -464,7 +464,7 @@ final class Handler extends BaseHandler {
 	 * @param Payload $payload
 	 * @return void
 	 */
-	protected static function checkQueryForAliasSyntax(Payload &$payload): void {
+	protected static function removeAliasSyntaxIfExists(Payload $payload): void {
 		$alias = false;
 		if ($payload->fields) {
 			$i = 0;
@@ -482,8 +482,8 @@ final class Handler extends BaseHandler {
 			return;
 		}
 		$payload->originalQuery = (string)preg_replace(
-			"/{$payload->table}\s+$alias\s+/is",
-			$payload->table . ' ',
+			"/{$payload->originalTable}\s+$alias\s+/is",
+			$payload->originalTable . ' ',
 			$payload->originalQuery
 		);
 	}
@@ -494,7 +494,7 @@ final class Handler extends BaseHandler {
 	 * @return TaskResult
 	 */
 	protected static function handleSelectDatabasePrefixed(Client $manticoreClient, Payload $payload): TaskResult {
-		self::checkQueryForAliasSyntax($payload);
+		self::removeAliasSyntaxIfExists($payload);
 		$query = str_ireplace(
 			['`Manticore`.', 'Manticore.'],
 			'',

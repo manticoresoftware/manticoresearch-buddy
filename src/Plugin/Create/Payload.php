@@ -22,7 +22,7 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  */
 final class Payload extends BasePayload
 {
-	public static ?string $requestTarget;
+	public static string $requestTarget;
 
 	public string $destinationTableName;
 	public string $sourceTableName;
@@ -147,7 +147,7 @@ final class Payload extends BasePayload
 		$payload = Payload::$sqlQueryParser::parse(
 			$request->payload,
 			fn($request) => (
-				stripos($request->payload, 'create') !== false
+				stripos($request->payload, 'create') === 0
 				&& stripos($request->payload, 'table') !== false
 				&& (
 					(
@@ -183,17 +183,17 @@ final class Payload extends BasePayload
 			(isset($payload['TABLE']['options'][0]['sub_tree'][0]['base_expr'])
 				&& strtolower($payload['TABLE']['options'][0]['sub_tree'][0]['base_expr']) === 'engine')
 				=> 'WithEngineHandler',
-			default => null,
+			default => '',
 		};
 
-		return (static::$requestTarget !== null);
+		return (static::$requestTarget !== '');
 	}
 
 	/**
 	 * @return string
 	 */
 	public function getHandlerClassName(): string {
-		return __NAMESPACE__ . '\\' . (string)static::$requestTarget;
+		return __NAMESPACE__ . '\\' . static::$requestTarget;
 	}
 
 }

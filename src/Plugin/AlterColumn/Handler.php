@@ -20,6 +20,36 @@ use RuntimeException;
 final class Handler extends BaseHandlerWithClient
 {
 
+	const TYPE_MAP = [
+		'BIGINT UNSIGNED' => 'bigint',
+		'BINARY' => 'string',
+		'BIT' => 'int',
+		'BLOB' => 'text',
+		'BOOL' => 'boolean',
+		'CHAR' => 'string',
+		'DATE' => 'timestamp',
+		'DATETIME' => 'timestamp',
+		'FLOAT' => 'float',
+		'INT' => 'int',
+		'INT UNSIGNED' => 'int',
+		'LONG VARBINARY' => 'int',
+		'LONG VARCHAR' => 'string',
+		'LONGBLOB' => 'text',
+		'LONGTEXT' => 'text',
+		'MEDIUMBLOB' => 'text',
+		'MEDIUMINT UNSIGNED' => 'text',
+		'MEDIUMTEXT' => 'text',
+		'SMALLINT UNSIGNED' => 'int',
+		'TEXT' => 'text',
+		'TIME' => 'timestamp',
+		'TIMESTAMP' => 'timestamp',
+		'TINYBLOB' => 'text',
+		'TINYINT UNSIGNED' => 'int',
+		'TINYTEXT' => 'text',
+		'VARBINARY' => 'string',
+		'VARCHAR' => 'string',
+		'JSON' => 'json',
+	];
 	/**
 	 * Initialize the executor
 	 *
@@ -77,42 +107,12 @@ final class Handler extends BaseHandlerWithClient
 	 */
 	protected static function getManticoreDatatype(string $mySqlDatatype): string {
 		$mySqlDatatype = strtoupper($mySqlDatatype);
-		$typeMap = [
-			'BIGINT UNSIGNED' => 'bigint',
-			'BINARY' => 'string',
-			'BIT' => 'int',
-			'BLOB' => 'text',
-			'BOOL' => 'boolean',
-			'CHAR' => 'string',
-			'DATE' => 'timestamp',
-			'DATETIME' => 'timestamp',
-			'FLOAT' => 'float',
-			'INT' => 'int',
-			'INT UNSIGNED' => 'int',
-			'LONG VARBINARY' => 'int',
-			'LONG VARCHAR' => 'string',
-			'LONGBLOB' => 'text',
-			'LONGTEXT' => 'text',
-			'MEDIUMBLOB' => 'text',
-			'MEDIUMINT UNSIGNED' => 'text',
-			'MEDIUMTEXT' => 'text',
-			'SMALLINT UNSIGNED' => 'int',
-			'TEXT' => 'text',
-			'TIME' => 'timestamp',
-			'TIMESTAMP' => 'timestamp',
-			'TINYBLOB' => 'text',
-			'TINYINT UNSIGNED' => 'int',
-			'TINYTEXT' => 'text',
-			'VARBINARY' => 'string',
-			'VARCHAR' => 'string',
-			'JSON' => 'json',
-		];
-		if (!isset($typeMap[$mySqlDatatype])) {
+		if (!isset(self::TYPE_MAP[$mySqlDatatype])) {
 			throw GenericError::create(
 				"Can't map $mySqlDatatype to any Manticore data type"
 			);
 		}
 
-		return $typeMap[$mySqlDatatype];
+		return self::TYPE_MAP[$mySqlDatatype];
 	}
 }

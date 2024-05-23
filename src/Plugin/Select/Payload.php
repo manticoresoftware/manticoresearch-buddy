@@ -44,6 +44,9 @@ final class Payload extends BasePayload {
 	public string $originalQuery;
 
 	/** @var string */
+	public string $originalTable;
+
+	/** @var string */
 	public string $path;
 
 	/** @var string */
@@ -96,7 +99,8 @@ final class Payload extends BasePayload {
 		// we put this function in fields and table will be empty
 		// otherwise it's normal select with fields and table required
 		if ($matches[2] ?? null) {
-			$table = strtolower(ltrim((string)$matches[2], '.'));
+			$self->originalTable = (string)$matches[2];
+			$table = strtolower(ltrim($self->originalTable, '.'));
 			if ($table[0] === '`' || $table[-1] === '`') {
 				$table = trim((string)preg_replace('/`?\.`?/', '.', $table), '`');
 			}

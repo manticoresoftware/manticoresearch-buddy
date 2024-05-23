@@ -42,7 +42,7 @@ final class Handler extends BaseHandlerWithClient
 			if ($result->hasError()) {
 				throw GenericError::create(
 					"Can't drop table {$payload->table}" .
-					'Reason: ' . $result->getError()
+					"Reason: {$result->getError()}"
 				);
 			}
 

@@ -86,7 +86,7 @@ final class Payload extends BasePayload {
 			$request->payload,
 			fn($request) => (
 				str_contains($request->error, "P01: syntax error, unexpected SET, expecting VALUES near '")
-				&& stripos($request->payload, 'replace') !== false
+				&& stripos($request->payload, 'replace') === 0
 				&& stripos($request->payload, 'set') !== false
 				&& stripos($request->payload, 'where') !== false),
 			$request
