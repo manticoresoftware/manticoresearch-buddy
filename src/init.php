@@ -70,6 +70,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-queue',
 	'manticoresoftware/buddy-plugin-sharding',
 	'manticoresoftware/buddy-plugin-update',
+	'manticoresoftware/buddy-plugin-fuzzy',
 ];
 // Filtering out the plugins that we don't need
 $plugins = array_filter(
