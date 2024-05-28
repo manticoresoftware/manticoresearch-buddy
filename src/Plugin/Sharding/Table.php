@@ -445,14 +445,13 @@ final class Table {
 	 */
 	protected function getShardNodesMap(Vector $schema): Map {
 		return $schema->reduce(
+			/** @var Map<int,Set<string>> $map */
 			function (Map $map, $row): Map {
 				foreach ($row['shards'] as $shard) {
-					$map[$shard] ??= new Set;
-					// Hack for stupic phpstan that cannot recognize it
-					if (!$map[$shard] instanceof Set) {
-						continue;
-					}
-					$map[$shard]->add($row['node']);
+					/** @var Set<string> $set */
+					$set = $map->get($shard, new Set);
+					$set->add($row['node']);
+					$map->put($shard, $set);
 				}
 				return $map;
 			}, new Map
