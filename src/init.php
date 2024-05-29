@@ -53,6 +53,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-backup',
 	'manticoresoftware/buddy-plugin-emulate-elastic',
 	'manticoresoftware/buddy-plugin-create',
+	'manticoresoftware/buddy-plugin-drop',
 	'manticoresoftware/buddy-plugin-insert',
 	'manticoresoftware/buddy-plugin-alias',
 	'manticoresoftware/buddy-plugin-select',
@@ -60,6 +61,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-cli-table',
 	'manticoresoftware/buddy-plugin-plugin',
 	'manticoresoftware/buddy-plugin-test',
+	'manticoresoftware/buddy-plugin-alter-column',
 	'manticoresoftware/buddy-plugin-alter-distributed-table',
 	'manticoresoftware/buddy-plugin-alter-rename-table',
 	'manticoresoftware/buddy-plugin-modify-table',
@@ -67,6 +69,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-replace',
 	'manticoresoftware/buddy-plugin-queue',
 	'manticoresoftware/buddy-plugin-sharding',
+	'manticoresoftware/buddy-plugin-update',
 ];
 // Filtering out the plugins that we don't need
 $plugins = array_filter(

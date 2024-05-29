@@ -84,7 +84,9 @@ final class Payload extends BasePayload {
 			. 'show full tables'
 			. '(\s+from\s+`?(?P<database>([a-z][a-z0-9\_]*))`?)?'
 			. '(\s+like\s+\'(?P<like>([^\']+))\')?'
+			. '(\s+where\s+tables\_in\_manticore\s*\=\s*\'(?P<where>[^\']+)\')?'
 			. '$#ius';
+
 
 		if (!preg_match($pattern, $request->payload, $m)) {
 			throw QueryParseError::create('You have an error in your query. Please, double-check it.');
@@ -96,6 +98,8 @@ final class Payload extends BasePayload {
 		}
 		if ($m['like'] ?? '') {
 			$self->like = $m['like'];
+		} elseif ($m['where'] ?? '') {
+			$self->like = $m['where'];
 		}
 		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;

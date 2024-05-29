@@ -16,7 +16,6 @@ use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
-use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -47,7 +46,7 @@ final class Handler extends BaseHandlerWithClient
 
 			$baseValues = static::getRecordValues($client, $payload, $fields);
 			$payload->set = self::removeBackticks($payload->set);
-			if ($payload->type === RequestFormat::JSON->value) {
+			if ($payload->isElasticLikePath) {
 				$payload->set = self::morphValuesByFieldType($payload->set, $fields);
 			}
 
@@ -59,7 +58,7 @@ final class Handler extends BaseHandlerWithClient
 				throw ManticoreSearchResponseError::create($result->getError());
 			}
 
-			if ($payload->type === RequestFormat::JSON->value) {
+			if ($payload->isElasticLikePath) {
 				return TaskResult::raw(['_index' => $payload->table, 'updated' => 1]);
 			}
 			return TaskResult::none();

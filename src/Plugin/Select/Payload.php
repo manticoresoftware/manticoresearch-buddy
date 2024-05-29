@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Select;
 
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\MySQLTool;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Task\Column;
@@ -43,6 +44,9 @@ final class Payload extends BasePayload {
 	public string $originalQuery;
 
 	/** @var string */
+	public string $originalTable;
+
+	/** @var string */
 	public string $path;
 
 	/** @var string */
@@ -56,6 +60,9 @@ final class Payload extends BasePayload {
 
 	/** @var array<string,array{operator:string,value:int|string|bool}> */
 	public array $where = [];
+
+	/** @var ?MySQLTool */
+	public ?MySQLTool $mySQLTool = null;
 
 	public function __construct() {
 	}
@@ -78,7 +85,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->path = $request->path;
 		$self->originalQuery = str_replace("\n", ' ', $request->payload);
-
+		$self->mySQLTool = $request->mySQLTool ?? null;
 		// Match fields
 		preg_match(
 			'/^SELECT\s+(?:(.*?)\s+FROM\s+(`?[a-z][a-z\_\-0-9]*`?(\.`?[a-z][a-z\_\-0-9]*`?)?)'
@@ -92,7 +99,8 @@ final class Payload extends BasePayload {
 		// we put this function in fields and table will be empty
 		// otherwise it's normal select with fields and table required
 		if ($matches[2] ?? null) {
-			$table = strtolower(ltrim((string)$matches[2], '.'));
+			$self->originalTable = (string)$matches[2];
+			$table = strtolower(ltrim($self->originalTable, '.'));
 			if ($table[0] === '`' || $table[-1] === '`') {
 				$table = trim((string)preg_replace('/`?\.`?/', '.', $table), '`');
 			}
@@ -231,13 +239,10 @@ final class Payload extends BasePayload {
 		}
 
 		if (str_contains($request->error, "unexpected '('")
-			&& stripos($request->payload, 'coalesce') !== false
-		) {
-			return true;
-		}
-
-		if (str_contains($request->error, "unexpected '('")
-			&& stripos($request->payload, 'contains') !== false
+			&& (stripos($request->payload, 'coalesce') !== false
+				|| stripos($request->payload, 'contains') !== false
+				|| str_contains($request->error, "expecting \$end near ')'")
+			)
 		) {
 			return true;
 		}
@@ -252,8 +257,7 @@ final class Payload extends BasePayload {
 			return true;
 		}
 
-		if (str_contains($request->error, "unexpected '('")
-			&& str_contains($request->error, "expecting \$end near ')'")) {
+		if (str_contains($request->error, 'unexpected $undefined near \'.*')) {
 			return true;
 		}
 		return false;
