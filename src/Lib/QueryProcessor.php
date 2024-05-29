@@ -118,14 +118,11 @@ class QueryProcessor {
 			static::$sqlQueryParser = $instance;
 		}
 
-		static::$pluggable = new Pluggable(
-			static::$settings,
-			static::getHooks(),
-		);
+		static::$pluggable = new Pluggable(static::$settings);
 		static::$corePlugins = static::$pluggable->fetchCorePlugins();
 		static::$localPlugins = static::$pluggable->fetchLocalPlugins();
 		static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
-
+		static::$pluggable->registerHooks(static::getHooks());
 		static::$isInited = true;
 	}
 
@@ -332,7 +329,7 @@ class QueryProcessor {
 	 * @return array<array{0:string,1:string,2:callable}>
 	 */
 	protected static function getHooks(): array {
-		return [
+		$hooks = [
 			// Happens when we installed the external plugin
 			[
 				'manticoresoftware/buddy-plugin-plugin',
@@ -373,9 +370,14 @@ class QueryProcessor {
 					static::resumePlugins([$name]);
 				},
 			],
-			// Happens when we run create table with shards in options
-			[
-				'manticoresoftware/buddy-plugin-modify-table',
+		];
+
+		// If the plugis is not enabled, we just return
+		$loadedPlugins = array_column(static::$corePlugins, 'full');
+		// Happens when we run create table with shards in options
+		if (in_array('manticoresoftware/buddy-plugin-sharding', $loadedPlugins)) {
+			$hooks[] = [
+				'manticoresoftware/buddy-plugin-sharding',
 				'shard',
 				static function (array $args) {
 					// TODO: remove the reference to the plugin,
@@ -387,7 +389,8 @@ class QueryProcessor {
 					$table = $args['table']['name'];
 					$processor->addTicker(fn() => $processor->status($table), 1);
 				},
-			],
-		];
+			];
+		}
+		return $hooks;
 	}
 }

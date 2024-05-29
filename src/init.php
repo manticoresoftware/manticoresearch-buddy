@@ -48,9 +48,7 @@ $container
 $container->register('tableFormatter', TableFormatter::class);
 
 putenv("LISTEN={$opts['listen']}");
-Pluggable::setContainer($container);
-Pluggable::setCorePlugins(
-	[
+$plugins = [
 	'manticoresoftware/buddy-plugin-empty-string',
 	'manticoresoftware/buddy-plugin-backup',
 	'manticoresoftware/buddy-plugin-emulate-elastic',
@@ -72,8 +70,14 @@ Pluggable::setCorePlugins(
 	'manticoresoftware/buddy-plugin-queue',
 	'manticoresoftware/buddy-plugin-sharding',
 	'manticoresoftware/buddy-plugin-update',
-	]
+];
+// Filtering out the plugins that we don't need
+$plugins = array_filter(
+	$plugins,
+	fn ($plugin) => !in_array($plugin, $opts['skip'])
 );
+Pluggable::setContainer($container);
+Pluggable::setCorePlugins($plugins);
 MetricThread::setContainer($container);
 
 return $container;
