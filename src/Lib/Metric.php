@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Lib;
 
+use AppendIterator;
 use Exception;
 use FilesystemIterator;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
@@ -27,6 +28,7 @@ use RuntimeException;
 use SplFileInfo;
 
 final class Metric {
+	const MANTICORE_JSON_FILE = 'manticore.json';
 	const MAX_QUEUE_SIZE = 200;
 	const RATE_MULTIPLIER = 1000;
 	const MAX_VOLUME_SIZE_TIME_MS = 1000;
@@ -85,7 +87,7 @@ final class Metric {
 	}
 
 	/**
-	 * Intialize the singleton of the Metric instance and use it
+	 * Initialize the singleton of the Metric instance and use it
 	 *
 	 * @return static
 	 */
@@ -388,13 +390,29 @@ final class Metric {
 	 * @return array<string,int>
 	 */
 	protected function getVolumeMetrics(): array {
+		$jsonFile = $this->dataDir . '/' . static::MANTICORE_JSON_FILE;
+		$jsonContent = file_get_contents($jsonFile);
+		if (!$jsonContent) {
+			throw new RuntimeException(sprintf('Cannot read manticore.json file from %s', $jsonFile));
+		}
+		// Decode config and get all path for size calculation
+		/** @var array{indexes?:array<array{path:string}>} $jsonConfig */
+		$jsonConfig = json_decode($jsonContent, true);
+		$indexes = $jsonConfig['indexes'] ?? [];
+		$paths = array_column($indexes, 'path');
 		$size = 0;
 		$t = (int)(microtime(true) * 1000);
+
 		// Create Recursive Directory Iterator
-		$iterator = new RecursiveIteratorIterator(
-			new RecursiveDirectoryIterator($this->dataDir, FilesystemIterator::SKIP_DOTS),
-			RecursiveIteratorIterator::SELF_FIRST
-		);
+		$iterator = new AppendIterator();
+		foreach ($paths as $path) {
+			$path = $this->dataDir . '/' . $path;
+			$dirIterator = new RecursiveIteratorIterator(
+				new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
+				RecursiveIteratorIterator::SELF_FIRST
+			);
+			$iterator->append($dirIterator);
+		}
 
 		// Iterate through files and accumulate their sizes
 		/** @var SplFileInfo $file */
@@ -402,6 +420,8 @@ final class Metric {
 			if (strpos($file->getPathname(), $this->binlogDir) !== false
 					||
 				!$file->isFile()
+					||
+				!$file->isReadable()
 			) {
 				continue;
 			}
@@ -412,6 +432,7 @@ final class Metric {
 		if ($duration > static::MAX_VOLUME_SIZE_TIME_MS) {
 			$this->collectVolumeMetrics = false;
 		}
+
 		return [
 			'volume_size_bytes' => $size,
 			'volume_size_time_ms' => $duration,
