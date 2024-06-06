@@ -59,14 +59,16 @@ final class EventHandler {
 			$response->end(Response::none());
 			return;
 		}
+		$startTime = hrtime(true);
 		$requestId = $request->header['Request-ID'] ?? uniqid(more_entropy: true);
 		$body = $request->rawContent() ?: '';
 		$channel = new Channel(1);
 		Coroutine::create(
-			static function () use ($requestId, $body, $channel) {
+			static function () use ($requestId, $body, $channel, $startTime) {
 				Buddy::debug("[$requestId] request data: $body");
 				$result = (string)static::process($requestId, $body);
 				Buddy::debug("[$requestId] response data: $result");
+				Buddy::debug("[$requestId] response time: " . round((hrtime(true) - $startTime) / 1e6, 3) . ' ms');
 				$channel->push($result);
 			}
 		);
