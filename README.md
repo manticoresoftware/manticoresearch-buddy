@@ -22,7 +22,7 @@ Each command that Buddy can process consists of implementing two interfaces: `Co
 
 The `CommandRequestInterface` represents the parsing of raw network data from JSON and its preparation for future request processing by the command. Its primary purpose is to parse the data into a `CommandRequest` object and throw exceptions in case of any errors.
 
-There is a base class – `ComandRequestBase`, that implements the required interface and adds some base logic to all requests we support. You should extend this class when you create a new command request.
+There is a base class – `CommandRequestBase`, that implements the required interface and adds some base logic to all requests we support. You should extend this class when you create a new command request.
 
 The `CommandExecutorInterface` contains the logic for the command that must be executed. It uses the `Task` class, which is run in parallel in a separate thread to make the process non-blocking.
 
@@ -141,7 +141,7 @@ Create `Processor` plugin and implement required logic
 ```php
 <?php declare(strict_types=1);
 
-… your NS and other copywrite here …
+… your NS and other copyright here …
 
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Process\Process;
@@ -205,7 +205,7 @@ The response JSON structure:
 | `type` | Set to `json response` if the request type was `unknown json request` and `sql response` for `unknown sql request`. |
 | `message` | A JSON object potentially containing an `error` message for displaying and/or logging. This is what Manticore Search will forward to the end-user. |
 | `error_code` | An integer representing the HTTP error code which will be a part of the HTTP response to the user making a JSON over HTTP request. For SQL over HTTP/mysql communications, this field is ignored. |
-| `version` | Indicates the current protocol version being used. Currentl version is 2. |
+| `version` | Indicates the current protocol version being used. Currently version is 2. |
 
 
 Example of HTTP Response:
