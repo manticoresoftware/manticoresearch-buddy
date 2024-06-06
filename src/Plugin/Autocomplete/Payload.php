@@ -28,6 +28,9 @@ final class Payload extends BasePayload {
 	/** @var int */
 	public int $distance = 2;
 
+	/** @var int */
+	public int $maxEdits = 5;
+
 	public function __construct() {
 	}
 
