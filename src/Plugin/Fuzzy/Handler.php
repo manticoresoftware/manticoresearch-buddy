@@ -36,30 +36,12 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
-			// First call keywords and tokenize input
-			$keywordsQuery = "CALL KEYWORDS('{$payload->query}', '{$payload->table}')";
-			/** @var array<array{data:array<array{tokenized:string}>}> $result */
-			$result = $manticoreClient->sendRequest($keywordsQuery)->getResult();
-			$tokenized = array_column($result[0]['data'] ?? [], 'tokenized');
-			$words = [];
-			foreach ($tokenized as $word) {
-				/** @var array<array{data:array<array{suggest:string,distance:int,docs:int}>}> $result */
-				$result = $manticoreClient
-					->sendRequest("CALL SUGGEST('$word', '{$payload->table}')")
-					->getResult();
-				$suggestions = $result[0]['data'] ?? [];
-				/** @var array{suggest:string,distance:int,docs:int} $suggestion */
-				foreach ($suggestions as $suggestion) {
-					// If the distance is out of allowed, we use original word form
-					if ($suggestion['distance'] > $payload->distance) {
-						$words[] = $word;
-					} else {
-						$words[] = $suggestion['suggest'];
-					}
-				}
-			}
-
-			$query = sprintf($payload->template, implode(' ', $words));
+			$sentences = $manticoreClient->fetchFuzzyVariations(
+				$payload->query,
+				$payload->table,
+				$payload->distance
+			);
+			$query = sprintf($payload->template, '"' . implode('"|"', $sentences) . '"');
 			$result = $manticoreClient->sendRequest($query)->getResult();
 			return TaskResult::raw($result);
 		};
