@@ -11,6 +11,8 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Fuzzy;
 
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
@@ -47,6 +49,51 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	public static function fromRequest(Request $request): static {
+		return match ($request->endpointBundle) {
+			Endpoint::Search => static::fromJsonRequest($request),
+			default => static::fromSqlRequest($request),
+		};
+	}
+
+	/**
+	 * Parse the request as JSON
+	 * @param Request $request
+	 * @return static
+	 */
+	protected static function fromJsonRequest(Request $request): static {
+		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array<string,string|int>} $payload */
+		$payload = json_decode($request->payload, true);
+		$query = $payload['query']['match']['*'] ?? '';
+		if (!$query) {
+			throw new QueryParseError('You are missing * match in query, please check it');
+		}
+		$self = new static();
+		$self->table = $payload['index'];
+		$self->query = $query;
+		$self->distance = (int)($payload['options']['distance'] ?? 2);
+		// Now build template that we will use to fetch fields with SQL but response will remain original query
+		$self->template = "SELECT * FROM `{$self->table}` WHERE MATCH('%s')";
+		$isFirstOption = true;
+		foreach ($payload['options'] as $k => $v) {
+			if ($k === 'distance' || $k === 'fuzzy') {
+				continue;
+			}
+			if ($isFirstOption) {
+				$self->template .= " OPTIONS {$k} = {$v}";
+				$isFirstOption = false;
+			} else {
+				$self->template .= ", {$k} = {$v}";
+			}
+		}
+		return $self;
+	}
+
+	/**
+	 * Parse the request as SQL
+	 * @param Request $request
+	 * @return static
+	 */
+	protected static function fromSqlRequest(Request $request): static {
 		$query = $request->payload;
 		preg_match('/FROM\s+(\w+)\s+WHERE\s+MATCH\s*\(\'(.*?)\'\)/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
@@ -84,11 +131,20 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		return stripos($request->payload, 'select') === 0
+		$hasMatch = stripos($request->payload, 'select') === 0
 			&& stripos($request->payload, 'match') !== false
 			&& stripos($request->payload, 'option') !== false
 			&& stripos($request->payload, 'fuzzy') !== false
 			&& stripos($request->error, 'unknown option') !== false
 		;
+
+
+		if (!$hasMatch) {
+			$hasMatch = $request->endpointBundle === Endpoint::Search
+				&& stripos($request->error, 'unknown option') !== false
+			;
+		}
+
+		return $hasMatch;
 	}
 }
