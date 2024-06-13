@@ -41,8 +41,8 @@ class ClusterHealthHandler extends BaseHandler {
 		$taskFn = static function (): TaskResult {
 			return TaskResult::raw(
 				[
-					'cluster_name' =>'docker-cluster',
-					'status' =>'yellow',
+					'cluster_name' => 'docker-cluster',
+					'status' => 'yellow',
 					'timed_out' => false,
 					'number_of_nodes' => 1,
 					'number_of_data_nodes' => 1,

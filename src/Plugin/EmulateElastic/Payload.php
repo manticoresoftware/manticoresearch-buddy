@@ -100,7 +100,6 @@ final class Payload extends BasePayload {
 	 * @return string
 	 */
 	public function getHandlerClassName(): string {
-		Buddy::debug("TEST: " . static::$requestTarget);
 		$namespace = __NAMESPACE__ . '\\';
 		$handlerName = match (static::$requestTarget) {
 			'_license' => 'LicenseHandler',
