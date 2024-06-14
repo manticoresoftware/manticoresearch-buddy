@@ -253,7 +253,7 @@ final class Metric {
 		Buddy::debugv(sprintf('rates: %s', json_encode($rateMetrics)));
 
 		// 5. Collect volume metrics if enabled
-		if ($this->collectVolumeMetrics) {
+		if ($this->collectVolumeMetrics && $this->hasVolumeMetrics()) {
 			$volumeMetrics = $this->getVolumeMetrics();
 			$metrics = array_merge($metrics, $volumeMetrics);
 			Buddy::debugv(sprintf('volume: %s', json_encode($volumeMetrics)));
@@ -383,6 +383,16 @@ final class Metric {
 			}
 		}
 		return [$dataDir, $binlogDir];
+	}
+
+
+	/**
+	 * Check if we have any volume metrics when the daemon is new we have nothing
+	 * @return bool
+	 */
+	protected function hasVolumeMetrics(): bool {
+		$jsonFile = $this->dataDir . '/' . static::MANTICORE_JSON_FILE;
+		return file_exists($jsonFile) && is_readable($jsonFile);
 	}
 
 	/**
