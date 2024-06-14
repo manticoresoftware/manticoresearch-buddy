@@ -14,6 +14,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Arrays;
 use RuntimeException;
 
 final class Handler extends BaseHandlerWithClient {
@@ -36,12 +37,27 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
-			$sentences = $manticoreClient->fetchFuzzyVariations(
-				$payload->query,
+			$query = trim($payload->query, '"');
+			$words = $manticoreClient->fetchFuzzyVariations(
+				$query,
 				$payload->table,
 				$payload->distance
 			);
-			$query = sprintf($payload->template, '"' . implode('"|"', $sentences) . '"');
+
+			// Build a regexp that matches any of the words from vartions
+			// If we work with phrase, we make phrase combinations
+			if ($payload->query[0] === '"') {
+				$combinations = Arrays::getPositionalCombinations($words);
+				$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
+				$match = '"' . implode('"|"', $combinations) . '"';
+			} else {
+				$sentences = [];
+				foreach ($words as $choices) {
+					$sentences[] = '(' . implode('|', $choices) . ')';
+				}
+				$match = implode(' ', $sentences);
+			}
+			$query = sprintf($payload->template, $match);
 			$result = $manticoreClient->sendRequest($query)->getResult();
 			return TaskResult::raw($result);
 		};
