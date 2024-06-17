@@ -55,11 +55,11 @@ final class Payload extends BasePayload {
 	 */
 	public static function fromRequest(Request $request): static {
 		$self = new static();
-
 		$pathParts = explode('/', ltrim($request->path, '/'));
 		static::$requestTarget = end($pathParts);
 		switch (static::$requestTarget) {
 			case '_license':
+			case 'health':
 				break;
 			case '_mapping':
 				/**
@@ -102,6 +102,7 @@ final class Payload extends BasePayload {
 		$namespace = __NAMESPACE__ . '\\';
 		$handlerName = match (static::$requestTarget) {
 			'_license' => 'LicenseHandler',
+			'health' => 'ClusterHealthHandler',
 			'_mapping' => 'CreateTableHandler',
 			default => throw new Exception('Cannot find handler for request type: ' . static::$requestTarget),
 		};
