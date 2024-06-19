@@ -43,21 +43,22 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = function (): TaskResult {
-			$sentences = $this->manticoreClient->fetchFuzzyVariations(
+			$words = $this->manticoreClient->fetchFuzzyVariations(
 				$this->payload->query,
 				$this->payload->table,
 				$this->payload->distance
 			);
 			$taskResult = TaskResult::withData([])->column('query', Column::String);
-			foreach ($sentences as $sentence) {
-				$lastSpacePosition = strrpos($sentence, ' ') ?: 0;
-				$word = substr($sentence, $lastSpacePosition + 1);
-				$sentence = substr($sentence, 0, $lastSpacePosition);
-				$q = "CALL SUGGEST('{$word}*', '{$this->payload->table}', {$this->payload->maxEdits} as max_edits)";
+			foreach ($words as $choices) {
+				$lastIndex = array_key_last($choices);
+				$lastWord = $choices[$lastIndex];
+				$q = "CALL SUGGEST('{$lastWord}*', '{$this->payload->table}', {$this->payload->maxEdits} as max_edits)";
 				/** @var array{0:array{data?:array<array{suggest:string}>}} $result */
 				$result = $this->manticoreClient->sendRequest($q)->getResult();
 				foreach ($result[0]['data'] ?? [] as $row) {
-					$taskResult->row(['query' => $sentence . ' ' . $row['suggest']]);
+					$choices[$lastIndex] = $row['suggest'];
+					$sentence = implode(' ', $choices);
+					$taskResult->row(['query' => $sentence]);
 				}
 			}
 			return $taskResult;
