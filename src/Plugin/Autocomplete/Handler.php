@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Arrays;
 use RuntimeException;
 
 /**
@@ -48,20 +49,35 @@ final class Handler extends BaseHandlerWithClient {
 				$this->payload->table,
 				$this->payload->distance
 			);
-			$taskResult = TaskResult::withData([])->column('query', Column::String);
-			foreach ($words as $choices) {
-				$lastIndex = array_key_last($choices);
-				$lastWord = $choices[$lastIndex];
+			// Expand last word with wildcard
+			$lastIndex = array_key_last($words);
+			$lastWords = $words[$lastIndex];
+			$words[$lastIndex] = [];
+			foreach ($lastWords as $lastWord) {
+				// 1. Try to end the latest word with a wildcard
+				$q = "CALL KEYWORDS('{$this->payload->table}', '{$lastWord}*')";
+				/** @var array{0:array{data?:array<array{normalized:string,tokenized:string}>}} $result */
+				$result = $this->manticoreClient->sendRequest($q)->getResult();
+				foreach ($result[0]['data'] ?? [] as $row) {
+					$words[$lastIndex][] = $row['normalized'];
+				}
+
+				// 2. Use suggestions for word extension in case of typos
 				$q = "CALL SUGGEST('{$lastWord}*', '{$this->payload->table}', {$this->payload->maxEdits} as max_edits)";
 				/** @var array{0:array{data?:array<array{suggest:string}>}} $result */
 				$result = $this->manticoreClient->sendRequest($q)->getResult();
 				foreach ($result[0]['data'] ?? [] as $row) {
-					$choices[$lastIndex] = $row['suggest'];
-					$sentence = implode(' ', $choices);
-					$taskResult->row(['query' => $sentence]);
+					$words[$lastIndex][] = $row['suggest'];
 				}
 			}
-			return $taskResult;
+			// Preparing the final result with suggestions
+			$data = [];
+			$combinations = Arrays::getPositionalCombinations($words);
+			$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
+			foreach ($combinations as $combination) {
+				$data[] = ['query' => $combination];
+			}
+			return TaskResult::withData($data)->column('query', Column::String);
 			/* $sentence = '"' . implode('"|"', $sentences) . '" *'; */
 			/* $q  = sprintf(self::HIGHLIGHT_QUERY_TEMPLATE, $this->payload->table, $sentence, 3); */
 			/* $result = $this->manticoreClient->sendRequest($q)->getResult(); */
