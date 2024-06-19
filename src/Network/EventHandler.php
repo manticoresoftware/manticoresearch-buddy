@@ -101,7 +101,7 @@ final class EventHandler {
 
 			$response = Response::fromMessage($result->getStruct(), $request->format);
 		} catch (Throwable $e) {
-			Buddy::debugv($e->getFile().':'.$e->getLine().'  '.$e->getMessage());
+			Buddy::debug("[$id] processing error: {$e->getMessage()} in file {$e->getFile()}:{$e->getLine()}");
 			/** @var string $originalError */
 			$originalError = match (true) {
 				isset($request) => $request->error,
