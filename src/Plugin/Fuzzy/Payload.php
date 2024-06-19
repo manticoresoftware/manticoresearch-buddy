@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
@@ -26,6 +27,9 @@ final class Payload extends BasePayload {
 
 	/** @var int */
 	public int $distance;
+
+	/** @var array<string> */
+	public array $langs;
 
 	/** @var string */
 	public string $query;
@@ -75,7 +79,7 @@ final class Payload extends BasePayload {
 		$self->template = "SELECT * FROM `{$self->table}` WHERE MATCH('%s')";
 		$isFirstOption = true;
 		foreach ($payload['options'] as $k => $v) {
-			if ($k === 'distance' || $k === 'fuzzy') {
+			if ($k === 'distance' || $k === 'fuzzy' || $k === 'langs') {
 				continue;
 			}
 			if ($isFirstOption) {
@@ -99,27 +103,40 @@ final class Payload extends BasePayload {
 		$tableName = $matches[1] ?? '';
 		$searchValue = $matches[2] ?? '';
 
+		// Parse distance and use default 2 if missing
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
 		$distanceValue = (int)($matches[1] ?? 2);
+
+		// Parse langs and use default all languages if missed
+		preg_match('/langs\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
+		if (isset($matches[1])) {
+			$langs = $matches[1] ? array_map('trim', explode(',', $matches[1])) : [];
+		} else {
+			$langs = KeyboardLayout::getSupportedLanguages();
+		}
 
 		$self = new static();
 		$self->query = $searchValue;
 		$self->table = $tableName;
 		$self->distance = $distanceValue;
-		$self->template = (string)preg_replace(
-			[
+		$self->langs = $langs;
+		$self->template = trim(
+			(string)preg_replace(
+				[
 				'/MATCH\(\'(.*)\'\)/ius',
-				'/(fuzzy|distance)\s*=\s*\d+[,\s\0]*/ius',
+				'/(fuzzy|distance)\s*=\s*\d+[,\s]*/ius',
+				'/(langs)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
-			],
-			[
+				],
+				[
 				'MATCH(\'%s\')',
 				'',
+				'',
 				'option ',
-			],
-			$query
+				],
+				$query
+			)
 		);
-		$self->template = trim(str_replace("\0", '', $self->template));
 		if (str_ends_with($self->template, 'option')) {
 			$self->template = substr($self->template, 0, -6);
 		}
