@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
@@ -26,6 +27,9 @@ final class Payload extends BasePayload {
 
 	/** @var int */
 	public int $distance;
+
+	/** @var array<string> */
+	public array $layouts;
 
 	/** @var string */
 	public string $query;
@@ -61,7 +65,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array<string,string|int>} $payload */
+		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $payload */
 		$payload = json_decode($request->payload, true);
 		$query = $payload['query']['match']['*'] ?? '';
 		if (!$query) {
@@ -71,11 +75,12 @@ final class Payload extends BasePayload {
 		$self->table = $payload['index'];
 		$self->query = $query;
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
+		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 		// Now build template that we will use to fetch fields with SQL but response will remain original query
 		$self->template = "SELECT * FROM `{$self->table}` WHERE MATCH('%s')";
 		$isFirstOption = true;
 		foreach ($payload['options'] as $k => $v) {
-			if ($k === 'distance' || $k === 'fuzzy') {
+			if ($k === 'distance' || $k === 'fuzzy' || $k === 'layouts') {
 				continue;
 			}
 			if ($isFirstOption) {
@@ -99,27 +104,36 @@ final class Payload extends BasePayload {
 		$tableName = $matches[1] ?? '';
 		$searchValue = $matches[2] ?? '';
 
+		// Parse distance and use default 2 if missing
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
 		$distanceValue = (int)($matches[1] ?? 2);
+
+		// Parse layouts and use default all languages if missed
+		preg_match('/layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
+		$layouts = static::parseLayouts($matches[1]);
 
 		$self = new static();
 		$self->query = $searchValue;
 		$self->table = $tableName;
 		$self->distance = $distanceValue;
-		$self->template = (string)preg_replace(
-			[
+		$self->layouts = $layouts;
+		$self->template = trim(
+			(string)preg_replace(
+				[
 				'/MATCH\(\'(.*)\'\)/ius',
-				'/(fuzzy|distance)\s*=\s*\d+[,\s\0]*/ius',
+				'/(fuzzy|distance)\s*=\s*\d+[,\s]*/ius',
+				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
-			],
-			[
+				],
+				[
 				'MATCH(\'%s\')',
 				'',
+				'',
 				'option ',
-			],
-			$query
+				],
+				$query
+			)
 		);
-		$self->template = trim(str_replace("\0", '', $self->template));
 		if (str_ends_with($self->template, 'option')) {
 			$self->template = substr($self->template, 0, -6);
 		}
@@ -146,5 +160,23 @@ final class Payload extends BasePayload {
 		}
 
 		return $hasMatch;
+	}
+
+	/**
+	 * Helper to parse the lang string into array
+	 * @param null|string|array<string> $layouts
+	 * @return array<string>
+	 */
+	protected static function parseLayouts(null|string|array $layouts): array {
+		// If we have array already, just return it
+		if (is_array($layouts)) {
+			return $layouts;
+		}
+		if (isset($layouts)) {
+			$layouts = array_map('trim', explode(',', $layouts));
+		} else {
+			$layouts = KeyboardLayout::getSupportedLanguages();
+		}
+		return $layouts;
 	}
 }

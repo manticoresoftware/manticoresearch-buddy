@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
+use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
 final class Handler extends BaseHandlerWithClient {
@@ -38,11 +39,24 @@ final class Handler extends BaseHandlerWithClient {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 			$query = trim($payload->query, '"');
-			$words = $manticoreClient->fetchFuzzyVariations(
-				$query,
-				$payload->table,
-				$payload->distance
-			);
+			$phrases = [$query];
+			// If we have layout correction we generate for all languages given phrases
+			if ($payload->layouts) {
+				$phrases = KeyboardLayout::combineMany($query, $payload->layouts);
+			}
+			$words = [];
+			foreach ($phrases as $phrase) {
+				$variations = $manticoreClient->fetchFuzzyVariations(
+					$phrase,
+					$payload->table,
+					$payload->distance
+				);
+				// Extend varitions for each iteration we have
+				foreach ($variations as $pos => $variation) {
+					$words[$pos] ??= [];
+					$words[$pos] = array_merge($words[$pos], $variation);
+				}
+			}
 
 			// Build a regexp that matches any of the words from vartions
 			// If we work with phrase, we make phrase combinations
