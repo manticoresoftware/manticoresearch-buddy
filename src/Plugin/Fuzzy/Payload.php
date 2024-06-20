@@ -29,7 +29,7 @@ final class Payload extends BasePayload {
 	public int $distance;
 
 	/** @var array<string> */
-	public array $langs;
+	public array $layouts;
 
 	/** @var string */
 	public string $query;
@@ -65,7 +65,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,langs?:string,other?:string}} $payload */
+		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $payload */
 		$payload = json_decode($request->payload, true);
 		$query = $payload['query']['match']['*'] ?? '';
 		if (!$query) {
@@ -75,12 +75,12 @@ final class Payload extends BasePayload {
 		$self->table = $payload['index'];
 		$self->query = $query;
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
-		$self->langs = static::parseLangs($payload['options']['langs'] ?? null);
+		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 		// Now build template that we will use to fetch fields with SQL but response will remain original query
 		$self->template = "SELECT * FROM `{$self->table}` WHERE MATCH('%s')";
 		$isFirstOption = true;
 		foreach ($payload['options'] as $k => $v) {
-			if ($k === 'distance' || $k === 'fuzzy' || $k === 'langs') {
+			if ($k === 'distance' || $k === 'fuzzy' || $k === 'layouts') {
 				continue;
 			}
 			if ($isFirstOption) {
@@ -108,21 +108,21 @@ final class Payload extends BasePayload {
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
 		$distanceValue = (int)($matches[1] ?? 2);
 
-		// Parse langs and use default all languages if missed
-		preg_match('/langs\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
-		$langs = static::parseLangs($matches[1]);
+		// Parse layouts and use default all languages if missed
+		preg_match('/layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
+		$layouts = static::parseLayouts($matches[1]);
 
 		$self = new static();
 		$self->query = $searchValue;
 		$self->table = $tableName;
 		$self->distance = $distanceValue;
-		$self->langs = $langs;
+		$self->layouts = $layouts;
 		$self->template = trim(
 			(string)preg_replace(
 				[
 				'/MATCH\(\'(.*)\'\)/ius',
 				'/(fuzzy|distance)\s*=\s*\d+[,\s]*/ius',
-				'/(langs)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
+				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
 				],
 				[
@@ -164,19 +164,19 @@ final class Payload extends BasePayload {
 
 	/**
 	 * Helper to parse the lang string into array
-	 * @param null|string|array<string> $langs
+	 * @param null|string|array<string> $layouts
 	 * @return array<string>
 	 */
-	protected static function parseLangs(null|string|array $langs): array {
+	protected static function parseLayouts(null|string|array $layouts): array {
 		// If we have array already, just return it
-		if (is_array($langs)) {
-			return $langs;
+		if (is_array($layouts)) {
+			return $layouts;
 		}
-		if (isset($langs)) {
-			$langs = array_map('trim', explode(',', $langs));
+		if (isset($layouts)) {
+			$layouts = array_map('trim', explode(',', $layouts));
 		} else {
-			$langs = KeyboardLayout::getSupportedLanguages();
+			$layouts = KeyboardLayout::getSupportedLanguages();
 		}
-		return $langs;
+		return $layouts;
 	}
 }

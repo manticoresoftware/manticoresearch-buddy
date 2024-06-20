@@ -41,8 +41,8 @@ final class Handler extends BaseHandlerWithClient {
 			$query = trim($payload->query, '"');
 			$phrases = [$query];
 			// If we have layout correction we generate for all languages given phrases
-			if ($payload->langs) {
-				$phrases = KeyboardLayout::combineMany($query, $payload->langs);
+			if ($payload->layouts) {
+				$phrases = KeyboardLayout::combineMany($query, $payload->layouts);
 			}
 			$words = [];
 			foreach ($phrases as $phrase) {
