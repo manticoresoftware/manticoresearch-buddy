@@ -65,7 +65,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array<string,string|int>} $payload */
+		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,langs?:string,other?:string}} $payload */
 		$payload = json_decode($request->payload, true);
 		$query = $payload['query']['match']['*'] ?? '';
 		if (!$query) {
@@ -75,6 +75,7 @@ final class Payload extends BasePayload {
 		$self->table = $payload['index'];
 		$self->query = $query;
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
+		$self->langs = static::parseLangs($payload['options']['langs'] ?? null);
 		// Now build template that we will use to fetch fields with SQL but response will remain original query
 		$self->template = "SELECT * FROM `{$self->table}` WHERE MATCH('%s')";
 		$isFirstOption = true;
@@ -109,11 +110,7 @@ final class Payload extends BasePayload {
 
 		// Parse langs and use default all languages if missed
 		preg_match('/langs\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
-		if (isset($matches[1])) {
-			$langs = $matches[1] ? array_map('trim', explode(',', $matches[1])) : [];
-		} else {
-			$langs = KeyboardLayout::getSupportedLanguages();
-		}
+		$langs = static::parseLangs($matches[1]);
 
 		$self = new static();
 		$self->query = $searchValue;
@@ -163,5 +160,23 @@ final class Payload extends BasePayload {
 		}
 
 		return $hasMatch;
+	}
+
+	/**
+	 * Helper to parse the lang string into array
+	 * @param null|string|array<string> $langs
+	 * @return array<string>
+	 */
+	protected static function parseLangs(null|string|array $langs): array {
+		// If we have array already, just return it
+		if (is_array($langs)) {
+			return $langs;
+		}
+		if (isset($langs)) {
+			$langs = array_map('trim', explode(',', $langs));
+		} else {
+			$langs = KeyboardLayout::getSupportedLanguages();
+		}
+		return $langs;
 	}
 }
