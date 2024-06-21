@@ -110,7 +110,7 @@ final class Payload extends BasePayload {
 
 		// Parse layouts and use default all languages if missed
 		preg_match('/layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
-		$layouts = static::parseLayouts($matches[1]);
+		$layouts = static::parseLayouts($matches[1] ?? null);
 
 		$self = new static();
 		$self->query = $searchValue;
