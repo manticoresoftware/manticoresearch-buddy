@@ -69,6 +69,9 @@ final class Handler extends BaseHandlerWithClient {
 				foreach ($result[0]['data'] ?? [] as $row) {
 					$words[$lastIndex][] = $row['suggest'];
 				}
+
+				// 3. Make sure we have unique fill up
+				$words[$lastIndex] = array_unique($words[$lastIndex]);
 			}
 			// Preparing the final result with suggestions
 			$data = [];
