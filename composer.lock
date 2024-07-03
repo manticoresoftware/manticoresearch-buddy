@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1895f90bca4ad1ac4bbfade753c8aa16",
+    "content-hash": "7acd8aa933552112191ff8b2c760b2e9",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -811,16 +811,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-feature/fuzzy-search-improvements",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "8321d3442cc07973f323fb97b3fc152588477c15"
+                "reference": "ebff73fca2245a27397afd8e0a1087d7f5dff716"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/8321d3442cc07973f323fb97b3fc152588477c15",
-                "reference": "8321d3442cc07973f323fb97b3fc152588477c15",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/ebff73fca2245a27397afd8e0a1087d7f5dff716",
+                "reference": "ebff73fca2245a27397afd8e0a1087d7f5dff716",
                 "shasum": ""
             },
             "require": {
@@ -836,7 +836,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -857,9 +856,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/fuzzy-search-improvements"
             },
-            "time": "2024-07-04T07:44:09+00:00"
+            "time": "2024-07-03T10:23:41+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
