@@ -11,17 +11,21 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Fuzzy;
 
-use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Tool\Arrays;
 use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
+use RuntimeException;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
+	/** @var string */
+	public string $path;
+
 	/** @var string */
 	public string $table;
 
@@ -31,11 +35,8 @@ final class Payload extends BasePayload {
 	/** @var array<string> */
 	public array $layouts;
 
-	/** @var string */
-	public string $query;
-
-	/** @var string */
-	public string $template;
+	/** @var string|array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>} */
+	public array|string $payload;
 
 	public function __construct() {
 	}
@@ -67,29 +68,14 @@ final class Payload extends BasePayload {
 	protected static function fromJsonRequest(Request $request): static {
 		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $payload */
 		$payload = json_decode($request->payload, true);
-		$query = $payload['query']['match']['*'] ?? '';
-		if (!$query) {
-			throw new QueryParseError('You are missing * match in query, please check it');
-		}
 		$self = new static();
+		$self->path = $request->path;
 		$self->table = $payload['index'];
-		$self->query = $query;
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
-		// Now build template that we will use to fetch fields with SQL but response will remain original query
-		$self->template = "SELECT * FROM `{$self->table}` WHERE MATCH('%s')";
-		$isFirstOption = true;
-		foreach ($payload['options'] as $k => $v) {
-			if ($k === 'distance' || $k === 'fuzzy' || $k === 'layouts') {
-				continue;
-			}
-			if ($isFirstOption) {
-				$self->template .= " OPTIONS {$k} = {$v}";
-				$isFirstOption = false;
-			} else {
-				$self->template .= ", {$k} = {$v}";
-			}
-		}
+
+		$payload = static::cleanUpPayloadOptions($payload);
+		$self->payload = $payload;
 		return $self;
 	}
 
@@ -100,9 +86,8 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromSqlRequest(Request $request): static {
 		$query = $request->payload;
-		preg_match('/FROM\s+(\w+)\s+WHERE\s+MATCH\s*\(\'(.*?)\'\)/ius', $query, $matches);
+		preg_match('/FROM\s+(\w+)\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
-		$searchValue = $matches[2] ?? '';
 
 		// Parse distance and use default 2 if missing
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
@@ -113,31 +98,164 @@ final class Payload extends BasePayload {
 		$layouts = static::parseLayouts($matches[1] ?? null);
 
 		$self = new static();
-		$self->query = $searchValue;
+		$self->path = $request->path;
 		$self->table = $tableName;
 		$self->distance = $distanceValue;
 		$self->layouts = $layouts;
-		$self->template = trim(
-			(string)preg_replace(
-				[
+		$self->payload = $query;
+		return $self;
+	}
+
+	/**
+	 * @param callable $fn A callable function that returns an array of options to be used in the query
+	 * @return string returns payload to use in the query send to Manticore
+	 */
+	public function getQueriesRequest(callable $fn): string {
+		// In case we have SQL request, we just return it
+		if (is_string($this->payload)) {
+			return $this->getQueriesSQLRequest($fn);
+		}
+
+		// Now let check the case when we parse HTTP JSON request
+		return $this->getQueriesHTTPRequest($fn);
+	}
+
+	/**
+	 * Get request with prepared queries with callable function for SQL request
+	 * @param callable $fn
+	 * @return string
+	 */
+	public function getQueriesSQLRequest(callable $fn): string {
+		/** @var string */
+		$payload = $this->payload;
+		preg_match('/MATCH\s*\(\'(.*?)\'\)/ius', $payload, $matches);
+		$searchValue = $matches[1] ?? '';
+		$template = (string)preg_replace(
+			[
 				'/MATCH\(\'(.*)\'\)/ius',
 				'/(fuzzy|distance)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
 				],
-				[
+			[
 				'MATCH(\'%s\')',
 				'',
 				'',
 				'option ',
-				],
-				$query
-			)
+			],
+			$payload
 		);
-		if (str_ends_with($self->template, 'option')) {
-			$self->template = substr($self->template, 0, -6);
+		$template = trim($template);
+		if (str_ends_with($template, 'option')) {
+			$template = substr($template, 0, -6);
 		}
-		return $self;
+
+		$isPhrase = false;
+		if ($searchValue[0] === '"') {
+			$isPhrase = true;
+			$searchValue = trim($searchValue, '"');
+		}
+		$variations = $fn($searchValue);
+		if ($isPhrase) {
+			$match = '"' . implode('"|"', $variations) . '"';
+		} else {
+			$match = '(' . implode(')|(', $variations) . ')';
+		}
+		return sprintf($template, $match);
+	}
+
+	/**
+	 * Get request with prepared queries with callable function for HTTP request
+	 * @param callable $fn
+	 * @return string
+	 */
+	public function getQueriesHTTPRequest(callable $fn): string {
+		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $request */
+		$request = $this->payload;
+		$queries = static::parseQueryMatches($request['query']);
+		foreach ($queries as $keyPath => $query) {
+			$options = $fn($query);
+			$should = [];
+			$parts = explode('.', $keyPath);
+			$lastIndex = sizeof($parts) - 1;
+			$isQueryString = $parts[$lastIndex] === 'query_string' && !str_ends_with($keyPath, 'match.query_string');
+			$field = $parts[$lastIndex];
+			foreach ($options as $v) {
+				$should[] = $isQueryString ? ['query_string' => $v] : [
+					'match' => [
+						$field => $v,
+					],
+				];
+			}
+			$replaceKey = implode('.', array_slice($parts, 0, $isQueryString ? -1 : -2));
+			$newQuery = ['bool' => ['should' => $should]];
+			// Here we do some trick and set the value of the pass in do notation to the payload by using refs
+			if ($replaceKey) {
+				Arrays::setValueByDotNotation($request['query'], $replaceKey, $newQuery);
+			} else {
+				$request['query'] = $newQuery;
+			}
+		}
+		$encoded = json_encode($request);
+		if ($encoded === false) {
+			throw new RuntimeException('Cannot encode JSON');
+		}
+		return $encoded;
+	}
+
+	/**
+	 * Recursively parse the query matches and extract it from nested arrays
+	 * @param array<mixed> $values
+	 * @param string $parent
+	 * @return array<string,string>
+	 */
+	public static function parseQueryMatches(array $values, string $parent = ''): array {
+		$queries = [];
+
+		foreach ($values as $key => $value) {
+			$currentKey = $parent === '' ? $key : $parent . '.' . $key;
+			$isArray = is_array($value);
+			if ($isArray && isset($value['query']) && isset($value['operator'])) {
+				$queries[$currentKey] = $value['query'];
+			} elseif ($isArray) {
+				$queries = array_merge($queries, static::parseQueryMatches($value, $key));
+			} elseif (is_string($value) && $parent === 'match') {
+				$queries[$currentKey] = $value;
+			} elseif (is_string($value) && $key === 'query_string') {
+				$queries[$currentKey] = $value;
+			}
+		}
+
+		return $queries;
+	}
+
+	/**
+	 * Clean up payload options that we do not need in the query
+	 *
+	 * @param array{
+	 * index: string,
+	 *     query: array{
+	 *         match: array{
+	 *             '*'?: string
+	 *         }
+	 *     },
+	 *     options: array{
+	 *         fuzzy?: string,
+	 *         distance?: int,
+	 *         layouts?: string,
+	 *         other?: string
+	 *     }
+	 * } $payload
+	 * @return array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>}
+	 */
+	public static function cleanUpPayloadOptions(array $payload): array {
+		$excludedOptions = ['distance', 'fuzzy', 'layouts'];
+		$payload['options'] = array_diff_key($payload['options'], array_flip($excludedOptions));
+		if (empty($payload['options'])) {
+			unset($payload['options']);
+		}
+
+		return $payload;
 	}
 
 	/**

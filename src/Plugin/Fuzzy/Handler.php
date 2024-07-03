@@ -38,41 +38,32 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
-			$query = trim($payload->query, '"');
-			$phrases = [$query];
-			// If we have layout correction we generate for all languages given phrases
-			if ($payload->layouts) {
-				$phrases = KeyboardLayout::combineMany($query, $payload->layouts);
-			}
-			$words = [];
-			foreach ($phrases as $phrase) {
-				$variations = $manticoreClient->fetchFuzzyVariations(
-					$phrase,
-					$payload->table,
-					$payload->distance
-				);
-				// Extend varitions for each iteration we have
-				foreach ($variations as $pos => $variation) {
-					$words[$pos] ??= [];
-					$words[$pos] = array_merge($words[$pos], $variation);
+			$fn = static function (string $query) use ($payload, $manticoreClient): array {
+				$phrases = [$query];
+				// If we have layout correction we generate for all languages given phrases
+				if ($payload->layouts) {
+					$phrases = KeyboardLayout::combineMany($query, $payload->layouts);
 				}
-			}
+				$words = [];
+				foreach ($phrases as $phrase) {
+					$variations = $manticoreClient->fetchFuzzyVariations(
+						$phrase,
+						$payload->table,
+						$payload->distance
+					);
+					// Extend varitions for each iteration we have
+					foreach ($variations as $pos => $variation) {
+						$words[$pos] ??= [];
+						$words[$pos] = array_merge($words[$pos], $variation);
+					}
+				}
 
-			// Build a regexp that matches any of the words from vartions
-			// If we work with phrase, we make phrase combinations
-			if ($payload->query[0] === '"') {
 				$combinations = Arrays::getPositionalCombinations($words);
 				$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
-				$match = '"' . implode('"|"', $combinations) . '"';
-			} else {
-				$sentences = [];
-				foreach ($words as $choices) {
-					$sentences[] = '(' . implode('|', $choices) . ')';
-				}
-				$match = implode(' ', $sentences);
-			}
-			$query = sprintf($payload->template, $match);
-			$result = $manticoreClient->sendRequest($query)->getResult();
+				return $combinations;
+			};
+			$request = $payload->getQueriesRequest($fn);
+			$result = $manticoreClient->sendRequest($request, $payload->path)->getResult();
 			return TaskResult::raw($result);
 		};
 
