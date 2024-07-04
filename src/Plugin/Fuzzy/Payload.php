@@ -206,11 +206,12 @@ final class Payload extends BasePayload {
 	/**
 	 * Recursively parse the query matches and extract it from nested arrays
 	 * @param array<mixed> $values
-	 * @param string $parent
+	 * @param string|int $parent
 	 * @return array<string,string>
 	 */
-	public static function parseQueryMatches(array $values, string $parent = ''): array {
+	public static function parseQueryMatches(array $values, string|int $parent = ''): array {
 		$queries = [];
+		$parent = (string)$parent;
 
 		foreach ($values as $key => $value) {
 			$currentKey = $parent === '' ? $key : $parent . '.' . $key;
