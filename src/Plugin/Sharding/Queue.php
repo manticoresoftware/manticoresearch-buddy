@@ -263,7 +263,7 @@ final class Queue {
 			`duration` int
 		)";
 		$this->client->sendRequest($query);
-		$this->cluster->attachTable($this->table);
+		$this->cluster->attachTables($this->table);
 	}
 
 	/**

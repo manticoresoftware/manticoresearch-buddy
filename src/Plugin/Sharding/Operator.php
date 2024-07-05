@@ -211,9 +211,7 @@ final class Operator {
 			$this->state->set('cluster_hash', Cluster::getNodesHash($cluster->getNodes()));
 			$this->init();
 			$currentQueue = $this->getQueue();
-			$cluster->attachTable($this->state->table);
-			$cluster->attachTable($currentQueue->table);
-			$cluster->attachTable($table->table);
+			$cluster->attachTables($this->state->table, $currentQueue->table, $table->table);
 		}
 
 		$result = $table->shard(
