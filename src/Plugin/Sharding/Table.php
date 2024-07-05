@@ -189,7 +189,7 @@ final class Table {
 
 		$schema = $this->configureNodeShards($shardCount, $replicationFactor);
 		$reduceFn = function (Map $clusterMap, array $row) use ($queue, $replicationFactor, &$nodes, &$nodeShardsMap) {
-			/** @var Map<string,Set<string>> $clusterMap */
+			/** @var Map<string,Cluster> $clusterMap */
 			$nodes->add($row['node']);
 			$nodeShardsMap[$row['node']] = $row['shards'];
 
@@ -213,7 +213,12 @@ final class Table {
 
 			return $clusterMap;
 		};
-		$schema->reduce($reduceFn, new Map);
+		$clusterMap = $schema->reduce($reduceFn, new Map);
+
+		// Now process all postponed pending tables to attach to the each cluster
+		foreach ($clusterMap as $cluster) {
+			$cluster->processPendingTables($queue);
+		}
 
 		/** @var Set<int> */
 		$queueIds = new Set;
@@ -237,9 +242,9 @@ final class Table {
 	 * @param  string $node
 	 * @param  Queue  $queue
 	 * @param  Set<string>    $connectedNodes
-	 * @param  Map<string,Set<string>>   $clusterMap
+	 * @param  Map<string,Cluster>   $clusterMap
 	 * @param  int    $shard
-	 * @return Map<string,Set<string>> The cluster map that we use
+	 * @return Map<string,Cluster> The cluster map that we use
 	 *  for session to maintain which nodes are connected
 	 *  and which cluster are processed already and who is the owner
 	 */
@@ -252,24 +257,26 @@ final class Table {
 	): Map {
 		$clusterName = $this->getClusterName($connectedNodes);
 		$hasCluster = isset($clusterMap[$clusterName]);
-		$cluster = new Cluster($this->client, $clusterName, $node);
-		if (!$hasCluster) {
+		if ($hasCluster) {
+			$cluster = $clusterMap[$clusterName];
+		} else {
+			$cluster = new Cluster($this->client, $clusterName, $node);
 			$nodesToJoin = $connectedNodes->filter(
 				fn ($connectedNode) => $connectedNode !== $node
 			);
-			$clusterMap[$clusterName] = new Set;
+			$clusterMap[$clusterName] = $cluster;
 			$waitForId = $cluster->create($queue);
 			$queue->setWaitForId($waitForId);
 			$cluster->addNodeIds($queue, ...$nodesToJoin);
 			$queue->resetWaitForId();
 		}
 
+		/** @var Cluster $cluster */
 		$table = $this->getTableShardName($shard);
-		if (!$clusterMap->get($clusterName)->contains($table)) {
-			$clusterMap->get($clusterName)->add($table);
+		if (!$cluster->hasPendingTable($table, TableOperation::Attach)) {
+			$cluster->addPendingTable($table, TableOperation::Attach);
 			$sql = $this->getCreateTableShardSQL($shard);
 			$queue->add($node, $sql);
-			$cluster->addTables($queue, $table);
 		}
 		return $clusterMap;
 	}
@@ -285,7 +292,7 @@ final class Table {
  	// @phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
 	public function rebalance(Queue $queue): void {
 		try {
-			/** @var Map<string,Set<string>> */
+			/** @var Map<string,Cluster> */
 			$clusterMap = new Map;
 
 			$schema = $this->getShardSchema();
@@ -307,8 +314,10 @@ final class Table {
 			// Preload current cluster map with configuration
 			foreach ($shardNodesMap as $shard => $connections) {
 				$clusterName = $this->getClusterName($connections);
-				$clusterMap[$clusterName] ??= new Set;
-				$clusterMap->get($clusterName)->add(...$connections);
+				$connections->sort();
+				$node = $connections->first();
+				$cluster = new Cluster($this->client, $clusterName, $node);
+				$clusterMap[$clusterName] = $cluster;
 			}
 
 			$affectedSchema = $schema->filter(
@@ -384,7 +393,7 @@ final class Table {
 
 			$this->updateScheme($newSchema);
 		} catch (\Throwable $t) {
-			var_dumP($t->getMessage());
+			var_dump($t->getMessage());
 		}
 	}
 
@@ -506,7 +515,7 @@ final class Table {
 	protected function getCreateTableShardSQL(int $shard): string {
 		$structure = $this->structure ? "({$this->structure})" : '';
 		// We can call this method on rebalancing, that means
-		// table may exist, so to supress error we use
+		// table may exist, so to suppress error we use
 		// if not exists to keep logic simpler
 		return "CREATE TABLE IF NOT EXISTS `{$this->getTableShardName($shard)}` {$structure} {$this->extra}";
 	}
@@ -553,7 +562,7 @@ final class Table {
 			$agents->add("agent='{$nodes->join('|')}'");
 		}
 
-		// Finaly generate create table
+		// Finally generate create table
 		return "CREATE TABLE `{$this->name}`
 			type='distributed' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
 		";
@@ -607,7 +616,7 @@ final class Table {
 			`shards` multi
 		)";
 		$this->client->sendRequest($query);
-		$this->cluster->attachTable($this->table);
+		$this->cluster->attachTables($this->table);
 	}
 
 	/**

@@ -141,7 +141,7 @@ final class State {
 			`updated_at` timestamp
 		)";
 		$this->client->sendRequest($query);
-		$this->cluster->attachTable($this->table);
+		$this->cluster->attachTables($this->table);
 	}
 
 	/**
