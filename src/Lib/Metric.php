@@ -20,7 +20,6 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresoftware\Telemetry\Metric as TelemetryMetric;
 use OpenMetrics\Exposition\Text\Exceptions\InvalidArgumentException;
 use Psr\Container\ContainerExceptionInterface;
-use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -32,10 +31,6 @@ final class Metric {
 	const MAX_QUEUE_SIZE = 200;
 	const RATE_MULTIPLIER = 1000;
 	const MAX_VOLUME_SIZE_TIME_MS = 1000;
-
-	/** @var ContainerInterface */
-	// We set this on initialization (init.php) so we are sure we have it in class
-	protected static ContainerInterface $container;
 
 	/** @var static $instance */
 	public static self $instance;
@@ -58,26 +53,20 @@ final class Metric {
 	/** @var string $dataDir path to the datadir that we will use to volume calc */
 	protected string $dataDir = '';
 
+	/** @var string $binlogDir path to the binlog dir that we will use to volume calc */
 	protected string $binlogDir = '';
 
-	/**
-	 * Setter for container property
-	 *
-	 * @param ContainerInterface $container
-	 *  The container object to resolve the executor's dependencies in case such exist
-	 * @return void
-	 *  The CommandExecutorInterface to execute to process the final query
-	 */
-	public static function setContainer(ContainerInterface $container): void {
-		self::$container = $container;
-	}
+	/** @var bool $persistLabelsLoaded */
+	protected bool $persistLabelsLoaded = false;
+
 
 	/**
+	 * @param HTTPClient $client
 	 * @param array<string,string> $labels
 	 * @param bool $enabled
 	 * @return void
 	 */
-	public function __construct(array $labels, public bool $enabled) {
+	protected function __construct(protected HTTPClient $client, array $labels, public bool $enabled) {
 		$this->telemetry = new TelemetryMetric($labels);
 		$this->snapshotTime = time();
 		[$this->dataDir, $this->binlogDir] = $this->getVolumeDirs();
@@ -89,9 +78,10 @@ final class Metric {
 	/**
 	 * Initialize the singleton of the Metric instance and use it
 	 *
+	 * @param HTTPClient $client
 	 * @return static
 	 */
-	public static function instance(): static {
+	public static function instance(HTTPClient $client): static {
 		if (isset(static::$instance)) {
 			return static::$instance;
 		}
@@ -99,20 +89,14 @@ final class Metric {
 		$enabled = is_telemetry_enabled();
 		Buddy::debugv(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
 
-		// 1. Get versions
-		$labels = static::getVersions();
-
-		// 2. Get config labels
-		$labels = array_merge($labels, static::getConfigLabels());
-
-		// 3. Add collector parameter, so it makes easier
+		// Add collector parameter, so it makes easier
 		// to understand where metric came from in case we will collect it
 		// in different services, we collect already it in backup in addition
-		$labels['collector'] = 'buddy';
+		$labels = [
+			'collector' => 'buddy',
+		];
 
-		Buddy::debugv(sprintf('labels: %s', json_encode($labels)));
-		static::$instance = new static($labels, $enabled);
-
+		static::$instance = new static($client, $labels, $enabled);
 		return static::$instance;
 	}
 
@@ -152,7 +136,7 @@ final class Metric {
 	 *
 	 * @return array<string,string>
 	 */
-	public static function getVersions(): array {
+	public function getVersions(): array {
 		$buddyVersion = trim(
 			(string)file_get_contents(
 				__DIR__ . DIRECTORY_SEPARATOR . '..'
@@ -160,20 +144,31 @@ final class Metric {
 				. DIRECTORY_SEPARATOR . 'APP_VERSION'
 			)
 		);
-		$verPattern = '(\d+\.\d+\.\d+[^\(\)]*)';
+
+		$statusMap = $this->getStatusMap();
+		if (!isset($statusMap['version'])) {
+			Buddy::debug('metric: failed to get version from SHOW STATUS query');
+			return [];
+		}
+
+		$verPattern = 'v?(\d+\.\d+\.\d+[^\(\)]*)';
 		$matchExpr = "/^{$verPattern}(\(columnar\s{$verPattern}\))?"
 			. "([^\(]*\(secondary\s{$verPattern}\))?"
 			. "([^\(]*\(knn\s{$verPattern}\))?"
 			. "([^\(]*\(buddy\s{$verPattern}\))?$/ius"
 		;
 		/** @var string $version */
-		$version = static::getStatusMap()['version'] ?? '';
+		$version = $statusMap['version'];
 		preg_match($matchExpr, $version, $m);
+		if (!isset($m[1])) {
+			Buddy::debug('metric: failed to parse manticore version');
+			return [];
+		}
 
 		return array_filter(
 			[
 				'buddy_version' => $buddyVersion,
-				'manticore_version' => $m[1] ?? null,
+				'manticore_version' => trim($m[1]),
 				'columnar_version' => $m[3] ?? null,
 				'secondary_version' => $m[5] ?? null,
 				'knn_version' => $m[7] ?? null,
@@ -209,15 +204,52 @@ final class Metric {
 	}
 
 	/**
+	 * Load persist labels from multiple request to manticore
+	 * @return bool
+	 * @throws NotFoundExceptionInterface
+	 * @throws ContainerExceptionInterface
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 * @throws InvalidArgumentException
+	 */
+	public function loadPersistLabels(): bool {
+		if ($this->persistLabelsLoaded) {
+			return true;
+		}
+		//
+		// 1 Get versions
+		$versionsLabels = $this->getVersions();
+		// If we failed to get versions, we do not need to continue and wait for next snapshot
+		if (!$versionsLabels) {
+			return false;
+		}
+
+		// 2 Get config labels
+		$configLabels = $this->getConfigLabels();
+		if (!$configLabels) {
+			return false;
+		}
+		$labels = array_merge($versionsLabels, $configLabels);
+		$this->telemetry->updateLabels($labels);
+		$this->persistLabelsLoaded = true;
+		return true;
+	}
+
+	/**
 	 * Run snashotting of metrics from the manticore daemon
 	 *
 	 * @return void
 	 */
 	public function snapshot(): void {
-		// 1. Update labels with those that can change
-		$this->telemetry->updateLabels(static::getVariableLabels());
+		// 1. Lazy fetch initial labels and keep it in telemetry instance
+		if (!$this->loadPersistLabels()) {
+			return;
+		}
 
-		// 2. Get metrics from SHOW STATUS query
+		// 2. Update labels with those that can change
+		$this->telemetry->updateLabels($this->getVariableLabels());
+
+		// 3. Get metrics from SHOW STATUS query
 		$status = $this->getStatusMap();
 		/** @var array<string,int> $metrics */
 		$metrics = array_map(
@@ -244,11 +276,11 @@ final class Metric {
 		Buddy::debugv(sprintf('labels: %s', json_encode($this->telemetry->getLabels())));
 
 		// 3. Get snapshot of tables metrics
-		$metrics = array_merge($metrics, static::getTablesMetrics());
+		$metrics = array_merge($metrics, $this->getTablesMetrics());
 		Buddy::debugv(sprintf('metrics: %s', json_encode($metrics)));
 
 		// 4. Get Rate Metrics
-		$rateMetrics = static::getRateMetrics($metrics);
+		$rateMetrics = $this->getRateMetrics($metrics);
 		$metrics = array_merge($metrics, $rateMetrics);
 		Buddy::debugv(sprintf('rates: %s', json_encode($rateMetrics)));
 
@@ -273,10 +305,10 @@ final class Metric {
 	 *
 	 * @return array<string,string|int>
 	 */
-	protected static function getStatusMap(): array {
+	protected function getStatusMap(): array {
 		$map = [];
 		/** @var array{0:array{Counter:string,Value:string}} $result */
-		$result = static::sendManticoreRequest('SHOW STATUS');
+		$result = $this->sendManticoreRequest('SHOW STATUS');
 		foreach ($result as ['Counter' => $key, 'Value' => $value]) {
 			if ($key === 'cluster_name') {
 				$map['cluster_count'] = ($map['cluster_count'] ?? 0) + 1;
@@ -296,11 +328,9 @@ final class Metric {
 	 *
 	 * @return array<string,int>
 	 */
-	protected static function getTablesMetrics(): array {
+	protected function getTablesMetrics(): array {
 		$metrics = [];
-		/** @var HTTPClient */
-		$client = static::$container->get('manticoreClient');
-		$tables = $client->getAllTables();
+		$tables = $this->client->getAllTables();
 		foreach ($tables as [$table, $tableType]) {
 			$tableTypeKey = "table_{$tableType}_count";
 			$metrics[$tableTypeKey] ??= 0;
@@ -312,7 +342,7 @@ final class Metric {
 
 			$suffix = $tableType === 'percolate' ? ' TABLE' : '';
 			/** @var array{array{Type:string,Properties:string}} */
-			$descResult = static::sendManticoreRequest("DESC {$table}{$suffix}");
+			$descResult = $this->sendManticoreRequest("DESC {$table}{$suffix}");
 			foreach ($descResult as ['Type' => $fieldType, 'Properties' => $properties]) {
 				$fieldTypeKey = "{$tableType}_field_{$fieldType}_count";
 				$metrics[$fieldTypeKey] ??= 0;
@@ -334,12 +364,12 @@ final class Metric {
 	 *
 	 * @return array<string,string>
 	 */
-	protected static function getConfigLabels(): array {
+	protected function getConfigLabels(): array {
 		$labels = [];
 
 		// 1. Get settings first
 		$dataDir = '';
-		$configResult = static::sendManticoreRequest('SHOW SETTINGS');
+		$configResult = $this->sendManticoreRequest('SHOW SETTINGS');
 		foreach ($configResult as ['Setting_name' => $key, 'Value' => $value]) {
 			if ($key === 'searchd.data_dir') {
 				$dataDir = $value;
@@ -362,10 +392,10 @@ final class Metric {
 	 * Get current data dir from settings
 	 * @return array{0:string,1:string}
 	 */
-	protected static function getVolumeDirs(): array {
+	protected function getVolumeDirs(): array {
 		$dataDir = '';
 		$binlogDir = '';
-		$configResult = static::sendManticoreRequest('SHOW SETTINGS');
+		$configResult = $this->sendManticoreRequest('SHOW SETTINGS');
 		/** @var string $value */
 		foreach ($configResult as ['Setting_name' => $key, 'Value' => $value]) {
 			if ($key === 'searchd.data_dir') {
@@ -453,9 +483,9 @@ final class Metric {
 	 * Get labels that change on each request we batch
 	 * @return array<string,string>s
 	 */
-	protected static function getVariableLabels(): array {
+	protected function getVariableLabels(): array {
 		$labels = [];
-		$varResult = static::sendManticoreRequest('SHOW VARIABLES');
+		$varResult = $this->sendManticoreRequest('SHOW VARIABLES');
 		$boolVars = ['auto_optimize', 'secondary_indexes', 'pseudo_sharding', 'accurate_aggregation'];
 		$strVars = ['query_log_format', 'distinct_precision_threshold', 'max_allowed_packet'];
 		foreach ($varResult as ['Variable_name' => $key, 'Value' => $value]) {
@@ -492,7 +522,7 @@ final class Metric {
 		foreach ($metrics as $name => $value) {
 			$this->add($name, $value);
 
-			// Caculate rate metrics when we need
+			// Calculate rate metrics when we need
 			if (!str_starts_with($name, 'command_') || $duration <= 0) {
 				continue;
 			}
@@ -517,10 +547,8 @@ final class Metric {
 	 * @param string $query
 	 * @return array<mixed>
 	 */
-	protected static function sendManticoreRequest(string $query): array {
-		/** @var HTTPClient */
-		$client = static::$container->get('manticoreClient');
-		$response = $client->sendRequest($query);
+	protected function sendManticoreRequest(string $query): array {
+		$response = $this->client->sendRequest($query);
 		/** @var array{0:array{data?:array<mixed>}} $result */
 		$result = $response->getResult();
 		return $result[0]['data'] ?? [];

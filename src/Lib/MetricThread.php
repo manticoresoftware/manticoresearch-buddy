@@ -88,8 +88,9 @@ final class MetricThread {
 				swoole_set_process_name($name);
 				chdir(sys_get_temp_dir());
 
-				Metric::setContainer(static::$container);
-				$metric = Metric::instance();
+				/** @var \Manticoresearch\Buddy\Core\ManticoreSearch\Client $client */
+				$client = static::$container->get('manticoreClient');
+				$metric = Metric::instance($client);
 				while ($msg = $worker->read()) {
 					if (!is_string($msg)) {
 						throw new \Exception('Incorrect data received');
