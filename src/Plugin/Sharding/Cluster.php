@@ -232,7 +232,7 @@ final class Cluster {
 		if (!$tables) {
 			throw new \Exception('Tables must be passed to add');
 		}
-		$tables = '`' . implode('`,`', $tables) . '`';
+		$tables = implode(',', $tables);
 		$query = "ALTER CLUSTER {$this->name} ADD {$tables}";
 		$queue->add($this->nodeId, $query);
 		return $this;
@@ -248,7 +248,7 @@ final class Cluster {
 		if (!$tables) {
 			throw new \Exception('Tables must be passed to remove');
 		}
-		$tables = '`' . implode('`,`', $tables) . '`';
+		$tables = implode(',', $tables);
 		$query = "ALTER CLUSTER {$this->name} DROP `{$tables}";
 		$queue->add($this->nodeId, $query);
 		return $this;
@@ -265,7 +265,7 @@ final class Cluster {
 		}
 		// We can have situation when no cluster required
 		if ($this->name) {
-			$tables = '`' . implode('`,`', $tables) . '`';
+			$tables = implode(',', $tables);
 			$query = "ALTER CLUSTER {$this->name} ADD {$tables}";
 			$this->client->sendRequest($query);
 		}
@@ -283,7 +283,7 @@ final class Cluster {
 		}
 		// We can have situation when no cluster required
 		if ($this->name) {
-			$tables = '`' . implode('`,`', $tables) . '`';
+			$tables = implode(',', $tables);
 			$query = "ALTER CLUSTER {$this->name} DROP {$tables}";
 			$this->client->sendRequest($query);
 		}
