@@ -136,18 +136,24 @@ final class Payload extends BasePayload {
 				'/(fuzzy|distance)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
+				'/ option/ius', // TODO: hack
 				],
 			[
 				'MATCH(\'%s\')',
 				'',
 				'',
 				'option ',
+				' option idf=\'plain,tfidf_normalized\',', // TODO: hack
 			],
 			$payload
 		);
-		$template = trim($template);
+		$template = trim($template, ' ,');
 		if (str_ends_with($template, 'option')) {
 			$template = substr($template, 0, -6);
+		}
+		// TODO: hack
+		if (false === strpos($template, 'option idf=\'plain,tfidf_normalized\'')) {
+			$template .= ' option idf=\'plain,tfidf_normalized\'';
 		}
 
 		$isPhrase = false;
@@ -156,8 +162,8 @@ final class Payload extends BasePayload {
 			$searchValue = trim($searchValue, '"');
 		}
 		$variations = $fn($searchValue);
-		$booster = 3;
-		$decay = 0.999;
+		$booster = 10;
+		$decay = 0.9;
 		if ($isPhrase) {
 			$match = '"' . implode(
 				'"|"', array_map(
@@ -266,9 +272,13 @@ final class Payload extends BasePayload {
 	public static function cleanUpPayloadOptions(array $payload): array {
 		$excludedOptions = ['distance', 'fuzzy', 'layouts'];
 		$payload['options'] = array_diff_key($payload['options'], array_flip($excludedOptions));
-		if (empty($payload['options'])) {
-			unset($payload['options']);
+		// TODO: hack
+		if (!isset($payload['options']['idf'])) { // @phpstan-ignore-line
+			$payload['options']['idf'] = 'plain,tfidf_normalized';
 		}
+		/* if (empty($payload['options'])) { */
+		/* 	unset($payload['options']); */
+		/* } */
 
 		return $payload;
 	}
