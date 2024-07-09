@@ -54,7 +54,7 @@ class QueueProcess extends BaseProcessor {
 
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
-			" WHERE match('@name \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\"') LIMIT 99999";
+			" WHERE match('@type \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\"') LIMIT 99999";
 		$results = $this->client->sendRequest($sql);
 
 		if ($results->hasError()) {
