@@ -132,7 +132,7 @@ final class Payload extends BasePayload {
 		$searchValue = $matches[1] ?? '';
 		$template = (string)preg_replace(
 			[
-				'/MATCH\(\'(.*)\'\)/ius',
+				'/MATCH\s*\(\'(.*?)\'\)/ius',
 				'/(fuzzy|distance)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
@@ -156,10 +156,24 @@ final class Payload extends BasePayload {
 			$searchValue = trim($searchValue, '"');
 		}
 		$variations = $fn($searchValue);
+		$booster = 3;
+		$decay = 0.999;
 		if ($isPhrase) {
-			$match = '"' . implode('"|"', $variations) . '"';
+			$match = '"' . implode(
+				'"|"', array_map(
+					function ($word, $i) use ($booster, $decay) {
+						return $word . '^' . ($booster * $decay ** $i);
+					}, $variations, array_keys($variations)
+				)
+			) . '"';
 		} else {
-			$match = '(' . implode(')|(', $variations) . ')';
+			$match = '(' . implode(
+				')|(', array_map(
+					function ($word, $i) use ($booster, $decay) {
+						return $word . '^' . ($booster * $decay ** $i);
+					}, $variations, array_keys($variations)
+				)
+			) . ')';
 		}
 		return sprintf($template, $match);
 	}

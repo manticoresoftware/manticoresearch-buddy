@@ -45,8 +45,9 @@ final class Handler extends BaseHandlerWithClient {
 					$phrases = KeyboardLayout::combineMany($query, $payload->layouts);
 				}
 				$words = [];
+				$scoreMap = [];
 				foreach ($phrases as $phrase) {
-					$variations = $manticoreClient->fetchFuzzyVariations(
+					[$variations, $variationScores] = $manticoreClient->fetchFuzzyVariations(
 						$phrase,
 						$payload->table,
 						$payload->distance
@@ -55,10 +56,11 @@ final class Handler extends BaseHandlerWithClient {
 					foreach ($variations as $pos => $variation) {
 						$words[$pos] ??= [];
 						$words[$pos] = array_merge($words[$pos], $variation);
+						$scoreMap = array_merge($scoreMap, $variationScores);
 					}
 				}
 
-				$combinations = Arrays::getPositionalCombinations($words);
+				$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
 				$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
 				return $combinations;
 			};

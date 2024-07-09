@@ -72,7 +72,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError
 	 */
 	public function processPhrase(string $phrase): array {
-		$words = $this->manticoreClient->fetchFuzzyVariations(
+		[$words, $scoreMap] = $this->manticoreClient->fetchFuzzyVariations(
 			$phrase,
 			$this->payload->table,
 			$this->payload->distance
@@ -104,7 +104,7 @@ final class Handler extends BaseHandlerWithClient {
 			$words[$lastIndex] = array_unique($words[$lastIndex]);
 		}
 
-		$combinations = Arrays::getPositionalCombinations($words);
+		$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
 		$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
 
 		return $combinations;
