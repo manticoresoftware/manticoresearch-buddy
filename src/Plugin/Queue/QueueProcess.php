@@ -25,7 +25,7 @@ class QueueProcess extends BaseProcessor {
 	public function start(): array {
 		parent::start();
 
-		$this->execute('runPool');
+		$this->runPool();
 		return [];
 	}
 
