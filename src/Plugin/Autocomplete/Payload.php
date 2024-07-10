@@ -32,8 +32,17 @@ final class Payload extends BasePayload {
 	/** @var int */
 	public int $distance = 2;
 
+	/** @var array<int,int> */
+	public array $prefixLengthToEditsMap = [
+		1 => 5,
+		2 => 4,
+		3 => 3,
+		4 => 2,
+		5 => 2,
+	];
+
 	/** @var int */
-	public int $maxEdits = 5;
+	public int $prefixDistance = 1;
 
 	/** @var array<string> */
 	public array $layouts = [];
@@ -66,7 +75,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{query?:string|mixed,table?:string|mixed,options?:array{distance?:int,max_edits?:int,layouts?:string}} $payload */
+		/** @var array{query?:string|mixed,table?:string|mixed,options?:array{distance?:int,prefix_distance?:int,prefix_length_to_edits_map?:string,layouts?:string}} $payload */
 		$payload = json_decode($request->payload, true);
 		if (!isset($payload['query']) || !is_string($payload['query'])) {
 			throw new QueryParseError('Failed to parse query: make sure you have query and it is a string');
@@ -80,7 +89,13 @@ final class Payload extends BasePayload {
 		$self->query = $payload['query'];
 		$self->table = $payload['table'];
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
-		$self->maxEdits = (int)($payload['options']['max_edits'] ?? 5);
+		$self->prefixDistance = (int)($payload['options']['prefix_distance'] ?? 1);
+		if (isset($payload['options']['prefix_length_to_edits_map'])) {
+			/** @var array<int,int> $map */
+			$map = json_decode($payload['options']['prefix_length_to_edits_map'], true);
+			$self->prefixLengthToEditsMap = $map;
+		}
+
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 		return $self;
 	}
@@ -127,7 +142,7 @@ final class Payload extends BasePayload {
 			if ($key === 'layouts') {
 				$value = static::parseLayouts($value);
 			}
-			if ($key === 'distance' || $key === 'max_edits') {
+			if ($key === 'distance' || $key === 'prefix_distance' || $key === 'prefix_length_to_edits_map') {
 				$value = (int)$value;
 			}
 			$this->{$key} = $value;
