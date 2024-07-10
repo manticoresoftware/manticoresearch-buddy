@@ -124,6 +124,7 @@ final class Handler extends BaseHandlerWithClient {
 		return static function (Payload $payload, Client $client): TaskResult {
 			$ts = time();
 			$value = [];
+			$timeout = $payload->getShardingTimeout();
 			while (true) {
 				// TODO: think about the way to refactor it and remove duplication
 				$q = "select `value` from _sharding_state where `key` = 'table:{$payload->table}'";
@@ -138,7 +139,7 @@ final class Handler extends BaseHandlerWithClient {
 				if ($status !== 'processing') {
 					return TaskResult::raw($value['result']);
 				}
-				if ((time() - $ts) > 30) {
+				if ((time() - $ts) > $timeout) {
 					break;
 				}
 				Coroutine::sleep(1);
