@@ -89,12 +89,7 @@ final class Handler extends BaseHandlerWithClient {
 		$words[$lastIndex] = [];
 		foreach ($lastWords as $lastWord) {
 			// 1. Try to end the latest word with a wildcard
-			$q = "CALL KEYWORDS('{$lastWord}*', '{$this->payload->table}')";
-			/** @var array{0:array{data?:array<array{normalized:string,tokenized:string}>}} $result */
-			$result = $this->manticoreClient->sendRequest($q)->getResult();
-			foreach ($result[0]['data'] ?? [] as $row) {
-				$words[$lastIndex][] = $row['normalized'];
-			}
+			$words[$lastIndex] = array_merge($words[$lastIndex], $this->expandKeywords($lastWord));
 
 			// 2. Use suggestions for word extension in case of typos $row['su
 			$lastWordLen = strlen($lastWord);
@@ -118,9 +113,30 @@ final class Handler extends BaseHandlerWithClient {
 			$words[$lastIndex] = array_unique($words[$lastIndex]);
 		}
 
-
 		$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
 		$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
 		return $combinations;
+	}
+
+	/**
+	 * Expand the keyword with wildcards
+	 * @param string $word
+	 * @return array<string>
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 */
+	private function expandKeywords(string $word): array {
+		$keywords = [];
+		$q = "CALL KEYWORDS('{$word}*', '{$this->payload->table}')";
+		/** @var array{0:array{data?:array<array{normalized:string,tokenized:string}>}} $result */
+		$result = $this->manticoreClient->sendRequest($q)->getResult();
+		foreach ($result[0]['data'] ?? [] as $row) {
+			$keyword = $row['normalized'];
+			if ($keyword[0] === '=') {
+				$keyword = substr($keyword, 1);
+			}
+			$keywords[] = $keyword;
+		}
+		return $keywords;
 	}
 }
