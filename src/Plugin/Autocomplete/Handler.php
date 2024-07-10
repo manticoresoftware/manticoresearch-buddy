@@ -78,13 +78,18 @@ final class Handler extends BaseHandlerWithClient {
 			$this->payload->distance
 		);
 
+		// No variations? do nothing
+		if (!$words) {
+			return [];
+		}
+
 		// Expand last word with wildcard
 		$lastIndex = array_key_last($words);
 		$lastWords = $words[$lastIndex];
 		$words[$lastIndex] = [];
 		foreach ($lastWords as $lastWord) {
 			// 1. Try to end the latest word with a wildcard
-			$q = "CALL KEYWORDS('{$this->payload->table}', '{$lastWord}*')";
+			$q = "CALL KEYWORDS('{$lastWord}*', '{$this->payload->table}')";
 			/** @var array{0:array{data?:array<array{normalized:string,tokenized:string}>}} $result */
 			$result = $this->manticoreClient->sendRequest($q)->getResult();
 			foreach ($result[0]['data'] ?? [] as $row) {
@@ -113,9 +118,9 @@ final class Handler extends BaseHandlerWithClient {
 			$words[$lastIndex] = array_unique($words[$lastIndex]);
 		}
 
+
 		$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
 		$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
-
 		return $combinations;
 	}
 }

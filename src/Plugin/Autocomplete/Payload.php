@@ -75,7 +75,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{query?:string|mixed,table?:string|mixed,options?:array{distance?:int,prefix_distance?:int,prefix_length_to_edits_map?:string,layouts?:string}} $payload */
+		/** @var array{query?:string|mixed,table?:string|mixed,options?:array{distance?:int,prefix_distance?:int,prefix_length_to_edits_map?:array<int,int>,layouts?:string}} $payload */
 		$payload = json_decode($request->payload, true);
 		if (!isset($payload['query']) || !is_string($payload['query'])) {
 			throw new QueryParseError('Failed to parse query: make sure you have query and it is a string');
@@ -91,9 +91,7 @@ final class Payload extends BasePayload {
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->prefixDistance = (int)($payload['options']['prefix_distance'] ?? 1);
 		if (isset($payload['options']['prefix_length_to_edits_map'])) {
-			/** @var array<int,int> $map */
-			$map = json_decode($payload['options']['prefix_length_to_edits_map'], true);
-			$self->prefixLengthToEditsMap = $map;
+			$self->prefixLengthToEditsMap = $payload['options']['prefix_length_to_edits_map'];
 		}
 
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
@@ -142,9 +140,14 @@ final class Payload extends BasePayload {
 			if ($key === 'layouts') {
 				$value = static::parseLayouts($value);
 			}
-			if ($key === 'distance' || $key === 'prefix_distance' || $key === 'prefix_length_to_edits_map') {
+			if ($key === 'distance' || $key === 'prefix_distance') {
 				$value = (int)$value;
 			}
+			if ($key === 'prefix_length_to_edits_map' && is_string($value)) {
+				/** @var string $value */
+				$value = json_decode($value, true);
+			}
+
 			$this->{$key} = $value;
 		}
 	}
