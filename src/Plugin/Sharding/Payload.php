@@ -68,7 +68,7 @@ final class Payload extends BasePayload {
 		/** @var array{table:string,cluster?:string,structure:string,extra:string} $matches */
 		$options = [];
 		if ($matches['extra']) {
-			$pattern = '/(?P<key>rf|shards)\s*=\s*(?P<value>\'?\d+\'?)/';
+			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*(?P<value>\'?\d+\'?)/';
 			if (preg_match_all($pattern, $matches['extra'], $optionMatches, PREG_SET_ORDER)) {
 				foreach ($optionMatches as $optionMatch) {
 					$key = strtolower($optionMatch['key']);
@@ -116,6 +116,18 @@ final class Payload extends BasePayload {
 		if (!$this->cluster && $this->options['rf'] > 1) {
 			throw QueryParseError::create('You cannot set rf greater than 1 when creating single node sharded table.');
 		}
+
+		if (isset($this->options['timeout']) && $this->options['timeout'] < 0) {
+			throw QueryParseError::create('You cannot set timeout less than 0');
+		}
+	}
+
+	/**
+	 * Get sharding timeout
+	 * @return int
+	 */
+	public function getShardingTimeout(): int {
+		return $this->options['timeout'] ?? 30;
 	}
 
 	/**
