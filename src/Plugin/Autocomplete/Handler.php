@@ -95,7 +95,7 @@ final class Handler extends BaseHandlerWithClient {
 			$lastWordLen = strlen($lastWord);
 			$maxEdits = $this->payload->prefixLengthToEditsMap[$lastWordLen] ?? 0;
 			if ($maxEdits > 0) {
-				$optionsString = "{$maxEdits} as max_edits, 100 as limit";
+				$optionsString = "{$maxEdits} as max_edits, 10 as limit";
 				$q = "CALL SUGGEST('{$lastWord}*', '{$this->payload->table}', {$optionsString})";
 				/** @var array{0:array{data?:array<array{suggest:string}>}} $result */
 				$result = $this->manticoreClient->sendRequest($q)->getResult();
