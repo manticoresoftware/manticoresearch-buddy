@@ -106,16 +106,22 @@ final class Queue {
 		if ($query['wait_for_id']) {
 			$waitFor = $this->getById($query['wait_for_id']);
 			if ($waitFor && $waitFor['status'] !== 'processed') {
-				Buddy::debugv("Wait for ID: {$query['wait_for_id']} [{$waitFor['status']}]");
+				Buddy::debugv("Sharding queue: wait for {$query['wait_for_id']} [{$waitFor['status']}]");
 				return true;
 			}
 		}
 
-		// We try to keep it inside 30 second frame
-		$timeSinceLastAttempt = time() - $query['updated_at'];
-		$maxAttemptTime = ceil(pow(1.4, $query['tries']));
-		if ($timeSinceLastAttempt >= $maxAttemptTime) {
-			return true;
+		// Do the delay check only for queries that were processed at least once
+		if ($query['tries'] > 0) {
+			$timeSinceLastAttempt = (int)(microtime(true) * 1000) - $query['updated_at'];
+			$maxAttemptTime = (int)ceil(pow(1.21, $query['tries']) * 1000);
+			if ($timeSinceLastAttempt < $maxAttemptTime) {
+				Buddy::debugv(
+					"Sharding queue: delay {$query['id']} with {$query['tries']} tries"
+						." due to {$timeSinceLastAttempt}ms < {$maxAttemptTime}ms"
+				);
+				return true;
+			}
 		}
 
 		return !$this->attemptToUpdateStatus($query, 'processing', 0);
@@ -194,6 +200,7 @@ final class Queue {
 				AND
 				`tries` < {$maxTries}
 			ORDER BY `id` ASC
+			LIMIT 1000
 		";
 
 		/** @var array{0?:array{data?:array<array<mixed>>}} */

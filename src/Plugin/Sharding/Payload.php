@@ -127,7 +127,7 @@ final class Payload extends BasePayload {
 	 * @return int
 	 */
 	public function getShardingTimeout(): int {
-		return $this->options['timeout'] ?? 30;
+		return (int)($this->options['timeout'] ?? 30);
 	}
 
 	/**
