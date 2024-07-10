@@ -264,7 +264,7 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 
 		$sql = /** @lang ManticoreSearch */
 			'CREATE TABLE ' . Payload::VIEWS_TABLE_NAME .
-			' (id bigint, name text, source_name text, destination_name text, ' .
+			' (id bigint, name text attribute indexed, source_name text, destination_name text, ' .
 			'query text, original_query text, suspended bool)';
 
 		$request = $manticoreClient->sendRequest($sql);
