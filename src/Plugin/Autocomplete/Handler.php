@@ -91,13 +91,22 @@ final class Handler extends BaseHandlerWithClient {
 				$words[$lastIndex][] = $row['normalized'];
 			}
 
-			// 2. Use suggestions for word extension in case of typos
-			$optionsString = "{$this->payload->maxEdits} as max_edits";
-			$q = "CALL SUGGEST('{$lastWord}*', '{$this->payload->table}', {$optionsString})";
-			/** @var array{0:array{data?:array<array{suggest:string}>}} $result */
-			$result = $this->manticoreClient->sendRequest($q)->getResult();
-			foreach ($result[0]['data'] ?? [] as $row) {
-				$words[$lastIndex][] = $row['suggest'];
+			// 2. Use suggestions for word extension in case of typos $row['su
+			$lastWordLen = strlen($lastWord);
+			$maxEdits = $this->payload->prefixLengthToEditsMap[$lastWordLen] ?? 0;
+			if ($maxEdits > 0) {
+				$optionsString = "{$maxEdits} as max_edits, 100 as limit";
+				$q = "CALL SUGGEST('{$lastWord}*', '{$this->payload->table}', {$optionsString})";
+				/** @var array{0:array{data?:array<array{suggest:string}>}} $result */
+				$result = $this->manticoreClient->sendRequest($q)->getResult();
+				foreach ($result[0]['data'] ?? [] as $row) {
+					// Check the prefix on Levenshtein distance and filter out unsuited autocompletes
+					$prefix = substr($row['suggest'], 0, $lastWordLen);
+					if (levenshtein($lastWord, $prefix) > $this->payload->prefixDistance) {
+						continue;
+					}
+					$words[$lastIndex][] = $row['suggest'];
+				}
 			}
 
 			// 3. Make sure we have unique fill up
