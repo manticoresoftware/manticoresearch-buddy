@@ -47,11 +47,7 @@ final class Handler extends BaseHandlerWithClient {
 				$phrases = KeyboardLayout::combineMany($this->payload->query, $this->payload->layouts);
 			}
 
-			$suggestions = [];
-			foreach ($phrases as $phrase) {
-				$combinations = $this->processPhrase($phrase);
-				$suggestions = array_merge($suggestions, $combinations);
-			}
+			$suggestions = $this->getSuggestions($phrases);
 			// Preparing the final result with suggestions
 			$data = [];
 			foreach ($suggestions as $suggestion) {
@@ -62,6 +58,36 @@ final class Handler extends BaseHandlerWithClient {
 
 		$task = Task::create($taskFn, []);
 		return $task->run();
+	}
+
+	/**
+	 * @param array<string> $phrases
+	 * @return array<string>
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 */
+	public function getSuggestions(array $phrases): array {
+		$combinationSets = [];
+		$maxCount = 0;
+		foreach ($phrases as $phrase) {
+			$suggestions = $this->processPhrase($phrase);
+			$maxCount = max($maxCount, sizeof($suggestions));
+			$combinationSets[] = $suggestions;
+		}
+
+		// Combine it in relevant order
+		$suggestions = [];
+		for ($i = 0; $i < $maxCount; $i++) {
+			foreach ($combinationSets as $combinationSet) {
+				if (!isset($combinationSet[$i])) {
+					continue;
+				}
+
+				$suggestions[] = $combinationSet[$i];
+			}
+		}
+
+		return $suggestions;
 	}
 
 	/**
