@@ -76,17 +76,8 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		// Combine it in relevant order
-		$suggestions = [];
-		for ($i = 0; $i < $maxCount; $i++) {
-			foreach ($combinationSets as $combinationSet) {
-				if (!isset($combinationSet[$i])) {
-					continue;
-				}
-
-				$suggestions[] = $combinationSet[$i];
-			}
-		}
-
+		/** @var array<string> $suggestions */
+		$suggestions = Arrays::blend(...$combinationSets);
 		return $suggestions;
 	}
 
@@ -140,14 +131,12 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
+		/** @var array<string> $combinations */
 		$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
 
 		// If the original phrase in the list, we add it to the beginning to boost weight
-		$key = array_search($phrase, $combinations);
-		if (is_int($key)) {
-			array_splice($combinations, $key, 1);
-			array_unshift($combinations, $phrase);
-		}
+		$combinations = Arrays::boostListValues($combinations, [$phrase]);
+		/** @var array<string> $combinations */
 		return $combinations;
 	}
 

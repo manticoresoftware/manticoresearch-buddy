@@ -55,13 +55,18 @@ final class Handler extends BaseHandlerWithClient {
 					// Extend varitions for each iteration we have
 					foreach ($variations as $pos => $variation) {
 						$words[$pos] ??= [];
-						$words[$pos] = array_merge($words[$pos], $variation);
-						$scoreMap = array_merge($scoreMap, $variationScores);
+						$words[$pos] = Arrays::blend($words[$pos], $variation);
+						$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
 					}
 				}
 
+				/** @var array<array<string>> $words */
 				$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
+				/** @var array<string> $combinations */
 				$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
+
+				// If the original phrase in the list, we add it to the beginning to boost weight
+				$combinations = Arrays::boostListValues($combinations, $phrases);
 				return $combinations;
 			};
 			$request = $payload->getQueriesRequest($fn);
