@@ -115,6 +115,13 @@ final class Handler extends BaseHandlerWithClient {
 
 		$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
 		$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
+
+		// If the original phrase in the list, we add it to the beginning to boost weight
+		$key = array_search($phrase, $combinations);
+		if (is_int($key)) {
+			array_splice($combinations, $key, 1);
+			array_unshift($combinations, $phrase);
+		}
 		return $combinations;
 	}
 
