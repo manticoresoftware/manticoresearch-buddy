@@ -95,7 +95,7 @@ final class Handler extends BaseHandlerWithClient {
 			$lastWordLen = strlen($lastWord);
 			$maxEdits = $this->payload->prefixLengthToEditsMap[$lastWordLen] ?? 0;
 			if ($maxEdits > 0) {
-				$optionsString = "{$maxEdits} as max_edits, 10 as limit";
+				$optionsString = "{$maxEdits} as max_edits, 100 as limit";
 				$q = "CALL SUGGEST('{$lastWord}*', '{$this->payload->table}', {$optionsString})";
 				/** @var array{0:array{data?:array<array{suggest:string}>}} $result */
 				$result = $this->manticoreClient->sendRequest($q)->getResult();
@@ -127,10 +127,16 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private function expandKeywords(string $word): array {
 		$keywords = [];
-		$q = "CALL KEYWORDS('{$word}*', '{$this->payload->table}')";
-		/** @var array{0:array{data?:array<array{normalized:string,tokenized:string}>}} $result */
+		$q = "CALL KEYWORDS('{$word}*', '{$this->payload->table}', 1 as stats, 'docs' as sort_mode)";
+		/** @var array{0:array{data?:array<array{normalized:string,tokenized:string,docs:int}>}} $result */
 		$result = $this->manticoreClient->sendRequest($q)->getResult();
-		foreach ($result[0]['data'] ?? [] as $row) {
+		$data = $result[0]['data'] ?? [];
+		$avgDocs = array_sum(array_column($data, 'docs')) / sizeof($data);
+		$minDocs = $avgDocs * 0.5;
+		foreach ($data as $row) {
+			if ($row['docs'] < $minDocs) {
+				break;
+			}
 			$keyword = $row['normalized'];
 			if ($keyword[0] === '=') {
 				$keyword = substr($keyword, 1);
