@@ -162,21 +162,22 @@ final class Payload extends BasePayload {
 			$searchValue = trim($searchValue, '"');
 		}
 		$variations = $fn($searchValue);
-		$booster = 10;
-		$decay = 0.9;
+		$maxBoost = 50;
+		$decreaseFactor = 1.44;
+		$boosterFn = fn($i) => max($maxBoost / (($i + 1) ^ $decreaseFactor), 1);
 		if ($isPhrase) {
 			$match = '"' . implode(
 				'"|"', array_map(
-					function ($word, $i) use ($booster, $decay) {
-						return $word . '^' . ($booster * $decay ** $i);
+					function ($word, $i) use ($boosterFn) {
+						return $word . '^' . $boosterFn($i);
 					}, $variations, array_keys($variations)
 				)
 			) . '"';
 		} else {
 			$match = '(' . implode(
 				')|(', array_map(
-					function ($word, $i) use ($booster, $decay) {
-						return $word . '^' . ($booster * $decay ** $i);
+					function ($word, $i) use ($boosterFn) {
+						return $word . '^' . $boosterFn($i);
 					}, $variations, array_keys($variations)
 				)
 			) . ')';
