@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
@@ -23,6 +24,9 @@ use RuntimeException;
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
+	const MAX_BOOST = 50;
+	const DECREASE_FACTOR = 1.44;
+
 	/** @var string */
 	public string $path;
 
@@ -161,27 +165,26 @@ final class Payload extends BasePayload {
 			$isPhrase = true;
 			$searchValue = trim($searchValue, '"');
 		}
+		/** @var array<string> $variations */
 		$variations = $fn($searchValue);
-		$maxBoost = 50;
-		$decreaseFactor = 1.44;
-		$boosterFn = fn($i) => max($maxBoost / (($i + 1) ^ $decreaseFactor), 1);
 		if ($isPhrase) {
 			$match = '"' . implode(
 				'"|"', array_map(
-					function ($word, $i) use ($boosterFn) {
-						return $word . '^' . $boosterFn($i);
+					function ($word, $i) {
+						return $word . '^' . static::getBoostValue($i);
 					}, $variations, array_keys($variations)
 				)
 			) . '"';
 		} else {
 			$match = '(' . implode(
 				')|(', array_map(
-					function ($word, $i) use ($boosterFn) {
-						return $word . '^' . $boosterFn($i);
+					function ($word, $i) {
+						return $word . '^' . static::getBoostValue($i);
 					}, $variations, array_keys($variations)
 				)
 			) . ')';
 		}
+		Buddy::debugv("Fuzzy match: $match");
 		return sprintf($template, $match);
 	}
 
@@ -222,6 +225,15 @@ final class Payload extends BasePayload {
 			throw new RuntimeException('Cannot encode JSON');
 		}
 		return $encoded;
+	}
+
+	/**
+	 * Calculate the boost value depending on the position
+	 * @param int $i
+	 * @return float
+	 */
+	private static function getBoostValue(int $i): float {
+		return max(static::MAX_BOOST / (($i + 1) ^ static::DECREASE_FACTOR), 1);
 	}
 
 	/**
