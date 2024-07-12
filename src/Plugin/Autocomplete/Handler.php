@@ -124,8 +124,8 @@ final class Handler extends BaseHandlerWithClient {
 				$suggestions = array_column(static::applyThreshold($data, 0.5, 20), 'suggest');
 				$thresholdSuggestionsCount = sizeof($suggestions);
 				$suggestions = array_filter(
-					$suggestions, function ($suggestion) use ($lastWord, $lastWordLen) {
-					// Check the prefix on Levenshtein distance and filter out unsuited autocompletes
+					$suggestions, function (string $suggestion) use ($lastWord, $lastWordLen) {
+						// Check the prefix on Levenshtein distance and filter out unsuited autocompletes
 						$prefix = substr($suggestion, 0, $lastWordLen);
 						if (levenshtein($lastWord, $prefix) > $this->payload->prefixDistance) {
 							return false;
@@ -178,7 +178,7 @@ final class Handler extends BaseHandlerWithClient {
 			return [];
 		}
 		/** @var array<keyword> */
-		$data = static::applyThreshold($data);
+		$data = static::applyThreshold($data, 0.5);
 		/** @var array<string> */
 		$keywords = array_map(
 			fn($row) => $row['normalized'][0] === '='
@@ -224,7 +224,7 @@ final class Handler extends BaseHandlerWithClient {
 		$filteredDocs = array_filter(
 			$documents, static function ($doc) use ($avgDocs, $threshold) {
 			// Keep documents with docs count above average * threshold
-				return $doc['docs'] >= ($avgDocs * $threshold);
+				return $doc['docs'] > 0 && $doc['docs'] >= ($avgDocs * $threshold);
 			}
 		);
 

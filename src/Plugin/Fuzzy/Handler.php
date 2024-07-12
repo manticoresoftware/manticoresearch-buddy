@@ -57,7 +57,8 @@ final class Handler extends BaseHandlerWithClient {
 					// Extend varitions for each iteration we have
 					foreach ($variations as $pos => $variation) {
 						$words[$pos] ??= [];
-						$words[$pos] = Arrays::blend($words[$pos], $variation);
+						$blend = Arrays::blend($words[$pos], $variation);
+						$words[$pos] = array_values(array_unique($blend));
 						$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
 					}
 				}

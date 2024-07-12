@@ -184,6 +184,10 @@ final class Payload extends BasePayload {
 				)
 			) . ')';
 		}
+		// Edge case when nothing to match, use original phrase as fallback
+		if (!$variations) {
+			$match = $searchValue;
+		}
 		Buddy::debug("Fuzzy: match: $match");
 		return sprintf($template, $match);
 	}
@@ -234,7 +238,7 @@ final class Payload extends BasePayload {
 	 * @return float
 	 */
 	private static function getBoostValue(int $i): float {
-		return max(static::MAX_BOOST / (($i + 1) ^ static::DECREASE_FACTOR), 1);
+		return max(static::MAX_BOOST / pow($i + 1, static::DECREASE_FACTOR), 1);
 	}
 
 	/**
