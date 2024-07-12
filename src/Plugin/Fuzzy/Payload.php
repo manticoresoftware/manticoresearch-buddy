@@ -184,7 +184,7 @@ final class Payload extends BasePayload {
 				)
 			) . ')';
 		}
-		Buddy::debugv("Fuzzy match: $match");
+		Buddy::debug("Fuzzy: match: $match");
 		return sprintf($template, $match);
 	}
 
@@ -197,6 +197,7 @@ final class Payload extends BasePayload {
 		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $request */
 		$request = $this->payload;
 		$queries = static::parseQueryMatches($request['query']);
+		Buddy::debug('Fuzzy: parsed queries: ' . implode(', ', $queries));
 		foreach ($queries as $keyPath => $query) {
 			$options = $fn($query);
 			$should = [];

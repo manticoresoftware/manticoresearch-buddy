@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
@@ -52,6 +53,7 @@ final class Handler extends BaseHandlerWithClient {
 						$payload->table,
 						$payload->distance
 					);
+					Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
 					// Extend varitions for each iteration we have
 					foreach ($variations as $pos => $variation) {
 						$words[$pos] ??= [];
@@ -64,7 +66,6 @@ final class Handler extends BaseHandlerWithClient {
 				$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
 				/** @var array<string> $combinations */
 				$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
-
 				// If the original phrase in the list, we add it to the beginning to boost weight
 				$combinations = Arrays::boostListValues($combinations, $phrases);
 				return $combinations;
