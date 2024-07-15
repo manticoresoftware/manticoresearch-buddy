@@ -92,15 +92,22 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError
 	 */
 	public function processPhrase(string $phrase): array {
-		[$words, $scoreMap] = $this->manticoreClient->fetchFuzzyVariations(
-			$phrase,
-			$this->payload->table,
-			$this->payload->fuzziness
-		);
+		$words = $scoreMap = [];
+		// Do query only in case we have fuzzy activated
+		$distance = $this->getLevenshteinDistance($phrase);
+		if ($distance > 0) {
+			[$words, $scoreMap] = $this->manticoreClient->fetchFuzzyVariations(
+				$phrase,
+				$this->payload->table,
+				$distance
+			);
+		}
 
+		// If no words found, we just add the original phrase
 		if (!$words) {
 			$words = [[$phrase]];
 		}
+
 		Buddy::debug("Autocomplete: variations for '$phrase': " . json_encode($words));
 
 		// Expand last word with wildcard
@@ -127,6 +134,26 @@ final class Handler extends BaseHandlerWithClient {
 		$combinations = Arrays::boostListValues($combinations, [$phrase]);
 		/** @var array<string> $combinations */
 		return $combinations;
+	}
+
+	/**
+	 * Get levenshtein distance for the given word on auto or not algorithm
+	 * @param string $word
+	 * @return int
+	 */
+	private function getLevenshteinDistance(string $word): int {
+		if (!$this->payload->fuzziness) {
+			return 0;
+		}
+		$wordLen = strlen($word);
+		// If we set fuzziness, we choose minimal distance from out algo and parameter set
+		return min(
+			$this->payload->fuzziness, match (true) {
+			$wordLen > 6 => 2,
+			$wordLen > 2 => 1,
+			default => 0,
+			}
+		);
 	}
 
 	/**
@@ -169,12 +196,13 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError
 	 */
 	private function expandSuggestions(string $lastWord): array {
-		$lastWordLen = strlen($lastWord);
-		$maxEdits = $this->payload->prefixLengthToEditsMap[$lastWordLen] ?? 0;
-		if (!$maxEdits) {
+		$distance = $this->getLevenshteinDistance($lastWord);
+		if (!$distance) {
 			return [];
 		}
 
+		$lastWordLen = strlen($lastWord);
+		$maxEdits = $this->payload->expansionLimit;
 		$optionsString = "{$maxEdits} as max_edits, 100 as limit, 1 as result_stats";
 		$match = $this->getExpansionWordMatch($lastWord);
 		$q = "CALL SUGGEST('{$match}', '{$this->payload->table}', {$optionsString})";
@@ -185,16 +213,33 @@ final class Handler extends BaseHandlerWithClient {
 		/** @var array<string> */
 		$suggestions = array_column(static::applyThreshold($data, 0.5, 20), 'suggest');
 		$thresholdSuggestionsCount = sizeof($suggestions);
-		$suggestions = array_filter(
-			$suggestions, function (string $suggestion) use ($lastWord, $lastWordLen) {
-				// Check the prefix on Levenshtein distance and filter out unsuited autocompletes
-				$prefix = substr($suggestion, 0, $lastWordLen);
-				if (levenshtein($lastWord, $prefix) > $this->payload->prefixDistance) {
-					return false;
-				}
+		$filterFn = function (string $suggestion) use ($lastWord, $lastWordLen, $distance) {
+			// First check case when we have exact match of not filled up word and it's in beginning or ending
+			// with maximum allowed distance
+			$lastWordPos = strpos($suggestion, $lastWord);
+			if ($this->payload->prepend && $lastWordPos !== false && $lastWordPos <= $distance) {
 				return true;
 			}
-		);
+
+			if ($this->payload->append && $lastWordPos !== false && ($lastWordLen - $lastWordPos) <= $distance) {
+				return true;
+			}
+
+			// Validate levenstein now for prefix or suffix
+			$prefix = substr($suggestion, 0, $lastWordLen);
+			if ($this->payload->prepend && levenshtein($lastWord, $prefix) <= $distance) {
+				return true;
+			}
+
+			$suffix = substr($suggestion, -$lastWordLen);
+			if ($this->payload->append && levenshtein($lastWord, $suffix) <= $distance) {
+				return true;
+			}
+
+			return false;
+		};
+
+		$suggestions = array_filter($suggestions, $filterFn);
 		$finalSuggestionsCount = sizeof($suggestions);
 		Buddy::debug(
 			'Autocomplete: filtering counters: ' .

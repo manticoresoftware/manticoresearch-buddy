@@ -30,28 +30,19 @@ final class Payload extends BasePayload {
 	public string $query;
 
 	/** @var int */
-	public int $fuzziness = 2;
+	public int $fuzziness;
 
 	/** @var bool */
-	public bool $prepend = true;
+	public bool $prepend;
 
 	/** @var bool */
-	public bool $append = true;
-
-	/** @var array<int,int> */
-	public array $prefixLengthToEditsMap = [
-		1 => 5,
-		2 => 4,
-		3 => 3,
-		4 => 2,
-		5 => 2,
-	];
+	public bool $append;
 
 	/** @var int */
-	public int $prefixDistance = 1;
+	public int $expansionLimit;
 
 	/** @var array<string> */
-	public array $layouts = [];
+	public array $layouts;
 
 	public function __construct() {
 	}
@@ -88,8 +79,7 @@ final class Payload extends BasePayload {
 					fuzziness?: int,
 					append?: int,
 					prepend?: int,
-					prefix_distance?: int,
-					prefix_length_to_edits_map?: array<int, int>,
+					expansion_limit?: int,
 					layouts?: string
 			}
 		} $payload */
@@ -108,13 +98,25 @@ final class Payload extends BasePayload {
 		$self->fuzziness = (int)($payload['options']['fuzziness'] ?? 2);
 		$self->prepend = !!($payload['options']['prepend'] ?? true);
 		$self->append = !!($payload['options']['append'] ?? true);
-		$self->prefixDistance = (int)($payload['options']['prefix_distance'] ?? 1);
-		if (isset($payload['options']['prefix_length_to_edits_map'])) {
-			$self->prefixLengthToEditsMap = $payload['options']['prefix_length_to_edits_map'];
+		$self->expansionLimit = (int)($payload['options']['expansion_limit'] ?? 10);
+		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
+		$self->validate();
+		return $self;
+	}
+
+	/**
+	 * Validate and throw error in case some parameters are not valid
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private function validate(): void {
+		if ($this->fuzziness < 0 || $this->fuzziness > 2) {
+			throw new QueryParseError('Fuzziness must be greater than 0 and lower than 3');
 		}
 
-		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
-		return $self;
+		if ($this->expansionLimit < 0 || $this->expansionLimit > 20) {
+			throw new QueryParseError('Expansion limit must be greater than 0 and lower than 20');
+		}
 	}
 
 	/**
@@ -172,17 +174,12 @@ final class Payload extends BasePayload {
 		if ($key === 'layouts') {
 			$value = static::parseLayouts($value);
 		}
-		if ($key === 'fuzziness' || $key === 'prefix_distance') {
+		if ($key === 'fuzziness' || $key === 'expansion_limit') {
 			$value = (int)$value;
 		}
 
 		if ($key === 'prepend' || $key === 'append') {
 			$value = (bool)$value;
-		}
-
-		if ($key === 'prefix_length_to_edits_map' && is_string($value)) {
-			/** @var string $value */
-			$value = json_decode($value, true);
 		}
 
 		return $value;
