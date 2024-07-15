@@ -43,12 +43,12 @@ class QueueProcess extends BaseProcessor {
 	public function runPool(): void {
 
 		if (!$this->client->hasTable(Payload::SOURCE_TABLE_NAME)) {
-			Buddy::debug('Queue source table not exist. Exit queue process pool');
+			Buddy::debug('Queue source table does not exist. Exiting queue process pool');
 			return;
 		}
 
 		if (!$this->client->hasTable(Payload::VIEWS_TABLE_NAME)) {
-			Buddy::debug('Queue views table not exist. Exit queue process pool');
+			Buddy::debug('Queue views table does not exist. Exiting queue process pool');
 			return;
 		}
 
