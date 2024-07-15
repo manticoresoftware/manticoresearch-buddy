@@ -57,7 +57,7 @@ final class Handler extends BaseHandlerWithClient {
 				default => 10,
 			};
 			$suggestions = $this->getSuggestions($phrases, $maxCount);
-			$this->sortSuggestions($suggestions);
+			$this->sortSuggestions($suggestions, $phrases);
 
 			// Preparing the final result with suggestions
 			$data = [];
@@ -100,23 +100,36 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Sort the suggestions by the prefix and suffix depending on request parameters
 	 * @param array<string> &$suggestions
+	 * @param array<string> $phrases
 	 * @return void
 	 */
-	public function sortSuggestions(array &$suggestions): void {
-		uasort($suggestions, [$this, 'compareSuggestions']);
+	public function sortSuggestions(array &$suggestions, array $phrases): void {
+		uasort(
+			$suggestions, function ($a, $b) use ($phrases) {
+				return $this->compareSuggestions($a, $b, $phrases);
+			}
+		);
 	}
 
 	/**
 	 * @param string $a
 	 * @param string $b
+	 * @param array<string> $phrases
 	 * @return int
 	 */
-	private function compareSuggestions(string $a, string $b): int {
+	private function compareSuggestions(string $a, string $b, array $phrases): int {
 		$query = $this->payload->query;
 		$aPrefix = $this->isPrefix($a, $query);
 		$bPrefix = $this->isPrefix($b, $query);
 		$aSuffix = $this->isSuffix($a, $query);
 		$bSuffix = $this->isSuffix($b, $query);
+		$aPhrasePrefix = $this->startsWithAnyPhrase($a, $phrases);
+		$bPhrasePrefix = $this->startsWithAnyPhrase($b, $phrases);
+
+		// Check for phrase prefixing first
+		if ($aPhrasePrefix !== $bPhrasePrefix) {
+			return $aPhrasePrefix ? -1 : 1;
+		}
 
 		if ($aPrefix !== $bPrefix) {
 			return $aPrefix ? -1 : 1;
@@ -145,6 +158,20 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private function isSuffix(string $str, string $query): bool {
 		return $this->payload->prepend && str_ends_with($str, $query);
+	}
+
+	/**
+	 * @param string $str
+	 * @param array<string> $phrases
+	 * @return bool
+	 */
+	private function startsWithAnyPhrase(string $str, array $phrases): bool {
+		foreach ($phrases as $phrase) {
+			if (str_starts_with(strtolower($str), strtolower($phrase))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -212,9 +239,9 @@ final class Handler extends BaseHandlerWithClient {
 		// If we set fuzziness, we choose minimal distance from out algo and parameter set
 		return min(
 			$this->payload->fuzziness, match (true) {
-			$wordLen > 6 => 2,
-			$wordLen > 2 => 1,
-			default => 0,
+				$wordLen > 6 => 2,
+				$wordLen > 2 => 1,
+				default => 0,
 			}
 		);
 	}
@@ -367,7 +394,7 @@ final class Handler extends BaseHandlerWithClient {
 		// Filter documents
 		$filteredDocs = array_filter(
 			$documents, static function ($doc) use ($avgDocs, $threshold) {
-			// Keep documents with docs count above average * threshold
+				// Keep documents with docs count above average * threshold
 				return $doc['docs'] > 0 && $doc['docs'] >= ($avgDocs * $threshold);
 			}
 		);
