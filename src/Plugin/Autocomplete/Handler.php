@@ -95,7 +95,7 @@ final class Handler extends BaseHandlerWithClient {
 		[$words, $scoreMap] = $this->manticoreClient->fetchFuzzyVariations(
 			$phrase,
 			$this->payload->table,
-			$this->payload->distance
+			$this->payload->fuzziness
 		);
 
 		if (!$words) {
@@ -109,46 +109,15 @@ final class Handler extends BaseHandlerWithClient {
 		$words[$lastIndex] = [];
 		foreach ($lastWords as $lastWord) {
 			// 1. Try to end the latest word with a wildcard
-			$words[$lastIndex] = array_merge($words[$lastIndex], $this->expandKeywords($lastWord));
-			// 2. Use suggestions for word extension in case of typos $row['su
-			$lastWordLen = strlen($lastWord);
-			$maxEdits = $this->payload->prefixLengthToEditsMap[$lastWordLen] ?? 0;
-			if ($maxEdits > 0) {
-				$optionsString = "{$maxEdits} as max_edits, 100 as limit, 1 as result_stats";
-				$q = "CALL SUGGEST('{$lastWord}*', '{$this->payload->table}', {$optionsString})";
-				/** @var array{0:array{data?:array<suggestion>}} $result */
-				$result = $this->manticoreClient->sendRequest($q)->getResult();
-				$data = $result[0]['data'] ?? [];
-				$rawSuggestionsCount = sizeof($data);
-				/** @var array<string> */
-				$suggestions = array_column(static::applyThreshold($data, 0.5, 20), 'suggest');
-				$thresholdSuggestionsCount = sizeof($suggestions);
-				$suggestions = array_filter(
-					$suggestions, function (string $suggestion) use ($lastWord, $lastWordLen) {
-						// Check the prefix on Levenshtein distance and filter out unsuited autocompletes
-						$prefix = substr($suggestion, 0, $lastWordLen);
-						if (levenshtein($lastWord, $prefix) > $this->payload->prefixDistance) {
-							return false;
-						}
-						return true;
-					}
-				);
-				$finalSuggestionsCount = sizeof($suggestions);
-				Buddy::debug(
-					'Autocomplete: filtering counters: ' .
-						"raw: $rawSuggestionsCount, " .
-						"threshold: $thresholdSuggestionsCount, " .
-						"final: $finalSuggestionsCount"
-				);
-				Buddy::debug(
-					"Autocomplete: filtered suggestions for '$lastWord*' [" .
-						implode(', ', $suggestions) .
-						']'
-				);
-				$words[$lastIndex] = array_merge($words[$lastIndex], $suggestions);
-			}
+			$keywords = $this->expandKeywords($lastWord);
 
-			// 3. Make sure we have unique fill up
+			// 2. Use suggestions for word extension in case of typos $row['su
+			$suggestions = $this->expandSuggestions($lastWord);
+
+			// 3. Merge it all
+			$words[$lastIndex] = array_merge($words[$lastIndex], $keywords, $suggestions);
+
+			// 4. Make sure we have unique fill up
 			$words[$lastIndex] = array_unique($words[$lastIndex]);
 		}
 		$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
@@ -169,7 +138,8 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private function expandKeywords(string $word): array {
 		$keywords = [];
-		$q = "CALL KEYWORDS('{$word}*', '{$this->payload->table}', 1 as stats, 'docs' as sort_mode)";
+		$match = $this->getExpansionWordMatch($word);
+		$q = "CALL KEYWORDS('{$match}', '{$this->payload->table}', 1 as stats, 'docs' as sort_mode)";
 		/** @var array{0:array{data?:array<keyword>}} $result */
 		$result = $this->manticoreClient->sendRequest($q)->getResult();
 		$data = $result[0]['data'] ?? [];
@@ -189,6 +159,72 @@ final class Handler extends BaseHandlerWithClient {
 
 		Buddy::debug("Autocomplete: expanded keywords for '$word*' [" . implode(', ', $keywords) . ']');
 		return $keywords;
+	}
+
+	/**
+	 * Expand the suggestions for the given word and filter it by out levenshtein distance
+	 * @param string $lastWord
+	 * @return array<string>
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 */
+	private function expandSuggestions(string $lastWord): array {
+		$lastWordLen = strlen($lastWord);
+		$maxEdits = $this->payload->prefixLengthToEditsMap[$lastWordLen] ?? 0;
+		if (!$maxEdits) {
+			return [];
+		}
+
+		$optionsString = "{$maxEdits} as max_edits, 100 as limit, 1 as result_stats";
+		$match = $this->getExpansionWordMatch($lastWord);
+		$q = "CALL SUGGEST('{$match}', '{$this->payload->table}', {$optionsString})";
+		/** @var array{0:array{data?:array<suggestion>}} $result */
+		$result = $this->manticoreClient->sendRequest($q)->getResult();
+		$data = $result[0]['data'] ?? [];
+		$rawSuggestionsCount = sizeof($data);
+		/** @var array<string> */
+		$suggestions = array_column(static::applyThreshold($data, 0.5, 20), 'suggest');
+		$thresholdSuggestionsCount = sizeof($suggestions);
+		$suggestions = array_filter(
+			$suggestions, function (string $suggestion) use ($lastWord, $lastWordLen) {
+				// Check the prefix on Levenshtein distance and filter out unsuited autocompletes
+				$prefix = substr($suggestion, 0, $lastWordLen);
+				if (levenshtein($lastWord, $prefix) > $this->payload->prefixDistance) {
+					return false;
+				}
+				return true;
+			}
+		);
+		$finalSuggestionsCount = sizeof($suggestions);
+		Buddy::debug(
+			'Autocomplete: filtering counters: ' .
+				"raw: $rawSuggestionsCount, " .
+				"threshold: $thresholdSuggestionsCount, " .
+				"final: $finalSuggestionsCount"
+		);
+		Buddy::debug(
+			"Autocomplete: filtered suggestions for '$lastWord*' [" .
+				implode(', ', $suggestions) .
+				']'
+		);
+
+		return $suggestions;
+	}
+
+	/**
+	 * Execute prepend and append logic and expand the word match
+	 * @param string $word
+	 * @return string
+	 */
+	private function getExpansionWordMatch(string $word): string {
+		$match = $word;
+		if ($this->payload->append) {
+			$match = "$word*";
+		}
+		if ($this->payload->prepend) {
+			$match = "*$word";
+		}
+		return $match;
 	}
 
 	/**

@@ -30,7 +30,13 @@ final class Payload extends BasePayload {
 	public string $query;
 
 	/** @var int */
-	public int $distance = 2;
+	public int $fuzziness = 2;
+
+	/** @var bool */
+	public bool $prepend = true;
+
+	/** @var bool */
+	public bool $append = true;
 
 	/** @var array<int,int> */
 	public array $prefixLengthToEditsMap = [
@@ -75,7 +81,18 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{query?:string|mixed,table?:string|mixed,options?:array{distance?:int,prefix_distance?:int,prefix_length_to_edits_map?:array<int,int>,layouts?:string}} $payload */
+		/** @var array{
+			query?: string|mixed,
+			table?: string|mixed,
+			options?: array{
+					fuzziness?: int,
+					append?: int,
+					prepend?: int,
+					prefix_distance?: int,
+					prefix_length_to_edits_map?: array<int, int>,
+					layouts?: string
+			}
+		} $payload */
 		$payload = json_decode($request->payload, true);
 		if (!isset($payload['query']) || !is_string($payload['query'])) {
 			throw new QueryParseError('Failed to parse query: make sure you have query and it is a string');
@@ -88,7 +105,9 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->query = $payload['query'];
 		$self->table = $payload['table'];
-		$self->distance = (int)($payload['options']['distance'] ?? 2);
+		$self->fuzziness = (int)($payload['options']['fuzziness'] ?? 2);
+		$self->prepend = !!($payload['options']['prepend'] ?? true);
+		$self->append = !!($payload['options']['append'] ?? true);
 		$self->prefixDistance = (int)($payload['options']['prefix_distance'] ?? 1);
 		if (isset($payload['options']['prefix_length_to_edits_map'])) {
 			$self->prefixLengthToEditsMap = $payload['options']['prefix_length_to_edits_map'];
@@ -137,19 +156,36 @@ final class Payload extends BasePayload {
 			if (!property_exists($this, $key) || $key === 'query' || $key === 'table') {
 				QueryParseError::throw("Unknown option '$key'");
 			}
-			if ($key === 'layouts') {
-				$value = static::parseLayouts($value);
-			}
-			if ($key === 'distance' || $key === 'prefix_distance') {
-				$value = (int)$value;
-			}
-			if ($key === 'prefix_length_to_edits_map' && is_string($value)) {
-				/** @var string $value */
-				$value = json_decode($value, true);
-			}
-
+			$value = static::castOption($key, $value);
 			$this->{$key} = $value;
 		}
+	}
+
+	/**
+	 * Cast the option to the its type declared in OPTIONS constant
+	 * @param string $key
+	 * @param string $value
+	 * @return mixed
+	 * @throws Exception
+	 */
+	private static function castOption(string $key, string $value): mixed {
+		if ($key === 'layouts') {
+			$value = static::parseLayouts($value);
+		}
+		if ($key === 'fuzziness' || $key === 'prefix_distance') {
+			$value = (int)$value;
+		}
+
+		if ($key === 'prepend' || $key === 'append') {
+			$value = (bool)$value;
+		}
+
+		if ($key === 'prefix_length_to_edits_map' && is_string($value)) {
+			/** @var string $value */
+			$value = json_decode($value, true);
+		}
+
+		return $value;
 	}
 
 	/**
