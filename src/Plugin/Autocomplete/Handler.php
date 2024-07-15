@@ -44,13 +44,13 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = function (): TaskResult {
-			$phrases = [$this->payload->query];
+			$layoutPhrases = [];
 			// If we have layout correction we generate for all languages given phrases
 			if ($this->payload->layouts) {
-				$phrases = KeyboardLayout::combineMany($this->payload->query, $this->payload->layouts);
+				$layoutPhrases = KeyboardLayout::combineMany($this->payload->query, $this->payload->layouts);
 			}
-
-			$suggestions = $this->getSuggestions($phrases);
+			$phrases = array_unique([$this->payload->query, ...$layoutPhrases]);
+			$suggestions = $this->getSuggestions($phrases, 10);
 			// Preparing the final result with suggestions
 			$data = [];
 			foreach ($suggestions as $suggestion) {
@@ -65,17 +65,22 @@ final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * @param array<string> $phrases
+	 * @param int $maxCount
 	 * @return array<string>
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 */
-	public function getSuggestions(array $phrases): array {
+	public function getSuggestions(array $phrases, int $maxCount = 10): array {
 		$combinationSets = [];
-		$maxCount = 0;
+		$count = 0;
 		foreach ($phrases as $phrase) {
 			$suggestions = $this->processPhrase($phrase);
-			$maxCount = max($maxCount, sizeof($suggestions));
+			$count = max($count, sizeof($suggestions));
 			$combinationSets[] = $suggestions;
+			// Do early return when enough suggestions found
+			if ($count >= $maxCount) {
+				break;
+			}
 		}
 
 		// Combine it in relevant order
