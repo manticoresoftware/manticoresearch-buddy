@@ -75,7 +75,7 @@ final class Handler extends BaseHandlerWithClient {
 		$count = 0;
 		foreach ($phrases as $phrase) {
 			$suggestions = $this->processPhrase($phrase);
-			$count = max($count, sizeof($suggestions));
+			$count += sizeof($suggestions);
 			$combinationSets[] = $suggestions;
 			// Do early return when enough suggestions found
 			if ($count >= $maxCount) {
