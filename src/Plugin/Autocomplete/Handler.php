@@ -50,7 +50,13 @@ final class Handler extends BaseHandlerWithClient {
 				$layoutPhrases = KeyboardLayout::combineMany($this->payload->query, $this->payload->layouts);
 			}
 			$phrases = array_unique([$this->payload->query, ...$layoutPhrases]);
-			$suggestions = $this->getSuggestions($phrases, 10);
+			$queryLen = strlen($this->payload->query);
+			$maxCount = match (true) {
+				$queryLen < 2 => 50,
+				$queryLen < 5 => 25,
+				default => 10,
+			};
+			$suggestions = $this->getSuggestions($phrases, $maxCount);
 			$this->sortSuggestions($suggestions);
 
 			// Preparing the final result with suggestions
