@@ -51,6 +51,8 @@ final class Handler extends BaseHandlerWithClient {
 			}
 			$phrases = array_unique([$this->payload->query, ...$layoutPhrases]);
 			$suggestions = $this->getSuggestions($phrases, 10);
+			$this->sortSuggestions($suggestions);
+
 			// Preparing the final result with suggestions
 			$data = [];
 			foreach ($suggestions as $suggestion) {
@@ -87,6 +89,56 @@ final class Handler extends BaseHandlerWithClient {
 		/** @var array<string> $suggestions */
 		$suggestions = Arrays::blend(...$combinationSets);
 		return $suggestions;
+	}
+
+	/**
+	 * Sort the suggestions by the prefix and suffix depending on request parameters
+	 * @param array<string> &$suggestions
+	 * @return void
+	 */
+	public function sortSuggestions(array &$suggestions): void {
+		uasort($suggestions, [$this, 'compareSuggestions']);
+	}
+
+	/**
+	 * @param string $a
+	 * @param string $b
+	 * @return int
+	 */
+	private function compareSuggestions(string $a, string $b): int {
+		$query = $this->payload->query;
+		$aPrefix = $this->isPrefix($a, $query);
+		$bPrefix = $this->isPrefix($b, $query);
+		$aSuffix = $this->isSuffix($a, $query);
+		$bSuffix = $this->isSuffix($b, $query);
+
+		if ($aPrefix !== $bPrefix) {
+			return $aPrefix ? -1 : 1;
+		}
+
+		if ($aSuffix !== $bSuffix) {
+			return $aSuffix ? -1 : 1;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * @param string $str
+	 * @param string $query
+	 * @return bool
+	 */
+	private function isPrefix(string $str, string $query): bool {
+		return $this->payload->append && str_starts_with($str, $query);
+	}
+
+	/**
+	 * @param string $str
+	 * @param string $query
+	 * @return bool
+	 */
+	private function isSuffix(string $str, string $query): bool {
+		return $this->payload->prepend && str_ends_with($str, $query);
 	}
 
 	/**
