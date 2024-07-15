@@ -222,11 +222,11 @@ final class Handler extends BaseHandlerWithClient {
 			// First check case when we have exact match of not filled up word and it's in beginning or ending
 			// with maximum allowed distance
 			$lastWordPos = strpos($suggestion, $lastWord);
-			if ($this->payload->prepend && $lastWordPos !== false && $lastWordPos <= $distance) {
+			if ($this->payload->prepend && $lastWordPos !== false && $lastWordPos < $distance) {
 				return true;
 			}
 
-			if ($this->payload->append && $lastWordPos !== false && ($lastWordLen - $lastWordPos) <= $distance) {
+			if ($this->payload->append && $lastWordPos !== false && ($lastWordLen - $lastWordPos) < $distance) {
 				return true;
 			}
 
