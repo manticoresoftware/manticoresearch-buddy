@@ -160,6 +160,17 @@ final class Payload extends BasePayload {
 			$template .= ' option idf=\'plain,tfidf_normalized\'';
 		}
 
+		$match = $this->getQueryStringMatch($fn, $searchValue);
+		Buddy::debug("Fuzzy: match: $match");
+		return sprintf($template, $match);
+	}
+
+	/**
+	 * @param callable $fn
+	 * @param string $searchValue
+	 * @return string
+	 */
+	public function getQueryStringMatch(callable $fn, string $searchValue): string {
 		$isPhrase = false;
 		if ($searchValue[0] === '"') {
 			$isPhrase = true;
@@ -188,8 +199,8 @@ final class Payload extends BasePayload {
 		if (!$variations) {
 			$match = $searchValue;
 		}
-		Buddy::debug("Fuzzy: match: $match");
-		return sprintf($template, $match);
+
+		return $match;
 	}
 
 	/**
@@ -203,35 +214,49 @@ final class Payload extends BasePayload {
 		$queries = static::parseQueryMatches($request['query']);
 		Buddy::debug('Fuzzy: parsed queries: ' . implode(', ', $queries));
 		foreach ($queries as $keyPath => $query) {
-			$options = $fn($query);
-			$should = [];
 			$parts = explode('.', $keyPath);
 			$lastIndex = sizeof($parts) - 1;
 			$isQueryString = $parts[$lastIndex] === 'query_string' && !str_ends_with($keyPath, 'match.query_string');
-			$field = $parts[$lastIndex];
-			foreach ($options as $v) {
-				$should[] = $isQueryString ? ['query_string' => $v] : [
-					'match' => [
-						$field => $v,
-					],
-				];
-			}
-			$replaceKey = implode('.', array_slice($parts, 0, $isQueryString ? -1 : -2));
-			$newQuery = ['bool' => ['should' => $should]];
-			// Here we do some trick and set the value of the pass in do notation to the payload by using refs
-			if ($replaceKey) {
-				Arrays::setValueByDotNotation($request['query'], $replaceKey, $newQuery);
+			if ($isQueryString) {
+				$match = $this->getQueryStringMatch($fn, $query);
+				Arrays::setValueByDotNotation($request['query'], $keyPath, $match);
 			} else {
-				$request['query'] = $newQuery;
+				$options = $fn($query);
+				$field = $parts[$lastIndex];
+				$newQuery = static::buildShouldHttpQuery($field, $options);
+				$replaceKey = implode('.', array_slice($parts, 0, -2));
+				// Here we do some trick and set the value of the pass in do notation to the payload by using refs
+				if ($replaceKey) {
+					Arrays::setValueByDotNotation($request['query'], $replaceKey, $newQuery);
+				} else {
+					$request['query'] = $newQuery;
+				}
+				$encodedNewQuery = json_encode($newQuery);
+				Buddy::debug("Fuzzy: transform: $query [$keyPath] -> $encodedNewQuery");
 			}
-			$encodedNewQuery = json_encode($newQuery);
-			Buddy::debug("Fuzzy: transform: $query [$keyPath] -> $encodedNewQuery");
 		}
 		$encoded = json_encode($request);
 		if ($encoded === false) {
 			throw new RuntimeException('Cannot encode JSON');
 		}
 		return $encoded;
+	}
+
+	/**
+	 * @param string $field
+	 * @param array<string> $options
+	 * @return array{bool:array{should:array<array{match:array<string,string>}>}}
+	 */
+	private static function buildShouldHttpQuery(string $field, array $options): array {
+		$should = [];
+		foreach ($options as $v) {
+			$should[] = [
+				'match' => [
+					$field => $v,
+				],
+			];
+		}
+		return ['bool' => ['should' => $should]];
 	}
 
 	/**
