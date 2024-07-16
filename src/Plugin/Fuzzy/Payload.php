@@ -171,6 +171,10 @@ final class Payload extends BasePayload {
 	 * @return string
 	 */
 	public function getQueryStringMatch(callable $fn, string $searchValue): string {
+		if (!$searchValue) {
+			return '';
+		}
+
 		$isPhrase = false;
 		if ($searchValue[0] === '"') {
 			$isPhrase = true;
