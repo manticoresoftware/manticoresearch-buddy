@@ -224,6 +224,8 @@ final class Payload extends BasePayload {
 			} else {
 				$request['query'] = $newQuery;
 			}
+			$encodedNewQuery = json_encode($newQuery);
+			Buddy::debug("Fuzzy: transform: $query [$keyPath] -> $encodedNewQuery");
 		}
 		$encoded = json_encode($request);
 		if ($encoded === false) {
