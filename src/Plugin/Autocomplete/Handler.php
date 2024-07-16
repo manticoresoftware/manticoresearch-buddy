@@ -395,7 +395,8 @@ final class Handler extends BaseHandlerWithClient {
 		$filteredDocs = array_filter(
 			$documents, static function ($doc) use ($avgDocs, $threshold) {
 				// Keep documents with docs count above average * threshold
-				return $doc['docs'] > 0 && $doc['docs'] >= ($avgDocs * $threshold);
+				$minDocs = (int)round($avgDocs * $threshold);
+				return $doc['docs'] >= $minDocs;
 			}
 		);
 
