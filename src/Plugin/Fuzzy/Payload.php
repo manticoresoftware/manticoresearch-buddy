@@ -277,14 +277,13 @@ final class Payload extends BasePayload {
 	public static function parseQueryMatches(array $values, string|int $parent = ''): array {
 		$queries = [];
 		$parent = (string)$parent;
-
 		foreach ($values as $key => $value) {
 			$currentKey = $parent === '' ? $key : $parent . '.' . $key;
 			$isArray = is_array($value);
 			if ($isArray && isset($value['query']) && isset($value['operator'])) {
 				$queries[$currentKey] = $value['query'];
 			} elseif ($isArray) {
-				$queries = array_merge($queries, static::parseQueryMatches($value, $key));
+				$queries = array_merge($queries, static::parseQueryMatches($value, $currentKey));
 			} elseif (is_string($value) && $parent === 'match') {
 				$queries[$currentKey] = $value;
 			} elseif (is_string($value) && $key === 'query_string') {
