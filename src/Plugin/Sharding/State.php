@@ -149,6 +149,19 @@ final class State {
 	 * @return bool
 	 */
 	public function isActive(): bool {
-		return $this->client->hasTable($this->table);
+		$hasTable = $this->client->hasTable($this->table);
+		$hasRequiredFields = false;
+		if ($hasTable) {
+			$hasRequiredFields = true;
+			foreach (self::STATE_DEFAULTS as $key => $value) {
+				$value = $this->fetch($key);
+				if (!isset($value)) {
+					$hasRequiredFields = false;
+					break;
+				}
+			}
+		}
+
+		return $hasTable && $hasRequiredFields;
 	}
 }
