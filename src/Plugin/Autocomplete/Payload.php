@@ -161,6 +161,25 @@ final class Payload extends BasePayload {
 			$value = static::castOption($key, $value);
 			$this->{$key} = $value;
 		}
+
+		// Make sure that we set default values for options
+		if (!isset($this->layouts)) {
+			$this->layouts = KeyboardLayout::getSupportedLanguages();
+		}
+		if (!isset($this->fuzziness)) {
+			$this->fuzziness = 2;
+		}
+		if (!isset($this->prepend)) {
+			$this->prepend = true;
+		}
+		if (!isset($this->append)) {
+			$this->append = true;
+		}
+		if (isset($this->expansionLimit)) {
+			return;
+		}
+
+		$this->expansionLimit = 10;
 	}
 
 	/**
