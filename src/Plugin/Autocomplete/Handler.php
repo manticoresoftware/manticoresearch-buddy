@@ -256,8 +256,7 @@ final class Handler extends BaseHandlerWithClient {
 	private function expandKeywords(string $word): array {
 		$keywords = [];
 		$match = $this->getExpansionWordMatch($word);
-		$optionString = "1 as stats, 'docs' as sort_mode,"
-			. "{$this->payload->expansionLimit} as expansion_limit";
+		$optionString = "1 as stats, 'docs' as sort_mode, 100 as expansion_limit";
 		$q = "CALL KEYWORDS('{$match}', '{$this->payload->table}', {$optionString})";
 		/** @var array{0:array{data?:array<keyword>}} $result */
 		$result = $this->manticoreClient->sendRequest($q)->getResult();
@@ -275,7 +274,9 @@ final class Handler extends BaseHandlerWithClient {
 			: $row['normalized'],
 			$data
 		);
-
+		// Filter out keywords that are too long to given config
+		$maxLen = strlen($word) + $this->payload->expansionLimit;
+		$keywords = array_filter($keywords, fn ($keyword) => strlen($keyword) <= $maxLen);
 		Buddy::debug("Autocomplete: expanded keywords for '$word*' [" . implode(', ', $keywords) . ']');
 		return $keywords;
 	}
