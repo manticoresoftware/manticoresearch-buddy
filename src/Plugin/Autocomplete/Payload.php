@@ -30,16 +30,16 @@ final class Payload extends BasePayload {
 	public string $query;
 
 	/** @var int */
-	public int $fuzziness;
+	public int $fuzziness = 2;
 
 	/** @var bool */
-	public bool $prepend;
+	public bool $prepend = true;
 
 	/** @var bool */
-	public bool $append;
+	public bool $append = true;
 
 	/** @var int */
-	public int $expansionLimit;
+	public int $expansionLimit = 10;
 
 	/** @var array<string> */
 	public array $layouts;
@@ -146,6 +146,11 @@ final class Payload extends BasePayload {
 	 * @throws Exception
 	 */
 	protected function parseOptions(array $matches): void {
+		// Make sure that we set default values for options
+		if (!isset($this->layouts)) {
+			$this->layouts = KeyboardLayout::getSupportedLanguages();
+		}
+
 		$matchesLen = sizeof($matches);
 		if ($matchesLen <= 4) {
 			return;
@@ -161,25 +166,6 @@ final class Payload extends BasePayload {
 			$value = static::castOption($key, $value);
 			$this->{$key} = $value;
 		}
-
-		// Make sure that we set default values for options
-		if (!isset($this->layouts)) {
-			$this->layouts = KeyboardLayout::getSupportedLanguages();
-		}
-		if (!isset($this->fuzziness)) {
-			$this->fuzziness = 2;
-		}
-		if (!isset($this->prepend)) {
-			$this->prepend = true;
-		}
-		if (!isset($this->append)) {
-			$this->append = true;
-		}
-		if (isset($this->expansionLimit)) {
-			return;
-		}
-
-		$this->expansionLimit = 10;
 	}
 
 	/**
@@ -193,7 +179,7 @@ final class Payload extends BasePayload {
 		if ($key === 'layouts') {
 			$value = static::parseLayouts($value);
 		}
-		if ($key === 'fuzziness' || $key === 'expansion_limit') {
+		if ($key === 'fuzziness' || $key === 'expansionLimit') {
 			$value = (int)$value;
 		}
 

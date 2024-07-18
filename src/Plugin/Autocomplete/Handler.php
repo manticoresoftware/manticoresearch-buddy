@@ -256,7 +256,8 @@ final class Handler extends BaseHandlerWithClient {
 	private function expandKeywords(string $word): array {
 		$keywords = [];
 		$match = $this->getExpansionWordMatch($word);
-		$q = "CALL KEYWORDS('{$match}', '{$this->payload->table}', 1 as stats, 'docs' as sort_mode)";
+		$optionString = "1 as stats, 'docs' as sort_mode, {$this->payload->expansionLimit} as limit";
+		$q = "CALL KEYWORDS('{$match}', '{$this->payload->table}', {$optionString})";
 		/** @var array{0:array{data?:array<keyword>}} $result */
 		$result = $this->manticoreClient->sendRequest($q)->getResult();
 		$data = $result[0]['data'] ?? [];
