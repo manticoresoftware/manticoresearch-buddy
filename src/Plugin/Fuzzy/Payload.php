@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
@@ -23,6 +24,9 @@ use RuntimeException;
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
+	const MAX_BOOST = 50;
+	const DECREASE_FACTOR = 1.44;
+
 	/** @var string */
 	public string $path;
 
@@ -132,22 +136,43 @@ final class Payload extends BasePayload {
 		$searchValue = $matches[1] ?? '';
 		$template = (string)preg_replace(
 			[
-				'/MATCH\(\'(.*)\'\)/ius',
+				'/MATCH\s*\(\'(.*?)\'\)/ius',
 				'/(fuzzy|distance)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
+				'/ option/ius', // TODO: hack
 				],
 			[
 				'MATCH(\'%s\')',
 				'',
 				'',
 				'option ',
+				' option idf=\'plain,tfidf_normalized\',', // TODO: hack
 			],
 			$payload
 		);
-		$template = trim($template);
+		$template = trim($template, ' ,');
 		if (str_ends_with($template, 'option')) {
 			$template = substr($template, 0, -6);
+		}
+		// TODO: hack
+		if (false === strpos($template, 'option idf=\'plain,tfidf_normalized\'')) {
+			$template .= ' option idf=\'plain,tfidf_normalized\'';
+		}
+
+		$match = $this->getQueryStringMatch($fn, $searchValue);
+		Buddy::debug("Fuzzy: match: $match");
+		return sprintf($template, $match);
+	}
+
+	/**
+	 * @param callable $fn
+	 * @param string $searchValue
+	 * @return string
+	 */
+	public function getQueryStringMatch(callable $fn, string $searchValue): string {
+		if (!$searchValue) {
+			return '';
 		}
 
 		$isPhrase = false;
@@ -155,13 +180,31 @@ final class Payload extends BasePayload {
 			$isPhrase = true;
 			$searchValue = trim($searchValue, '"');
 		}
+		/** @var array<string> $variations */
 		$variations = $fn($searchValue);
 		if ($isPhrase) {
-			$match = '"' . implode('"|"', $variations) . '"';
+			$match = '"' . implode(
+				'"|"', array_map(
+					function ($word, $i) {
+						return $word . '^' . static::getBoostValue($i);
+					}, $variations, array_keys($variations)
+				)
+			) . '"';
 		} else {
-			$match = '(' . implode(')|(', $variations) . ')';
+			$match = '(' . implode(
+				')|(', array_map(
+					function ($word, $i) {
+						return $word . '^' . static::getBoostValue($i);
+					}, $variations, array_keys($variations)
+				)
+			) . ')';
 		}
-		return sprintf($template, $match);
+		// Edge case when nothing to match, use original phrase as fallback
+		if (!$variations) {
+			$match = $searchValue;
+		}
+
+		return $match;
 	}
 
 	/**
@@ -173,27 +216,27 @@ final class Payload extends BasePayload {
 		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $request */
 		$request = $this->payload;
 		$queries = static::parseQueryMatches($request['query']);
+		Buddy::debug('Fuzzy: parsed queries: ' . implode(', ', $queries));
 		foreach ($queries as $keyPath => $query) {
-			$options = $fn($query);
-			$should = [];
 			$parts = explode('.', $keyPath);
 			$lastIndex = sizeof($parts) - 1;
 			$isQueryString = $parts[$lastIndex] === 'query_string' && !str_ends_with($keyPath, 'match.query_string');
-			$field = $parts[$lastIndex];
-			foreach ($options as $v) {
-				$should[] = $isQueryString ? ['query_string' => $v] : [
-					'match' => [
-						$field => $v,
-					],
-				];
-			}
-			$replaceKey = implode('.', array_slice($parts, 0, $isQueryString ? -1 : -2));
-			$newQuery = ['bool' => ['should' => $should]];
-			// Here we do some trick and set the value of the pass in do notation to the payload by using refs
-			if ($replaceKey) {
-				Arrays::setValueByDotNotation($request['query'], $replaceKey, $newQuery);
+			if ($isQueryString) {
+				$match = $this->getQueryStringMatch($fn, $query);
+				Arrays::setValueByDotNotation($request['query'], $keyPath, $match);
 			} else {
-				$request['query'] = $newQuery;
+				$options = $fn($query);
+				$field = $parts[$lastIndex];
+				$newQuery = static::buildShouldHttpQuery($field, $options);
+				$replaceKey = implode('.', array_slice($parts, 0, -2));
+				// Here we do some trick and set the value of the pass in do notation to the payload by using refs
+				if ($replaceKey) {
+					Arrays::setValueByDotNotation($request['query'], $replaceKey, $newQuery);
+				} else {
+					$request['query'] = $newQuery;
+				}
+				$encodedNewQuery = json_encode($newQuery);
+				Buddy::debug("Fuzzy: transform: $query [$keyPath] -> $encodedNewQuery");
 			}
 		}
 		$encoded = json_encode($request);
@@ -201,6 +244,32 @@ final class Payload extends BasePayload {
 			throw new RuntimeException('Cannot encode JSON');
 		}
 		return $encoded;
+	}
+
+	/**
+	 * @param string $field
+	 * @param array<string> $options
+	 * @return array{bool:array{should:array<array{match:array<string,string>}>}}
+	 */
+	private static function buildShouldHttpQuery(string $field, array $options): array {
+		$should = [];
+		foreach ($options as $v) {
+			$should[] = [
+				'match' => [
+					$field => $v,
+				],
+			];
+		}
+		return ['bool' => ['should' => $should]];
+	}
+
+	/**
+	 * Calculate the boost value depending on the position
+	 * @param int $i
+	 * @return float
+	 */
+	private static function getBoostValue(int $i): float {
+		return max(static::MAX_BOOST / pow($i + 1, static::DECREASE_FACTOR), 1);
 	}
 
 	/**
@@ -212,14 +281,13 @@ final class Payload extends BasePayload {
 	public static function parseQueryMatches(array $values, string|int $parent = ''): array {
 		$queries = [];
 		$parent = (string)$parent;
-
 		foreach ($values as $key => $value) {
 			$currentKey = $parent === '' ? $key : $parent . '.' . $key;
 			$isArray = is_array($value);
 			if ($isArray && isset($value['query']) && isset($value['operator'])) {
 				$queries[$currentKey] = $value['query'];
 			} elseif ($isArray) {
-				$queries = array_merge($queries, static::parseQueryMatches($value, $key));
+				$queries = array_merge($queries, static::parseQueryMatches($value, $currentKey));
 			} elseif (is_string($value) && $parent === 'match') {
 				$queries[$currentKey] = $value;
 			} elseif (is_string($value) && $key === 'query_string') {
@@ -252,9 +320,13 @@ final class Payload extends BasePayload {
 	public static function cleanUpPayloadOptions(array $payload): array {
 		$excludedOptions = ['distance', 'fuzzy', 'layouts'];
 		$payload['options'] = array_diff_key($payload['options'], array_flip($excludedOptions));
-		if (empty($payload['options'])) {
-			unset($payload['options']);
+		// TODO: hack
+		if (!isset($payload['options']['idf'])) { // @phpstan-ignore-line
+			$payload['options']['idf'] = 'plain,tfidf_normalized';
 		}
+		/* if (empty($payload['options'])) { */
+		/* 	unset($payload['options']); */
+		/* } */
 
 		return $payload;
 	}

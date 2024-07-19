@@ -30,13 +30,19 @@ final class Payload extends BasePayload {
 	public string $query;
 
 	/** @var int */
-	public int $distance = 2;
+	public int $fuzziness = 2;
+
+	/** @var bool */
+	public bool $prepend = true;
+
+	/** @var bool */
+	public bool $append = true;
 
 	/** @var int */
-	public int $maxEdits = 5;
+	public int $expansionLimit = 10;
 
 	/** @var array<string> */
-	public array $layouts = [];
+	public array $layouts;
 
 	public function __construct() {
 	}
@@ -66,7 +72,17 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{query?:string|mixed,table?:string|mixed,options?:array{distance?:int,max_edits?:int,layouts?:string}} $payload */
+		/** @var array{
+			query?: string|mixed,
+			table?: string|mixed,
+			options?: array{
+					fuzziness?: int,
+					append?: int,
+					prepend?: int,
+					expansion_limit?: int,
+					layouts?: string
+			}
+		} $payload */
 		$payload = json_decode($request->payload, true);
 		if (!isset($payload['query']) || !is_string($payload['query'])) {
 			throw new QueryParseError('Failed to parse query: make sure you have query and it is a string');
@@ -79,10 +95,28 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->query = $payload['query'];
 		$self->table = $payload['table'];
-		$self->distance = (int)($payload['options']['distance'] ?? 2);
-		$self->maxEdits = (int)($payload['options']['max_edits'] ?? 5);
+		$self->fuzziness = (int)($payload['options']['fuzziness'] ?? 2);
+		$self->prepend = !!($payload['options']['prepend'] ?? true);
+		$self->append = !!($payload['options']['append'] ?? true);
+		$self->expansionLimit = (int)($payload['options']['expansion_limit'] ?? 10);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
+		$self->validate();
 		return $self;
+	}
+
+	/**
+	 * Validate and throw error in case some parameters are not valid
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private function validate(): void {
+		if ($this->fuzziness < 0 || $this->fuzziness > 2) {
+			throw new QueryParseError('Fuzziness must be greater than 0 and lower than 3');
+		}
+
+		if ($this->expansionLimit < 0 || $this->expansionLimit > 20) {
+			throw new QueryParseError('Expansion limit must be greater than 0 and lower than 20');
+		}
 	}
 
 	/**
@@ -112,6 +146,11 @@ final class Payload extends BasePayload {
 	 * @throws Exception
 	 */
 	protected function parseOptions(array $matches): void {
+		// Make sure that we set default values for options
+		if (!isset($this->layouts)) {
+			$this->layouts = KeyboardLayout::getSupportedLanguages();
+		}
+
 		$matchesLen = sizeof($matches);
 		if ($matchesLen <= 4) {
 			return;
@@ -124,14 +163,31 @@ final class Payload extends BasePayload {
 			if (!property_exists($this, $key) || $key === 'query' || $key === 'table') {
 				QueryParseError::throw("Unknown option '$key'");
 			}
-			if ($key === 'layouts') {
-				$value = static::parseLayouts($value);
-			}
-			if ($key === 'distance' || $key === 'max_edits') {
-				$value = (int)$value;
-			}
+			$value = static::castOption($key, $value);
 			$this->{$key} = $value;
 		}
+	}
+
+	/**
+	 * Cast the option to the its type declared in OPTIONS constant
+	 * @param string $key
+	 * @param string $value
+	 * @return mixed
+	 * @throws Exception
+	 */
+	private static function castOption(string $key, string $value): mixed {
+		if ($key === 'layouts') {
+			$value = static::parseLayouts($value);
+		}
+		if ($key === 'fuzziness' || $key === 'expansionLimit') {
+			$value = (int)$value;
+		}
+
+		if ($key === 'prepend' || $key === 'append') {
+			$value = (bool)$value;
+		}
+
+		return $value;
 	}
 
 	/**

@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
@@ -45,21 +46,29 @@ final class Handler extends BaseHandlerWithClient {
 					$phrases = KeyboardLayout::combineMany($query, $payload->layouts);
 				}
 				$words = [];
+				$scoreMap = [];
 				foreach ($phrases as $phrase) {
-					$variations = $manticoreClient->fetchFuzzyVariations(
+					[$variations, $variationScores] = $manticoreClient->fetchFuzzyVariations(
 						$phrase,
 						$payload->table,
 						$payload->distance
 					);
+					Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
 					// Extend varitions for each iteration we have
 					foreach ($variations as $pos => $variation) {
 						$words[$pos] ??= [];
-						$words[$pos] = array_merge($words[$pos], $variation);
+						$blend = Arrays::blend($words[$pos], $variation);
+						$words[$pos] = array_values(array_unique($blend));
+						$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
 					}
 				}
 
-				$combinations = Arrays::getPositionalCombinations($words);
+				/** @var array<array<string>> $words */
+				$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
+				/** @var array<string> $combinations */
 				$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
+				// If the original phrase in the list, we add it to the beginning to boost weight
+				$combinations = Arrays::boostListValues($combinations, $phrases);
 				return $combinations;
 			};
 			$request = $payload->getQueriesRequest($fn);
