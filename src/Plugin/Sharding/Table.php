@@ -215,7 +215,7 @@ final class Table {
 		};
 		$clusterMap = $schema->reduce($reduceFn, new Map);
 
-		// Now process all postponed pending tables to attach to the each cluster
+		// Now process all postponed pending tables to attach to each cluster
 		foreach ($clusterMap as $cluster) {
 			$cluster->processPendingTables($queue);
 		}
