@@ -275,7 +275,7 @@ final class Handler extends BaseHandlerWithClient {
 			$data
 		);
 		// Filter out keywords that are too long to given config
-		$maxLen = strlen($word) + $this->payload->expansionLimit;
+		$maxLen = strlen($word) + $this->payload->expansionLen;
 		$keywords = array_filter($keywords, fn ($keyword) => strlen($keyword) <= $maxLen);
 		Buddy::debug("Autocomplete: expanded keywords for '$word*' [" . implode(', ', $keywords) . ']');
 		return $keywords;
@@ -295,7 +295,7 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$lastWordLen = strlen($lastWord);
-		$maxEdits = $this->payload->expansionLimit;
+		$maxEdits = $this->payload->expansionLen;
 		$optionsString = "{$maxEdits} as max_edits, 100 as limit, 1 as result_stats";
 		$match = $this->getExpansionWordMatch($lastWord);
 		$q = "CALL SUGGEST('{$match}', '{$this->payload->table}', {$optionsString})";
