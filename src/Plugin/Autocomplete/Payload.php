@@ -39,7 +39,7 @@ final class Payload extends BasePayload {
 	public bool $append = true;
 
 	/** @var int */
-	public int $expansionLimit = 10;
+	public int $expansionLen = 10;
 
 	/** @var array<string> */
 	public array $layouts;
@@ -79,7 +79,7 @@ final class Payload extends BasePayload {
 					fuzziness?: int,
 					append?: int,
 					prepend?: int,
-					expansion_limit?: int,
+					expansion_len?: int,
 					layouts?: string
 			}
 		} $payload */
@@ -98,7 +98,7 @@ final class Payload extends BasePayload {
 		$self->fuzziness = (int)($payload['options']['fuzziness'] ?? 2);
 		$self->prepend = !!($payload['options']['prepend'] ?? true);
 		$self->append = !!($payload['options']['append'] ?? true);
-		$self->expansionLimit = (int)($payload['options']['expansion_limit'] ?? 10);
+		$self->expansionLen = (int)($payload['options']['expansion_len'] ?? 10);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 		$self->validate();
 		return $self;
@@ -114,7 +114,7 @@ final class Payload extends BasePayload {
 			throw new QueryParseError('Fuzziness must be greater than 0 and lower than 3');
 		}
 
-		if ($this->expansionLimit < 0 || $this->expansionLimit > 20) {
+		if ($this->expansionLen < 0 || $this->expansionLen > 20) {
 			throw new QueryParseError('Expansion limit must be greater than 0 and lower than 20');
 		}
 	}
@@ -179,7 +179,7 @@ final class Payload extends BasePayload {
 		if ($key === 'layouts') {
 			$value = static::parseLayouts($value);
 		}
-		if ($key === 'fuzziness' || $key === 'expansionLimit') {
+		if ($key === 'fuzziness' || $key === 'expansionLen') {
 			$value = (int)$value;
 		}
 
