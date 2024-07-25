@@ -63,6 +63,11 @@ final class Handler extends BaseHandlerWithClient {
 					}
 				}
 
+				// If no words found, we just add the original phrase as fallback
+				if (!$words) {
+					return ["$query"];
+				}
+
 				/** @var array<array<string>> $words */
 				$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
 				/** @var array<string> $combinations */

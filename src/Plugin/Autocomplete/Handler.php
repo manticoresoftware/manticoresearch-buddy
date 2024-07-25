@@ -261,10 +261,8 @@ final class Handler extends BaseHandlerWithClient {
 		/** @var array{0:array{data?:array<keyword>}} $result */
 		$result = $this->manticoreClient->sendRequest($q)->getResult();
 		$data = $result[0]['data'] ?? [];
-		// Case when nothing found in that way we have word* form
-		if (sizeof($data) === 1 && $data[0]['tokenized'] === $data[0]['normalized']) {
-			return [];
-		}
+		// Filter out cases when tokenized form is the same as normalized (when * in beginning or end)
+		$data = array_filter($data, fn($row) => $row['tokenized'] !== $row['normalized']);
 		/** @var array<keyword> */
 		$data = static::applyThreshold($data, 0.5);
 		/** @var array<string> */
@@ -307,26 +305,33 @@ final class Handler extends BaseHandlerWithClient {
 		$suggestions = array_column(static::applyThreshold($data, 0.5, 20), 'suggest');
 		$thresholdSuggestionsCount = sizeof($suggestions);
 		$filterFn = function (string $suggestion) use ($lastWord, $lastWordLen, $distance) {
+			$suggestionLen = strlen($suggestion);
+			$lastWordPos = strpos($suggestion, $lastWord);
+
 			// First check case when we have exact match of not filled up word and it's in beginning or ending
 			// with maximum allowed distance
-			$lastWordPos = strpos($suggestion, $lastWord);
-			if ($this->payload->prepend && $lastWordPos !== false && $lastWordPos < $distance) {
-				return true;
-			}
-
-			if ($this->payload->append && $lastWordPos !== false && ($lastWordLen - $lastWordPos) < $distance) {
-				return true;
+			if ($lastWordPos !== false) {
+				if ($this->payload->prepend && $lastWordPos <= $distance) {
+					return true;
+				}
+				if ($this->payload->append && ($suggestionLen - $lastWordPos - $lastWordLen) <= $distance) {
+					return true;
+				}
 			}
 
 			// Validate levenstein now for prefix or suffix
-			$prefix = substr($suggestion, 0, $lastWordLen);
-			if ($this->payload->prepend && levenshtein($lastWord, $prefix) <= $distance) {
-				return true;
+			if ($this->payload->prepend) {
+				$prefix = substr($suggestion, 0, $lastWordLen);
+				if (levenshtein($lastWord, $prefix) <= $distance) {
+					return true;
+				}
 			}
 
-			$suffix = substr($suggestion, -$lastWordLen);
-			if ($this->payload->append && levenshtein($lastWord, $suffix) <= $distance) {
-				return true;
+			if ($this->payload->append) {
+				$suffix = substr($suggestion, -$lastWordLen);
+				if (levenshtein($lastWord, $suffix) <= $distance) {
+					return true;
+				}
 			}
 
 			return false;
@@ -373,7 +378,8 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return array<keyword>|array<suggestion>
 	 */
 	private static function applyThreshold(array $documents, float $threshold = 0.5, int $topN = 10): array {
-		if (!$documents) {
+		// Do not apply when we have less than topN documents
+		if (sizeof($documents) < $topN) {
 			return [];
 		}
 
