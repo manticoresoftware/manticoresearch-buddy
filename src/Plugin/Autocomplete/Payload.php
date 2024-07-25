@@ -127,7 +127,8 @@ final class Payload extends BasePayload {
 	protected static function fromSqlRequest(Request $request): static {
 		$pattern = '/autocomplete\('
 			. '\s*\'([^\']+)\'\s*,\s*\'([^\']+)\'\s*'
-			. '((?:,\s*(?:(\d+)\s+as\s+(\w+)|\'([^\']+)\'\s+as\s+(\w+))\s*)*)\)/ius';
+			. '((?:,\s*(?:(?P<number_value>\d+)\s+as\s+(?P<number_option>\w+)|'
+			. '\'(?P<string_value>[^\']*)\'\s+as\s+(?P<string_option>\w+))\s*)*)\)/ius';
 		preg_match($pattern, $request->payload, $matches);
 		if (!$matches) {
 			throw new QueryParseError('Failed to parse query');
@@ -136,13 +137,19 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->query = $matches[1];
 		$self->table = $matches[2];
+		/** @var array{string_options?:array<string>,number_options?:array<string>,
+		 * string_values?:array<string>,number_values?:array<string>} $matches */
 		$self->parseOptions($matches);
 		return $self;
 	}
 
 	/**
-	 * @param array<int,string> $matches
-	 * @return void
+	 * @param array{
+	 *  string_options?: array<string>,
+	 *  number_options?: array<string>,
+	 *  string_values?: array<string>,
+	 *  number_values?: array<string>
+	 * } $matches
 	 * @throws Exception
 	 */
 	protected function parseOptions(array $matches): void {
@@ -151,14 +158,17 @@ final class Payload extends BasePayload {
 			$this->layouts = KeyboardLayout::getSupportedLanguages();
 		}
 
-		$matchesLen = sizeof($matches);
-		if ($matchesLen <= 4) {
+		$options = array_merge($matches['string_options'] ?? [], $matches['number_options'] ?? []);
+		if (!$options) {
 			return;
 		}
-
-		for ($i = 4; $i < $matchesLen; $i += 2) {
-			$value = $matches[$i];
-			$key = $matches[$i + 1];
+		$values = array_merge($matches['string_values'] ?? [], $matches['number_values'] ?? []);
+		foreach ($options as $i => $key) {
+			$value = $values[$i] ?? null;
+			if (!isset($value)) {
+				QueryParseError::throw("Missing value for option '$key'");
+			}
+			/** @var string $value */
 			$key = Strings::underscoreToCamelcase($key);
 			if (!property_exists($this, $key) || $key === 'query' || $key === 'table') {
 				QueryParseError::throw("Unknown option '$key'");
