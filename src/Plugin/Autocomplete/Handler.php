@@ -261,17 +261,14 @@ final class Handler extends BaseHandlerWithClient {
 		/** @var array{0:array{data?:array<keyword>}} $result */
 		$result = $this->manticoreClient->sendRequest($q)->getResult();
 		$data = $result[0]['data'] ?? [];
+		$totalFound = sizeof($data);
+		Buddy::debug('Autocomplete: expanded keywords found: ' . $totalFound);
 		// Filter out cases when tokenized form is the same as normalized (when * in beginning or end)
-		$data = array_filter($data, fn($row) => $row['tokenized'] !== $row['normalized']);
+		$data = array_filter($data, fn($row) => $row['docs'] > 0);
 		/** @var array<keyword> */
 		$data = static::applyThreshold($data, 0.5);
 		/** @var array<string> */
-		$keywords = array_map(
-			fn($row) => $row['normalized'][0] === '='
-			? substr($row['normalized'], 1)
-			: $row['normalized'],
-			$data
-		);
+		$keywords = array_map(fn($row) => ltrim($row['normalized'], '='), $data);
 		// Filter out keywords that are too long to given config
 		$maxLen = strlen($word) + $this->payload->expansionLen;
 		$keywords = array_filter($keywords, fn ($keyword) => strlen($keyword) <= $maxLen);
@@ -362,10 +359,10 @@ final class Handler extends BaseHandlerWithClient {
 	private function getExpansionWordMatch(string $word): string {
 		$match = $word;
 		if ($this->payload->append) {
-			$match = "$word*";
+			$match = "$match*";
 		}
 		if ($this->payload->prepend) {
-			$match = "*$word";
+			$match = "*$match";
 		}
 		return $match;
 	}
@@ -379,7 +376,9 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private static function applyThreshold(array $documents, float $threshold = 0.5, int $topN = 10): array {
 		// Do not apply when we have less than topN documents
-		if (sizeof($documents) < $topN) {
+		$totalRows = sizeof($documents);
+		if ($totalRows < $topN) {
+			Buddy::debug("Autocomplete: skipping threshold [$topN], total rows: $totalRows");
 			return [];
 		}
 
@@ -394,7 +393,8 @@ final class Handler extends BaseHandlerWithClient {
 		$totalDocs = array_sum(array_column($documents, 'docs'));
 		$avgDocs = $totalDocs / sizeof($documents);
 		Buddy::debug(
-			'Autocomplete: apply threshold ' .
+			"Autocomplete: apply threshold [$topN] " .
+				"rows found: $totalRows, " .
 				"average docs: $avgDocs, " .
 				"total docs: $totalDocs, " .
 				'size: ' . sizeof($documents)
