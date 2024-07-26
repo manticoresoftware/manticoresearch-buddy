@@ -263,8 +263,6 @@ final class Handler extends BaseHandlerWithClient {
 		$data = $result[0]['data'] ?? [];
 		$totalFound = sizeof($data);
 		Buddy::debug('Autocomplete: expanded keywords found: ' . $totalFound);
-		// Filter out cases when tokenized form is the same as normalized (when * in beginning or end)
-		$data = array_filter($data, fn($row) => $row['docs'] > 0);
 		/** @var array<keyword> */
 		$data = static::applyThreshold($data, 0.5);
 		/** @var array<string> */
@@ -379,7 +377,8 @@ final class Handler extends BaseHandlerWithClient {
 		$totalRows = sizeof($documents);
 		if ($totalRows < $topN) {
 			Buddy::debug("Autocomplete: skipping threshold [$topN], total rows: $totalRows");
-			return [];
+			// Filter out cases when tokenized form is the same as normalized (when * in beginning or end)
+			return array_filter($documents, fn($row) => $row['docs'] > 0);
 		}
 
 		// Sort documents by number of associated docs in descending order
