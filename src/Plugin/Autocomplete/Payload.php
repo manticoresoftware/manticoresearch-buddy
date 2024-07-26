@@ -125,10 +125,8 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromSqlRequest(Request $request): static {
-		$pattern = '/autocomplete\('
-			. '\s*\'([^\']+)\'\s*,\s*\'([^\']+)\'\s*'
-			. '((?:,\s*(?:(?P<number_value>\d+)\s+as\s+(?P<number_option>\w+)|'
-			. '\'(?P<string_value>[^\']*)\'\s+as\s+(?P<string_option>\w+))\s*)*)\)/ius';
+		$pattern = '/autocomplete\(\s*\'([^\']+)\'\s*,\s*\'([^\']+)\'\s*'
+			. '((?:,\s*(?:(\d+)|\'([^\']*)\')\s+as\s+(\w+))*)\s*\)/ius';
 		preg_match($pattern, $request->payload, $matches);
 		if (!$matches) {
 			throw new QueryParseError('Failed to parse query');
@@ -137,37 +135,37 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->query = $matches[1];
 		$self->table = $matches[2];
-		/** @var array{string_options?:array<string>,number_options?:array<string>,
-		 * string_values?:array<string>,number_values?:array<string>} $matches */
-		$self->parseOptions($matches);
+		if (!empty($matches[3])) {
+			$self->parseOptions($matches[3]);
+		}
 		return $self;
 	}
 
 	/**
-	 * @param array{
-	 *  string_options?: array<string>,
-	 *  number_options?: array<string>,
-	 *  string_values?: array<string>,
-	 *  number_values?: array<string>
-	 * } $matches
+	 * @param string $optionString
+	 * @return void
 	 * @throws Exception
 	 */
-	protected function parseOptions(array $matches): void {
+	protected function parseOptions(string $optionString): void {
 		// Make sure that we set default values for options
 		if (!isset($this->layouts)) {
 			$this->layouts = KeyboardLayout::getSupportedLanguages();
 		}
 
-		$options = array_merge($matches['string_options'] ?? [], $matches['number_options'] ?? []);
-		if (!$options) {
+		if (!$optionString) {
 			return;
 		}
-		$values = array_merge($matches['string_values'] ?? [], $matches['number_values'] ?? []);
-		foreach ($options as $i => $key) {
-			$value = $values[$i] ?? null;
-			if (!isset($value)) {
-				QueryParseError::throw("Missing value for option '$key'");
+
+		preg_match_all('/,\s*((\d+|\'[^\']*\')\s+as\s+(\w+))/ius', $optionString, $optionMatches, PREG_SET_ORDER);
+		foreach ($optionMatches as $optionMatch) {
+			$value = trim($optionMatch[2]);
+			$key = $optionMatch[3];
+
+			// Remove quotes if the value is a string
+			if (strpos($value, "'") === 0) {
+				$value = trim($value, "'");
 			}
+
 			/** @var string $value */
 			$key = Strings::underscoreToCamelcase($key);
 			if (!property_exists($this, $key) || $key === 'query' || $key === 'table') {
@@ -228,7 +226,7 @@ final class Payload extends BasePayload {
 			return $layouts;
 		}
 		if (isset($layouts)) {
-			$layouts = array_map('trim', explode(',', $layouts));
+			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
 		} else {
 			$layouts = KeyboardLayout::getSupportedLanguages();
 		}
