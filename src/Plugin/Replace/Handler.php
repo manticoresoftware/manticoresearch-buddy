@@ -152,7 +152,7 @@ final class Handler extends BaseHandlerWithClient
 				Fields::TYPE_BOOL => ($fieldValue === 0) ? '0' : (bool)$fieldValue,
 				Fields::TYPE_FLOAT => (float)$fieldValue,
 				Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
-					"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue) . "'",
+					"'" . (is_array($fieldValue) ? json_encode($fieldValue) : self::escape((string)$fieldValue)) . "'",
 				Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
 					'(' . (is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue) . ')',
 				default => $fieldValue
@@ -161,6 +161,13 @@ final class Handler extends BaseHandlerWithClient
 
 		/** @var array<string, bool|float|int|string> */
 		return $records;
+	}
+
+	private static function escape(string $string):string {
+		if (str_contains($string, "'")) {
+			$string = str_replace("'", "\\'", $string);
+		}
+		return $string;
 	}
 
 	/**
