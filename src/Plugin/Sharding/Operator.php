@@ -37,6 +37,7 @@ final class Operator {
 	protected function init(): static {
 		/** @var string */
 		$clusterName = $this->state->get('cluster');
+		Buddy::debug("Sharding: initializing under cluster {$clusterName}");
 		$this->cluster = new Cluster(
 			$this->client,
 			$clusterName,
@@ -188,6 +189,7 @@ final class Operator {
 		$table = new Table($this->client, $cluster, ...$table);
 		$shouldSetup = !$this->state->get('master');
 		if ($shouldSetup) {
+			Buddy::debug("Sharding: setuping cluster {$cluster->name}");
 			$this->state->setCluster($cluster);
 			$this->state->setup();
 			$this->becomeMaster();
@@ -196,7 +198,6 @@ final class Operator {
 			// Set initial cluster we used
 			$this->state->set('cluster', $cluster->name);
 			$this->state->set('cluster_hash', Cluster::getNodesHash($cluster->getNodes()));
-			$this->init();
 			$this->getQueue()->setup();
 		}
 
