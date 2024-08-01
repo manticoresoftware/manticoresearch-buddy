@@ -135,8 +135,12 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->query = $matches[1];
 		$self->table = $matches[2];
-		if (!empty($matches[3])) {
+		if (isset($matches[3])) {
 			$self->parseOptions($matches[3]);
+		}
+		// Make sure that we set default values for options
+		if (!isset($self->layouts)) {
+			$self->layouts = KeyboardLayout::getSupportedLanguages();
 		}
 		return $self;
 	}
@@ -147,11 +151,6 @@ final class Payload extends BasePayload {
 	 * @throws Exception
 	 */
 	protected function parseOptions(string $optionString): void {
-		// Make sure that we set default values for options
-		if (!isset($this->layouts)) {
-			$this->layouts = KeyboardLayout::getSupportedLanguages();
-		}
-
 		if (!$optionString) {
 			return;
 		}

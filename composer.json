@@ -30,8 +30,6 @@
 		}
 	},
 	"require": {
-		"react/http": "^1.8",
-		"react/socket": "^1.12",
 		"manticoresoftware/telemetry": "^0.1.19",
 		"symfony/dependency-injection": "^6.1",
 		"manticoresoftware/buddy-core": "dev-main",
