@@ -184,6 +184,18 @@ trait CheckInsertDataTrait {
 	}
 
 	/**
+	 * Detecting if type is timestamp in one of string formats we support
+	 *
+	 * @param string $val
+	 * @return bool
+	 */
+	protected static function isManticoreDate(string $val): bool {
+		// Detecting only the date formats that we currently support in daemon
+		$dateRegex = '/^\d{4}\-\d{2}\-\d{2}(T\d{2}$|((T|\s)\d{2}:\d{2}(:\d{2}((\.\d{3})?(\+\d{2}:\d{2}Z?)?)?)?)?$)/';
+		return preg_match($dateRegex, $val) ? true : false;
+	}
+
+	/**
 	 * Converting enum Datatypes to their string values
 	 *
 	 * @param array<Datatype> $types
