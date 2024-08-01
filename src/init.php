@@ -12,6 +12,7 @@
 use Manticoresearch\Buddy\Base\Lib\CliArgsProcessor;
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Loader;
+use Manticoresearch\Buddy\Core\Cache\Flag as FlagCache;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
@@ -46,6 +47,7 @@ $container
 	->addArgument(new Reference('ManticoreResponseBuilder'))
 	->addArgument($opts['listen']);
 $container->register('tableFormatter', TableFormatter::class);
+$container->register('flagCache', FlagCache::class);
 
 putenv("LISTEN={$opts['listen']}");
 $plugins = [

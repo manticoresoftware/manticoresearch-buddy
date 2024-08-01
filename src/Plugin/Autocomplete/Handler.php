@@ -12,7 +12,8 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Autocomplete;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
+use Manticoresearch\Buddy\Core\Error\QueryValidationError;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -26,7 +27,7 @@ use RuntimeException;
  * @phpstan-type keyword array{normalized:string,tokenized:string,docs:int}
  * @phpstan-type suggestion array{suggest:string,docs:int}
  */
-final class Handler extends BaseHandlerWithClient {
+final class Handler extends BaseHandlerWithFlagCache {
 	/**
 	 *  Initialize the executor
 	 *
@@ -44,6 +45,7 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = function (): TaskResult {
+			$this->validate();
 			$layoutPhrases = [];
 			// If we have layout correction we generate for all languages given phrases
 			if ($this->payload->layouts) {
@@ -69,6 +71,29 @@ final class Handler extends BaseHandlerWithClient {
 
 		$task = Task::create($taskFn, []);
 		return $task->run();
+	}
+
+	/**
+	 * Perform validation, method should be run inside coroutine
+	 * @return void
+	 */
+	protected function validate(): void {
+		$cacheKey = "autocomplete:validate:{$this->payload->table}";
+		if ($this->flagCache->has($cacheKey)) {
+			return;
+		}
+		/** @var array{error?:string} */
+		$result = $this->manticoreClient->sendRequest('SHOW CREATE TABLE ' . $this->payload->table)->getResult();
+		if (isset($result['error'])) {
+			QueryValidationError::throw($result['error']);
+		}
+
+		/** @var array{0:array{data:array<array{'Create Table':string}>}} $result */
+		$schema  = $result[0]['data'][0]['Create Table'];
+		if (false === str_contains($schema, 'min_infix_len')) {
+			QueryValidationError::throw('Autocomplete plugin requires min_infix_len to be set');
+		}
+		$this->flagCache->set($cacheKey, true, 30);
 	}
 
 	/**
