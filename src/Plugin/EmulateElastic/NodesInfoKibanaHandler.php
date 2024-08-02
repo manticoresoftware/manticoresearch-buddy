@@ -19,7 +19,7 @@ use RuntimeException;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class ClusterHealthHandler extends BaseHandler {
+class NodesInfoKibanaHandler extends BaseHandler {
 
 	/**
 	 *  Initialize the executor
@@ -41,21 +41,15 @@ class ClusterHealthHandler extends BaseHandler {
 		$taskFn = static function (): TaskResult {
 			return TaskResult::raw(
 				[
-					'cluster_name' => 'docker-cluster',
-					'status' => 'yellow',
-					'timed_out' => false,
-					'number_of_nodes' => 1,
-					'number_of_data_nodes' => 1,
-					'active_primary_shards' => 1,
-					'active_shards' => 1,
-					'relocating_shards' => 0,
-					'initializing_shards' => 0,
-					'unassigned_shards' => 0,
-					'delayed_unassigned_shards' => 0,
-					'number_of_pending_tasks' => 0,
-					'number_of_in_flight_fetch' => 0,
-					'task_max_waiting_in_queue_millis' => 0,
-					'active_shards_percent_as_number' => 100,
+					'nodes' => [
+						'fWM984kTSbGjOAoF1qWQew' => [
+							'http' => [
+								'publish_address' => '127.0.0.1:19308',
+							],
+							'ip' => '127.0.0.1',
+							'version' => '7.6.0',
+						],
+					],
 				]
 			);
 		};
