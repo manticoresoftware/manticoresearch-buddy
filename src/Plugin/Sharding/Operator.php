@@ -198,6 +198,7 @@ final class Operator {
 			// Set initial cluster we used
 			$this->state->set('cluster', $cluster->name);
 			$this->state->set('cluster_hash', Cluster::getNodesHash($cluster->getNodes()));
+			$this->init();
 			$this->getQueue()->setup();
 		}
 
