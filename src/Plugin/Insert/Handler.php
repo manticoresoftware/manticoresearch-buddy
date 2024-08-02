@@ -15,6 +15,7 @@ use Exception;
 use Manticoresearch\Buddy\Base\Plugin\Insert\Error\AutoSchemaDisabledError;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -68,7 +69,12 @@ class Handler extends BaseHandlerWithClient {
 				throw new Exception('Empty queries to process');
 			}
 
-			return TaskResult::raw((array)json_decode($resp->getBody(), true));
+			$struct = Struct::fromJson(
+				$resp->getBody()
+			);
+			return TaskResult::raw(
+				$struct->toJson()
+			);
 		};
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]

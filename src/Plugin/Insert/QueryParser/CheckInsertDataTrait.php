@@ -74,6 +74,7 @@ trait CheckInsertDataTrait {
 	protected static function checkPredefinedColTypes(array &$types, array $cols): void {
 		$predefinedTypes = [
 			'@timestamp' => Datatype::Timestamp,
+			'id' => Datatype::Bigint,
 		];
 		foreach (array_keys($types) as $i) {
 			if (!isset($cols[$i], $predefinedTypes[$cols[$i]])) {
