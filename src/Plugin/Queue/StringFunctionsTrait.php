@@ -31,16 +31,16 @@ trait StringFunctionsTrait {
 	 * @throws ManticoreSearchClientError
 	 */
 	protected function getFields(Client $client, string $tableName): void {
-		$desc = $client->sendRequest('DESC '.$tableName);
+		$desc = $client->sendRequest('DESC ' . $tableName);
 
 		if ($desc->hasError()) {
 			Buddy::debug(
-				"Can't describe table ".$tableName.'. Reason: '
-				.$desc->getError()
+				"Can't describe table " . $tableName . '. Reason: '
+				. $desc->getError()
 			);
 			throw GenericError::create(
-				"Can't describe table ".$tableName.'. Reason: '
-				.$desc->getError()
+				"Can't describe table " . $tableName . '. Reason: '
+				. $desc->getError()
 			);
 		}
 
@@ -87,13 +87,13 @@ trait StringFunctionsTrait {
 			Fields::TYPE_INT, Fields::TYPE_BIGINT => (int)$fieldValue,
 			Fields::TYPE_TIMESTAMP => is_numeric($fieldValue)
 				? (int)$fieldValue
-				: "'".self::escapeSting($fieldValue)."'",
+				: "'" . self::escapeSting($fieldValue) . "'",
 			Fields::TYPE_BOOL => (bool)$fieldValue,
 			Fields::TYPE_FLOAT => (float)$fieldValue,
 			Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
-				"'".$this->escapeSting($fieldValue)."'",
+				"'" . $this->escapeSting($fieldValue) . "'",
 			Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
-				'('.$this->prepareMvaField($fieldValue).')',
+				'(' . $this->prepareMvaField($fieldValue) . ')',
 			default => $this->escapeSting($fieldValue)
 		};
 	}

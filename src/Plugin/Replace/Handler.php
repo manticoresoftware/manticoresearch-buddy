@@ -84,7 +84,7 @@ final class Handler extends BaseHandlerWithClient {
 		string $table
 	): array {
 		$descResult = $manticoreClient
-			->sendRequest('DESC '.$table);
+			->sendRequest('DESC ' . $table);
 
 		if ($descResult->hasError()) {
 			throw ManticoreSearchClientError::create((string)$descResult->getError());
@@ -122,8 +122,8 @@ final class Handler extends BaseHandlerWithClient {
 			}
 
 			ManticoreSearchResponseError::throw(
-				'Field '.$fieldName
-				.' doesn\'t have stored property. Replace query can\'t be performed'
+				'Field ' . $fieldName
+				. ' doesn\'t have stored property. Replace query can\'t be performed'
 			);
 		}
 	}
@@ -176,15 +176,16 @@ final class Handler extends BaseHandlerWithClient {
 					 *
 					 * @phpstan-ignore-next-line
 					 */
-					: "'".self::escape((string)$fieldValue)."'",
+					: "'" . self::escape((string)$fieldValue) . "'",
 				Fields::TYPE_BOOL => ($fieldValue === 0) ? '0' : (bool)$fieldValue,
 				Fields::TYPE_FLOAT => (float)$fieldValue,
 				Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
-					"'".(is_array($fieldValue) ? json_encode($fieldValue)
-						: self::escape((string)$fieldValue))."'",
+					"'" . (is_array($fieldValue) ? json_encode($fieldValue)
+						: self::escape((string)$fieldValue)) . "'",
 				Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
-					'('.(is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue)
-					.')',
+					'(' . (is_array($fieldValue) ? implode(',', $fieldValue)
+						: $fieldValue)
+					. ')',
 				default => $fieldValue
 			};
 		}
