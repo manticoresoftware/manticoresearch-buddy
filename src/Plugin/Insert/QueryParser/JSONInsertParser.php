@@ -139,27 +139,37 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	}
 
 	/**
+	 * @param int $val
+	 * @return Datatype
+	 */
+	protected static function detectIntVal(int $val): Datatype {
+		return $val > Datalim::MySqlMaxInt->value ? Datatype::Bigint : Datatype::Int;
+	}
+
+	/**
+	 * @param string $val
+	 * @return Datatype
+	 */
+	protected static function detectStringVal(string $val): Datatype {
+		return match (true) {
+			self::isManticoreString($val) => Datatype::String,
+			self::isManticoreDate($val) => Datatype::Timestamp,
+			default => Datatype::Text,
+		};
+	}
+
+	/**
 	 * @param mixed $val
 	 * @return Datatype
 	 */
 	protected static function detectValType(mixed $val): Datatype {
-		if ($val === null) {
-			return Datatype::Null;
-		}
-		if (is_float($val)) {
-			return Datatype::Float;
-		}
-		if (is_int($val)) {
-			if ($val > Datalim::MySqlMaxInt->value) {
-				return Datatype::Bigint;
-			}
-			return Datatype::Int;
-		}
-		if (is_array($val)) {
-			return self::detectArrayVal($val);
-		}
-
-		return (is_string($val) && self::isManticoreString($val) === true) ? Datatype::String : Datatype::Text;
+		return match (true) {
+			($val === null) => Datatype::Null,
+			is_float($val) => Datatype::Float,
+			is_int($val) => self::detectIntVal($val),
+			is_array($val) => self::detectArrayVal($val),
+			is_string($val) => self::detectStringVal($val),
+			default => Datatype::Text,
+		};
 	}
-
 }
