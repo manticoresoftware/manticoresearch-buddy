@@ -18,8 +18,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\BuddyTest\Lib\BuddyRequestError;
 
-trait StringFunctionsTrait
-{
+trait StringFunctionsTrait {
 
 	/**
 	 * @var array<string, string>
