@@ -62,7 +62,7 @@ final class Processor extends BaseProcessor {
 
 		$operator->processQueue();
 
-		// hearbeat and mark current node state
+		// heartbeat and mark current node state
 		$operator->heartbeat()->checkMaster();
 
 		// If this is not master
@@ -95,11 +95,12 @@ final class Processor extends BaseProcessor {
 	 * @return bool True when is done and false when need to repeat
 	 */
 	public function status(string $table): bool {
-		// Do nothing, if we have no sharding
-		if (!$this->getOperator()->hasSharding()) {
-			return true;
+		if ($this->getOperator()->hasSharding()) {
+			return $this->getOperator()->checkTableStatus($table);
 		}
-		return $this->getOperator()->checkTableStatus($table);
+		Buddy::debugv("Sharding: no sharding detected while checking table status of {$table}");
+		// In case nothing happened, keep running
+		return false;
 	}
 
 	/**
