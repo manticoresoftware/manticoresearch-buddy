@@ -28,7 +28,7 @@ final class Operator {
 	}
 
 	/**
-	 * Just extra function that is requried to run once all setup
+	 * Just extra function that is required to run once all setup
 	 * This function sets additional cluster and queue property
 	 * that we cannot set on other stages and can do only after
 	 * we know which cluster we run or not at all
@@ -37,6 +37,7 @@ final class Operator {
 	protected function init(): static {
 		/** @var string */
 		$clusterName = $this->state->get('cluster');
+		Buddy::debug("Sharding: initializing under cluster {$clusterName}");
 		$this->cluster = new Cluster(
 			$this->client,
 			$clusterName,
@@ -70,7 +71,7 @@ final class Operator {
 			return $this;
 		}
 
-		// If the master node is incative, we are taking it over
+		// If the master node is inactive, we are taking it over
 		$cluster = $this->getCluster();
 		$inactiveNodes = $cluster->getInactiveNodes();
 		$isMasterInactive = $inactiveNodes->contains($master);
@@ -188,6 +189,7 @@ final class Operator {
 		$table = new Table($this->client, $cluster, ...$table);
 		$shouldSetup = !$this->state->get('master');
 		if ($shouldSetup) {
+			Buddy::debug("Sharding: setuping cluster {$cluster->name}");
 			$this->state->setCluster($cluster);
 			$this->state->setup();
 			$this->becomeMaster();
@@ -234,6 +236,7 @@ final class Operator {
 		$stateKey = "table:{$table}";
 		/** @var array{}|array{queue_ids:array<int>,status:string} */
 		$result = $this->state->get($stateKey);
+		Buddy::debugv("Sharding: table status of {$table}: " . json_encode($result));
 		if (!$result) {
 			return false;
 		}
@@ -248,6 +251,7 @@ final class Operator {
 
 			++$processed;
 		}
+		Buddy::debugv("Sharding: table status of {$table}: queue size: {$queueSize}, processed: {$processed}");
 
 		$isProcessed = $processed === $queueSize;
 		// Update the state

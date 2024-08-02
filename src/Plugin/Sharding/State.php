@@ -4,6 +4,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Ds\Vector;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 final class State {
@@ -70,7 +71,14 @@ final class State {
 				WHERE `key` = '{$key}'
 			",
 		};
-		$this->client->sendRequest($query);
+
+		// Try to set key and log error in case of failure
+		$res = $this->client->sendRequest($query);
+		if ($res->hasError()) {
+			$error = $res->getError();
+			Buddy::debugv("Sharding: Error while setting state key '{$key}': {$error}");
+		}
+
 		return $this;
 	}
 
