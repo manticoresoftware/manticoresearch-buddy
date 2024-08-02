@@ -26,7 +26,7 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Initialize the executor
 	 *
-	 * @param  Payload  $payload
+	 * @param Payload $payload
 	 *
 	 * @return void
 	 */
@@ -73,8 +73,8 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param  Client  $manticoreClient
-	 * @param  string  $table
+	 * @param Client $manticoreClient
+	 * @param string $table
 	 *
 	 * @return array<int|string, array{type:string, properties:string}>
 	 * @throws ManticoreSearchClientError
@@ -108,7 +108,7 @@ final class Handler extends BaseHandlerWithClient {
 
 
 	/**
-	 * @param  array<int|string, array{type:string, properties:string}>  $fields
+	 * @param array<int|string, array{type:string, properties:string}> $fields
 	 *
 	 * @return void
 	 * @throws GenericError
@@ -129,9 +129,9 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param  Client  $manticoreClient
-	 * @param  Payload  $payload
-	 * @param  array<int|string, array{type:string, properties:string}>  $fields
+	 * @param Client $manticoreClient
+	 * @param Payload $payload
+	 * @param array<int|string, array{type:string, properties:string}> $fields
 	 *
 	 * @return array<string, bool|float|int|string>
 	 * @throws ManticoreSearchClientError
@@ -156,8 +156,8 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param  array<string, bool|float|int|string|array<int, string>>  $records
-	 * @param  array<int|string, array{type:string, properties:string}>  $fields
+	 * @param array<string, bool|float|int|string|array<int, string>> $records
+	 * @param array<int|string, array{type:string, properties:string}> $fields
 	 *
 	 * @return array<string, bool|float|int|string>
 	 */
@@ -195,7 +195,7 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param  string  $string
+	 * @param string $string
 	 *
 	 * @return string
 	 */
@@ -207,7 +207,7 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param  array<string, bool|float|int|string>  $data
+	 * @param array<string, bool|float|int|string> $data
 	 *
 	 * @return array<string, bool|float|int|string>
 	 */
@@ -225,8 +225,8 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param  string  $tableName
-	 * @param  array<string, bool|float|int|string>  $set
+	 * @param string $tableName
+	 * @param array<string, bool|float|int|string> $set
 	 *
 	 * @return string
 	 */

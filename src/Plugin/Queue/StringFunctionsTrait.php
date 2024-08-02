@@ -58,7 +58,7 @@ trait StringFunctionsTrait {
 	}
 
 	/**
-	 * @param  string  $field
+	 * @param string $field
 	 *
 	 * @return string
 	 */
@@ -67,8 +67,8 @@ trait StringFunctionsTrait {
 	}
 
 	/**
-	 * @param  mixed  $fieldValue
-	 * @param  string  $fieldType
+	 * @param mixed $fieldValue
+	 * @param string $fieldType
 	 *
 	 * @return string|int|bool|float
 	 * @throws BuddyRequestError
@@ -99,7 +99,7 @@ trait StringFunctionsTrait {
 	}
 
 	/**
-	 * @param  string  $fieldValue
+	 * @param string $fieldValue
 	 *
 	 * @return string
 	 */
@@ -118,7 +118,7 @@ trait StringFunctionsTrait {
 	}
 
 	/**
-	 * @param  string  $value
+	 * @param string $value
 	 *
 	 * @return string
 	 */
@@ -130,7 +130,7 @@ trait StringFunctionsTrait {
 	/**
 	 * Just for phpstan
 	 *
-	 * @param  mixed  $input
+	 * @param mixed $input
 	 *
 	 * @return false|string
 	 */
