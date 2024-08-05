@@ -11,7 +11,10 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
 
-use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
+use Ds\Vector;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
@@ -19,7 +22,7 @@ use RuntimeException;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class NodesInfoKibanaHandler extends BaseHandler {
+class NodesInfoKibanaHandler extends BaseHandlerWithClient {
 
 	/**
 	 *  Initialize the executor
@@ -38,15 +41,23 @@ class NodesInfoKibanaHandler extends BaseHandler {
 	 */
 	public function run(): Task {
 
-		$taskFn = static function (): TaskResult {
+		$taskFn = static function (Client $manticoreClient): TaskResult {
+			/** @var Settings $settings */
+			$settings = $manticoreClient->getSettings();
+			if (!isset($settings->searchdListen)) {
+				throw new RuntimeException('Settings searchdListen parameter must be set');
+			}
+
+			[$ip, $port] = self::getNodeParameters($settings->searchdListen);
+
 			return TaskResult::raw(
 				[
 					'nodes' => [
 						'fWM984kTSbGjOAoF1qWQew' => [
 							'http' => [
-								'publish_address' => '127.0.0.1:19308',
+								'publish_address' => "$ip:$port",
 							],
-							'ip' => '127.0.0.1',
+							'ip' => $ip,
 							'version' => '7.6.0',
 						],
 					],
@@ -54,14 +65,37 @@ class NodesInfoKibanaHandler extends BaseHandler {
 			);
 		};
 
-		return Task::create($taskFn)->run();
+		return Task::create($taskFn, [$this->manticoreClient])->run();
 	}
 
 	/**
-	 * @return array<string>
+	 * @param Vector<string> $searchdListenSettings
+	 * @return array{0:string,1:string}
+	 * @throws \Exception
 	 */
-	public function getProps(): array {
-		return [];
-	}
+	protected static function getNodeParameters(Vector $searchdListenSettings): array {
+		$httpListenTail = ':http';
+		foreach ($searchdListenSettings as $line) {
+			if (!str_ends_with($line, $httpListenTail)) {
+				continue;
+			}
+			$line = str_replace($httpListenTail, '', $line);
+			if (str_contains($line, ':')) {
+				[$ip, $port] = explode(':', $line);
+			} else {
+				$ip = '127.0.0.1';
+				$port = $line;
+			}
+			if ($ip === '0.0.0.0') {
+				$hostname = gethostname();
+				$ip = gethostbyname($hostname ?: '');
+			}
+			break;
+		}
+		if (!isset($ip, $port)) {
+			throw new RuntimeException('Node parameters cannot be resolved');
+		}
 
+		return [$ip, $port];
+	}
 }
