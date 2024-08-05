@@ -34,8 +34,14 @@ trait StringFunctionsTrait {
 		$desc = $client->sendRequest('DESC ' . $tableName);
 
 		if ($desc->hasError()) {
-			Buddy::debug("Can't describe table " . $tableName . '. Reason: ' . $desc->getError());
-			throw GenericError::create("Can't describe table " . $tableName . '. Reason: ' . $desc->getError());
+			Buddy::debug(
+				"Can't describe table " . $tableName . '. Reason: '
+				. $desc->getError()
+			);
+			throw GenericError::create(
+				"Can't describe table " . $tableName . '. Reason: '
+				. $desc->getError()
+			);
 		}
 
 		$this->fields = [];
@@ -53,6 +59,7 @@ trait StringFunctionsTrait {
 
 	/**
 	 * @param string $field
+	 *
 	 * @return string
 	 */
 	protected function getFieldType(string $field): string {
@@ -62,11 +69,14 @@ trait StringFunctionsTrait {
 	/**
 	 * @param mixed $fieldValue
 	 * @param string $fieldType
+	 *
 	 * @return string|int|bool|float
 	 * @throws BuddyRequestError
 	 */
-	protected function morphValuesByFieldType(mixed $fieldValue, string $fieldType): string|int|bool|float {
-
+	protected function morphValuesByFieldType(
+		mixed $fieldValue,
+		string $fieldType
+	): string|int|bool|float {
 		$fieldValue = $this->mixedToString($fieldValue);
 
 		if ($fieldValue === false) {
@@ -74,7 +84,10 @@ trait StringFunctionsTrait {
 		}
 
 		return match ($fieldType) {
-			Fields::TYPE_INT, Fields::TYPE_BIGINT, Fields::TYPE_TIMESTAMP => (int)$fieldValue,
+			Fields::TYPE_INT, Fields::TYPE_BIGINT => (int)$fieldValue,
+			Fields::TYPE_TIMESTAMP => is_numeric($fieldValue)
+				? (int)$fieldValue
+				: "'" . self::escapeSting($fieldValue) . "'",
 			Fields::TYPE_BOOL => (bool)$fieldValue,
 			Fields::TYPE_FLOAT => (float)$fieldValue,
 			Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
@@ -87,6 +100,7 @@ trait StringFunctionsTrait {
 
 	/**
 	 * @param string $fieldValue
+	 *
 	 * @return string
 	 */
 	private function prepareMvaField(string $fieldValue): string {
@@ -105,6 +119,7 @@ trait StringFunctionsTrait {
 
 	/**
 	 * @param string $value
+	 *
 	 * @return string
 	 */
 	protected function escapeSting(string $value): string {
@@ -116,10 +131,10 @@ trait StringFunctionsTrait {
 	 * Just for phpstan
 	 *
 	 * @param mixed $input
+	 *
 	 * @return false|string
 	 */
 	private function mixedToString(mixed $input): false|string {
-
 		if (is_array($input)) {
 			return json_encode($input);
 		}
