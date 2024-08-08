@@ -297,7 +297,7 @@ class QueryProcessor {
 	public static function detectPluginPrefixFromRequest(Request $request): string {
 		$list = [
 			Pluggable::CORE_NS_PREFIX => static::$corePlugins,
-			Pluggable::EXTRA_NS_PREFIX => static::$extraPlugins,
+			Pluggable::EXTRA_NS_PREFIX => [...static::$extraPlugins, ...static::$localPlugins],
 		];
 		foreach ($list as $prefix => $plugins) {
 			foreach ($plugins as $plugin) {
