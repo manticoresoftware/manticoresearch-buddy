@@ -68,7 +68,8 @@ class KafkaWorker implements WorkerRunnerInterface
 			$this->client,
 			$this->bufferTable,
 			$instance['destination_name'],
-			$instance['query']
+			$instance['query'],
+			$this->batchSize
 		);
 		$this->getFields($this->client, $this->bufferTable);
 	}

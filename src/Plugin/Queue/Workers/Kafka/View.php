@@ -32,11 +32,11 @@ class View {
 	 * @throws GenericError
 	 * @throws ManticoreSearchClientError
 	 */
-	public function __construct(Client $client, string $buffer, string $destination, string $query) {
+	public function __construct(Client $client, string $buffer, string $destination, string $query, int $limit) {
 		$this->client = $client;
 		$this->buffer = $buffer;
 		$this->destination = $destination;
-		$this->query = $query;
+		$this->query = "$query LIMIT $limit";
 		$this->getFields($client, $destination);
 	}
 
