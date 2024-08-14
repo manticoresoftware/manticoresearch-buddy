@@ -38,6 +38,9 @@ final class Handler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload): TaskResult {
 			$settings = $payload->getSettings();
 			$pluggable = new Pluggable($settings);
+			if (!$pluggable->isRegistered()) {
+				throw new \RuntimeException('Plugins are not registered. Check your error log');
+			}
 			// We do switching against name just because there is strange trouble in threaded env
 			switch ($payload->type->name) {
 				// Install new plugin
