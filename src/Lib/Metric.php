@@ -25,6 +25,7 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
 use SplFileInfo;
+use Throwable;
 
 final class Metric {
 	const MANTICORE_JSON_FILE = 'manticore.json';
@@ -200,7 +201,11 @@ final class Metric {
 		}
 
 		$ts = time();
-		$this->snapshot();
+		try {
+			$this->snapshot();
+		} catch (Throwable $e) {
+			Buddy::error($e);
+		}
 	}
 
 	/**
@@ -447,6 +452,10 @@ final class Metric {
 		$iterator = new AppendIterator();
 		foreach ($paths as $path) {
 			$path = $this->dataDir . '/' . $path;
+			// We have situation when there is no dir while it's still written to json file
+			if (!is_dir($path)) {
+				continue;
+			}
 			$dirIterator = new RecursiveIteratorIterator(
 				new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
 				RecursiveIteratorIterator::SELF_FIRST
