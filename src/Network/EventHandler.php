@@ -104,17 +104,25 @@ final class EventHandler {
 			$response = Response::fromMessage($result->getStruct(), $request->format);
 		} catch (Throwable $e) {
 			Buddy::debug("[$id] processing error: {$e->getMessage()} in file {$e->getFile()}:{$e->getLine()}");
-			/** @var string $originalError */
-			$originalError = match (true) {
-				isset($request) => $request->error,
-				default => ((array)json_decode($payload, true))['error'] ?? '',
-			};
+			if (isset($request)) {
+				/** @var string $originalError */
+				$originalError = $request->error;
+				/** @var array<mixed> $originalErrorBody */
+				$originalErrorBody = $request->errorBody;
+			} else {
+				/** @var array{message?:array{error_body?:array<mixed>},error?:string} $payloadInfo */
+				$payloadInfo = (array)json_decode($payload, true);
+				$originalError = $payloadInfo['error'] ?? '';
+				$originalErrorBody = isset($payloadInfo['message'], $payloadInfo['message']['error_body'])
+					? $payloadInfo['message']['error_body'] : [];
+			}
 
 			// We proxy original error in case when we do not know how to handle query
 			// otherwise we send our custom error
 			if (static::shouldProxyError($e)) {
 				/** @var GenericError $e */
 				$e->setResponseError($originalError);
+				$e->setResponseErrorBody($originalErrorBody);
 			} elseif (!is_a($e, GenericError::class)) {
 				$e = GenericError::create($originalError);
 			}
