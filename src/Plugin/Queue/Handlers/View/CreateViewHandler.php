@@ -138,7 +138,7 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 
 			$sql = /** @lang ManticoreSearch */
 				'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
-				" WHERE match('@name \"" . $sourceName . "\"')";
+				" WHERE name='$sourceName'";
 
 			$sourceRecords = $manticoreClient->sendRequest($sql)->getResult();
 
