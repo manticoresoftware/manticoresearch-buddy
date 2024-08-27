@@ -11,7 +11,7 @@ final class Cluster {
 	// Name of the cluster that we use to store meta data
 	// TODO: not in use yet
 	const SYSTEM_NAME = 'system';
-	const GALERA_OPTIONS = 'gmcast.peer_timeout=PT5S';
+	const GALERA_OPTIONS = 'gmcast.peer_timeout=PT0.1S;evs.install_timeout=PT5S';
 
 	/** @var Set<string> $nodes set of all nodes that belong the the cluster */
 	protected Set $nodes;
@@ -197,7 +197,9 @@ final class Cluster {
 		foreach ($nodeIds as $node) {
 			$this->nodes->add($node);
 			// TODO: the pass is the subject to remove
-			$query = "JOIN CLUSTER {$this->name} at '{$this->nodeId}' '{$this->name}' as path";
+			$galeraOptions = static::GALERA_OPTIONS;
+			$query = "JOIN CLUSTER {$this->name} at '{$this->nodeId}' '{$this->name}' as " .
+				"path, '{$galeraOptions}' as options";
 			$queue->add($node, $query);
 		}
 		return $this;
