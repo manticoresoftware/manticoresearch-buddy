@@ -200,6 +200,7 @@ final class Cluster {
 		foreach ($nodeIds as $node) {
 			$this->nodes->add($node);
 			// TODO: the pass is the subject to remove
+            $galeraOptions = static::GALERA_OPTIONS;
 			$query = "JOIN CLUSTER {$this->name} at '{$this->nodeId}' '{$this->name}' as path, '{$galeraOptions}' as options";
 			$queue->add($node, $query);
 		}
