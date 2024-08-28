@@ -125,9 +125,8 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromSqlRequest(Request $request): static {
-		$pattern = '/autocomplete\('
-			. '\s*\'([^\']+)\'\s*,\s*\'([^\']+)\'\s*'
-			. '((?:,\s*(?:(\d+)\s+as\s+(\w+)|\'([^\']+)\'\s+as\s+(\w+))\s*)*)\)/ius';
+		$pattern = '/autocomplete\(\s*\'([^\']+)\'\s*,\s*\'([^\']+)\'\s*'
+			. '((?:,\s*(?:(\d+)|\'([^\']*)\')\s+as\s+(\w+))*)\s*\)/ius';
 		preg_match($pattern, $request->payload, $matches);
 		if (!$matches) {
 			throw new QueryParseError('Failed to parse query');
@@ -136,29 +135,37 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->query = $matches[1];
 		$self->table = $matches[2];
-		$self->parseOptions($matches);
+		if (isset($matches[3])) {
+			$self->parseOptions($matches[3]);
+		}
+		// Make sure that we set default values for options
+		if (!isset($self->layouts)) {
+			$self->layouts = KeyboardLayout::getSupportedLanguages();
+		}
 		return $self;
 	}
 
 	/**
-	 * @param array<int,string> $matches
+	 * @param string $optionString
 	 * @return void
 	 * @throws Exception
 	 */
-	protected function parseOptions(array $matches): void {
-		// Make sure that we set default values for options
-		if (!isset($this->layouts)) {
-			$this->layouts = KeyboardLayout::getSupportedLanguages();
-		}
-
-		$matchesLen = sizeof($matches);
-		if ($matchesLen <= 4) {
+	protected function parseOptions(string $optionString): void {
+		if (!$optionString) {
 			return;
 		}
 
-		for ($i = 4; $i < $matchesLen; $i += 2) {
-			$value = $matches[$i];
-			$key = $matches[$i + 1];
+		preg_match_all('/,\s*((\d+|\'[^\']*\')\s+as\s+(\w+))/ius', $optionString, $optionMatches, PREG_SET_ORDER);
+		foreach ($optionMatches as $optionMatch) {
+			$value = trim($optionMatch[2]);
+			$key = $optionMatch[3];
+
+			// Remove quotes if the value is a string
+			if (strpos($value, "'") === 0) {
+				$value = trim($value, "'");
+			}
+
+			/** @var string $value */
 			$key = Strings::underscoreToCamelcase($key);
 			if (!property_exists($this, $key) || $key === 'query' || $key === 'table') {
 				QueryParseError::throw("Unknown option '$key'");
@@ -218,7 +225,7 @@ final class Payload extends BasePayload {
 			return $layouts;
 		}
 		if (isset($layouts)) {
-			$layouts = array_map('trim', explode(',', $layouts));
+			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
 		} else {
 			$layouts = KeyboardLayout::getSupportedLanguages();
 		}

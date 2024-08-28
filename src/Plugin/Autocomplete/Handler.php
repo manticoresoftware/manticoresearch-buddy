@@ -12,7 +12,8 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Autocomplete;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
+use Manticoresearch\Buddy\Core\Error\QueryValidationError;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -26,7 +27,7 @@ use RuntimeException;
  * @phpstan-type keyword array{normalized:string,tokenized:string,docs:int}
  * @phpstan-type suggestion array{suggest:string,docs:int}
  */
-final class Handler extends BaseHandlerWithClient {
+final class Handler extends BaseHandlerWithFlagCache {
 	/**
 	 *  Initialize the executor
 	 *
@@ -44,6 +45,7 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = function (): TaskResult {
+			$this->validate();
 			$layoutPhrases = [];
 			// If we have layout correction we generate for all languages given phrases
 			if ($this->payload->layouts) {
@@ -69,6 +71,29 @@ final class Handler extends BaseHandlerWithClient {
 
 		$task = Task::create($taskFn, []);
 		return $task->run();
+	}
+
+	/**
+	 * Perform validation, method should be run inside coroutine
+	 * @return void
+	 */
+	protected function validate(): void {
+		$cacheKey = "autocomplete:validate:{$this->payload->table}";
+		if ($this->flagCache->has($cacheKey)) {
+			return;
+		}
+		/** @var array{error?:string} */
+		$result = $this->manticoreClient->sendRequest('SHOW CREATE TABLE ' . $this->payload->table)->getResult();
+		if (isset($result['error'])) {
+			QueryValidationError::throw($result['error']);
+		}
+
+		/** @var array{0:array{data:array<array{'Create Table':string}>}} $result */
+		$schema  = $result[0]['data'][0]['Create Table'];
+		if (false === str_contains($schema, 'min_infix_len')) {
+			QueryValidationError::throw('Autocomplete plugin requires min_infix_len to be set');
+		}
+		$this->flagCache->set($cacheKey, true, 30);
 	}
 
 	/**
@@ -261,19 +286,12 @@ final class Handler extends BaseHandlerWithClient {
 		/** @var array{0:array{data?:array<keyword>}} $result */
 		$result = $this->manticoreClient->sendRequest($q)->getResult();
 		$data = $result[0]['data'] ?? [];
-		// Case when nothing found in that way we have word* form
-		if (sizeof($data) === 1 && $data[0]['tokenized'] === $data[0]['normalized']) {
-			return [];
-		}
+		$totalFound = sizeof($data);
+		Buddy::debug('Autocomplete: expanded keywords found: ' . $totalFound);
 		/** @var array<keyword> */
 		$data = static::applyThreshold($data, 0.5);
 		/** @var array<string> */
-		$keywords = array_map(
-			fn($row) => $row['normalized'][0] === '='
-			? substr($row['normalized'], 1)
-			: $row['normalized'],
-			$data
-		);
+		$keywords = array_map(fn($row) => ltrim($row['normalized'], '='), $data);
 		// Filter out keywords that are too long to given config
 		$maxLen = strlen($word) + $this->payload->expansionLen;
 		$keywords = array_filter($keywords, fn ($keyword) => strlen($keyword) <= $maxLen);
@@ -307,26 +325,33 @@ final class Handler extends BaseHandlerWithClient {
 		$suggestions = array_column(static::applyThreshold($data, 0.5, 20), 'suggest');
 		$thresholdSuggestionsCount = sizeof($suggestions);
 		$filterFn = function (string $suggestion) use ($lastWord, $lastWordLen, $distance) {
+			$suggestionLen = strlen($suggestion);
+			$lastWordPos = strpos($suggestion, $lastWord);
+
 			// First check case when we have exact match of not filled up word and it's in beginning or ending
 			// with maximum allowed distance
-			$lastWordPos = strpos($suggestion, $lastWord);
-			if ($this->payload->prepend && $lastWordPos !== false && $lastWordPos < $distance) {
-				return true;
-			}
-
-			if ($this->payload->append && $lastWordPos !== false && ($lastWordLen - $lastWordPos) < $distance) {
-				return true;
+			if ($lastWordPos !== false) {
+				if ($this->payload->prepend && $lastWordPos <= $distance) {
+					return true;
+				}
+				if ($this->payload->append && ($suggestionLen - $lastWordPos - $lastWordLen) <= $distance) {
+					return true;
+				}
 			}
 
 			// Validate levenstein now for prefix or suffix
-			$prefix = substr($suggestion, 0, $lastWordLen);
-			if ($this->payload->prepend && levenshtein($lastWord, $prefix) <= $distance) {
-				return true;
+			if ($this->payload->prepend) {
+				$prefix = substr($suggestion, 0, $lastWordLen);
+				if (levenshtein($lastWord, $prefix) <= $distance) {
+					return true;
+				}
 			}
 
-			$suffix = substr($suggestion, -$lastWordLen);
-			if ($this->payload->append && levenshtein($lastWord, $suffix) <= $distance) {
-				return true;
+			if ($this->payload->append) {
+				$suffix = substr($suggestion, -$lastWordLen);
+				if (levenshtein($lastWord, $suffix) <= $distance) {
+					return true;
+				}
 			}
 
 			return false;
@@ -357,10 +382,10 @@ final class Handler extends BaseHandlerWithClient {
 	private function getExpansionWordMatch(string $word): string {
 		$match = $word;
 		if ($this->payload->append) {
-			$match = "$word*";
+			$match = "$match*";
 		}
 		if ($this->payload->prepend) {
-			$match = "*$word";
+			$match = "*$match";
 		}
 		return $match;
 	}
@@ -373,8 +398,12 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return array<keyword>|array<suggestion>
 	 */
 	private static function applyThreshold(array $documents, float $threshold = 0.5, int $topN = 10): array {
-		if (!$documents) {
-			return [];
+		// Do not apply when we have less than topN documents
+		$totalRows = sizeof($documents);
+		if ($totalRows < $topN) {
+			Buddy::debug("Autocomplete: skipping threshold [$topN], total rows: $totalRows");
+			// Filter out cases when tokenized form is the same as normalized (when * in beginning or end)
+			return array_filter($documents, fn($row) => $row['docs'] > 0);
 		}
 
 		// Sort documents by number of associated docs in descending order
@@ -388,7 +417,8 @@ final class Handler extends BaseHandlerWithClient {
 		$totalDocs = array_sum(array_column($documents, 'docs'));
 		$avgDocs = $totalDocs / sizeof($documents);
 		Buddy::debug(
-			'Autocomplete: apply threshold ' .
+			"Autocomplete: apply threshold [$topN] " .
+				"rows found: $totalRows, " .
 				"average docs: $avgDocs, " .
 				"total docs: $totalDocs, " .
 				'size: ' . sizeof($documents)

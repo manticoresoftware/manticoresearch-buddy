@@ -13,8 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka;
 
 use Closure;
 
-class Batch
-{
+class Batch {
 	protected int $batchSize;
 
 	/**

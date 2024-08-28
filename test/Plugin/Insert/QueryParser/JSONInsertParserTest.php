@@ -37,24 +37,47 @@ class JSONInsertParserTest extends TestCase {
 
 	public function testInsertValTypeDetection(): void {
 		echo "\nTesting the detection of an Insert value datatype\n";
-		self::$parser = new JSONInsertParser();
+		$parser = new JSONInsertParser();
+		self::$parser = $parser;
 
-		$this->assertEquals(Datatype::Float, self::invokeMethod(self::$parser, 'detectValType', [0.1]));
-		$this->assertEquals(Datatype::Text, self::invokeMethod(self::$parser, 'detectValType', ['0.1']));
-		$this->assertEquals(Datatype::Bigint, self::invokeMethod(self::$parser, 'detectValType', [11111111111]));
-		$this->assertEquals(Datatype::Text, self::invokeMethod(self::$parser, 'detectValType', ['11111111111']));
-		$this->assertEquals(Datatype::Int, self::invokeMethod(self::$parser, 'detectValType', [1]));
-		$this->assertEquals(Datatype::Json, self::invokeMethod(self::$parser, 'detectValType', [['a' => 1]]));
+		$this->assertEquals(Datatype::Float, self::invokeMethod($parser, 'detectValType', [0.1]));
+		$this->assertEquals(Datatype::Text, self::invokeMethod($parser, 'detectValType', ['0.1']));
+		$this->assertEquals(Datatype::Bigint, self::invokeMethod($parser, 'detectValType', [11111111111]));
+		$this->assertEquals(Datatype::Text, self::invokeMethod($parser, 'detectValType', ['11111111111']));
+		$this->assertEquals(Datatype::Int, self::invokeMethod($parser, 'detectValType', [1]));
+		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', [['a' => 1]]));
+		$this->assertEquals(Datatype::Multi64, self::invokeMethod($parser, 'detectValType', [[1, 1111111111111]]));
+		$this->assertEquals(Datatype::Multi, self::invokeMethod($parser, 'detectValType', [[11, 1]]));
+		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', [[1, 0.1]]));
+		$this->assertEquals(Datatype::String, self::invokeMethod($parser, 'detectValType', ['testmail@google.com']));
+		$this->assertEquals(Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01']));
+		$this->assertEquals(Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01']));
 		$this->assertEquals(
-			Datatype::Multi64, self::invokeMethod(self::$parser, 'detectValType', [[1, 1111111111111]])
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01:01'])
 		);
-		$this->assertEquals(Datatype::Multi, self::invokeMethod(self::$parser, 'detectValType', [[11, 1]]));
-		$this->assertEquals(Datatype::Json, self::invokeMethod(self::$parser, 'detectValType', [[1, 0.1]]));
 		$this->assertEquals(
-			Datatype::String,
-			self::invokeMethod(self::$parser, 'detectValType', ['testmail@google.com'])
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01:01.001'])
 		);
-		$this->assertEquals(Datatype::Text, self::invokeMethod(self::$parser, 'detectValType', ['test text']));
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01:01.001+01:00'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01:01+01:00'])
+		);
+		$this->assertEquals(Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01']));
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01:01'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01:01.001'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01:01.001+01:00'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01:01+01:00'])
+		);
+		$this->assertEquals(Datatype::Text, self::invokeMethod($parser, 'detectValType', ['test text']));
 	}
 
 	public function testInsertRowParse(): void {

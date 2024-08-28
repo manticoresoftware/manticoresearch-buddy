@@ -38,6 +38,33 @@ class SQLInsertParserTest extends TestCase {
 		$this->assertEquals(Datatype::Multi, self::invokeMethod($parser, 'detectValType', ['(1, 0.1)']));
 		$this->assertEquals(Datatype::Multi, self::invokeMethod($parser, 'detectValType', ['(11, 1)']));
 		$this->assertEquals(Datatype::String, self::invokeMethod($parser, 'detectValType', ['testmail@google.com']));
+		$this->assertEquals(Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01']));
+		$this->assertEquals(Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01']));
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01:01'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01:01.001'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01:01.001+01:00'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01:01+01:00'])
+		);
+		$this->assertEquals(Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01']));
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01:01'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01:01.001'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01:01.001+01:00'])
+		);
+		$this->assertEquals(
+			Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01 01:01:01+01:00'])
+		);
 		$this->assertEquals(Datatype::Text, self::invokeMethod($parser, 'detectValType', ['test text']));
 	}
 

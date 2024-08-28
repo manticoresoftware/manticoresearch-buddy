@@ -21,13 +21,13 @@ use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient
-{
+final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * Initialize the executor
 	 *
 	 * @param Payload $payload
+	 *
 	 * @return void
 	 */
 	public function __construct(public Payload $payload) {
@@ -51,7 +51,10 @@ final class Handler extends BaseHandlerWithClient
 			}
 
 			$result = $client->sendRequest(
-				static::buildQuery($payload->table, array_merge($baseValues, $payload->set))
+				static::buildQuery(
+					$payload->table,
+					array_merge($baseValues, $payload->set)
+				)
 			);
 
 			if ($result->getError()) {
@@ -72,10 +75,14 @@ final class Handler extends BaseHandlerWithClient
 	/**
 	 * @param Client $manticoreClient
 	 * @param string $table
+	 *
 	 * @return array<int|string, array{type:string, properties:string}>
 	 * @throws ManticoreSearchClientError
 	 */
-	private static function getFields(Client $manticoreClient, string $table): array {
+	private static function getFields(
+		Client $manticoreClient,
+		string $table
+	): array {
 		$descResult = $manticoreClient
 			->sendRequest('DESC ' . $table);
 
@@ -88,7 +95,9 @@ final class Handler extends BaseHandlerWithClient
 			$fields = [];
 			/** @var array{Type:string, Properties:string, Field:string} $field */
 			foreach ($descResult[0]['data'] as $field) {
-				$fields[$field['Field']] = ['type' => $field['Type'], 'properties' => $field['Properties']];
+				$fields[$field['Field']] = [
+					'type' => $field['Type'], 'properties' => $field['Properties'],
+				];
 			}
 
 			return $fields;
@@ -100,13 +109,15 @@ final class Handler extends BaseHandlerWithClient
 
 	/**
 	 * @param array<int|string, array{type:string, properties:string}> $fields
+	 *
 	 * @return void
 	 * @throws GenericError
 	 */
 	private static function checkStoredFields(array $fields): void {
 		foreach ($fields as $fieldName => $fieldSettings) {
 			if ($fieldSettings['type'] !== 'text'
-				|| str_contains($fieldSettings['properties'], 'stored')) {
+				|| str_contains($fieldSettings['properties'], 'stored')
+			) {
 				continue;
 			}
 
@@ -121,10 +132,15 @@ final class Handler extends BaseHandlerWithClient
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
 	 * @param array<int|string, array{type:string, properties:string}> $fields
+	 *
 	 * @return array<string, bool|float|int|string>
 	 * @throws ManticoreSearchClientError
 	 */
-	private static function getRecordValues(Client $manticoreClient, Payload $payload, array $fields): array {
+	private static function getRecordValues(
+		Client $manticoreClient,
+		Payload $payload,
+		array $fields
+	): array {
 		$sql = "SELECT * FROM  {$payload->table}  WHERE id = {$payload->id}";
 
 		/** @var array<int, array<string, array<int, array<string, string>>>> $records */
@@ -142,19 +158,34 @@ final class Handler extends BaseHandlerWithClient
 	/**
 	 * @param array<string, bool|float|int|string|array<int, string>> $records
 	 * @param array<int|string, array{type:string, properties:string}> $fields
+	 *
 	 * @return array<string, bool|float|int|string>
 	 */
-	private static function morphValuesByFieldType(array $records, array $fields): array {
-
+	private static function morphValuesByFieldType(
+		array $records,
+		array $fields
+	): array {
 		foreach ($records as $fieldName => $fieldValue) {
 			$records[$fieldName] = match ($fields[$fieldName]['type']) {
-				Fields::TYPE_INT, Fields::TYPE_BIGINT, Fields::TYPE_TIMESTAMP => (int)$fieldValue,
+				Fields::TYPE_INT, Fields::TYPE_BIGINT => (int)$fieldValue,
+				Fields::TYPE_TIMESTAMP => is_numeric($fieldValue)
+					? (int)$fieldValue
+					/**
+					 * We exactly know that timestamp value can be only string and int.
+					 * phpstan suggest array also. So we skip this warning
+					 *
+					 * @phpstan-ignore-next-line
+					 */
+					: "'" . self::escape((string)$fieldValue) . "'",
 				Fields::TYPE_BOOL => ($fieldValue === 0) ? '0' : (bool)$fieldValue,
 				Fields::TYPE_FLOAT => (float)$fieldValue,
 				Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
-					"'" . (is_array($fieldValue) ? json_encode($fieldValue) : $fieldValue) . "'",
+					"'" . (is_array($fieldValue) ? json_encode($fieldValue)
+						: self::escape((string)$fieldValue)) . "'",
 				Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
-					'(' . (is_array($fieldValue) ? implode(',', $fieldValue) : $fieldValue) . ')',
+					'(' . (is_array($fieldValue) ? implode(',', $fieldValue)
+						: $fieldValue)
+					. ')',
 				default => $fieldValue
 			};
 		}
@@ -164,11 +195,23 @@ final class Handler extends BaseHandlerWithClient
 	}
 
 	/**
+	 * @param string $string
+	 *
+	 * @return string
+	 */
+	private static function escape(string $string): string {
+		if (str_contains($string, "'")) {
+			$string = str_replace("'", "\\'", $string);
+		}
+		return $string;
+	}
+
+	/**
 	 * @param array<string, bool|float|int|string> $data
+	 *
 	 * @return array<string, bool|float|int|string>
 	 */
 	private static function removeBackticks(array $data): array {
-
 		foreach ($data as $fieldName => $row) {
 			if ($fieldName[0] !== '`') {
 				continue;
@@ -184,6 +227,7 @@ final class Handler extends BaseHandlerWithClient
 	/**
 	 * @param string $tableName
 	 * @param array<string, bool|float|int|string> $set
+	 *
 	 * @return string
 	 */
 	private static function buildQuery(string $tableName, array $set): string {
