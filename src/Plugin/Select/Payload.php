@@ -93,12 +93,15 @@ final class Payload extends BasePayload {
 			$self->originalQuery,
 			$matches
 		);
+		if (!$matches) {
+			throw QueryParseError::create('Failed to parse query');
+		}
 
 		// At this point we have two cases: when we have table and when we direct select some function like
 		// select version()
 		// we put this function in fields and table will be empty
 		// otherwise it's normal select with fields and table required
-		if ($matches[2] ?? null) {
+		if (isset($matches[1]) && ($matches[2] ?? null)) {
 			$self->originalTable = (string)$matches[2];
 			$table = strtolower(ltrim($self->originalTable, '.'));
 			if ($table[0] === '`' || $table[-1] === '`') {
@@ -107,6 +110,9 @@ final class Payload extends BasePayload {
 			$self->table = $table;
 			$pattern = '/(?:[^,(]+|(\((?>[^()]+|(?1))*\)))+/';
 			preg_match_all($pattern, $matches[1], $matches);
+			if (!$matches) {
+				throw QueryParseError::create('Failed to parse query');
+			}
 			$self->fields = array_map('trim', $matches[0]);
 
 			$self->where = self::addWhereStatements($request->payload);

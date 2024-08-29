@@ -358,7 +358,7 @@ final class Handler extends BaseHandler {
 			'/COALESCE\(([a-z@][a-z0-9_@]*),\s*\'\'\)\s*(<>|=[^>])\s*\'\'|'
 				. 'CONTAINS\(([a-z@][a-z0-9_@]*), \'NEAR\(\((\w+), (\w+)\), (\d+)\)\'\)/ius',
 			function ($matches) {
-				if (isset($matches[1])) {
+				if (!isset($matches[6])) {
 					return $matches[1] . ' ' . $matches[2] . ' \'\'';
 				}
 
