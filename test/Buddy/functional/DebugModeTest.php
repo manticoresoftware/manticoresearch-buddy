@@ -28,6 +28,9 @@ class DebugModeTest extends TestCase {
 
 	public function setUp(): void {
 		preg_match('/log = (.*?)[\r\n]/', self::$manticoreConf, $matches);
+		if (!$matches) {
+			throw new Exception('Cannot find searchd log path in manticore config');
+		}
 		$this->searchdLogFilepath = $matches[1];
 		$this->searchdLog = (string)file_get_contents($this->searchdLogFilepath);
 		self::setUpBeforeClass();
