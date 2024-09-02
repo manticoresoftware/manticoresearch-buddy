@@ -7,6 +7,17 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
+/**
+ * @phpstan-type QueryItem array{
+ *  id:int,
+ *  query:string,
+ *  wait_for_id:int,
+ *  tries:int,
+ *  status:string,
+ *  created_at:int,
+ *  updated_at:int
+ * }
+ */
 final class Queue {
 	const MAX_TRIES = 10;
 
@@ -70,13 +81,13 @@ final class Queue {
 	/**
 	 * Get the single row by id
 	 * @param  int    $id
-	 * @return array{id:int,node:string,query:string,wait_for_id:int,status:string,updated_at:int}|array{}
+	 * @return QueryItem|array{}
 	 */
 	public function getById(int $id): array {
 		$table = $this->cluster->getSystemTableName($this->table);
 
 		$q = "SELECT * FROM {$table} WHERE id = {$id} LIMIT 1";
-		/** @var array{0:array{data:array<array{id:int,node:string,query:string,wait_for_id:int,status:string,updated_at:int}>}} */
+		/** @var array{0:array{data:array<QueryItem>}} */
 		$res = $this->client->sendRequest($q)->getResult();
 		return $res[0]['data'][0] ?? [];
 	}
@@ -89,17 +100,21 @@ final class Queue {
 	public function process(Node $node): void {
 		$queries = $this->dequeue($node);
 		foreach ($queries as $query) {
+			// If the query is not ready to be repeated, we just return
 			if ($this->shouldSkipQuery($query)) {
 				return;
 			}
 
-			$this->handleQuery($node, $query);
+			// In case current query is not ok, we just return and repeat later
+			if (!$this->handleQuery($node, $query)) {
+				return;
+			}
 		}
 	}
 
 	/**
 	 * Helper to check if we should skip query in processing the queue
-	 * @param  array{id:int,query:string,wait_for_id:int,tries:int,status:string,updated_at:int} $query
+	 * @param  QueryItem $query
 	 * @return bool
 	 */
 	protected function shouldSkipQuery(array $query): bool {
@@ -112,8 +127,10 @@ final class Queue {
 		}
 
 		// Do the delay check only for queries that were processed at least once
+		// We check with created_at cuz join cluster queries that are normally failing
+		// takes a lot of time to be processed and we do not want to delay them on repeat
 		if ($query['tries'] > 0) {
-			$timeSinceLastAttempt = (int)(microtime(true) * 1000) - $query['updated_at'];
+			$timeSinceLastAttempt = (int)(microtime(true) * 1000) - $query['created_at'];
 			$maxAttemptTime = (int)ceil(pow(1.21, $query['tries']) * 1000);
 			if ($timeSinceLastAttempt < $maxAttemptTime) {
 				Buddy::debugv(
@@ -130,10 +147,10 @@ final class Queue {
 	/**
 	 * Helper to process the query from the queue
 	 * @param  Node   $node
-	 * @param  array{id:int,query:string,wait_for_id:int,tries:int,status:string}  $query
-	 * @return void
+	 * @param  QueryItem  $query
+	 * @return bool
 	 */
-	protected function handleQuery(Node $node, array $query): void {
+	protected function handleQuery(Node $node, array $query): bool {
 		$mt = microtime(true);
 		Buddy::debugv("[{$node->id}] Queue query: {$query['query']}");
 
@@ -146,15 +163,16 @@ final class Queue {
 		$this->attemptToUpdateStatus($query, $status, $duration);
 
 		if ($status !== 'error') {
-			return;
+			return true;
 		}
 
 		Buddy::info("[$node->id] Queue query error: {$query['query']}");
+		return false;
 	}
 
 	/**
 	 * Execute query and return info
-	 * @param  array{id:int,query:string,tries:int}  $query
+	 * @param  QueryItem  $query
 	 * @return array<mixed>
 	 */
 	protected function executeQuery(array $query): array {
@@ -165,7 +183,7 @@ final class Queue {
 
 	/**
 	 * Try to update status with log to the debug
-	 * @param array{id:int,query:string,tries:int} $query
+	 * @param QueryItem $query
 	 * @param string $status
 	 * @param int $duration
 	 * @return bool
@@ -185,14 +203,13 @@ final class Queue {
 	 * We use this method for internal use only
 	 * and automatic handle returns of failed queries
 	 * @param  Node   $node
-	 * @return Vector<array{id:int,query:string,wait_for_id:int,tries:int,status:string,updated_at:int}>
+	 * @return Vector<QueryItem>
 	 *  list of queries for request node
 	 */
 	protected function dequeue(Node $node): Vector {
 		$maxTries = static::MAX_TRIES;
 		$query = "
-		SELECT `id`, `query`, `wait_for_id`, `tries`, `updated_at`
-			FROM {$this->table}
+		SELECT * FROM {$this->table}
 			WHERE
 				`node` = '{$node->id}'
 				 AND
