@@ -10,8 +10,9 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\Fuzzy;
 
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
+use Manticoresearch\Buddy\Core\Error\QueryValidationError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\TableValidator;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
@@ -19,8 +20,7 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient {
-
+final class Handler extends BaseHandlerWithFlagCache {
 
 	/**
 	 * Initialize the executor
@@ -38,20 +38,21 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws RuntimeException
 	 */
 	public function run(): Task {
-		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
-			$fn = static function (string $query) use ($payload, $manticoreClient): array {
+		$taskFn = function (): TaskResult {
+			$fn = function (string $query): array {
+				$this->validate();
 				$phrases = [$query];
 				// If we have layout correction we generate for all languages given phrases
-				if ($payload->layouts) {
-					$phrases = KeyboardLayout::combineMany($query, $payload->layouts);
+				if ($this->payload->layouts) {
+					$phrases = KeyboardLayout::combineMany($query, $this->payload->layouts);
 				}
 				$words = [];
 				$scoreMap = [];
 				foreach ($phrases as $phrase) {
-					[$variations, $variationScores] = $manticoreClient->fetchFuzzyVariations(
+					[$variations, $variationScores] = $$this->manticoreClient->fetchFuzzyVariations(
 						$phrase,
-						$payload->table,
-						$payload->distance
+						$this->payload->table,
+						$this->payload->distance
 					);
 					Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
 					// Extend varitions for each iteration we have
@@ -70,20 +71,32 @@ final class Handler extends BaseHandlerWithClient {
 
 				/** @var array<array<string>> $words */
 				$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
-				/** @var array<string> $combinations */
 				$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
+				/** @var array<string> $combinations */
 				// If the original phrase in the list, we add it to the beginning to boost weight
 				$combinations = Arrays::boostListValues($combinations, $phrases);
 				return $combinations;
 			};
-			$request = $payload->getQueriesRequest($fn);
-			$result = $manticoreClient->sendRequest($request, $payload->path)->getResult();
+			$request = $this->payload->getQueriesRequest($fn);
+			$result = $this->manticoreClient->sendRequest($request, $this->payload->path)->getResult();
 			return TaskResult::raw($result);
 		};
 
-		return Task::create(
-			$taskFn,
-			[$this->payload, $this->manticoreClient]
-		)->run();
+		return Task::create($taskFn)->run();
 	}
+
+	/**
+	 * Perform validation, method should be run inside coroutine
+	 * @return void
+	 * @throws QueryValidationError
+	 */
+	protected function validate(): void {
+		$validator = new TableValidator($this->manticoreClient, $this->flagCache, 30);
+		if ($validator->hasMinInfixLen($this->payload->table)) {
+			return;
+		}
+
+		QueryValidationError::throw('Fuzzy plugin requires min_infix_len to be set');
+	}
+
 }
