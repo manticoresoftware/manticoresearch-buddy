@@ -49,7 +49,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 				$words = [];
 				$scoreMap = [];
 				foreach ($phrases as $phrase) {
-					[$variations, $variationScores] = $$this->manticoreClient->fetchFuzzyVariations(
+					[$variations, $variationScores] = $this->manticoreClient->fetchFuzzyVariations(
 						$phrase,
 						$this->payload->table,
 						$this->payload->distance
