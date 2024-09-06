@@ -80,6 +80,7 @@ final class Payload extends BasePayload {
 			static::$requestTarget = 'index-pattern';
 		}
 		switch (static::$requestTarget) {
+			case '_count':
 			case '_license':
 			case '_nodes':
 			case '_xpack':
@@ -144,6 +145,14 @@ final class Payload extends BasePayload {
 		if (str_starts_with(static::$requestError, '"_source" property should be')) {
 			return 'InvalidSourceKibanaHandler';
 		}
+		if (preg_match('/bucket \'\S+\' without aggregate items/', static::$requestError)
+			|| str_contains(static::$requestError, 'invalid sorting order')
+			|| str_contains(static::$requestError, "sort-by attribute '_key' not found")
+			|| str_contains(static::$requestError, '"field" property missing')
+			|| str_contains(static::$requestError, 'nested "aggs" is not supported')
+		) {
+			return 'KibanaSearch\Handler';
+		}
 
 		throw new Exception('Cannot find handler for error: ' . static::$requestError);
 	}
@@ -155,6 +164,7 @@ final class Payload extends BasePayload {
 		$namespace = __NAMESPACE__ . '\\';
 		$handlerName = match (static::$requestTarget) {
 			'_license' => 'LicenseHandler',
+			'_count' => 'CountInfoKibanaHandler',
 			'_nodes' => 'NodesInfoKibanaHandler',
 			'_xpack' => 'XpackInfoKibanaHandler',
 			'.kibana', 'config', 'space', 'index-pattern' => 'SettingsKibanaHandler',
