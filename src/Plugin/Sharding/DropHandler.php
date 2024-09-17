@@ -18,7 +18,7 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 use Swoole\Coroutine;
 
-final class Handler extends BaseHandlerWithClient {
+final class DropHandler extends BaseHandlerWithClient {
 	/**
 	 * Initialize the executor
 	 *
@@ -44,8 +44,8 @@ final class Handler extends BaseHandlerWithClient {
 			$taskFn,
 			[$this->payload, $this->manticoreClient]
 		);
-		$args = $this->payload->toShardArgs();
-		$task->on('run', fn() => static::processHook('shard', [$args]));
+		$args = $this->payload->toHookArgs();
+		$task->on('run', fn() => static::processHook('sharding:drop', [$args]));
 		return $task->run();
 	}
 
@@ -54,48 +54,16 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return ?Task
 	 */
 	protected function validate(): ?Task {
-		if ($this->payload->options['rf'] < 1 || $this->payload->options['shards'] < 1) {
-			return static::getErrorTask(
-				'Invalid shards or rf options are set'
-			);
-		}
-
 		// Try to validate that we do not create the same table we have
 		$q = "SHOW CREATE TABLE {$this->payload->table}";
 		$resp = $this->manticoreClient->sendRequest($q);
 		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
 		$result = $resp->getResult();
-		if (isset($result[0]['data'][0])) {
+		if (!isset($result[0]['data'][0])) {
 			return static::getErrorTask(
-				"table '{$this->payload->table}': CREATE TABLE failed: table '{$this->payload->table}' already exists"
-			);
-		}
-
-		$nodeCount = 1;
-		// Check that cluster exists
-		if ($this->payload->cluster) {
-			/** @var array{0:array{data?:array{0:array{Value:string}}}} $result */
-			$result = $this->manticoreClient
-				->sendRequest("SHOW STATUS LIKE 'cluster_{$this->payload->cluster}_nodes_view'")
-				->getResult();
-			if (!isset($result[0]['data'][0])) {
-				return static::getErrorTask(
-					"Cluster '{$this->payload->cluster}' does not exist"
-				);
-			}
-			$nodeCount = substr_count($result[0]['data'][0]['Value'], 'replication');
-
-			if ($nodeCount < 2) {
-				return static::getErrorTask(
-					"The node count for cluster {$this->payload->cluster} is too low: {$nodeCount}."
-					.' You can create local sharded table.'
-				);
-			}
-		}
-
-		if ($nodeCount < $this->payload->options['rf']) {
-			return static::getErrorTask(
-				"The node count ({$nodeCount}) is lower than replication factor ({$this->payload->options['rf']})"
+				"table '{$this->payload->table}' is missing: "
+					. 'DROP SHARDED TABLE failed: '
+					."table '{$this->payload->table}' must exists"
 			);
 		}
 

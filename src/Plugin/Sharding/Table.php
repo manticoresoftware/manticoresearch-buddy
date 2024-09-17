@@ -238,6 +238,54 @@ final class Table {
 	}
 
 	/**
+	 * Drop the whole sharded table
+	 * @param Queue $queue
+	 * @return Map<string,mixed>
+	 */
+	public function drop(Queue $queue): Map {
+		/** @var Map<string,mixed> */
+		$result = new Map(
+			[
+			'status' => 'processing',
+			'result' => null,
+			'structure' => $this->structure,
+			'extra' => $this->extra,
+			]
+		);
+
+		/** @var Set<string> */
+		$nodes = new Set;
+
+		/** @var Set<int> */
+		$queueIds = new Set;
+
+		// Get the current shard schema
+		$schema = $this->getShardSchema();
+
+		// Iterate through all nodes and their shards
+		foreach ($schema as $row) {
+			$nodes->add($row['node']);
+			$ids = $this->cleanUpNode($queue, $row['node'], $row['shards']);
+			$queueIds->add(...$ids);
+		}
+
+		// Remove the sharding configuration from the system table
+		$systemTable = $this->cluster->getSystemTableName($this->table);
+		$this->client->sendRequest(
+			"
+			DELETE FROM {$systemTable}
+			WHERE
+			cluster = '{$this->cluster->name}'
+			AND
+			table = '{$this->name}'
+		"
+		);
+
+		$result['nodes'] = $nodes;
+		$result['queue_ids'] = $queueIds;
+		return $result;
+	}
+	/**
 	 * Handle replication for the table and shard
 	 * @param  string $node
 	 * @param  Queue  $queue
@@ -402,13 +450,15 @@ final class Table {
 	 * @param Queue $queue
 	 * @param  string $nodeId
 	 * @param  Set<int>    $shards
-	 * @return static
+	 * @return Set<int>
 	 */
-	public function cleanUpNode(Queue $queue, string $nodeId, Set $shards): static {
+	public function cleanUpNode(Queue $queue, string $nodeId, Set $shards): Set {
 		// Delete distributed table
 		/** @var Set<string> $removedClusters list of clusters that we will delete */
 		$removedClusters = new Set;
-		$queue->add($nodeId, "DROP TABLE {$this->name}");
+		/** @var Set<int> $queueIds */
+		$queueIds = new Set;
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE {$this->name}");
 		foreach ($shards as $shard) {
 			// First remove cluster, due to we need to detach tables first
 			$connections = $this->getConnectedNodes(new Set([$shard]));
@@ -432,9 +482,10 @@ final class Table {
 			if (isset($cluster) && !$removedClusters->contains($cluster->name)) {
 				// We need to fire delete cluster once
 				$queueId = $cluster->remove($queue);
+				$queueIds[] = $queueId;
 
 				// Clean up the table associated with this cluster
-				$queue
+				$queueIds[] = $queue
 					->setWaitForId($queueId)
 					->add($nodeId, "DROP TABLE {$table}");
 				$queue->resetWaitForId();
@@ -444,7 +495,7 @@ final class Table {
 			unset($cluster);
 		}
 
-		return $this;
+		return $queueIds;
 	}
 
 	/**
