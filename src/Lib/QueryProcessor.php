@@ -378,13 +378,27 @@ class QueryProcessor {
 		if (in_array('manticoresoftware/buddy-plugin-sharding', $loadedPlugins)) {
 			$hooks[] = [
 				'manticoresoftware/buddy-plugin-sharding',
-				'shard',
+				'sharding:create',
 				static function (array $args) {
 					// TODO: remove the reference to the plugin,
 					// cuz plugins should be decoupled from the core,
 					// but for now for ease of migration we keep it here
 					$processor = ShardingPayload::getProcessors()[0];
 					$processor->execute('shard', $args);
+
+					$table = $args['table']['name'];
+					$processor->addTicker(fn() => $processor->status($table), 1);
+				},
+			];
+			$hooks[] = [
+				'manticoresoftware/buddy-plugin-sharding',
+				'sharding:drop',
+				static function (array $args) {
+					// TODO: remove the reference to the plugin,
+					// cuz plugins should be decoupled from the core,
+					// but for now for ease of migration we keep it here
+					$processor = ShardingPayload::getProcessors()[0];
+					$processor->execute('drop', $args);
 
 					$table = $args['table']['name'];
 					$processor->addTicker(fn() => $processor->status($table), 1);

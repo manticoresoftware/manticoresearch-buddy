@@ -227,6 +227,15 @@ final class Operator {
 	}
 
 	/**
+	 * Drop table the whole sharded table
+	 * @param array{name:string,cluster:string} $table
+	 * @return void
+	 */
+	public function drop(array $table): void {
+		$this->state->set("table:{$table['name']}", $table);
+	}
+
+	/**
 	 * Helper to run table status checker on pings
 	 * It should return true when we done or false to repeat
 	 * @param  string $table
