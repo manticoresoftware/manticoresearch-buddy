@@ -20,8 +20,7 @@ use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient
-{
+final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Initialize the executor
 	 *
@@ -151,7 +150,7 @@ final class Handler extends BaseHandlerWithClient
 
 		if (is_array($result[0])) {
 			foreach ($result[0]['data'] as $k => $v) {
-				if ($v['id'] !== (int)$payload->docId) {
+				if (!isset($v['id']) || $v['id'] !== (int)$payload->docId) {
 					continue;
 				}
 
