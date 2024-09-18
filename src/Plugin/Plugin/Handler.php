@@ -12,13 +12,18 @@ namespace Manticoresearch\Buddy\Base\Plugin\Plugin;
 
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\Strings;
 use RuntimeException;
 
 final class Handler extends BaseHandlerWithClient {
+	/** @var Pluggable */
+	protected Pluggable $pluggable;
+
 	/**
 	 * Initialize the executor
 	 *
@@ -26,6 +31,22 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return void
 	 */
 	public function __construct(public Payload $payload) {
+	}
+
+	/**
+	 * Get props that we need to set to this handler on initialization
+	 * @return array<string>
+	 */
+	public function getProps(): array {
+		return [...parent::getProps(), 'pluggable'];
+	}
+
+	/**
+	 * @param Pluggable $pluggable
+	 * @return void
+	 */
+	public function setPluggable(Pluggable $pluggable): void {
+		$this->pluggable = $pluggable;
 	}
 
   /**
@@ -99,13 +120,13 @@ final class Handler extends BaseHandlerWithClient {
 
 		// Define function to run on sucdessful execution
 		$successFn = match ($this->payload->type) {
-			ActionType::Create => fn() => static::processHook('installed'),
-			ActionType::Delete => fn() => static::processHook('deleted'),
+			ActionType::Create => fn() => static::processEvent('installed'),
+			ActionType::Delete => fn() => static::processEvent('deleted'),
 			ActionType::Show => fn() => null,
 			ActionType::Disable => fn() =>
-				static::processHook('disabled', [trim($this->payload->package ?? '', "'")]),
+				static::processEvent('disabled', [trim($this->payload->package ?? '', "'")]),
 			ActionType::Enable => fn() =>
-				static::processHook('enabled', [trim($this->payload->package ?? '', "'")]),
+				static::processEvent('enabled', [trim($this->payload->package ?? '', "'")]),
 		};
 
 		return Task::create(
@@ -119,13 +140,76 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return array{core:array<mixed>,local:array<mixed>,external:array<mixed>}
 	 */
 	protected static function getPlugins(Pluggable $pluggable): array {
-		$externalPlugins = $pluggable->fetchExtraPlugins();
-		$localPlugins = $pluggable->fetchLocalPlugins();
-		$corePlugins = $pluggable->fetchCorePlugins();
+		$externalPlugins = $pluggable->getExtraPlugins();
+		$localPlugins = $pluggable->getLocalPlugins();
+		$corePlugins = $pluggable->getCorePlugins();
 		return [
 			'core' => $corePlugins,
 			'local' => $localPlugins,
 			'external' => $externalPlugins,
 		];
+	}
+
+	/**
+	 * @param string $event
+	 * @param array<mixed> $args
+	 * @return void
+	 * @throws RuntimeException
+	 */
+	public function processEvent(string $event, array $args = []): void {
+		$fn = match ($event) {
+			// Happens when we installed the external plugin or deleted it
+			'installed', 'deleted' => function () {
+				$this->pluggable->getExtraPlugins(true);
+			},
+			// Happens when we disable the plugin
+			'disabled' => function (string $name) {
+				Buddy::debug("Plugin '$name' has been disabled");
+				if (!$this->pluggable->disablePlugin($name)) {
+					return;
+				}
+
+				static::pausePlugins([$name]);
+			},
+			// Happens when we enable the plugin
+			'enabled' => function (string $name) {
+				Buddy::debug("Plugin '$name' has been enabled");
+				if (!$this->pluggable->enablePlugin($name)) {
+					return;
+				}
+
+				static::resumePlugins([$name]);
+			},
+			default => throw new RuntimeException("Unknown hook event: $event"),
+		};
+
+		// Execute the choose function
+		$fn(...$args);
+	}
+
+	/**
+	 * Resume plugins after pause
+	 * @param array<string> $filter
+	 * @return void
+	 */
+	public function resumePlugins(array $filter = []): void {
+		$this->pluggable->iterateProcessors(
+			static function (BaseProcessor $processor) {
+				$processor->execute('resume');
+			}, $filter
+		);
+	}
+
+	/**
+	 * Run stop method of all plugin handlers
+	 * @param array<string> $filter
+	 * @return void
+	 */
+	public function pausePlugins(array $filter = []): void {
+		$this->pluggable->iterateProcessors(
+			static function (BaseProcessor $processor) {
+				$processor->execute('pause');
+			}, $filter
+		);
 	}
 }
