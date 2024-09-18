@@ -232,7 +232,28 @@ final class Operator {
 	 * @return void
 	 */
 	public function drop(array $table): void {
-		$this->state->set("table:{$table['name']}", $table);
+		// Get the current stats first
+		/** @var array{result:string,status:string,structure:string,extra:string}|null $currentState */
+		$currentState = $this->state->get("table:{$table['name']}");
+		if (!$currentState) {
+			return;
+		}
+
+		// Prepare cluster and Table to operate with
+		$cluster = new Cluster(
+			$this->client,
+			$table['cluster'],
+			Node::findId($this->client),
+		);
+		$table = new Table(
+			$this->client,
+			$cluster,
+			$table['name'],
+			$currentState['structure'],
+			$currentState['extra']
+		);
+		$result = $table->drop($this->getQueue());
+		$this->state->set("table:{$table->name}", $result);
 	}
 
 	/**

@@ -44,9 +44,31 @@ final class CreateHandler extends BaseHandlerWithClient {
 			$taskFn,
 			[$this->payload, $this->manticoreClient]
 		);
+		/** @var array{
+		 * table:array{cluster:string,name:string,structure:string,extra:string},
+		 * replicationFactor:int,
+		 * shardCount:int
+		 * } $args
+		 */
 		$args = $this->payload->toHookArgs();
-		$task->on('run', fn() => static::processHook('sharding:create', [$args]));
+		$task->on('run', fn() => static::runInBackground($args));
 		return $task->run();
+	}
+
+	/**
+	 * @param array{
+	 * table:array{cluster:string,name:string,structure:string,extra:string},
+	 * replicationFactor:int,
+	 * shardCount:int
+	 * } $args
+	 * @return void
+	 */
+	public static function runInBackground(array $args): void {
+		$processor = Payload::getProcessors()[0];
+		$processor->execute('shard', $args);
+
+		$table = $args['table']['name'];
+		$processor->addTicker(fn() => $processor->status($table), 1);
 	}
 
 	/**

@@ -139,11 +139,12 @@ final class Payload extends BasePayload {
 		return stripos($request->error, 'syntax error')
 			&& strpos($request->error, 'P03') === 0
 			&& (
-				stripos($request->payload, 'create table') === 0
-				)
-			&& stripos($request->payload, 'rf') !== false
-			&& stripos($request->payload, 'shards') !== false
-			&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/', $request->payload);
+				(stripos($request->payload, 'create table') === 0
+					&& stripos($request->payload, 'rf') !== false
+					&& stripos($request->payload, 'shards') !== false
+					&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/', $request->payload)
+				) || stripos($request->payload, 'drop') === 0
+			);
 	}
 
 	/**
@@ -151,7 +152,7 @@ final class Payload extends BasePayload {
 	 * @return void
 	 */
 	protected function validate(): void {
-		if (!$this->cluster && $this->options['rf'] > 1) {
+		if (!$this->cluster && $this->type !== 'drop' && $this->options['rf'] > 1) {
 			throw QueryParseError::create('You cannot set rf greater than 1 when creating single node sharded table.');
 		}
 
@@ -203,7 +204,7 @@ final class Payload extends BasePayload {
 	 * Get handler class to process depending on the type
 	 * @return string
 	 */
-	public function getShardingClass(): string {
+	public function getHandlerClassName(): string {
 		return match ($this->type) {
 			'create' => CreateHandler::class,
 			'drop' => DropHandler::class,

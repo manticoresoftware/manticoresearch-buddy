@@ -11,7 +11,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Closure;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -45,8 +45,20 @@ final class DropHandler extends BaseHandlerWithClient {
 			[$this->payload, $this->manticoreClient]
 		);
 		$args = $this->payload->toHookArgs();
-		$task->on('run', fn() => static::processHook('sharding:drop', [$args]));
+		$task->on('run', fn() => static::runInBackground($args));
 		return $task->run();
+	}
+
+	/**
+	 * @param array{table:array{name:string,cluster:string}} $args
+	 * @return void
+	 */
+	public static function runInBackground(array $args): void {
+		$processor = Payload::getProcessors()[0];
+		$processor->execute('drop', $args);
+
+		$table = $args['table']['name'];
+		$processor->addTicker(fn() => $processor->status($table), 1);
 	}
 
 	/**
@@ -57,7 +69,18 @@ final class DropHandler extends BaseHandlerWithClient {
 		// Try to validate that we do not create the same table we have
 		$q = "SHOW CREATE TABLE {$this->payload->table}";
 		$resp = $this->manticoreClient->sendRequest($q);
-		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
+		/**
+		 * @var array{
+		 *  0: array{
+		 *   data?: array{
+		 *    0: array{
+		 *     Table: string,
+		 *     "Create Table": string
+		 *    }
+		 *   }
+		 *  }
+		 * } $result
+		 */
 		$result = $resp->getResult();
 		if (!isset($result[0]['data'][0])) {
 			return static::getErrorTask(
@@ -67,7 +90,46 @@ final class DropHandler extends BaseHandlerWithClient {
 			);
 		}
 
+		if (false === stripos($result[0]['data'][0]['Create Table'], "type='distributed'")) {
+			return static::getErrorTask(
+				"table '{$this->payload->table}' is not distributed: "
+				. 'DROP SHARDED TABLE failed: '
+				."table '{$this->payload->table}' must be distributed"
+			);
+		}
+
+		// In case we have no state, means table is not sharded
+		$state = $this->getTableState($this->payload->table);
+		if (!$state) {
+			return static::getErrorTask(
+				"table '{$this->payload->table}' is not sharded: "
+				. 'DROP SHARDED TABLE failed: '
+				."table '{$this->payload->table}' be created with sharding"
+			);
+		}
+
 		return null;
+	}
+
+	/**
+	 * @param string $table
+	 * @return array{result:string,status?:string}|array{}
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 */
+	protected function getTableState(string $table): array {
+		// TODO: think about the way to refactor it and remove duplication
+		$q = "select `value` from _sharding_state where `key` = 'table:{$table}'";
+		$resp = $this->manticoreClient->sendRequest($q);
+
+		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
+		$result = $resp->getResult();
+
+		if (isset($result[0]['data'][0]['value'])) {
+			/** @var array{result:string,status?:string} $value */
+			$value = json_decode($result[0]['data'][0]['value'], true);
+		}
+		return $value ?? [];
 	}
 
 	/**
@@ -88,29 +150,22 @@ final class DropHandler extends BaseHandlerWithClient {
 	 * Get task function for handling sharding case
 	 * @return Closure
 	 */
-	protected static function getShardingFn(): Closure {
-		return static function (Payload $payload, Client $client): TaskResult {
+	protected function getShardingFn(): Closure {
+		return function (): TaskResult {
 			$ts = time();
-			$value = [];
-			$timeout = $payload->getShardingTimeout();
+			$timeout = $this->payload->getShardingTimeout();
 			while (true) {
-				// TODO: think about the way to refactor it and remove duplication
-				$q = "select `value` from _sharding_state where `key` = 'table:{$payload->table}'";
-				$resp = $client->sendRequest($q);
-				$result = $resp->getResult();
-				/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
-				if (isset($result[0]['data'][0]['value'])) {
-					$value = json_decode($result[0]['data'][0]['value'], true);
-				}
-				/** @var array{result:string,status?:string} $value */
-				$status = $value['status'] ?? 'processing';
-				if ($status !== 'processing') {
-					return TaskResult::raw($value['result']);
+				$state = $this->getTableState($this->payload->table);
+				if ($state) {
+					$status = $state['status'] ?? 'processing';
+					if ($status !== 'processing') {
+						return TaskResult::raw($state['result']);
+					}
 				}
 				if ((time() - $ts) > $timeout) {
 					break;
 				}
-				Coroutine::sleep(1);
+				Coroutine::sleep(0.6);
 			}
 			return TaskResult::withError('Waiting timeout exceeded.');
 		};
