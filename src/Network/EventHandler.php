@@ -112,9 +112,13 @@ final class EventHandler {
 			} else {
 				/** @var array{message?:array{error_body?:array<mixed>},error?:string} $payloadInfo */
 				$payloadInfo = (array)json_decode($payload, true);
-				$originalError = $payloadInfo['error'] ?? '';
-				$originalErrorBody = isset($payloadInfo['message'], $payloadInfo['message']['error_body'])
-					? $payloadInfo['message']['error_body'] : [];
+				if (isset($payloadInfo['error'])) {
+					$originalError = $payloadInfo['error']['message'];
+					$originalErrorBody = $payloadInfo['error']['body'] ?? [];
+				} else {
+					$originalError = '';
+					$originalErrorBody = [];
+				}
 			}
 
 			// We proxy original error in case when we do not know how to handle query
