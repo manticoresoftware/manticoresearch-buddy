@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+		<?php declare(strict_types=1);
 
 /*
   Copyright (c) 2023-present, Manticore Software LTD (https://manticoresearch.com)
@@ -158,7 +158,7 @@ class ShowFullOrOpenTablesPayloadTest extends TestCase {
    * }
    */
 	protected static function buildSQLQuery(array $args, string $queryType): array {
-		$query = "SHOW $queryType TABLES";
+		$query = "SHOW {$queryType} TABLES";
 
 		if (isset($args['database'])) {
 			$query .= " FROM `{$args['database']}`";

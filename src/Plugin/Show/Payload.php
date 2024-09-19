@@ -260,14 +260,14 @@ final class Payload extends BasePayload {
 	 * @throws Exception
 	 */
 	public function getHandlerClassName(): string {
-		return __NAMESPACE__ . '\\' . match (static::$type) {
-			'expanded tables' => 'ExpandedTablesHandler',
-			'create table' => 'CreateTableHandler',
-			'schemas' => 'SchemasHandler',
-			'queries' => 'QueriesHandler',
-			'version' => 'VersionHandler',
-			'full columns' => 'FullColumnsHandler',
-			'unsupported' => 'UnsupportedStmtHandler',
+		return match (static::$type) {
+			'expanded tables' => ExpandedTablesHandler::class,
+			'create table' => CreateTableHandler::class,
+			'schemas' => SchemasHandler::class,
+			'queries' => QueriesHandler::class,
+			'version' => VersionHandler::class,
+			'full columns' => FullColumnsHandler::class,
+			'unsupported' => UnsupportedStmtHandler::class,
 			default => throw new Exception('Cannot find handler for request type: ' . static::$type),
 		};
 	}

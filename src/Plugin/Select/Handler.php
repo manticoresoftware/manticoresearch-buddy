@@ -398,7 +398,7 @@ final class Handler extends BaseHandler {
 	 * @param string $table
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
-	 * @return array<mixed>
+	 * @return array<array<string,mixed>>
 	 */
 	protected static function getTableColumns(string $table, Client $manticoreClient, Payload $payload): array {
 		$data = [];
