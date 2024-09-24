@@ -105,9 +105,11 @@ class QueryProcessor {
 			static::$sqlQueryParser = $instance;
 		}
 
-		/** @var Pluggable */
-		$pluggable = static::getObjFromContainer('pluggable');
-		static::$pluggable = $pluggable;
+		if (!isset(static::$pluggable)) {
+			/** @var Pluggable */
+			$pluggable = static::getObjFromContainer('pluggable');
+			static::$pluggable = $pluggable;
+		}
 		static::$isInited = true;
 	}
 
