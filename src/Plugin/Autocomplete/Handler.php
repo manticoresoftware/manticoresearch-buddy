@@ -85,7 +85,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			return;
 		}
 
-		QueryValidationError::throw('Autocomplete plugin requires min_infix_len to be set');
+		QueryValidationError::throw('Autocomplete requires min_infix_len to be set');
 	}
 
 	/**
