@@ -109,8 +109,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		}
 
 		// Combine it in relevant order
+		// We need to use unique to avoid duplicates in case
+		// we're dealing with multiple languages and it results in a single character change
+		// so in the end, we wind up with multiple suggestions for the same phrase
 		/** @var array<string> $suggestions */
-		$suggestions = Arrays::blend(...$combinationSets);
+		$suggestions = array_unique(Arrays::blend(...$combinationSets));
 		return $suggestions;
 	}
 
