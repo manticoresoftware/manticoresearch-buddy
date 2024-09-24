@@ -96,7 +96,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			return;
 		}
 
-		QueryValidationError::throw('Fuzzy plugin requires min_infix_len to be set');
+		QueryValidationError::throw('Fuzzy search requires min_infix_len to be set');
 	}
 
 }
