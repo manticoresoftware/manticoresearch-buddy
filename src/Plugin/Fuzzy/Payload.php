@@ -33,6 +33,9 @@ final class Payload extends BasePayload {
 	/** @var string */
 	public string $table;
 
+	/** @var bool */
+	public bool $fuzzy;
+
 	/** @var int */
 	public int $distance;
 
@@ -75,6 +78,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $payload['index'];
+		$self->fuzzy = (bool)($payload['options']['fuzzy'] ?? 0);
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 
@@ -93,6 +97,10 @@ final class Payload extends BasePayload {
 		preg_match('/FROM\s+(\w+)\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
+		// Parse fuzzy and use default 0 if missing
+		preg_match('/fuzzy\s*=\s*(\d+)/ius', $query, $matches);
+		$fuzzy = (bool)($matches[1] ?? 0);
+
 		// Parse distance and use default 2 if missing
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
 		$distanceValue = (int)($matches[1] ?? 2);
@@ -104,6 +112,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $tableName;
+		$self->fuzzy = $fuzzy;
 		$self->distance = $distanceValue;
 		$self->layouts = $layouts;
 		$self->payload = $query;
