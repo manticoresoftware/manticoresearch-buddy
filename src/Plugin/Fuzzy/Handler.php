@@ -10,6 +10,7 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\Fuzzy;
 
+use Closure;
 use Manticoresearch\Buddy\Core\Error\QueryValidationError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\TableValidator;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
@@ -39,50 +40,63 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 */
 	public function run(): Task {
 		$taskFn = function (): TaskResult {
-			$fn = function (string $query): array {
-				$this->validate();
-				$phrases = [$query];
-				// If we have layout correction we generate for all languages given phrases
-				if ($this->payload->layouts) {
-					$phrases = KeyboardLayout::combineMany($query, $this->payload->layouts);
-				}
-				$words = [];
-				$scoreMap = [];
-				foreach ($phrases as $phrase) {
-					[$variations, $variationScores] = $this->manticoreClient->fetchFuzzyVariations(
-						$phrase,
-						$this->payload->table,
-						$this->payload->distance
-					);
-					Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
-					// Extend varitions for each iteration we have
-					foreach ($variations as $pos => $variation) {
-						$words[$pos] ??= [];
-						$blend = Arrays::blend($words[$pos], $variation);
-						$words[$pos] = array_values(array_unique($blend));
-						$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
-					}
-				}
-
-				// If no words found, we just add the original phrase as fallback
-				if (!$words) {
-					return ["$query"];
-				}
-
-				/** @var array<array<string>> $words */
-				$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
-				$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
-				/** @var array<string> $combinations */
-				// If the original phrase in the list, we add it to the beginning to boost weight
-				$combinations = Arrays::boostListValues($combinations, $phrases);
-				return $combinations;
-			};
+			$fn = $this->getHandlerFn();
 			$request = $this->payload->getQueriesRequest($fn);
 			$result = $this->manticoreClient->sendRequest($request, $this->payload->path)->getResult();
 			return TaskResult::raw($result);
 		};
 
 		return Task::create($taskFn)->run();
+	}
+
+	/**
+	 * Get handler function that we use to process the query
+	 * @return Closure
+	 */
+	protected function getHandlerFn(): Closure {
+		// In case fuzzy set to false, we just return the original query
+		if (!$this->payload->fuzzy) {
+			return fn($query) => [$query];
+		}
+		// Otherwise we process the query
+		return function (string $query): array {
+			$this->validate();
+			$phrases = [$query];
+			// If we have layout correction we generate for all languages given phrases
+			if ($this->payload->layouts) {
+				$phrases = KeyboardLayout::combineMany($query, $this->payload->layouts);
+			}
+			$words = [];
+			$scoreMap = [];
+			foreach ($phrases as $phrase) {
+				[$variations, $variationScores] = $this->manticoreClient->fetchFuzzyVariations(
+					$phrase,
+					$this->payload->table,
+					$this->payload->distance
+				);
+				Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
+				// Extend varitions for each iteration we have
+				foreach ($variations as $pos => $variation) {
+					$words[$pos] ??= [];
+					$blend = Arrays::blend($words[$pos], $variation);
+					$words[$pos] = array_values(array_unique($blend));
+					$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
+				}
+			}
+
+			// If no words found, we just add the original phrase as fallback
+			if (!$words) {
+				return ["$query"];
+			}
+
+			/** @var array<array<string>> $words */
+			$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
+			$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
+			/** @var array<string> $combinations */
+			// If the original phrase in the list, we add it to the beginning to boost weight
+			$combinations = Arrays::boostListValues($combinations, $phrases);
+			return $combinations;
+		};
 	}
 
 	/**
