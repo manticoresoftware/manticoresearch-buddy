@@ -20,9 +20,9 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
 /**
- * This is the parent class to handle erroneous Manticore queries
+ * This is a class to handle SHOW TABLES-like queries where MySQL syntax is used
  */
-class FullTablesHandler extends BaseHandlerWithTableFormatter {
+class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
 	/**
 	 *  Initialize the executor
 	 *
@@ -60,10 +60,19 @@ class FullTablesHandler extends BaseHandlerWithTableFormatter {
 			// Adjust result row to be mysql like
 			if ($result[0]['data']) {
 				foreach ($result[0]['data'] as &$row) {
-					$row = [
-						"Tables_in_{$payload->database}" => $row['Index'],
-						'Table_type' => 'BASE TABLE', // Set Mysql like table type
-					];
+					$row = match ($payload->tableType) {
+						'full' => [
+							"Tables_in_{$payload->database}" => $row['Index'],
+							'Table_type' => 'BASE TABLE', // Set Mysql like table type
+						],
+						'open' => [
+							'Database' => 'Manticore',
+							'Table' => $row['Index'],
+							'In_use' => 0,
+							'Name_locked' => 0,
+						],
+						default => throw new \Exception("Unknown table type {$payload->tableType} passed"),
+					};
 				}
 			}
 
@@ -71,9 +80,17 @@ class FullTablesHandler extends BaseHandlerWithTableFormatter {
 				return TaskResult::raw($tableFormatter->getTable($time0, $result[0]['data'], $total));
 			}
 
-			return TaskResult::withData($result[0]['data'])
-				->column("Tables_in_{$payload->database}", Column::String)
-				->column('Table_type', Column::String);
+			return match ($payload->tableType) {
+				'full' => TaskResult::withData($result[0]['data'])
+					->column("Tables_in_{$payload->database}", Column::String)
+					->column('Table_type', Column::String),
+				'open' => TaskResult::withData($result[0]['data'])
+					->column('Database', Column::String)
+					->column('Table', Column::String)
+					->column('In_Use', Column::Long)
+					->column('Name_locked', Column::Long),
+				default => throw new \Exception("Unknown table type {$payload->tableType} passed"),
+			};
 		};
 
 		return Task::create(

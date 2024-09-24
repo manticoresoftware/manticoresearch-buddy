@@ -25,7 +25,7 @@ final class Payload extends BasePayload {
 	/**
 	 * @var string $type Type of show queries, basicly what is followed after show
 	 */
-	public static string $type = 'full tables';
+	public static string $type = 'expanded tables';
 
 	/**
 	 * @var string $database Manticore single database with no name
@@ -44,6 +44,8 @@ final class Payload extends BasePayload {
 	 * 	It contains match pattern from LIKE statement if its presented
 	 */
 	public string $like = '';
+
+	public string $tableType;
 
 	public string $path;
 	public bool $hasCliEndpoint;
@@ -64,7 +66,7 @@ final class Payload extends BasePayload {
 	 */
 	public static function fromRequest(Request $request): static {
 		return match (static::$type) {
-			'full tables' => static::fromFullTablesRequest($request),
+			'expanded tables' => static::fromExpandedTablesRequest($request),
 			'create table' => static::fromCreateTableRequest($request),
 			'schemas', 'queries' => static::fromSimpleRequest($request),
 			'version' => static::fromVersionRequest($request),
@@ -79,9 +81,9 @@ final class Payload extends BasePayload {
 	 * @return static
 	 * @throws QueryParseError
 	 */
-	protected static function fromFullTablesRequest(Request $request): static {
+	protected static function fromExpandedTablesRequest(Request $request): static {
 		$pattern = '#^'
-			. 'show full tables'
+			. 'show (full|open) tables'
 			. '(\s+from\s+`?(?P<database>([a-z][a-z0-9\_]*))`?)?'
 			. '(\s+like\s+\'(?P<like>([^\']+))\')?'
 			. '(\s+where\s+tables\_in\_manticore\s*\=\s*\'(?P<where>[^\']+)\')?'
@@ -93,6 +95,8 @@ final class Payload extends BasePayload {
 		}
 
 		$self = new static();
+		// TODO: move table type names to a separate enum?
+		$self->tableType = (stripos($request->payload, 'show full tables') === 0) ? 'full' : 'open';
 		if ($m['database'] ?? '') {
 			$self->database = $m['database'];
 		}
@@ -177,8 +181,9 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		if (stripos($request->payload, 'show full tables') === 0) {
-			static::$type = 'full tables';
+		if (stripos($request->payload, 'show full tables') === 0
+		|| stripos($request->payload, 'show open tables') === 0) {
+			static::$type = 'expanded tables';
 			return true;
 		}
 
@@ -223,7 +228,6 @@ final class Payload extends BasePayload {
 
 		$unsupportedStatements = [
 			'show tables from',
-			'show open tables from',
 			'show table status from',
 			'show function status',
 			'show procedure status',
@@ -256,14 +260,14 @@ final class Payload extends BasePayload {
 	 * @throws Exception
 	 */
 	public function getHandlerClassName(): string {
-		return __NAMESPACE__ . '\\' . match (static::$type) {
-			'full tables' => 'FullTablesHandler',
-			'create table' => 'CreateTableHandler',
-			'schemas' => 'SchemasHandler',
-			'queries' => 'QueriesHandler',
-			'version' => 'VersionHandler',
-			'full columns' => 'FullColumnsHandler',
-			'unsupported' => 'UnsupportedStmtHandler',
+		return match (static::$type) {
+			'expanded tables' => ExpandedTablesHandler::class,
+			'create table' => CreateTableHandler::class,
+			'schemas' => SchemasHandler::class,
+			'queries' => QueriesHandler::class,
+			'version' => VersionHandler::class,
+			'full columns' => FullColumnsHandler::class,
+			'unsupported' => UnsupportedStmtHandler::class,
 			default => throw new Exception('Cannot find handler for request type: ' . static::$type),
 		};
 	}
