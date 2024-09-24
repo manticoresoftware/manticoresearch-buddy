@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Fuzzy;
 
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -98,8 +99,10 @@ final class Payload extends BasePayload {
 		$tableName = $matches[1] ?? '';
 
 		// Parse fuzzy and use default 0 if missing
-		preg_match('/fuzzy\s*=\s*(\d+)/ius', $query, $matches);
-		$fuzzy = (bool)($matches[1] ?? 0);
+		if (!preg_match('/fuzzy\s*=\s*(\d+)/ius', $query, $matches)) {
+			throw QueryParseError::create('Invalid value for option \'fuzzy\'');
+		}
+		$fuzzy = (bool)$matches[1];
 
 		// Parse distance and use default 2 if missing
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
