@@ -300,7 +300,7 @@ final class Payload extends BasePayload {
 				$queries[$currentKey] = $value['query'];
 			} elseif ($isArray) {
 				$queries = array_merge($queries, static::parseQueryMatches($value, $currentKey));
-			} elseif (is_string($value) && $parent === 'match') {
+			} elseif (is_string($value) && str_ends_with($parent, 'match')) {
 				$queries[$currentKey] = $value;
 			} elseif (is_string($value) && $key === 'query_string') {
 				$queries[$currentKey] = $value;
