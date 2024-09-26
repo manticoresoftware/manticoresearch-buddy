@@ -296,7 +296,7 @@ final class Payload extends BasePayload {
 		foreach ($values as $key => $value) {
 			$currentKey = $parent === '' ? $key : $parent . '.' . $key;
 			$isArray = is_array($value);
-			if ($isArray && isset($value['query']) && isset($value['operator'])) {
+			if ($isArray && isset($value['query'])) {
 				$queries[$currentKey] = $value['query'];
 			} elseif ($isArray) {
 				$queries = array_merge($queries, static::parseQueryMatches($value, $currentKey));
