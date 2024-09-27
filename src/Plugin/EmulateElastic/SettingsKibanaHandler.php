@@ -36,7 +36,7 @@ class SettingsKibanaHandler extends BaseHandler {
 	 * @return Task
 	 */
 	public function run(): Task {
-		self::initQueryMap('Cluster');
+		self::initQueryMap('Settings');
 
 		return self::getResponseByQuery($this->payload->path);
 	}
