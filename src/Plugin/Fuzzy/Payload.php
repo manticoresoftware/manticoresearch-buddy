@@ -102,6 +102,15 @@ final class Payload extends BasePayload {
 		preg_match('/FROM\s+(\w+)\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
+		$pattern = '/OPTION\s+' .
+			'([a-zA-Z0-9_]+\s*=\s*[\'"]?[a-zA-Z0-9_]+[\'"]?\s*,\s*)*' .
+			'[a-zA-Z0-9_]+\s*=\s*[\'"]?[a-zA-Z0-9_]+[\'"]?' .
+			'(\s*,\s*[a-zA-Z0-9_]+\s*=\s*[\'"]?[a-zA-Z0-9_]+[\'"]?)*$/ius';
+
+		if (!preg_match($pattern, $query)) {
+			throw QueryParseError::create('Invalid options in query string, make sure they are separated by commas');
+		}
+
 		// Parse fuzzy and use default 0 if missing
 		if (!preg_match('/fuzzy\s*=\s*(\d+)/ius', $query, $matches)) {
 			throw QueryParseError::create('Invalid value for option \'fuzzy\'');
