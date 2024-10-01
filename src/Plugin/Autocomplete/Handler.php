@@ -209,6 +209,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			[$words, $scoreMap] = $this->manticoreClient->fetchFuzzyVariations(
 				$phrase,
 				$this->payload->table,
+				$this->payload->preserve,
 				$distance
 			);
 		}

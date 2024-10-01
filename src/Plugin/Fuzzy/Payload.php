@@ -43,6 +43,9 @@ final class Payload extends BasePayload {
 	/** @var array<string> */
 	public array $layouts;
 
+	/** @var bool */
+	public bool $preserve;
+
 	/** @var string|array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>} */
 	public array|string $payload;
 
@@ -74,7 +77,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $payload */
+		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool}} $payload */
 		$payload = json_decode($request->payload, true);
 		$self = new static();
 		$self->path = $request->path;
@@ -82,6 +85,7 @@ final class Payload extends BasePayload {
 		$self->fuzzy = (bool)($payload['options']['fuzzy'] ?? 0);
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
+		$self->preserve = (bool)($payload['options']['preserve'] ?? true);
 
 		$payload = static::cleanUpPayloadOptions($payload);
 		$self->payload = $payload;
@@ -108,6 +112,10 @@ final class Payload extends BasePayload {
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
 		$distanceValue = (int)($matches[1] ?? 2);
 
+		// Parse preserve
+		preg_match('/preserve\s*=\s*(\d+)/ius', $query, $matches);
+		$preserve = (bool)($matches[1] ?? 1);
+
 		// Parse layouts and use default all languages if missed
 		preg_match('/layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
 		$layouts = static::parseLayouts($matches[1] ?? null);
@@ -118,6 +126,7 @@ final class Payload extends BasePayload {
 		$self->fuzzy = $fuzzy;
 		$self->distance = $distanceValue;
 		$self->layouts = $layouts;
+		$self->preserve = $preserve;
 		$self->payload = $query;
 		return $self;
 	}
@@ -321,16 +330,16 @@ final class Payload extends BasePayload {
 	 *         }
 	 *     },
 	 *     options: array{
-	 *         fuzzy?: string,
+	 *         fuzzy?: bool,
 	 *         distance?: int,
 	 *         layouts?: string,
-	 *         other?: string
+	 *         preserve?: bool
 	 *     }
 	 * } $payload
 	 * @return array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>}
 	 */
 	public static function cleanUpPayloadOptions(array $payload): array {
-		$excludedOptions = ['distance', 'fuzzy', 'layouts'];
+		$excludedOptions = ['distance', 'fuzzy', 'layouts', 'preserve'];
 		$payload['options'] = array_diff_key($payload['options'], array_flip($excludedOptions));
 		// TODO: hack
 		if (!isset($payload['options']['idf'])) { // @phpstan-ignore-line
