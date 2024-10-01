@@ -85,7 +85,7 @@ final class Payload extends BasePayload {
 		$self->fuzzy = (bool)($payload['options']['fuzzy'] ?? 0);
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
-		$self->preserve = (bool)($payload['options']['preserve'] ?? true);
+		$self->preserve = (bool)($payload['options']['preserve'] ?? false);
 
 		$payload = static::cleanUpPayloadOptions($payload);
 		$self->payload = $payload;
@@ -123,7 +123,7 @@ final class Payload extends BasePayload {
 
 		// Parse preserve
 		preg_match('/preserve\s*=\s*(\d+)/ius', $query, $matches);
-		$preserve = (bool)($matches[1] ?? 1);
+		$preserve = (bool)($matches[1] ?? 0);
 
 		// Parse layouts and use default all languages if missed
 		preg_match('/layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
