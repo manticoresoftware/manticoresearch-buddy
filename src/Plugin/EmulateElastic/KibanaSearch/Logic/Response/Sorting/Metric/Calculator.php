@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Re
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Metric;
 
 /**
- *  Adds aggregated metric field values to data rows
+ *  Calculates aggregated values for metric fields and adds these values to data rows if necessary
  */
 final class Calculator implements MetricUpdaterInterface {
 

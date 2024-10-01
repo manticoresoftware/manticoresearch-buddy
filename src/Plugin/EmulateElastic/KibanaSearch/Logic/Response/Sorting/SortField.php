@@ -15,7 +15,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Re
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Response\Sorting\Metric\MetricCalculatorInterface;
 
 /**
- *  Sorts and cuts off ordered field data
+ *  Represents a data field to be sorted and cut off
  */
 final class SortField {
 
@@ -42,6 +42,8 @@ final class SortField {
 	}
 
 	/**
+	 * Executing the merge sort algorithm recursively for all sort fields
+	 *
 	 * @return array<int>
 	 */
 	public function process(int $rowIndFrom, int $rowIndTo): array {
@@ -154,6 +156,7 @@ final class SortField {
 		$keys = array_keys($sortedSubsets);
 		$this->orderSubsetsByMetric($keys);
 
+		// Limiting the results if needed
 		if ($this->limit) {
 			array_splice($keys, $this->limit);
 		}

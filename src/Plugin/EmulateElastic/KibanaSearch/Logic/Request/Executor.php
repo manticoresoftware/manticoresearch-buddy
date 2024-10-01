@@ -48,6 +48,7 @@ class Executor {
 	public function execute(): bool {
 		foreach ($this->logics as $logic) {
 			$logic->apply();
+			// Checking if the current logic can be applied here
 			if (!($logic instanceof FailableLogicInterface)) {
 				continue;
 			}

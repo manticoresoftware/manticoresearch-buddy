@@ -34,7 +34,17 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
 /**
- *  Processes complex aggregation-based requests from Kibana
+ *  Processes complex aggregation-based requests from Kibana.
+ *  Processing scheme:
+ *   - parsing the Kibana request object splitting it into separate nodes
+ *   - determining which kind of post-processing the request data will require
+ *   - for each of the nodes, creating a respective SQL query condition, thus building a request to Manticore
+ *   - executing the request(or multiple requests, if the Kibana request involves multiple tables) to Manticore
+ *   - post-processing data from the Manticore response(s) when necessary:
+ *      performing sorting and limiting by multiple fields, calculating 'partial' aggregation values,
+ *      processing 'concurrent' Kibana filters, combining data from multiple responses, etc.
+ *   - bulding the Kibana response object from the post-processed data
+ *
  */
 final class Handler extends BaseHandlerWithClient {
 
@@ -79,6 +89,8 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
+	 * Builds all data required for the response to Kibana
+	 *
 	 * @param TableFieldInfo $tableFieldInfo
 	 * @param NodeSet $nodeSet
 	 * @param Client $manticoreClient
@@ -101,8 +113,10 @@ final class Handler extends BaseHandlerWithClient {
 			)
 		);
 		$responseData = [];
+		// Iterate through all tables from the request building summary response data
 		foreach ($tableFieldInfo->getTables() as $table) {
 			$manticoreRequest->init($table);
+			// Check if the current table satisfies to the request conditions
 			if (!$requestLogicExecutor
 				->init()
 				->execute()
@@ -110,6 +124,7 @@ final class Handler extends BaseHandlerWithClient {
 				continue;
 			}
 
+			// Building data for a further Manticore request to the current table
 			foreach ($nodeSet->getNodes() as $node) {
 				$node->setRequest($manticoreRequest)->fillInRequest();
 			}
@@ -124,6 +139,7 @@ final class Handler extends BaseHandlerWithClient {
 				continue;
 			}
 
+			// Post-processing data from Manticore response
 			$responseLogicExecutor
 				->init()
 				->setResponseRows($responseRows)
@@ -136,6 +152,8 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
+	 * Builds a response in Kibana format using previously built data
+	 *
 	 * @param array<int,array<string,mixed>> $responseData
 	 * @param NodeSet $nodeSet
 	 * @return array<mixed>
@@ -151,6 +169,8 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
+	 * Splits data from Kibana request into separate 'node' objects using extra info about the requested table
+	 *
 	 * @param array<mixed> $request
 	 * @param TableFieldInfo $tableFieldInfo
 	 * @return array<BaseNode>

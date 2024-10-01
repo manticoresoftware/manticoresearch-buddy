@@ -15,7 +15,7 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Ag
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\GroupFilter;
 
 /**
- *  Builds search response to Kibana
+ *  Builds a response in Kibana format from post-processed Manticore response data
  */
 final class Response {
 
@@ -77,8 +77,10 @@ final class Response {
 			];
 		}
 		$this->nodeCount = sizeof($this->aggNodes);
+
 		$this->findConcurrentNodeInds();
 		$this->findNextNodeKeys();
+		// Filling response nodes with respective data from each row of the Manticore response
 		foreach ($responseData as $dataRow) {
 			if ($dataRow) {
 				$total += $dataRow[$this->countField];
@@ -105,6 +107,7 @@ final class Response {
 			if ($nextFillKeys === false) {
 				break;
 			}
+			// Determining if we move to the next response node or continue to fill the current one
 			$isNodeConcurrent = in_array($i, $this->concurrentNodeInds);
 			if ($nextFillKeys || !$isNodeConcurrent) {
 				$fillKeys = $nextFillKeys;
@@ -121,6 +124,9 @@ final class Response {
 	}
 
 	/**
+	 * Since concurrent nodes are formatted in a specific way in Kibana response
+	 * we need to detect them and process separately too
+	 *
 	 * @return void
 	 */
 	protected function findConcurrentNodeInds(): void {
@@ -128,6 +134,7 @@ final class Response {
 		$curInd = -1;
 		foreach ($this->filterNodes as $i => $node) {
 			$isConcurrentNode = $node->isConcurrent();
+			// Detecting if a node with the current index has no concurrent nodes left
 			$isIndSetOver = ($curInd !== -1) && (!$isConcurrentNode || ($i !== $curInd + 1));
 			if ($isIndSetOver) {
 				$lastConcurrentNodeInds[] = $curInd;
@@ -142,10 +149,14 @@ final class Response {
 			return;
 		}
 		$lastConcurrentNodeInds[] = $curInd;
+		// If a concurrent node is not a last one among its siblings,
+		// we define it as a non-traverable to stop processing node sub-tree at it
 		$this->nonTraversableNodeInds = array_diff($this->concurrentNodeInds, $lastConcurrentNodeInds);
 	}
 
 	/**
+	 * Detects keys for all response nodes to use them when building the nodes
+	 *
 	 * @return void
 	 */
 	protected function findNextNodeKeys(): void {

@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Re
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Metric;
 
 /**
- *  Creates a MetricUpdater instance for a given Metric node instance
+ *  Creates a Calculator object for a given Metric node instance
  */
 final class CalculatorFactory {
 

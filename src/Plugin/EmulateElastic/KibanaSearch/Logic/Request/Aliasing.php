@@ -15,7 +15,8 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Request\
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Interfaces\AliasedNodeInterface;
 
 /**
- *  Generates aliases for node fields making sure they don't coincide with existing fields
+ *  Generates aliases for node fields to be used in a request to Manticore
+ *  making sure they don't coincide with existing fields
  */
 class Aliasing implements RequestLogicInterface {
 

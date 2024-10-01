@@ -29,6 +29,10 @@ class Factory {
 		'date_range' => ['field', 'ranges', 'time_zone'],
 	];
 
+	/**
+	 * @param TimeZoneExpression $timeZoneExpression
+	 * @param FilterExpressionFactory $filterExpressionFactory
+	 */
 	public function __construct(
 		protected TimeZoneExpression $timeZoneExpression,
 		protected FilterExpressionFactory $filterExpressionFactory

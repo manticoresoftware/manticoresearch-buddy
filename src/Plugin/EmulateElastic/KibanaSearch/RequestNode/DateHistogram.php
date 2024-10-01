@@ -63,6 +63,7 @@ final class DateHistogram extends GroupExprNode {
 		$docCount = $dataRow[$this->countField];
 		$bucketKey = $this->findBucket($buckets, 'key', $key);
 		if ($bucketKey === -1) {
+			// Creating a new date histogram bucket
 			$bucketKey = sizeof($buckets);
 			$buckets[$bucketKey] = [
 				'key' => $key,

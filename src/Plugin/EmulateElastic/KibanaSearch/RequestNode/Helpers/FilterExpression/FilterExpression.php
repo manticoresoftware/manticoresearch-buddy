@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestN
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Interfaces\FilterNodeInterface;
 
 /**
- *  Builds logical expressions for filter nodes
+ *  Represents logical expressions used by filter nodes
  */
 final class FilterExpression {
 
@@ -53,6 +53,8 @@ final class FilterExpression {
 	}
 
 	/**
+	 * Converts data from a Kibana request's filter object to a logical expression
+	 *
 	 * @param array<mixed> $filter
 	 * @param string $cond
 	 * @param bool $inNotFilter
@@ -108,6 +110,8 @@ final class FilterExpression {
 	}
 
 	/**
+	 * Processes nested filter objects from the Kibana filter object
+	 *
 	 * @param string $filterKey
 	 * @param array<array<mixed>> $subFilter
 	 * @param string $cond
@@ -173,6 +177,9 @@ final class FilterExpression {
 	}
 
 	/**
+	 * Builds logical expression from the 'query_string' filter object
+	 * making sure it's allowed for the given request field
+	 *
 	 * @param array{fields:array<string>,query:string} $subFilter
 	 * @param bool $inNotFilter
 	 * @return string
@@ -199,6 +206,9 @@ final class FilterExpression {
 	}
 
 	/**
+	 * Builds logical expression from the 'match' filter object
+	 * making sure it's allowed for the given request field
+	 *
 	 * @param array<mixed> $subFilter
 	 * @param bool $inNotFilter
 	 * @return string
@@ -229,6 +239,9 @@ final class FilterExpression {
 	}
 
 	/**
+	 * Builds logical expression from the 'range' filter object
+	 * making sure it's allowed for the given request field
+	 *
 	 * @param array<mixed> $subFilter
 	 * @param bool $inNotFilter
 	 * @return string

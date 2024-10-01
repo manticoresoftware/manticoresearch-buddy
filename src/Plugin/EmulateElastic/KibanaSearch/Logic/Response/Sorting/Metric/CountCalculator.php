@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Response\Sorting\Metric;
 
 /**
- *  Adds aggregated metric field values to data rows
+ *  Calculates values for the 'COUNT' metric fields
  */
 final class CountCalculator implements MetricCalculatorInterface {
 

@@ -16,7 +16,9 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Gr
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\QueryFilter;
 
 /**
- *  Handles SpninxQL search responses from Manticore
+ *  Checks filter objects from the Kibana request to determine their type
+ *  and if they can be applied directly in Manticore request
+ *  or need to be used later, in post-processing Manticore response
  */
 class Filtering implements RequestLogicInterface {
 
@@ -94,6 +96,9 @@ class Filtering implements RequestLogicInterface {
 	}
 
 	/**
+	 * Detecting 'concurrent' filters from the Kibana request,
+	 * i.e. the ones than need to be processed as if the parts of the MySQL's UNION query
+	 *
 	 * @return void
 	 */
 	protected function findConcurrentFilterInds(): void {

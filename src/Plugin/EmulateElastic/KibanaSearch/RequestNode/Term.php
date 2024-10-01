@@ -77,6 +77,7 @@ final class Term extends AggNode {
 		$docCount = $dataRow[$this->request->getCountField()];
 		$bucketKey = $this->findBucket($buckets, 'key', $dataFieldVal);
 		if ($bucketKey === -1) {
+			// Creatign a new term bucket
 			$bucketKey = sizeof($buckets);
 			$buckets[$bucketKey] = [
 				'key' => $dataFieldVal,

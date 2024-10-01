@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Response\Sorting\Metric;
 
 /**
- *  Adds aggregated metric field values to data rows
+ *  Adds calcualted metric field values to data rows
  */
 interface MetricUpdaterInterface extends MetricCalculatorInterface {
 

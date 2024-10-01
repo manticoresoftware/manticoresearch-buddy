@@ -11,6 +11,9 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Response\ConcurrentFilterProcessing;
 
+/**
+ * Represents a set of concurrent filters
+ */
 final class FilterSet {
 
 	/** @var array<string> $fields */
@@ -33,6 +36,8 @@ final class FilterSet {
 	}
 
 	/**
+	 * Checks if a data row contains multiple concurrent filters and, therefore, requires extra processing
+	 *
 	 * @param array<string,mixed> $row
 	 * @return array<int,array<string,mixed>>|false
 	 */

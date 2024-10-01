@@ -21,7 +21,7 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Qu
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Term;
 
 /**
- *  Extracts sets of nodes and their fields by given criteria
+ *  Extracts subsets of Kibana request nodes and their fields by given criteria
  */
 class NodeSet {
 
@@ -58,7 +58,7 @@ class NodeSet {
 		if (!interface_exists($interface)) {
 			throw new \Exception("Non-existing interface $interface is passed");
 		}
-		return $this->interfaceNodes[$interface] ?? $this->extractNodesByInterface($interface);
+		return $this->nodesByInterface[$interface] ?? $this->extractNodesByInterface($interface);
 	}
 
 	/**

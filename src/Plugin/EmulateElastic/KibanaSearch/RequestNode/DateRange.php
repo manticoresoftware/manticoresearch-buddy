@@ -144,6 +144,7 @@ final class DateRange extends BaseRange {
 			return false;
 		}
 		$rangeBucket = &$buckets[(int)$this->rangeMap[$rangeInd]];
+		// Create an empty object for the bucket's sub-data if it doesn't exist yet
 		if (!array_key_exists($nextNodeKey, $rangeBucket)) {
 			$rangeBucket[$nextNodeKey] = [];
 		}

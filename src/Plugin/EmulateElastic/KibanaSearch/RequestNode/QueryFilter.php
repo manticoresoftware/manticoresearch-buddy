@@ -16,7 +16,7 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\He
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Interfaces\FilterNodeInterface;
 
 /**
- *  Filter node of Kibana search request
+ *  Filter node of Kibana search request used for filtering request results by extra conditions set by the user
  */
 final class QueryFilter extends BaseNode implements FilterNodeInterface {
 
@@ -25,7 +25,9 @@ final class QueryFilter extends BaseNode implements FilterNodeInterface {
 
 	/**
 	 * @param string $key
-	 * @param array{bool:array{filter:array<mixed>,should:array<mixed>,must:array<mixed>,must_not:array<mixed>}} $filter
+	 * @param array{
+	 *   bool:array{filter:array<mixed>,should:array<mixed>,must:array<mixed>,must_not:array<mixed>}
+	 * } $filter
 	 * @param FilterExpression $filterExpression
 	 */
 	public function __construct(
@@ -66,7 +68,7 @@ final class QueryFilter extends BaseNode implements FilterNodeInterface {
 	}
 
 	/**
-	 * Getting duplicate filter data Kibana 7.6.0 for some reason sends and remove it
+	 * Getting duplicate filter data that Kibana 7.6.0 for some reason sends and removing it
 	 *
 	 * @return void
 	 */

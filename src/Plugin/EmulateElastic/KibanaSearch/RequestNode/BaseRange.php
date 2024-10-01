@@ -46,7 +46,7 @@ abstract class BaseRange extends GroupExprNode {
 				$rangeExpr .= ($rangeExpr ? ',' : '') . "range_to={$range['to']}";
 			}
 			if (in_array($rangeExpr, $rangeExprs)) {
-				// There's no need to send the same range multiple times
+				// There's no need to include the same range in the request multiple times
 				continue;
 			}
 			$rangeExprs[] = "{{$rangeExpr}}";

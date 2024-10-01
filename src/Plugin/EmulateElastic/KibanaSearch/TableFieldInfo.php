@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 
 /**
- *  Parses search request from Kibana
+ *  Gets and keeps information about request's tables and their fields
  */
 class TableFieldInfo {
 
@@ -71,6 +71,8 @@ class TableFieldInfo {
 	}
 
 	/**
+	 * Loads information about table fields by making a request to the respective Manticore endpoint
+	 *
 	 * @return void
 	 */
 	protected function load(string $table = ''): void {

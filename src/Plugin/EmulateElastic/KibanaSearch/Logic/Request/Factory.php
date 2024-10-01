@@ -28,7 +28,7 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\SphinxQLReques
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\TableFieldInfo;
 
 /**
- * Creates node objects from Kibana request data
+ * Creates request logic objects
  */
 class Factory {
 

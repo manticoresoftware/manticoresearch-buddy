@@ -105,11 +105,14 @@ final class Range extends BaseRange {
 		$this->makeResponseBucketsIfNotExist($responseNode);
 		$this->initResponseBuckets($responseNode[$this->key]['buckets']);
 		$buckets = &$responseNode[$this->key]['buckets'];
+		// We don't include empty ranges got from Manticore to the response for Kibana
 		if (!array_key_exists($this->aliasedFieldExpr, $responseRow)
 			|| !is_numeric($responseRow[$this->aliasedFieldExpr])) {
 			return [];
 		}
 		$rangeInd = (int)$responseRow[$this->aliasedFieldExpr];
+		// If the current range does not exist in the current node sub-tree,
+		// we return false to stop processing this sub-tree
 		if (!array_key_exists($rangeInd, $this->bucketKeys)) {
 			return false;
 		}

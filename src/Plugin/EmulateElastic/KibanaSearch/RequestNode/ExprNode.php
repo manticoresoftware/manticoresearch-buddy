@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestN
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Interfaces\AliasedNodeInterface;
 
 /**
- *  Node of Kibana search request
+ *  Node of Kibana search request representing a Kibana expression
  */
 abstract class ExprNode extends AggNode implements AliasedNodeInterface {
 
