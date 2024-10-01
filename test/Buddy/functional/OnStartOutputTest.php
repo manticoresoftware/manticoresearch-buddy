@@ -28,6 +28,9 @@ class OnStartOutputTest extends TestCase {
 
 	public function setUp(): void {
 		preg_match('/log = (.*?)[\r\n]/', self::$manticoreConf, $matches);
+		if (!$matches) {
+			throw new Exception('Cannot find searchd log path in manticore config');
+		}
 		$this->searchdLogFilepath = $matches[1];
 		$this->searchdLog = (string)file_get_contents($this->searchdLogFilepath);
 	}
@@ -41,6 +44,9 @@ class OnStartOutputTest extends TestCase {
 		$logUpdate = $this->getLogUpdate();
 		$matches = [];
 		preg_match('/\[BUDDY\] started (.*?) at (.*?)$/s', $logUpdate, $matches);
+		if (!$matches) {
+			throw new Exception('Cannot find searchd log path in manticore config');
+		}
 		$this->assertCount(3, $matches);
 		$addr1 = $matches[2];
 
@@ -49,6 +55,9 @@ class OnStartOutputTest extends TestCase {
 		self::setUpBeforeClass();
 		$logUpdate = $this->getLogUpdate();
 		preg_match('/\[BUDDY\] started (.*) at (.*?)$/s', $logUpdate, $matches);
+		if (!$matches) {
+			throw new Exception('Cannot find searchd log path in manticore config');
+		}
 		$this->assertCount(3, $matches);
 		$addr2 = $matches[2];
 

@@ -18,7 +18,7 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 use Swoole\Coroutine;
 
-final class Handler extends BaseHandlerWithClient {
+final class CreateHandler extends BaseHandlerWithClient {
 	/**
 	 * Initialize the executor
 	 *
@@ -44,9 +44,31 @@ final class Handler extends BaseHandlerWithClient {
 			$taskFn,
 			[$this->payload, $this->manticoreClient]
 		);
-		$args = $this->payload->toShardArgs();
-		$task->on('run', fn() => static::processHook('shard', [$args]));
+		/** @var array{
+		 * table:array{cluster:string,name:string,structure:string,extra:string},
+		 * replicationFactor:int,
+		 * shardCount:int
+		 * } $args
+		 */
+		$args = $this->payload->toHookArgs();
+		$task->on('run', fn() => static::runInBackground($args));
 		return $task->run();
+	}
+
+	/**
+	 * @param array{
+	 * table:array{cluster:string,name:string,structure:string,extra:string},
+	 * replicationFactor:int,
+	 * shardCount:int
+	 * } $args
+	 * @return void
+	 */
+	public static function runInBackground(array $args): void {
+		$processor = Payload::getProcessors()[0];
+		$processor->execute('shard', $args);
+
+		$table = $args['table']['name'];
+		$processor->addTicker(fn() => $processor->status($table), 1);
 	}
 
 	/**

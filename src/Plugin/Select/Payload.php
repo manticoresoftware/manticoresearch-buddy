@@ -25,18 +25,20 @@ final class Payload extends BasePayload {
 	// HANDLED_TABLES value defines if we actually process the request and return some data (1)
 	// or just return an empty result (0)
 	const HANDLED_TABLES = [
-		'information_schema.files' => 0,
-		'information_schema.tables' => 1,
-		'information_schema.triggers' => 0,
 		'information_schema.column_statistics' => 0,
 		'information_schema.columns' => 1,
 		'information_schema.events' => 0,
-		'information_schema.schemata' => 0,
+		'information_schema.files' => 0,
 		'information_schema.key_column_usage' => 0,
-		'information_schema.statistics' => 0,
 		'information_schema.partitions' => 0,
+		'information_schema.plugins' => 0,
 		'information_schema.referential_constraints' => 0,
 		'information_schema.routines' => 0,
+		'information_schema.schemata' => 1,
+		'information_schema.statistics' => 0,
+		'information_schema.tables' => 1,
+		'information_schema.triggers' => 0,
+		'information_schema.views' => 0,
 		'mysql.user' => 0,
 	];
 
@@ -93,12 +95,15 @@ final class Payload extends BasePayload {
 			$self->originalQuery,
 			$matches
 		);
+		if (!$matches) {
+			throw QueryParseError::create('Failed to parse query');
+		}
 
 		// At this point we have two cases: when we have table and when we direct select some function like
 		// select version()
 		// we put this function in fields and table will be empty
 		// otherwise it's normal select with fields and table required
-		if ($matches[2] ?? null) {
+		if (isset($matches[1]) && ($matches[2] ?? null)) {
 			$self->originalTable = (string)$matches[2];
 			$table = strtolower(ltrim($self->originalTable, '.'));
 			if ($table[0] === '`' || $table[-1] === '`') {
@@ -107,8 +112,10 @@ final class Payload extends BasePayload {
 			$self->table = $table;
 			$pattern = '/(?:[^,(]+|(\((?>[^()]+|(?1))*\)))+/';
 			preg_match_all($pattern, $matches[1], $matches);
+			if (!$matches) {
+				throw QueryParseError::create('Failed to parse query');
+			}
 			$self->fields = array_map('trim', $matches[0]);
-
 			$self->where = self::addWhereStatements($request->payload);
 
 			// Check that we hit tables that we support otherwise return standard error

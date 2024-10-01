@@ -5,9 +5,12 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 use Ds\Map;
 use Ds\Set;
 use Ds\Vector;
+use Exception;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use RuntimeException;
 
+/** @package Manticoresearch\Buddy\Base\Plugin\Sharding */
 final class Table {
 	public readonly string $table;
 
@@ -238,6 +241,54 @@ final class Table {
 	}
 
 	/**
+	 * Drop the whole sharded table
+	 * @param Queue $queue
+	 * @return Map<string,mixed>
+	 */
+	public function drop(Queue $queue): Map {
+		/** @var Map<string,mixed> */
+		$result = new Map(
+			[
+			'status' => 'processing',
+			'result' => null,
+			'structure' => $this->structure,
+			'extra' => $this->extra,
+			]
+		);
+
+		/** @var Set<string> */
+		$nodes = new Set;
+
+		/** @var Set<int> */
+		$queueIds = new Set;
+
+		// Get the current shard schema
+		$schema = $this->getShardSchema();
+
+		// Iterate through all nodes and their shards
+		foreach ($schema as $row) {
+			$nodes->add($row['node']);
+			$ids = $this->cleanUpNode($queue, $row['node'], $row['shards']);
+			$queueIds->add(...$ids);
+		}
+
+		// Remove the sharding configuration from the system table
+		$systemTable = $this->cluster->getSystemTableName($this->table);
+		$this->client->sendRequest(
+			"
+			DELETE FROM {$systemTable}
+			WHERE
+			cluster = '{$this->cluster->name}'
+			AND
+			table = '{$this->name}'
+		"
+		);
+
+		$result['nodes'] = $nodes;
+		$result['queue_ids'] = $queueIds;
+		return $result;
+	}
+	/**
 	 * Handle replication for the table and shard
 	 * @param  string $node
 	 * @param  Queue  $queue
@@ -402,51 +453,99 @@ final class Table {
 	 * @param Queue $queue
 	 * @param  string $nodeId
 	 * @param  Set<int>    $shards
-	 * @return static
+	 * @return Set<int>
 	 */
-	public function cleanUpNode(Queue $queue, string $nodeId, Set $shards): static {
-		// Delete distributed table
-		/** @var Set<string> $removedClusters list of clusters that we will delete */
+	public function cleanUpNode(Queue $queue, string $nodeId, Set $shards): Set {
 		$removedClusters = new Set;
-		$queue->add($nodeId, "DROP TABLE {$this->name}");
+		/** @var Set<int> */
+		$queueIds = new Set;
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$this->name}");
+
 		foreach ($shards as $shard) {
-			// First remove cluster, due to we need to detach tables first
 			$connections = $this->getConnectedNodes(new Set([$shard]));
 			$clusterName = $this->getClusterName($connections);
 			$table = $this->getTableShardName($shard);
-			// Now detach table from all connections
-			foreach ($connections as $connectedNode) {
-				if ($connectedNode === $nodeId) {
-					continue;
-				}
-				$cluster = new Cluster(
-					$this->client,
+
+			if (sizeof($connections) > 1) {
+				$this->handleClusteredCleanUp(
+					$queue,
+					$nodeId,
+					$connections,
 					$clusterName,
-					$connectedNode
+					$table,
+					$removedClusters,
+					$queueIds
 				);
-				$cluster->makePrimary($queue);
-				$cluster->removeTables($queue, $table);
+			} else {
+				$this->handleSingleNodeCleanUp($queue, $nodeId, $table, $queueIds);
 			}
-
-			// We run it on active node, not down one
-			if (isset($cluster) && !$removedClusters->contains($cluster->name)) {
-				// We need to fire delete cluster once
-				$queueId = $cluster->remove($queue);
-
-				// Clean up the table associated with this cluster
-				$queue
-					->setWaitForId($queueId)
-					->add($nodeId, "DROP TABLE {$table}");
-				$queue->resetWaitForId();
-
-				$removedClusters->add($cluster->name);
-			}
-			unset($cluster);
 		}
 
-		return $this;
+		return $queueIds;
 	}
 
+	/**
+	 * @param Queue $queue
+	 * @param string $nodeId
+	 * @param Set<string> $connections
+	 * @param string $clusterName
+	 * @param string $table
+	 * @param Set<string> $removedClusters
+	 * @param Set<int> &$queueIds
+	 * @return void
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 * @throws Exception
+	 */
+	private function handleClusteredCleanUp(
+		Queue $queue,
+		string $nodeId,
+		Set $connections,
+		string $clusterName,
+		string $table,
+		Set $removedClusters,
+		Set &$queueIds
+	): void {
+		foreach ($connections as $connectedNode) {
+			if ($connectedNode === $nodeId) {
+				continue;
+			}
+			$cluster = new Cluster(
+				$this->client,
+				$clusterName,
+				$connectedNode
+			);
+			$cluster->makePrimary($queue);
+			$cluster->removeTables($queue, $table);
+		}
+
+		if (!isset($cluster) || $removedClusters->contains($cluster->name)) {
+			return;
+		}
+
+		$queueId = $cluster->remove($queue);
+		$queueIds[] = $queueId;
+
+		$queueIds[] = $queue
+			->setWaitForId($queueId)
+			->add($nodeId, "DROP TABLE IF EXISTS {$table}");
+		$queue->resetWaitForId();
+
+		$removedClusters->add($cluster->name);
+	}
+
+	/**
+	 * @param Queue $queue
+	 * @param string $nodeId
+	 * @param string $table
+	 * @param Set<int> &$queueIds
+	 * @return void
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 */
+	private function handleSingleNodeCleanUp(Queue $queue, string $nodeId, string $table, Set &$queueIds): void {
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}");
+	}
 	/**
 	 * Convert schema to map where each shard has nodes
 	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema

@@ -31,8 +31,7 @@ try {
 	$initBuffer = ob_get_clean();
 	putenv("PLUGIN_DIR={$settings->commonPluginDir}");
 } catch (Throwable $t) {
-	fwrite(STDERR, "Error while initialization: {$t->getMessage()}" . PHP_EOL);
-	Buddy::debug($t->getTraceAsString());
+	Buddy::error($t);
 	ob_flush();
 	exit(1);
 }

@@ -20,6 +20,7 @@ use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\ExpressionLanguage\Expression;
 
 // Init autoload first
 include_once __DIR__ . DIRECTORY_SEPARATOR
@@ -48,6 +49,10 @@ $container
 	->addArgument($opts['listen']);
 $container->register('tableFormatter', TableFormatter::class);
 $container->register('flagCache', FlagCache::class);
+
+$container
+	->register('pluggable', Pluggable::class)
+	->setArguments([new Expression('service("manticoreClient").getSettings()')]);
 
 putenv("LISTEN={$opts['listen']}");
 $plugins = [

@@ -12,7 +12,6 @@
 namespace Manticoresearch\Buddy\Base\Lib;
 
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\Base\Plugin\Sharding\Payload as ShardingPayload;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
@@ -43,18 +42,6 @@ class QueryProcessor {
 
 	/** @var Pluggable */
 	protected static Pluggable $pluggable;
-
-	/** @var array<array{full:string,short:string,version:string}> */
-	protected static array $corePlugins = [];
-
-	/** @var array<array{full:string,short:string,version:string}> */
-	protected static array $localPlugins = [];
-
-	/** @var array<array{full:string,short:string,version:string}> */
-	protected static array $extraPlugins = [];
-
-	/** @var array<string,true> Here we keep disabled plugins map */
-	protected static array $disabledPlugins = [];
 
 	/**
 	 * @var SqlQueryParser<T>
@@ -118,87 +105,12 @@ class QueryProcessor {
 			static::$sqlQueryParser = $instance;
 		}
 
-		static::$pluggable = new Pluggable(static::$settings);
-		static::$corePlugins = static::$pluggable->fetchCorePlugins();
-		static::$localPlugins = static::$pluggable->fetchLocalPlugins();
-		static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
-		static::$pluggable->registerHooks(static::getHooks());
-		static::$isInited = true;
-	}
-
-	/**
-	 * Run start method of all plugin handlers
-	 * We do not need stop cuz swoole manages it for us
-	 * @param ?callable $fn
-	 * @param array<string> $filter
-	 * @return array<array{0:callable,1:integer}>>
-	 * @throws GenericError
-	 */
-	public static function startPlugins(?callable $fn = null, array $filter = []): array {
-		/** @var HTTPClient $client ] */
-		$client = static::getObjFromContainer('manticoreClient');
-		$tickers = [];
-		static::iteratePluginProcessors(
-			static function (BaseProcessor $processor) use ($fn, $client, &$tickers) {
-				if (isset($fn)) {
-					$fn($processor->getProcess()->process);
-				}
-				$processor->setClient($client);
-				$tickers += $processor->start();
-			}, $filter
-		);
-
-		return $tickers;
-	}
-
-	/**
-	 * Resume plugins after pause
-	 * @param array<string> $filter
-	 * @return void
-	 */
-	public static function resumePlugins(array $filter = []): void {
-		static::iteratePluginProcessors(
-			static function (BaseProcessor $processor) {
-				$processor->execute('resume');
-			}, $filter
-		);
-	}
-
-	/**
-	 * Run stop method of all plugin handlers
-	 * @param array<string> $filter
-	 * @return void
-	 */
-	public static function pausePlugins(array $filter = []): void {
-		static::iteratePluginProcessors(
-			static function (BaseProcessor $processor) {
-				$processor->execute('pause');
-			}, $filter
-		);
-	}
-
-	/**
-	 * @param callable $fn
-	 * @param array<string> $filter If we pass name we filter only for this plugin
-	 * @return void
-	 */
-	protected static function iteratePluginProcessors(callable $fn, array $filter = []): void {
-		$list = [
-			[Pluggable::CORE_NS_PREFIX, static::$corePlugins],
-			[Pluggable::EXTRA_NS_PREFIX, static::$extraPlugins],
-			[Pluggable::EXTRA_NS_PREFIX, static::$localPlugins],
-		];
-		foreach ($list as [$prefix, $plugins]) {
-			foreach ($plugins as $plugin) {
-				// If we have filter, we
-				if ($filter && !in_array($plugin['full'], $filter)) {
-					continue;
-				}
-				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
-				$pluginPayloadClass = "$pluginPrefix\\Payload";
-				array_map($fn, $pluginPayloadClass::getProcessors());
-			}
+		if (!isset(static::$pluggable)) {
+			/** @var Pluggable */
+			$pluggable = static::getObjFromContainer('pluggable');
+			static::$pluggable = $pluggable;
 		}
+		static::$isInited = true;
 	}
 
 	/**
@@ -251,7 +163,7 @@ class QueryProcessor {
 	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getCorePlugins(): array {
-		return static::$corePlugins;
+		return static::$pluggable->getCorePlugins();
 	}
 
 	/**
@@ -259,7 +171,7 @@ class QueryProcessor {
 	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getLocalPlugins(): array {
-		return static::$localPlugins;
+		return static::$pluggable->getLocalPlugins();
 	}
 
 	/**
@@ -267,7 +179,15 @@ class QueryProcessor {
 	 * @return array<array{full:string,short:string,version:string}>
 	 */
 	public static function getExtraPlugins(): array {
-		return static::$extraPlugins;
+		return static::$pluggable->getExtraPlugins();
+	}
+
+	/**
+	 * Get list of disabled plugins
+	 * @return array<string,true>
+	 */
+	public static function getDisabledPlugins(): array {
+		return static::$pluggable->getDisabledPlugins();
 	}
 
 	/**
@@ -296,9 +216,10 @@ class QueryProcessor {
 	 */
 	public static function detectPluginPrefixFromRequest(Request $request): string {
 		$list = [
-			Pluggable::CORE_NS_PREFIX => static::$corePlugins,
-			Pluggable::EXTRA_NS_PREFIX => [...static::$extraPlugins, ...static::$localPlugins],
+			Pluggable::CORE_NS_PREFIX => static::getCorePlugins(),
+			Pluggable::EXTRA_NS_PREFIX => [...static::getExtraPlugins(), ...static::getLocalPlugins()],
 		];
+		$disabledPlugins = static::getDisabledPlugins();
 		foreach ($list as $prefix => $plugins) {
 			foreach ($plugins as $plugin) {
 				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
@@ -312,7 +233,7 @@ class QueryProcessor {
 				}
 
 				// Do not execute in case the plugin is disabled
-				if (isset(static::$disabledPlugins[$plugin['full']])) {
+				if (isset($disabledPlugins[$plugin['full']])) {
 					GenericError::throw("Plugin '{$plugin['short']}' is disabled");
 				}
 
@@ -325,72 +246,28 @@ class QueryProcessor {
 	}
 
 	/**
-	 * Get hooks to register for Pluggable system
-	 * @return array<array{0:string,1:string,2:callable}>
+	 * Run start method of all plugin handlers
+	 * We do not need stop cuz swoole manages it for us
+	 * @param ?callable $fn
+	 * @param array<string> $filter
+	 * @return array<array{0:callable,1:integer}>>
+	 * @throws GenericError
 	 */
-	protected static function getHooks(): array {
-		$hooks = [
-			// Happens when we installed the external plugin
-			[
-				'manticoresoftware/buddy-plugin-plugin',
-				'installed',
-				static function () {
-					static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
-				},
-			],
-			// Happens when we remove the plugin
-			[
-				'manticoresoftware/buddy-plugin-plugin',
-				'deleted',
-				static function () {
-					static::$extraPlugins = static::$pluggable->fetchExtraPlugins();
-				},
-			],
-			// Happens when we disable the plugin
-			[
-				'manticoresoftware/buddy-plugin-plugin',
-				'disabled',
-				static function (string $name) {
-					Buddy::debug("Plugin '$name' has been disabled");
-					static::$disabledPlugins[$name] = true;
-					static::pausePlugins([$name]);
-				},
-			],
-			// Happens when we enable the plugin
-			[
-				'manticoresoftware/buddy-plugin-plugin',
-				'enabled',
-				static function (string $name) {
-					Buddy::debug("Plugin '$name' has been enabled");
-					if (!isset(static::$disabledPlugins[$name])) {
-						return;
-					}
+	public static function startPlugins(?callable $fn = null, array $filter = []): array {
+		/** @var HTTPClient $client ] */
+		$client = static::getObjFromContainer('manticoreClient');
+		$tickers = [];
+		static::$pluggable->iterateProcessors(
+			static function (BaseProcessor $processor) use ($fn, $client, &$tickers) {
+				if (isset($fn)) {
+					$fn($processor->getProcess()->process);
+				}
+				$processor->setClient($client);
+				$tickers += $processor->start();
+			}, $filter
+		);
 
-					unset(static::$disabledPlugins[$name]);
-					static::resumePlugins([$name]);
-				},
-			],
-		];
-
-		// If the plugis is not enabled, we just return
-		$loadedPlugins = array_column(static::$corePlugins, 'full');
-		// Happens when we run create table with shards in options
-		if (in_array('manticoresoftware/buddy-plugin-sharding', $loadedPlugins)) {
-			$hooks[] = [
-				'manticoresoftware/buddy-plugin-sharding',
-				'shard',
-				static function (array $args) {
-					// TODO: remove the reference to the plugin,
-					// cuz plugins should be decoupled from the core,
-					// but for now for ease of migration we keep it here
-					$processor = ShardingPayload::getProcessors()[0];
-					$processor->execute('shard', $args);
-
-					$table = $args['table']['name'];
-					$processor->addTicker(fn() => $processor->status($table), 1);
-				},
-			];
-		}
-		return $hooks;
+		return $tickers;
 	}
+
 }

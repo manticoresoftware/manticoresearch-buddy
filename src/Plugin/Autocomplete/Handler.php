@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Autocomplete;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\QueryValidationError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\TableValidator;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -76,24 +77,15 @@ final class Handler extends BaseHandlerWithFlagCache {
 	/**
 	 * Perform validation, method should be run inside coroutine
 	 * @return void
+	 * @throws QueryValidationError
 	 */
 	protected function validate(): void {
-		$cacheKey = "autocomplete:validate:{$this->payload->table}";
-		if ($this->flagCache->has($cacheKey)) {
+		$validator = new TableValidator($this->manticoreClient, $this->flagCache, 30);
+		if ($validator->hasMinInfixLen($this->payload->table)) {
 			return;
 		}
-		/** @var array{error?:string} */
-		$result = $this->manticoreClient->sendRequest('SHOW CREATE TABLE ' . $this->payload->table)->getResult();
-		if (isset($result['error'])) {
-			QueryValidationError::throw($result['error']);
-		}
 
-		/** @var array{0:array{data:array<array{'Create Table':string}>}} $result */
-		$schema  = $result[0]['data'][0]['Create Table'];
-		if (false === str_contains($schema, 'min_infix_len')) {
-			QueryValidationError::throw('Autocomplete plugin requires min_infix_len to be set');
-		}
-		$this->flagCache->set($cacheKey, true, 30);
+		QueryValidationError::throw('Autocomplete requires min_infix_len to be set');
 	}
 
 	/**
@@ -117,8 +109,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		}
 
 		// Combine it in relevant order
+		// We need to use unique to avoid duplicates in case
+		// we're dealing with multiple languages and it results in a single character change
+		// so in the end, we wind up with multiple suggestions for the same phrase
 		/** @var array<string> $suggestions */
-		$suggestions = Arrays::blend(...$combinationSets);
+		$suggestions = array_unique(Arrays::blend(...$combinationSets));
 		return $suggestions;
 	}
 

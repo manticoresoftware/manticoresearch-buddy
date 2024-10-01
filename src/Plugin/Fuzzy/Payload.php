@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Fuzzy;
 
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -32,6 +33,9 @@ final class Payload extends BasePayload {
 
 	/** @var string */
 	public string $table;
+
+	/** @var bool */
+	public bool $fuzzy;
 
 	/** @var int */
 	public int $distance;
@@ -75,6 +79,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $payload['index'];
+		$self->fuzzy = (bool)($payload['options']['fuzzy'] ?? 0);
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 
@@ -93,6 +98,12 @@ final class Payload extends BasePayload {
 		preg_match('/FROM\s+(\w+)\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
+		// Parse fuzzy and use default 0 if missing
+		if (!preg_match('/fuzzy\s*=\s*(\d+)/ius', $query, $matches)) {
+			throw QueryParseError::create('Invalid value for option \'fuzzy\'');
+		}
+		$fuzzy = (bool)$matches[1];
+
 		// Parse distance and use default 2 if missing
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
 		$distanceValue = (int)($matches[1] ?? 2);
@@ -104,6 +115,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $tableName;
+		$self->fuzzy = $fuzzy;
 		$self->distance = $distanceValue;
 		$self->layouts = $layouts;
 		$self->payload = $query;
@@ -284,11 +296,11 @@ final class Payload extends BasePayload {
 		foreach ($values as $key => $value) {
 			$currentKey = $parent === '' ? $key : $parent . '.' . $key;
 			$isArray = is_array($value);
-			if ($isArray && isset($value['query']) && isset($value['operator'])) {
+			if ($isArray && isset($value['query'])) {
 				$queries[$currentKey] = $value['query'];
 			} elseif ($isArray) {
 				$queries = array_merge($queries, static::parseQueryMatches($value, $currentKey));
-			} elseif (is_string($value) && $parent === 'match') {
+			} elseif (is_string($value) && str_ends_with($parent, 'match')) {
 				$queries[$currentKey] = $value;
 			} elseif (is_string($value) && $key === 'query_string') {
 				$queries[$currentKey] = $value;
