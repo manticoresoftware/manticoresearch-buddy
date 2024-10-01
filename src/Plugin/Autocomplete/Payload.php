@@ -45,7 +45,7 @@ final class Payload extends BasePayload {
 	public array $layouts;
 
 	/** @var bool */
-	public bool $preserve;
+	public bool $preserve = false;
 
 	public function __construct() {
 	}
