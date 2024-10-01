@@ -167,7 +167,7 @@ final class Payload extends BasePayload {
 		$template = (string)preg_replace(
 			[
 				'/MATCH\s*\(\'(.*?)\'\)/ius',
-				'/(fuzzy|distance)\s*=\s*\d+[,\s]*/ius',
+				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
 				'/ option/ius', // TODO: hack
@@ -210,24 +210,36 @@ final class Payload extends BasePayload {
 			$isPhrase = true;
 			$searchValue = trim($searchValue, '"');
 		}
-		/** @var array<string> $variations */
+		/** @var array<array<string>> $variations */
 		$variations = $fn($searchValue);
 		if ($isPhrase) {
 			$match = '"' . implode(
-				'"|"', array_map(
-					function ($word, $i) {
-						return $word . '^' . static::getBoostValue($i);
+				'" "', array_map(
+					function ($words, $i) {
+						return '(' . implode(
+							'|', array_map(
+								function ($word) use ($i) {
+									return $word . '^' . static::getBoostValue($i);
+								}, $words
+							)
+						) . ')';
 					}, $variations, array_keys($variations)
 				)
 			) . '"';
 		} else {
-			$match = '(' . implode(
-				')|(', array_map(
-					function ($word, $i) {
-						return $word . '^' . static::getBoostValue($i);
+			$match = implode(
+				' ', array_map(
+					function ($words, $i) {
+						return '(' . implode(
+							'|', array_map(
+								function ($word) use ($i) {
+									return $word . '^' . static::getBoostValue($i);
+								}, $words
+							)
+						) . ')';
 					}, $variations, array_keys($variations)
 				)
-			) . ')';
+			);
 		}
 		// Edge case when nothing to match, use original phrase as fallback
 		if (!$variations) {

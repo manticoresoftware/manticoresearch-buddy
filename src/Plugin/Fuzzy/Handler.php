@@ -87,16 +87,10 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 			// If no words found, we just add the original phrase as fallback
 			if (!$words) {
-				return ["$query"];
+				$words = [[$query]];
 			}
 
-			/** @var array<array<string>> $words */
-			$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
-			$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
-			/** @var array<string> $combinations */
-			// If the original phrase in the list, we add it to the beginning to boost weight
-			$combinations = Arrays::boostListValues($combinations, $phrases);
-			return $combinations;
+			return $words;
 		};
 	}
 
