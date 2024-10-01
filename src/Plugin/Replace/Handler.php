@@ -52,6 +52,7 @@ final class Handler extends BaseHandlerWithClient {
 
 			$result = $client->sendRequest(
 				static::buildQuery(
+					$payload->cluster,
 					$payload->table,
 					array_merge($baseValues, $payload->set)
 				)
@@ -227,13 +228,20 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * @param string $tableName
 	 * @param array<string, bool|float|int|string> $set
+	 * @param string|null $cluster
 	 *
 	 * @return string
 	 */
-	private static function buildQuery(string $tableName, array $set): string {
+	private static function buildQuery(?string $cluster, string $tableName, array $set): string {
 		$keys = implode(',', array_keys($set));
 		$values = implode(',', array_values($set));
-		return "REPLACE INTO `$tableName` ($keys) VALUES ($values)";
+
+		$clusterName = '';
+		if ($cluster !== null) {
+			$clusterName = "`$cluster`:";
+		}
+
+		return "REPLACE INTO $clusterName`$tableName` ($keys) VALUES ($values)";
 	}
 
 

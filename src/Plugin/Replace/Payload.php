@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Replace;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
@@ -29,6 +30,7 @@ final class Payload extends BasePayload {
 	public array $set;
 	public int $id;
 	public string $type;
+	public ?string $cluster = null;
 
 	/**
 	 * Get description for this plugin
@@ -51,7 +53,7 @@ final class Payload extends BasePayload {
 			$pathChunks = explode('/', $request->path);
 			$payload = json_decode($request->payload, true);
 
-			$self->table = $pathChunks[0] ?? '';
+			self::parseClusterTableName($self, $pathChunks[0] ?? '');
 			$self->id = (int)$pathChunks[2];
 
 			if (is_array($payload)) {
@@ -64,8 +66,7 @@ final class Payload extends BasePayload {
 			 *   WHERE:array<int, array{base_expr: string}>} $payload
 			 */
 			$payload = static::$sqlQueryParser::getParsedPayload();
-
-			$self->table = self::parseTable($payload['REPLACE']);
+			self::parseClusterTableName($self, self::parseTable($payload['REPLACE']));
 			$self->set = self::parseSet($payload['SET']);
 			$self->id = (int)$payload['WHERE'][2]['base_expr'];
 		}
@@ -73,10 +74,25 @@ final class Payload extends BasePayload {
 		return $self;
 	}
 
+	private static function parseClusterTableName(self $self, string $tableName): void {
+
+		if (str_contains($tableName, ':')) {
+			$exploded = explode(':', $tableName);
+			$self->table = trim($exploded[1]);
+			$self->cluster = trim($exploded[0]);
+
+			return;
+		}
+
+		$self->table = trim($tableName);
+	}
+
 	/**
 	 * @param Request $request
+	 *
 	 * @return bool
-	 */
+	 * @throws GenericError
+  */
 	public static function hasMatch(Request $request): bool {
 		if ($request->format->value === RequestFormat::JSON->value && str_contains($request->path, '/_update/')) {
 			// We process Elastic-like update requests no matter what
