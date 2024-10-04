@@ -56,7 +56,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	protected function getHandlerFn(): Closure {
 		// In case fuzzy set to false, we just return the original query
 		if (!$this->payload->fuzzy) {
-			return fn($query) => [$query];
+			return fn($query) => [[$query]];
 		}
 		// Otherwise we process the query
 		return function (string $query): array {
