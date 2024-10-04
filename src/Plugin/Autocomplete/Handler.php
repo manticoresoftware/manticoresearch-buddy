@@ -254,47 +254,55 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 * @return array<string>
 	 */
 	private static function buildRelevantCombinations(array $words, array $scoreMap, int $maxCount): array {
-		if (!$words) {
+		if (empty($words)) {
 			return [];
 		}
 
-		$flattened = [];
-		foreach ($words as $position => $variations) {
-			foreach ($variations as $word) {
-				$flattened[] = ['position' => $position, 'word' => $word];
-			}
+		$combinations = ['' => 0.0];
+		$positions = array_keys($words);
+
+		foreach ($positions as $position) {
+			$combinations = static::processCombinations($combinations, $words[$position], $scoreMap, $maxCount);
 		}
 
-		usort(
-			$flattened, function ($a, $b) use ($scoreMap) {
-				$scoreA = $scoreMap[$a['word']] ?? 0;
-				$scoreB = $scoreMap[$b['word']] ?? 0;
-				return $scoreB <=> $scoreA;
-			}
-		);
-
-		$combinations = [];
-		$positionMap = [];
-
-		foreach ($flattened as $item) {
-			$position = $item['position'];
-			$word = $item['word'];
-
-			if (isset($positionMap[$position])) {
-				continue;
-			}
-
-			$positionMap[$position] = $word;
-			$combination = implode(' ', $positionMap);
-			$combinations[] = $combination;
-
-			if (sizeof($combinations) >= $maxCount) {
-				break;
-			}
-		}
-
-		return $combinations;
+		arsort($combinations);
+		return array_slice(array_filter(array_keys($combinations)), 0, $maxCount);
 	}
+
+	/**
+	 * @param array<string,float> $combinations
+	 * @param array<string> $positionWords
+	 * @param array<string,float> $scoreMap
+	 * @param int $maxCount
+	 * @return array<string,float>
+	 */
+	private static function processCombinations(
+		array $combinations,
+		array $positionWords,
+		array $scoreMap,
+		int $maxCount
+	): array {
+		$newCombinations = [];
+		foreach ($combinations as $combination => $score) {
+			foreach ($positionWords as $word) {
+				$newCombination = trim($combination . ' ' . $word);
+				$newScore = $score + ($scoreMap[$word] ?? 0);
+				if (sizeof($newCombinations) >= $maxCount && $newScore <= min($newCombinations)) {
+					continue;
+				}
+
+				$newCombinations[$newCombination] = $newScore;
+				if (sizeof($newCombinations) <= $maxCount) {
+					continue;
+				}
+
+				arsort($newCombinations);
+				array_pop($newCombinations);
+			}
+		}
+		return $newCombinations;
+	}
+
 
 	/**
 	 * Get levenshtein distance for the given word on auto or not algorithm
