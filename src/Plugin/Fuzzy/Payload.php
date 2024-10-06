@@ -290,15 +290,15 @@ final class Payload extends BasePayload {
 
 	/**
 	 * @param string $field
-	 * @param array<string> $options
+	 * @param array<array<string>> $words
 	 * @return array{bool:array{should:array<array{match:array<string,string>}>}}
 	 */
-	private static function buildShouldHttpQuery(string $field, array $options): array {
+	private static function buildShouldHttpQuery(string $field, array $words): array {
 		$should = [];
-		foreach ($options as $v) {
+		foreach ($words as $options) {
 			$should[] = [
 				'match' => [
-					$field => $v,
+					$field => '(' . implode('|', $options) . ')',
 				],
 			];
 		}
