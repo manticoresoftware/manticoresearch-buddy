@@ -17,12 +17,13 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\Network\Request;
-use Manticoresearch\Buddy\Core\Network\Response;
+use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\Buddy\CoreTest\Trait\TestInEnvironmentTrait;
 use PHPUnit\Framework\TestCase;
 
+/** @package  */
 class InsertQueryHandlerTest extends TestCase {
 
 	use TestHTTPServerTrait;
@@ -72,9 +73,9 @@ class InsertQueryHandlerTest extends TestCase {
 				$task = $handler->run();
 				$task->wait(true);
 				$this->assertEquals(true, $task->isSucceed());
-			/** @var Response */
+				/** @var Struct<string,mixed> */
 				$result = $task->getResult()->getStruct();
-				$this->assertEquals($resp, json_encode($result));
+				$this->assertEquals($resp, $result->toJson());
 			}
 		);
 		\Swoole\Event::wait();
