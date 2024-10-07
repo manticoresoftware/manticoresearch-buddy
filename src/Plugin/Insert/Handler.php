@@ -72,9 +72,7 @@ class Handler extends BaseHandlerWithClient {
 			$struct = Struct::fromJson(
 				$resp->getBody()
 			);
-			return TaskResult::raw(
-				$struct->toJson()
-			);
+			return TaskResult::raw($struct);
 		};
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
