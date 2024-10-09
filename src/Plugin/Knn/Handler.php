@@ -11,7 +11,9 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Knn;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
@@ -54,13 +56,21 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * @param Client $client
 	 * @param Payload $payload
+	 *
 	 * @return string|false
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|GenericError
 	 */
 	private static function getQueryVectorValue(Client $client, Payload $payload): string|false {
-		$document = $client
-			->sendRequest('SELECT * FROM ' . $payload->table . ' WHERE id = ' . $payload->docId)
-			->getResult();
+		$request = $client
+			->sendRequest(
+				'SELECT * FROM ' . $payload->table .
+				' WHERE id = ' . $payload->docId
+			);
+
+		if ($request->hasError()) {
+			ManticoreSearchResponseError::throw((string)$request->getError());
+		}
+		$document = $request->getResult();
 
 		if (is_array($document) && !empty($document[0]['data'])) {
 			if (!empty($document[0]['data'][0][$payload->field])) {
@@ -92,8 +102,9 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
 	 * @param string $queryVector
+	 *
 	 * @return array <string, string>
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|GenericError
 	 */
 	private static function knnHttpQuery(Client $manticoreClient, Payload $payload, string $queryVector): array {
 		$query = [
@@ -117,9 +128,13 @@ final class Handler extends BaseHandlerWithClient {
 			$query['knn']['filter'] = $payload->condition;
 		}
 
-		$result = $manticoreClient
-			->sendRequest((string)json_encode($query), Endpoint::Search->value)
-			->getResult();
+		$request = $manticoreClient
+			->sendRequest((string)json_encode($query), Endpoint::Search->value);
+
+		if ($request->hasError()) {
+			ManticoreSearchResponseError::throw((string)$request->getError());
+		}
+		$result = $request->getResult();
 
 		if (is_array($result['hits']) && isset($result['hits']['hits'])) {
 			// Removing requested doc from result set
@@ -142,14 +157,19 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param Payload $payload
 	 * @param string $queryVector
 	 * @return array <string, string>
-	 * @throws QueryParseError|ManticoreSearchClientError
+	 * @throws QueryParseError|ManticoreSearchClientError|GenericError
 	 */
 	private static function knnSqlQuery(Client $manticoreClient, Payload $payload, string $queryVector): array {
 
 		self::substituteParsedQuery($payload, $queryVector);
-			$result = $manticoreClient
-				->sendRequest($payload::$sqlQueryParser::getCompletedPayload())
-				->getResult();
+
+		$request = $manticoreClient
+				->sendRequest($payload::$sqlQueryParser::getCompletedPayload());
+
+		if ($request->hasError()) {
+			ManticoreSearchResponseError::throw((string)$request->getError());
+		}
+		$result = $request->getResult();
 
 		if (is_array($result[0])) {
 			foreach ($result[0]['data'] as $k => $v) {
