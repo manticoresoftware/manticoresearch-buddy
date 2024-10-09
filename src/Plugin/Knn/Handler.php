@@ -63,7 +63,10 @@ final class Handler extends BaseHandlerWithClient {
 			->getResult();
 
 		if (is_array($document) && !empty($document[0]['data'])) {
-			return $document[0]['data'][0][$payload->field] ?? false;
+			if (!empty($document[0]['data'][0][$payload->field])) {
+				return $document[0]['data'][0][$payload->field];
+			}
+			return false;
 		}
 
 		return false;
