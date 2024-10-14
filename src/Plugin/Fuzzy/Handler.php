@@ -56,7 +56,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	protected function getHandlerFn(): Closure {
 		// In case fuzzy set to false, we just return the original query
 		if (!$this->payload->fuzzy) {
-			return fn($query) => [$query];
+			return fn($query) => [[$query]];
 		}
 		// Otherwise we process the query
 		return function (string $query): array {
@@ -72,6 +72,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 				[$variations, $variationScores] = $this->manticoreClient->fetchFuzzyVariations(
 					$phrase,
 					$this->payload->table,
+					$this->payload->preserve,
 					$this->payload->distance
 				);
 				Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
@@ -86,16 +87,10 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 			// If no words found, we just add the original phrase as fallback
 			if (!$words) {
-				return ["$query"];
+				$words = [[$query]];
 			}
 
-			/** @var array<array<string>> $words */
-			$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
-			$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
-			/** @var array<string> $combinations */
-			// If the original phrase in the list, we add it to the beginning to boost weight
-			$combinations = Arrays::boostListValues($combinations, $phrases);
-			return $combinations;
+			return $words;
 		};
 	}
 

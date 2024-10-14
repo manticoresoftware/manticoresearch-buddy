@@ -99,7 +99,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$combinationSets = [];
 		$count = 0;
 		foreach ($phrases as $phrase) {
-			$suggestions = $this->processPhrase($phrase);
+			$suggestions = $this->processPhrase($phrase, $maxCount);
 			$count += sizeof($suggestions);
 			$combinationSets[] = $suggestions;
 			// Do early return when enough suggestions found
@@ -197,11 +197,12 @@ final class Handler extends BaseHandlerWithFlagCache {
 	/**
 	 * Process the given phrase and return the list of suggestions
 	 * @param string $phrase
+	 * @param int $maxCount
 	 * @return array<string>
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 */
-	public function processPhrase(string $phrase): array {
+	public function processPhrase(string $phrase, int $maxCount = 10): array {
 		$words = $scoreMap = [];
 		// Do query only in case we have fuzzy activated
 		$distance = $this->getLevenshteinDistance($phrase);
@@ -209,6 +210,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			[$words, $scoreMap] = $this->manticoreClient->fetchFuzzyVariations(
 				$phrase,
 				$this->payload->table,
+				$this->payload->preserve,
 				$distance
 			);
 		}
@@ -237,14 +239,70 @@ final class Handler extends BaseHandlerWithFlagCache {
 			// 4. Make sure we have unique fill up
 			$words[$lastIndex] = array_unique($words[$lastIndex]);
 		}
-		$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
-		/** @var array<string> $combinations */
-		$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
 		// If the original phrase in the list, we add it to the beginning to boost weight
+		$combinations = static::buildRelevantCombinations($words, $scoreMap, $maxCount);
 		$combinations = Arrays::boostListValues($combinations, [$phrase]);
 		/** @var array<string> $combinations */
 		return $combinations;
 	}
+
+	/**
+	 * Most effecitve way to find MOST scored relevant combinations by score map and return it with maxCount
+	 * @param array<array<string>> $words
+	 * @param array<string,float> $scoreMap
+	 * @param int $maxCount
+	 * @return array<string>
+	 */
+	private static function buildRelevantCombinations(array $words, array $scoreMap, int $maxCount): array {
+		if (empty($words)) {
+			return [];
+		}
+
+		$combinations = ['' => 0.0];
+		$positions = array_keys($words);
+
+		foreach ($positions as $position) {
+			$combinations = static::processCombinations($combinations, $words[$position], $scoreMap, $maxCount);
+		}
+
+		arsort($combinations);
+		return array_slice(array_filter(array_keys($combinations)), 0, $maxCount);
+	}
+
+	/**
+	 * @param array<string,float> $combinations
+	 * @param array<string> $positionWords
+	 * @param array<string,float> $scoreMap
+	 * @param int $maxCount
+	 * @return array<string,float>
+	 */
+	private static function processCombinations(
+		array $combinations,
+		array $positionWords,
+		array $scoreMap,
+		int $maxCount
+	): array {
+		$newCombinations = [];
+		foreach ($combinations as $combination => $score) {
+			foreach ($positionWords as $word) {
+				$newCombination = trim($combination . ' ' . $word);
+				$newScore = $score + ($scoreMap[$word] ?? 0);
+				if (sizeof($newCombinations) >= $maxCount && $newScore <= min($newCombinations)) {
+					continue;
+				}
+
+				$newCombinations[$newCombination] = $newScore;
+				if (sizeof($newCombinations) <= $maxCount) {
+					continue;
+				}
+
+				arsort($newCombinations);
+				array_pop($newCombinations);
+			}
+		}
+		return $newCombinations;
+	}
+
 
 	/**
 	 * Get levenshtein distance for the given word on auto or not algorithm
@@ -424,7 +482,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$documents, static function ($doc) use ($avgDocs, $threshold) {
 				// Keep documents with docs count above average * threshold
 				$minDocs = (int)round($avgDocs * $threshold);
-				return $doc['docs'] >= $minDocs;
+				return $doc['docs'] > $minDocs;
 			}
 		);
 

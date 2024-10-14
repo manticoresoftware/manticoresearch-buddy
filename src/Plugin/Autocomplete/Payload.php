@@ -44,6 +44,9 @@ final class Payload extends BasePayload {
 	/** @var array<string> */
 	public array $layouts;
 
+	/** @var bool */
+	public bool $preserve = false;
+
 	public function __construct() {
 	}
 
@@ -80,7 +83,8 @@ final class Payload extends BasePayload {
 					append?: int,
 					prepend?: int,
 					expansion_len?: int,
-					layouts?: string
+					layouts?: string,
+					preserve?: int
 			}
 		} $payload */
 		$payload = json_decode($request->payload, true);
@@ -100,6 +104,7 @@ final class Payload extends BasePayload {
 		$self->append = !!($payload['options']['append'] ?? true);
 		$self->expansionLen = (int)($payload['options']['expansion_len'] ?? 10);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
+		$self->preserve = !!($payload['options']['preserve'] ?? false);
 		$self->validate();
 		return $self;
 	}
@@ -190,7 +195,7 @@ final class Payload extends BasePayload {
 			$value = (int)$value;
 		}
 
-		if ($key === 'prepend' || $key === 'append') {
+		if ($key === 'prepend' || $key === 'append' || $key === 'preserve') {
 			$value = (bool)$value;
 		}
 

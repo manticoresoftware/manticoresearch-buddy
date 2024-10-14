@@ -43,6 +43,9 @@ final class Payload extends BasePayload {
 	/** @var array<string> */
 	public array $layouts;
 
+	/** @var bool */
+	public bool $preserve;
+
 	/** @var string|array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>} */
 	public array|string $payload;
 
@@ -74,7 +77,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $payload */
+		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool}} $payload */
 		$payload = json_decode($request->payload, true);
 		$self = new static();
 		$self->path = $request->path;
@@ -82,6 +85,7 @@ final class Payload extends BasePayload {
 		$self->fuzzy = (bool)($payload['options']['fuzzy'] ?? 0);
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
+		$self->preserve = (bool)($payload['options']['preserve'] ?? false);
 
 		$payload = static::cleanUpPayloadOptions($payload);
 		$self->payload = $payload;
@@ -104,9 +108,23 @@ final class Payload extends BasePayload {
 		}
 		$fuzzy = (bool)$matches[1];
 
+		// Check that we have , between options
+		$pattern = '/OPTION\s+' .
+			'([a-zA-Z0-9_]+\s*=\s*[\'"]?[a-zA-Z0-9_]+[\'"]?\s*,\s*)*' .
+			'[a-zA-Z0-9_]+\s*=\s*[\'"]?[a-zA-Z0-9_]+[\'"]?' .
+			'(\s*,\s*[a-zA-Z0-9_]+\s*=\s*[\'"]?[a-zA-Z0-9_]+[\'"]?)*$/ius';
+
+		if (!preg_match($pattern, $query)) {
+			throw QueryParseError::create('Invalid options in query string, make sure they are separated by commas');
+		}
+
 		// Parse distance and use default 2 if missing
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
 		$distanceValue = (int)($matches[1] ?? 2);
+
+		// Parse preserve
+		preg_match('/preserve\s*=\s*(\d+)/ius', $query, $matches);
+		$preserve = (bool)($matches[1] ?? 0);
 
 		// Parse layouts and use default all languages if missed
 		preg_match('/layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
@@ -118,6 +136,7 @@ final class Payload extends BasePayload {
 		$self->fuzzy = $fuzzy;
 		$self->distance = $distanceValue;
 		$self->layouts = $layouts;
+		$self->preserve = $preserve;
 		$self->payload = $query;
 		return $self;
 	}
@@ -149,7 +168,7 @@ final class Payload extends BasePayload {
 		$template = (string)preg_replace(
 			[
 				'/MATCH\s*\(\'(.*?)\'\)/ius',
-				'/(fuzzy|distance)\s*=\s*\d+[,\s]*/ius',
+				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
 				'/ option/ius', // TODO: hack
@@ -192,24 +211,36 @@ final class Payload extends BasePayload {
 			$isPhrase = true;
 			$searchValue = trim($searchValue, '"');
 		}
-		/** @var array<string> $variations */
+		/** @var array<array<string>> $variations */
 		$variations = $fn($searchValue);
 		if ($isPhrase) {
 			$match = '"' . implode(
-				'"|"', array_map(
-					function ($word, $i) {
-						return $word . '^' . static::getBoostValue($i);
+				'" "', array_map(
+					function ($words, $i) {
+						return '(' . implode(
+							'|', array_map(
+								function ($word) use ($i) {
+									return $word . '^' . static::getBoostValue($i);
+								}, $words
+							)
+						) . ')';
 					}, $variations, array_keys($variations)
 				)
 			) . '"';
 		} else {
-			$match = '(' . implode(
-				')|(', array_map(
-					function ($word, $i) {
-						return $word . '^' . static::getBoostValue($i);
+			$match = implode(
+				' ', array_map(
+					function ($words, $i) {
+						return '(' . implode(
+							'|', array_map(
+								function ($word) use ($i) {
+									return $word . '^' . static::getBoostValue($i);
+								}, $words
+							)
+						) . ')';
 					}, $variations, array_keys($variations)
 				)
-			) . ')';
+			);
 		}
 		// Edge case when nothing to match, use original phrase as fallback
 		if (!$variations) {
@@ -260,15 +291,15 @@ final class Payload extends BasePayload {
 
 	/**
 	 * @param string $field
-	 * @param array<string> $options
+	 * @param array<array<string>> $words
 	 * @return array{bool:array{should:array<array{match:array<string,string>}>}}
 	 */
-	private static function buildShouldHttpQuery(string $field, array $options): array {
+	private static function buildShouldHttpQuery(string $field, array $words): array {
 		$should = [];
-		foreach ($options as $v) {
+		foreach ($words as $options) {
 			$should[] = [
 				'match' => [
-					$field => $v,
+					$field => '(' . implode('|', $options) . ')',
 				],
 			];
 		}
@@ -321,16 +352,16 @@ final class Payload extends BasePayload {
 	 *         }
 	 *     },
 	 *     options: array{
-	 *         fuzzy?: string,
+	 *         fuzzy?: bool,
 	 *         distance?: int,
 	 *         layouts?: string,
-	 *         other?: string
+	 *         preserve?: bool
 	 *     }
 	 * } $payload
 	 * @return array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>}
 	 */
 	public static function cleanUpPayloadOptions(array $payload): array {
-		$excludedOptions = ['distance', 'fuzzy', 'layouts'];
+		$excludedOptions = ['distance', 'fuzzy', 'layouts', 'preserve'];
 		$payload['options'] = array_diff_key($payload['options'], array_flip($excludedOptions));
 		// TODO: hack
 		if (!isset($payload['options']['idf'])) { // @phpstan-ignore-line
