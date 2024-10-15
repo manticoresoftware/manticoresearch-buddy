@@ -55,7 +55,7 @@ final class DirectRequestTest extends TestCase {
 		$this->assertEquals(true, isset($response['type']));
 		$this->assertEquals('json response', $response['type']);
 		$this->assertEquals(true, isset($response['version']));
-		$this->assertEquals(2, $response['version']);
+		$this->assertEquals(Buddy::PROTOCOL_VERSION, $response['version']);
 		$this->assertIsArray($response['message']);
 
 		$this->assertEquals(1, sizeof($response['message']));
