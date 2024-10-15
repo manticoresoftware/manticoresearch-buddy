@@ -13,6 +13,7 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\Payload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request as NetRequest;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use PHPUnit\Framework\TestCase;
 
 class PayloadTest extends TestCase {
@@ -23,7 +24,7 @@ class PayloadTest extends TestCase {
 				'error' => '/test/_mapping - unsupported endpoint',
 				'payload' => '{"properties":{"location":{"type":"geo_point"},'.
 					'"title":{"type":"text","fields":{"keyword":{"type":"keyword","ignore_above":256}}}}}',
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'format' => RequestFormat::JSON,
 				'endpointBundle' => ManticoreEndpoint::Elastic,
 				'path' => '/test/_mapping',
@@ -53,7 +54,7 @@ class PayloadTest extends TestCase {
 				'error' => '/test/_mapping - unsupported endpoint',
 				'payload' => '{"properties":{"location":{"type":"geo_point"},'.
 					'"title":{"type":"text","fields":{"keyword":{"type":"keyword","ignore_above":256}}}}}',
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'format' => RequestFormat::JSON,
 				'endpointBundle' => ManticoreEndpoint::Elastic,
 				'path' => '/test/_mapping',
@@ -69,7 +70,7 @@ class PayloadTest extends TestCase {
 				'error' => '/test/_unknown - unsupported endpoint',
 				'payload' => '{"properties":{"location":{"type":"geo_point"},'.
 				'"title":{"type":"text","fields":{"keyword":{"type":"keyword","ignore_above":256}}}}}',
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'format' => RequestFormat::JSON,
 				'endpointBundle' => ManticoreEndpoint::Elastic,
 				'path' => '/test/_unknown',

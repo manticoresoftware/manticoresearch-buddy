@@ -12,6 +12,7 @@
 namespace Manticoresearch\BuddyTest\Trait;
 
 use Exception;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 trait TestFunctionalTrait {
 
@@ -347,7 +348,7 @@ trait TestFunctionalTrait {
 		$request = [
 			'type' => 'unknown json request',
 			'error' => $error,
-			'version' => 2,
+			'version' => Buddy::PROTOCOL_VERSION,
 			'message' => [
 				'path_query' => '/sql?mode=raw',
 				'body' => $query,

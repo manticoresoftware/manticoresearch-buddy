@@ -9,6 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
 use PHPUnit\Framework\TestCase;
 
