@@ -110,9 +110,9 @@ final class Payload extends BasePayload {
 
 		// Check that we have , between options
 		$pattern = '/OPTION\s+' .
-			'([a-zA-Z0-9_]+\s*=\s*[\'"]?[a-zA-Z0-9_]+[\'"]?\s*,\s*)*' .
-			'[a-zA-Z0-9_]+\s*=\s*[\'"]?[a-zA-Z0-9_]+[\'"]?' .
-			'(\s*,\s*[a-zA-Z0-9_]+\s*=\s*[\'"]?[a-zA-Z0-9_]+[\'"]?)*$/ius';
+			'([a-zA-Z0-9_]+\s*=\s*(\'[^\']*\'|[0-9]+)\s*,\s*)*' .
+			'[a-zA-Z0-9_]+\s*=\s*(\'[^\']*\'|[0-9]+)' .
+			'(\s*,\s*[a-zA-Z0-9_]+\s*=\s*(\'[^\']*\'|[0-9]+))*$/ius';
 
 		if (!preg_match($pattern, $query)) {
 			throw QueryParseError::create('Invalid options in query string, make sure they are separated by commas');
