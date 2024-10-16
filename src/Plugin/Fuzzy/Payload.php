@@ -407,7 +407,7 @@ final class Payload extends BasePayload {
 			return $layouts;
 		}
 		if (isset($layouts)) {
-			$layouts = array_map('trim', explode(',', $layouts));
+			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
 		} else {
 			$layouts = KeyboardLayout::getSupportedLanguages();
 		}
