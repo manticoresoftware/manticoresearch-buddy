@@ -19,6 +19,7 @@ use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
+/** @package Manticoresearch\Buddy\Base\Plugin\Select */
 final class Handler extends BaseHandler {
 	const TABLES_FIELD_MAP = [
 		'engine' => ['field', 'engine'],
@@ -534,12 +535,12 @@ final class Handler extends BaseHandler {
 			};
 		}
 
-		/** @var array{0:array{columns:array<array<string,mixed>>,data:array<array<string,string>>}} */
-		$result = $manticoreClient->sendRequest($selectQuery)->getResult();
+		$response = $manticoreClient->sendRequest($selectQuery);
 		if ($isLikeOp) {
-			$result = static::filterRegexFieldsFromResult($result);
+			$filterFn = static::getFilterRegexFieldFn();
+			$response->filterResult($filterFn);
 		}
-		return TaskResult::raw($result);
+		return TaskResult::fromResponse($response);
 	}
 
 
@@ -561,9 +562,8 @@ final class Handler extends BaseHandler {
 		if (!$query) {
 			throw new Exception('Failed to fix query');
 		}
-		/** @var array<array{data:array<array<string,string>>}> */
-		$selectResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
-		return TaskResult::raw($selectResult);
+		$selectResponse = $manticoreClient->sendRequest($query, $payload->path);
+		return TaskResult::fromResponse($selectResponse);
 	}
 
 	/**
@@ -711,8 +711,10 @@ final class Handler extends BaseHandler {
 			$query = preg_replace($patterns, $replacements, $query) ?? $query;
 		}
 
+		$queryResponse = $manticoreClient->sendRequest($query, $payload->path);
 		/** @var array{error?:string} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+		$queryResult = $queryResponse->getResult();
+
 		if (isset($queryResult['error'])) {
 			$payload->originalQuery = $query;
 			$errors = [
@@ -729,7 +731,7 @@ final class Handler extends BaseHandler {
 			}
 		}
 
-		return TaskResult::raw($queryResult);
+		return TaskResult::fromResponse($queryResponse);
 	}
 
 	/**
@@ -773,28 +775,37 @@ final class Handler extends BaseHandler {
 	}
 
 	/**
-	 * @param array{0:array{columns:array<array<string,mixed>>,data:array<array<string,string>>}} $result
-	 * @return array{0:array{columns:array<array<string,mixed>>,data:array<array<string,string>>}}
+	 * Get filter regex fields method to exclude regex fields from result
+	 * @return callable
 	 */
-	protected static function filterRegexFieldsFromResult(array $result): array {
-		$result[0]['columns'] = array_filter(
-			$result[0]['columns'],
-			fn($v) => !str_ends_with(array_key_first($v) ?? '', '__regex')
-		);
-		$result[0]['data'] = array_map(
-			function ($row) {
-				foreach (array_keys($row) as $key) {
-					if (!str_ends_with($key, '__regex')) {
-						continue;
+	protected static function getFilterRegexFieldFn(): callable {
+		/**
+		 * @param array{0:array{columns:array<array<string,mixed>>,data:array<array<string,string>>}} $data
+		 * @return array{0:array{columns:array<array<string,mixed>>,data:array<array<string,string>>}}
+		 */
+		return function (array $data): array {
+			$data[0]['columns'] = array_filter(
+				$data[0]['columns'],
+				fn($v) => !str_ends_with(array_key_first($v) ?? '', '__regex')
+			);
+
+			$data[0]['data'] = array_map(
+				function ($row) {
+					foreach (array_keys($row) as $key) {
+						/** @var string $key */
+						if (!str_ends_with($key, '__regex')) {
+							continue;
+						}
+
+						unset($row[$key]);
 					}
 
-					unset($row[$key]);
-				}
+					return $row;
+				},
+				$data[0]['data']
+			);
 
-				return $row;
-			}, $result[0]['data']
-		);
-
-		return $result;
+			return $data;
+		};
 	}
 }
