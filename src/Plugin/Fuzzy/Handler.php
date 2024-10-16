@@ -42,8 +42,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$taskFn = function (): TaskResult {
 			$fn = $this->getHandlerFn();
 			$request = $this->payload->getQueriesRequest($fn);
-			$result = $this->manticoreClient->sendRequest($request, $this->payload->path)->getResult();
-			return TaskResult::raw($result);
+			$response = $this->manticoreClient->sendRequest($request, $this->payload->path);
+			return TaskResult::fromResponse($response);
 		};
 
 		return Task::create($taskFn)->run();

@@ -101,7 +101,7 @@ final class EventHandler {
 				$result = $handler->getResult();
 			}
 
-			$response = Response::fromMessage($result->getStruct(), $request->format);
+			$response = Response::fromResult($result, $request->format);
 		} catch (Throwable $e) {
 			Buddy::error($e, "[$id] processing error");
 			if (isset($request)) {
