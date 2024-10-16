@@ -334,14 +334,14 @@ trait TestFunctionalTrait {
 	 * Run direct HTTP request to the Buddy
 	 *
 	 * @param string $query
-	 * @param string $error
+	 * @param array{message:string} $error
 	 * @param bool $redirectOutput
 	 * @return array{version:int,type:string,message:array<int,array{columns:array<string>,data:array<int,array<string,string>>}>}
 	 * @throws Exception
 	 */
 	protected static function runHttpBuddyRequest(
 		string $query,
-		string $error = '',
+		array $error = ['message' => ''],
 		bool $redirectOutput = true
 	): array {
 		$port = static::$listenBuddyPort;

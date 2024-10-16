@@ -41,7 +41,7 @@ final class DirectRequestTest extends TestCase {
 		$table = 'test_' . uniqid();
 		$response = static::runHttpBuddyRequest(
 			"INSERT INTO $table (name, value) values ('Hello', 10), ('World', 100)",
-			"table $table absent"
+			['message' => "table $table absent"],
 		);
 		$this->assertBasicChecks($response);
 		static::runSqlQuery("DROP TABLE IF EXISTS $table");
