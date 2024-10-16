@@ -59,6 +59,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-empty-string',
 	'manticoresoftware/buddy-plugin-backup',
 	'manticoresoftware/buddy-plugin-emulate-elastic',
+	'manticoresoftware/buddy-plugin-fuzzy',
 	'manticoresoftware/buddy-plugin-create',
 	'manticoresoftware/buddy-plugin-drop',
 	'manticoresoftware/buddy-plugin-insert',
@@ -77,7 +78,6 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-queue',
 	'manticoresoftware/buddy-plugin-sharding',
 	'manticoresoftware/buddy-plugin-update',
-	'manticoresoftware/buddy-plugin-fuzzy',
 	'manticoresoftware/buddy-plugin-autocomplete',
 ];
 // Filtering out the plugins that we don't need
