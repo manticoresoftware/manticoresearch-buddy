@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\Buddy\CoreTest\Trait\TestInEnvironmentTrait;
 use PHPUnit\Framework\TestCase;
@@ -44,7 +45,7 @@ class CliTableHandlerTest extends TestCase {
 			[
 				'error' => '',
 				'payload' => 'SHOW QUERIES',
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'format' => RequestFormat::SQL,
 				'endpointBundle' => ManticoreEndpoint::Cli,
 				'path' => 'cli',

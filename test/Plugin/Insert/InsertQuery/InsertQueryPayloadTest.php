@@ -13,6 +13,7 @@ use Manticoresearch\Buddy\Base\Plugin\Insert\Payload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use PHPUnit\Framework\TestCase;
 
 class InsertQueryPayloadTest extends TestCase {
@@ -20,7 +21,7 @@ class InsertQueryPayloadTest extends TestCase {
 		echo "\nTesting the creation of InsertQuery\Request from manticore request data struct\n";
 		$request = Request::fromArray(
 			[
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => 'INSERT INTO test(int_col, string_col, float_col, @timestamp)'
 					. ' VALUES(1, \'string\', 2.22, \'2000-01-01T12:00:00Z\')',

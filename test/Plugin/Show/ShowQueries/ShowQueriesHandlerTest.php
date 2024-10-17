@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Request as NetRequest;
 use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\Buddy\CoreTest\Trait\TestInEnvironmentTrait;
 use PHPUnit\Framework\TestCase;
@@ -47,7 +48,7 @@ class ShowQueriesHandlerTest extends TestCase {
 			[
 				'error' => "P01: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
 				'payload' => 'SHOW QUERIES',
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'format' => RequestFormat::SQL,
 				'endpointBundle' => ManticoreEndpoint::Sql,
 				'path' => 'sql?mode=raw',

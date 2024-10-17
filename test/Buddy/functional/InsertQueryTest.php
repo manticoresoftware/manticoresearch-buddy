@@ -155,11 +155,11 @@ class InsertQueryTest extends TestCase {
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
 		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
-		if (!isset($outData['error'])) {
+		if (!isset($outData['errors'])) {
 			$this->fail();
 		}
 
-		$this->assertEquals('id has already been specified', $outData['error']);
+		$this->assertEquals(true, $outData['errors']);
 	}
 
 	public function testAutoColumnAddOnInsert(): void {

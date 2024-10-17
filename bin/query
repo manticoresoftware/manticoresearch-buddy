@@ -21,10 +21,11 @@ include_once __DIR__ . '/src/init.php';
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 echo 'Running query: $query' . PHP_EOL. PHP_EOL;
 try {
   \$request = Request::fromPayload([
-    'version' => 2,
+    'version' => Buddy::PROTOCOL_VERSION,
     'type' => 'unknown json request',
     'error' => '',
     'message' => [
