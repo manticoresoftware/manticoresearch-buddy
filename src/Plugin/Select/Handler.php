@@ -377,10 +377,10 @@ final class Handler extends BaseHandler {
 		if ($table === 'Manticore') {
 			// Some MySQL tools require info on columns from all database tables available
 			$query = 'SHOW TABLES';
-			/** @var array<array{data:array<array{Index:string}>}> */
+			/** @var array<array{data:array<array{Table:string}>}> */
 			$showResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
 			$tables = array_map(
-				fn ($row) => $row['Index'],
+				fn ($row) => $row['Table'],
 				$showResult[0]['data']
 			);
 			$data = [];
@@ -442,7 +442,7 @@ final class Handler extends BaseHandler {
 	 */
 	protected static function getFieldValue(string $field, array $row, ?string $table = null): mixed {
 		if ($field === 'TABLE_NAME') {
-			return $table ?? ($row['Index'] ?? null);
+			return $table ?? ($row['Table'] ?? null);
 		}
 		return static::DEFAULT_FIELD_VALUES[$field] ?? null;
 	}

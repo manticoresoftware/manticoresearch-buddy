@@ -62,12 +62,12 @@ class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
 				foreach ($result[0]['data'] as &$row) {
 					$row = match ($payload->tableType) {
 						'full' => [
-							"Tables_in_{$payload->database}" => $row['Index'],
+							"Tables_in_{$payload->database}" => $row['Table'],
 							'Table_type' => 'BASE TABLE', // Set Mysql like table type
 						],
 						'open' => [
 							'Database' => 'Manticore',
-							'Table' => $row['Index'],
+							'Table' => $row['Table'],
 							'In_use' => 0,
 							'Name_locked' => 0,
 						],

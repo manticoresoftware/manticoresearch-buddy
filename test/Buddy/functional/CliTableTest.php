@@ -32,7 +32,7 @@ class CliTableTest extends TestCase {
 		if (isset($out[0]['columns'])) {
 			$result = preg_match(
 				"/\+-+\+-+\+\n"
-				. "\| Index\s+\| Type\s+\|\n"
+				. "\| Table\s+\| Type\s+\|\n"
 				. "\+-+\+-+\+\n"
 				. "\| test\s+\| rt\s+\|\n"
 				. "\+-+\+-+\+\n"
