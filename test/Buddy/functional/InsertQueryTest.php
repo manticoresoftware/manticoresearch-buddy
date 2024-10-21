@@ -103,9 +103,9 @@ class InsertQueryTest extends TestCase {
 			$this->fail();
 		}
 		$result = [
-			'type' => 'illegal_argument_exception',
-			'reason' => "Rejecting mapping update to [{$this->testTable}] as the final mapping "
-				. 'would have more than 1 type: [_doc, _create]',
+			'type' => 'index_not_found_exception',
+			'reason' => 'no such index [test]',
+			'index' => 'test',
 		];
 		$this->assertEquals($result, $outData['error']);
 	}
