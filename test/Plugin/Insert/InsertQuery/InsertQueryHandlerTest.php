@@ -15,7 +15,6 @@ use Manticoresearch\Buddy\Base\Plugin\Insert\Payload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Response as ManticoreResponse;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Response;
@@ -62,7 +61,7 @@ class InsertQueryHandlerTest extends TestCase {
 		);
 
 		self::setBuddyVersion();
-		$manticoreClient = new HTTPClient(new ManticoreResponse(), $serverUrl);
+		$manticoreClient = new HTTPClient($serverUrl);
 		// Force sync mode to avoid coroutines issues
 		$manticoreClient->setForceSync(true);
 		$handler = new Handler($payload);
