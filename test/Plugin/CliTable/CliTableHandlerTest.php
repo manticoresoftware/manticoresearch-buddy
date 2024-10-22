@@ -14,7 +14,6 @@ use Manticoresearch\Buddy\Base\Plugin\Show\QueriesHandler as Handler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -54,7 +53,7 @@ class CliTableHandlerTest extends TestCase {
 
 		self::setBuddyVersion();
 		$serverUrl = self::setUpMockManticoreServer(false);
-		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
+		$manticoreClient = new HTTPClient($serverUrl);
 		$manticoreClient->setForceSync(true);
 		$tableFormatter = new TableFormatter();
 		Payload::$type = 'queries';
