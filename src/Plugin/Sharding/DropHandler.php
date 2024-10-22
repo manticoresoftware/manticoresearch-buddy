@@ -1,12 +1,12 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+	Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License version 3 or any later
-  version. You should have received a copy of the GPL license along with this
-  program; if you did not, you can find it at http://www.gnu.org/
+	This program is free software; you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 3 or any later
+	version. You should have received a copy of the GPL license along with this
+	program; if you did not, you can find it at http://www.gnu.org/
 */
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
@@ -28,7 +28,7 @@ final class DropHandler extends BaseHandlerWithClient {
 	public function __construct(public Payload $payload) {
 	}
 
-  /**
+	/**
 	 * Process the request
 	 *
 	 * @return Task
@@ -93,8 +93,8 @@ final class DropHandler extends BaseHandlerWithClient {
 		if (false === stripos($result[0]['data'][0]['Create Table'], "type='distributed'")) {
 			return static::getErrorTask(
 				"table '{$this->payload->table}' is not distributed: "
-				. 'DROP SHARDED TABLE failed: '
-				."table '{$this->payload->table}' must be distributed"
+					. 'DROP SHARDED TABLE failed: '
+					."table '{$this->payload->table}' must be distributed"
 			);
 		}
 
@@ -103,8 +103,8 @@ final class DropHandler extends BaseHandlerWithClient {
 		if (!$state) {
 			return static::getErrorTask(
 				"table '{$this->payload->table}' is not sharded: "
-				. 'DROP SHARDED TABLE failed: '
-				."table '{$this->payload->table}' be created with sharding"
+					. 'DROP SHARDED TABLE failed: '
+					."table '{$this->payload->table}' be created with sharding"
 			);
 		}
 
@@ -113,7 +113,7 @@ final class DropHandler extends BaseHandlerWithClient {
 
 	/**
 	 * @param string $table
-	 * @return array{result:string,status?:string}|array{}
+	 * @return array{result:string,status?:string,type?:string}|array{}
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 */
@@ -126,7 +126,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		$result = $resp->getResult();
 
 		if (isset($result[0]['data'][0]['value'])) {
-			/** @var array{result:string,status?:string} $value */
+			/** @var array{result:string,status?:string,type?:string} $value */
 			$value = json_decode($result[0]['data'][0]['value'], true);
 		}
 		return $value ?? [];
@@ -157,8 +157,9 @@ final class DropHandler extends BaseHandlerWithClient {
 			while (true) {
 				$state = $this->getTableState($this->payload->table);
 				if ($state) {
+					$type = $state['type'] ?? 'unknown';
 					$status = $state['status'] ?? 'processing';
-					if ($status !== 'processing') {
+					if ($type === 'drop' && $status !== 'processing') {
 						return TaskResult::raw($state['result']);
 					}
 				}
