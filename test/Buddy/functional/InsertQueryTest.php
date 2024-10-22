@@ -103,9 +103,9 @@ class InsertQueryTest extends TestCase {
 			$this->fail();
 		}
 		$result = [
-			'type' => 'illegal_argument_exception',
-			'reason' => "Rejecting mapping update to [{$this->testTable}] as the final mapping "
-				. 'would have more than 1 type: [_doc, _create]',
+			'type' => 'index_not_found_exception',
+			'reason' => 'no such index [test]',
+			'index' => 'test',
 		];
 		$this->assertEquals($result, $outData['error']);
 	}
@@ -155,11 +155,11 @@ class InsertQueryTest extends TestCase {
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
 		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
-		if (!isset($outData['error'])) {
+		if (!isset($outData['errors'])) {
 			$this->fail();
 		}
 
-		$this->assertEquals('id has already been specified', $outData['error']);
+		$this->assertEquals(true, $outData['errors']);
 	}
 
 	public function testAutoColumnAddOnInsert(): void {

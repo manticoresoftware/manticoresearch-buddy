@@ -14,6 +14,7 @@ use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use PHPUnit\Framework\TestCase;
 
 class BackupPayloadTest extends TestCase {
@@ -181,7 +182,7 @@ class BackupPayloadTest extends TestCase {
 				BackupPayload::fromRequest(
 					Request::fromArray(
 						[
-							'version' => 2,
+							'version' => Buddy::PROTOCOL_VERSION,
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
@@ -218,7 +219,7 @@ class BackupPayloadTest extends TestCase {
 				BackupPayload::fromRequest(
 					Request::fromArray(
 						[
-							'version' => 2,
+							'version' => Buddy::PROTOCOL_VERSION,
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
@@ -275,7 +276,7 @@ class BackupPayloadTest extends TestCase {
 		}
 		echo $query . PHP_EOL;
 		return [
-			'version' => 2,
+			'version' => Buddy::PROTOCOL_VERSION,
 			'error' => '',
 			'payload' => $query,
 			'format' => RequestFormat::SQL,

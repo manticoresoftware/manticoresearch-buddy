@@ -15,10 +15,10 @@ use Manticoresearch\Buddy\Base\Plugin\Insert\Payload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Response as ManticoreResponse;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Response;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\Buddy\CoreTest\Trait\TestInEnvironmentTrait;
 use PHPUnit\Framework\TestCase;
@@ -61,7 +61,7 @@ class InsertQueryHandlerTest extends TestCase {
 		);
 
 		self::setBuddyVersion();
-		$manticoreClient = new HTTPClient(new ManticoreResponse(), $serverUrl);
+		$manticoreClient = new HTTPClient($serverUrl);
 		// Force sync mode to avoid coroutines issues
 		$manticoreClient->setForceSync(true);
 		$handler = new Handler($payload);
@@ -86,7 +86,7 @@ class InsertQueryHandlerTest extends TestCase {
 		$mockServerUrl = self::setUpMockManticoreServer(false);
 		$request = Request::fromArray(
 			[
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'error' => "table 'test' absent, or does not support INSERT",
 				'payload' => 'INSERT INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,
