@@ -264,7 +264,7 @@ final class Operator {
 	 */
 	public function checkTableStatus(string $table): bool {
 		$stateKey = "table:{$table}";
-		/** @var array{}|array{queue_ids:array<int>,status:string} */
+		/** @var array{}|array{queue_ids:array<int>,status:string,type:string} */
 		$result = $this->state->get($stateKey);
 		Buddy::debugv("Sharding: table status of {$table}: " . json_encode($result));
 		if (!$result) {
@@ -287,9 +287,9 @@ final class Operator {
 		// Update the state
 		if ($isProcessed) {
 			$result['status'] = 'done';
-			$result['result'] = getenv('DEBUG')
-				? $this->client->sendRequest("SHOW CREATE TABLE {$table}")->getResult()
-				: TaskResult::none()->getStruct();
+			$result['result'] = getenv('DEBUG') && $result['type'] === 'create'
+			? $this->client->sendRequest("SHOW CREATE TABLE {$table}")->getResult()
+			: TaskResult::none()->getStruct();
 			$this->state->set($stateKey, $result);
 		}
 

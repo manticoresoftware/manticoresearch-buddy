@@ -156,9 +156,11 @@ final class CreateHandler extends BaseHandlerWithClient {
 				if (isset($result[0]['data'][0]['value'])) {
 					$value = json_decode($result[0]['data'][0]['value'], true);
 				}
-				/** @var array{result:string,status?:string} $value */
+
+				/** @var array{result:string,status?:string,type?:string} $value */
+				$type = $value['type'] ?? 'unknown';
 				$status = $value['status'] ?? 'processing';
-				if ($status !== 'processing') {
+				if ($type === 'create' && $status !== 'processing') {
 					return TaskResult::raw($value['result']);
 				}
 				if ((time() - $ts) > $timeout) {

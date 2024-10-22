@@ -43,10 +43,10 @@ final class Table {
 				SELECT *
 				FROM {$this->table}
 				WHERE
-					cluster = '{$this->cluster->name}'
-						AND
-					table = '{$this->name}'
-			"
+				cluster = '{$this->cluster->name}'
+				AND
+				table = '{$this->name}'
+				"
 			)
 			->getResult();
 
@@ -71,9 +71,9 @@ final class Table {
 			$nodes->push(
 				new Map(
 					[
-					'node' => $row['node'],
-					'shards' => $shards,
-					'connections' => $connectedNodes,
+						'node' => $row['node'],
+						'shards' => $shards,
+						'connections' => $connectedNodes,
 					]
 				)
 			);
@@ -88,13 +88,13 @@ final class Table {
 	 */
 	public function getConnectedNodes(Set $shards): Set {
 		$query = "
-			SELECT node FROM {$this->table}
-			WHERE
-				cluster = '{$this->cluster->name}'
-					AND
-				table = '{$this->name}'
-					AND
-				shards in ({$shards->join(',')})
+		SELECT node FROM {$this->table}
+		WHERE
+		cluster = '{$this->cluster->name}'
+		AND
+		table = '{$this->name}'
+		AND
+		shards in ({$shards->join(',')})
 		";
 
 		$connections = new Set;
@@ -114,14 +114,14 @@ final class Table {
 	 */
 	public function getExternalNodeShards(Set $shards): Vector {
 		$query = "
-			SELECT node, shards FROM {$this->table}
-			WHERE
-				cluster = '{$this->cluster->name}'
-					AND
-				table = '{$this->name}'
-					AND
-				ANY(shards) not in ({$shards->join(',')})
-			ORDER BY id ASC
+		SELECT node, shards FROM {$this->table}
+		WHERE
+		cluster = '{$this->cluster->name}'
+		AND
+		table = '{$this->name}'
+		AND
+		ANY(shards) not in ({$shards->join(',')})
+		ORDER BY id ASC
 		";
 
 		$nodes = new Vector;
@@ -131,8 +131,8 @@ final class Table {
 			$nodes->push(
 				new Map(
 					[
-					'node' => $row['node'],
-					'shards' => static::parseShards($row['shards']),
+						'node' => $row['node'],
+						'shards' => static::parseShards($row['shards']),
 					]
 				)
 			);
@@ -177,10 +177,11 @@ final class Table {
 		/** @var Map<string,mixed> */
 		$result = new Map(
 			[
-			'status' => 'processing',
-			'result' => null,
-			'structure' => $this->structure,
-			'extra' => $this->extra,
+				'status' => 'processing',
+				'type' => 'create',
+				'result' => null,
+				'structure' => $this->structure,
+				'extra' => $this->extra,
 			]
 		);
 
@@ -249,10 +250,11 @@ final class Table {
 		/** @var Map<string,mixed> */
 		$result = new Map(
 			[
-			'status' => 'processing',
-			'result' => null,
-			'structure' => $this->structure,
-			'extra' => $this->extra,
+				'status' => 'processing',
+				'type' => 'drop',
+				'result' => null,
+				'structure' => $this->structure,
+				'extra' => $this->extra,
 			]
 		);
 
@@ -281,7 +283,7 @@ final class Table {
 			cluster = '{$this->cluster->name}'
 			AND
 			table = '{$this->name}'
-		"
+			"
 		);
 
 		$result['nodes'] = $nodes;
@@ -333,14 +335,14 @@ final class Table {
 	}
 
 	/**
-   * Rebalances the shards,
-   * identifying affected shards from inactive nodes
-   * and moving only them.
-   *
-   * @param Queue $queue
-   * @return void
-   */
- 	// @phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
+	 * Rebalances the shards,
+	 * identifying affected shards from inactive nodes
+	 * and moving only them.
+	 *
+	 * @param Queue $queue
+	 * @return void
+	 */
+	// @phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
 	public function rebalance(Queue $queue): void {
 		try {
 			/** @var Map<string,Cluster> */
@@ -427,7 +429,7 @@ final class Table {
 				}
 			}
 
-		/** @var Set<int> */
+			/** @var Set<int> */
 			$queueIds = new Set;
 			foreach ($newSchema as $row) {
 				$sql = "DROP TABLE {$this->name}";
@@ -566,13 +568,13 @@ final class Table {
 		);
 	}
 
-  /**
-   * Get available node for rebalancing
-   * @param  Map<string,Set<int>>    $activeShardsMap
-   * @param  int    $shard
-   * @param int $count How many nodes we need to pull and equals to lost replicas
-   * @return Set<string>
-   */
+	/**
+	 * Get available node for rebalancing
+	 * @param  Map<string,Set<int>>    $activeShardsMap
+	 * @param  int    $shard
+	 * @param int $count How many nodes we need to pull and equals to lost replicas
+	 * @return Set<string>
+	 */
 	protected function getAvailableNodes(
 		Map $activeShardsMap,
 		int $shard,
@@ -664,7 +666,7 @@ final class Table {
 		// Finally generate create table
 		return "CREATE TABLE `{$this->name}`
 			type='distributed' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
-		";
+			";
 	}
 
 
@@ -676,20 +678,20 @@ final class Table {
 	protected function updateScheme(Vector $scheme): static {
 		$table = $this->cluster->getSystemTableName($this->table);
 		$query = "
-			DELETE FROM {$table}
-			WHERE
-				cluster = '{$this->cluster->name}'
-					AND
-				table = '{$this->name}'
+		DELETE FROM {$table}
+		WHERE
+		cluster = '{$this->cluster->name}'
+		AND
+		table = '{$this->name}'
 		";
 		$this->client->sendRequest($query);
 		foreach ($scheme as $row) {
 			$shardsMva = $row['shards']->join(',');
 			$query = "
-				INSERT INTO {$table}
-					(`cluster`, `node`, `table`, `shards`)
-				VALUES
-					('{$this->cluster->name}', '{$row['node']}', '{$this->name}', ($shardsMva))
+			INSERT INTO {$table}
+			(`cluster`, `node`, `table`, `shards`)
+			VALUES
+			('{$this->cluster->name}', '{$row['node']}', '{$this->name}', ($shardsMva))
 			";
 			$this->client->sendRequest($query);
 		}
@@ -709,10 +711,10 @@ final class Table {
 			);
 		}
 		$query = "CREATE TABLE `{$this->table}` (
-			`cluster` string,
-			`node` string,
-			`table` string,
-			`shards` multi
+		`cluster` string,
+		`node` string,
+		`table` string,
+		`shards` multi
 		)";
 		$this->client->sendRequest($query);
 		$this->cluster->attachTables($this->table);
