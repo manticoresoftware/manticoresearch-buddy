@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [ -z "$1" ]; then
+	echo "Usage: $0 <num-manticore-nodes>"
+	exit 1
+fi
+nodes=$1
+if ((nodes < 2)); then
+	echo "Number of nodes must be greater than 1"
+	exit 1
+fi
+if ((nodes > 4)); then
+	echo "Number of nodes must be less than or equal to 555"
+	exit 1
+fi
+
+for n in $(seq 1 $nodes); do
+	cat << EOF > $DIR/manticore-${n}.conf
+searchd {
+	buddy_path = manticore-executor /workdir/src/main.php --debugv
+	listen = 127.0.0.1:${n}9312
+	listen = 127.0.0.1:${n}9306:mysql
+	listen = 127.0.0.1:${n}9308:http
+	log = /var/log/manticore/searchd-$n.log
+	query_log = /var/log/manticore/query-$n.log
+	pid_file = /var/run/manticore/searchd-$n.pid
+	data_dir = /var/lib/manticore/$n
+}
+EOF
+done
+
+# Function to stop processes
+stop_processes() {
+	echo "Stopping searchd processes..."
+
+	for n in $(seq 1 $nodes); do
+		searchd --config "$DIR/manticore-${n}.conf" --stop
+	done
+	exit 0
+}
+
+# Set up trap to catch Cmd+C (SIGINT)
+trap stop_processes SIGINT
+
+# Start both searchd processes in the background and redirect output to console
+for n in $(seq 1 $nodes); do
+	test -d /var/lib/manticore/$n && rm -rf $_
+	mkdir -p /var/lib/manticore/$n
+	searchd --config "$DIR/manticore-${n}.conf" --nodetach > >(sed 's/^/['$n'] /') 2>&1 &
+done
+
+# Wait for all searchd processes to start
+sleep 2
+
+# Creating cluster
+mysql -h0 -P19306 -e 'CREATE CLUSTER c'
+for n in $(seq 2 $nodes); do
+	mysql -h0 -P"${n}9306" -e "JOIN CLUSTER c at '127.0.0.1:19312'"
+done
+
+echo "All searchd processes started. Press Cmd+C to stop."
+
+# Wait indefinitely
+while true; do
+	sleep 1
+done
