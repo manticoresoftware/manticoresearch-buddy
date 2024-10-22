@@ -14,12 +14,10 @@ use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Loader;
 use Manticoresearch\Buddy\Core\Cache\Flag as FlagCache;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\ExpressionLanguage\Expression;
 
 // Init autoload first
@@ -41,11 +39,9 @@ $opts = CliArgsProcessor::run();
 // TODO: probably it's a good idea to get rid out of this container at all
 // TODO: And at least think about extraction of plugin dependencies
 $container = new ContainerBuilder();
-$container->register('ManticoreResponseBuilder', Response::class);
 $container->register('QueryParserLoader', Loader::class);
 $container
 	->register('manticoreClient', HTTPClient::class)
-	->addArgument(new Reference('ManticoreResponseBuilder'))
 	->addArgument($opts['listen']);
 $container->register('tableFormatter', TableFormatter::class);
 $container->register('flagCache', FlagCache::class);
