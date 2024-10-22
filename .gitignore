@@ -7,3 +7,4 @@ build/**
 phar_builder
 plugins/*
 !plugins/.gitkeep
+bin/manticore-*.conf
