@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -44,15 +43,13 @@ class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
 		$taskFn = static function (
 			Payload $payload,
 			Client $manticoreClient,
-			TableFormatter $tableFormatter
 		): TaskResult {
-			$time0 = hrtime(true);
 			// First, get response from the manticore
 			$query = 'SHOW TABLES';
 			if ($payload->like) {
 				$query .= " LIKE '{$payload->like}'";
 			}
-			$resp = $manticoreClient->sendRequest($query, $payload->path);
+			$resp = $manticoreClient->sendRequest($query);
 			/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:int,columns?:string}> $result */
 			$result = $resp->getResult();
 			$total = $result[0]['total'] ?? -1;
@@ -76,10 +73,6 @@ class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
 				}
 			}
 
-			if ($payload->hasCliEndpoint) {
-				return TaskResult::raw($tableFormatter->getTable($time0, $result[0]['data'], $total));
-			}
-
 			return match ($payload->tableType) {
 				'full' => TaskResult::withData($result[0]['data'])
 					->column("Tables_in_{$payload->database}", Column::String)
@@ -95,7 +88,7 @@ class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
 
 		return Task::create(
 			$taskFn,
-			[$this->payload, $this->manticoreClient, $this->tableFormatter]
+			[$this->payload, $this->manticoreClient]
 		)->run();
 	}
 }

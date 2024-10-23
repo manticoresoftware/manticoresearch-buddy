@@ -53,7 +53,7 @@ class FullColumnsHandler extends BaseHandlerWithTableFormatter {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 			$query = "DESC {$payload->table}";
 			/** @var array{0:array{data:array<mixed>}} */
-			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+			$result = $manticoreClient->sendRequest($query)->getResult();
 			$base = [
 				'Field' => '',
 				'Type' => '',
