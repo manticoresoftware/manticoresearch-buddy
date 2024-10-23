@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -50,31 +49,24 @@ class QueriesHandler extends BaseHandlerWithTableFormatter {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = static function (
-			Payload $payload,
 			Client $manticoreClient,
-			TableFormatter $tableFormatter,
 			array $tasks
 		): TaskResult {
 			// First, get response from the manticore
-			$time0 = hrtime(true);
 			$resp = $manticoreClient->sendRequest(
-				'SELECT * FROM @@system.sessions',
-				$payload->path
+				'SELECT * FROM @@system.sessions'
 			);
 			$result = static::formatResponse($resp->getBody());
 			// Second, get our own queries and append to the final result
 			/** @var array{0:array{data:array<mixed>,total:int}} $result */
 			$result[0]['data'] = array_merge($result[0]['data'], $tasks);
 			$result[0]['total'] += sizeof($tasks);
-			if ($payload->hasCliEndpoint) {
-				return TaskResult::raw($tableFormatter->getTable($time0, $result[0]['data'], $result[0]['total']));
-			}
 			return TaskResult::raw($result);
 		};
 
 		return Task::create(
 			$taskFn,
-			[$this->payload, $this->manticoreClient, $this->tableFormatter, static::getTasksToAppend()]
+			[$this->manticoreClient, static::getTasksToAppend()]
 		)->run();
 	}
 

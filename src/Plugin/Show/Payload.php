@@ -47,9 +47,6 @@ final class Payload extends BasePayload {
 
 	public string $tableType;
 
-	public string $path;
-	public bool $hasCliEndpoint;
-
 	/**
 	 * Get description for this plugin
 	 * @return string
@@ -105,7 +102,6 @@ final class Payload extends BasePayload {
 		} elseif ($m['where'] ?? '') {
 			$self->like = $m['where'];
 		}
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;
 	}
 
@@ -114,9 +110,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromVersionRequest(Request $request): static {
-		$self = new static();
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
-		return $self;
+		return new static();
 	}
 
 	/**
@@ -135,7 +129,6 @@ final class Payload extends BasePayload {
 		$self->database = $m[1];
 		$self->table = $m[2];
 
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;
 	}
 
@@ -144,9 +137,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromSimpleRequest(Request $request): static {
-		$self = new static();
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
-		return $self;
+		return new static();
 	}
 
 	/**
@@ -173,7 +164,6 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->database = $m[2];
 		$self->table = $m[1];
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;
 	}
 	/**

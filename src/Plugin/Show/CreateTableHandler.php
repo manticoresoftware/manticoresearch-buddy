@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
@@ -42,19 +41,13 @@ class CreateTableHandler extends BaseHandlerWithTableFormatter {
 		// We just waiting for a thread to be done
 		$taskFn = static function (
 			Payload $payload,
-			Client $manticoreClient,
-			TableFormatter $tableFormatter
+			Client $manticoreClient
 		): TaskResult {
-			$time0 = hrtime(true);
 			// First, get response from the manticore
 			$query = "SHOW CREATE TABLE {$payload->table}";
 			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
 			/** @var array{data:array<int,array<string,string>>} $resultStruct */
 			$resultStruct = $result[0];
-			if ($payload->hasCliEndpoint) {
-				$total = sizeof($resultStruct['data']);
-				return TaskResult::raw($tableFormatter->getTable($time0, $resultStruct['data'], $total));
-			}
 
 			// It's important to have ` and 2 spaces for Apache Superset
 			foreach ($resultStruct['data'] as &$row) {
@@ -77,7 +70,7 @@ class CreateTableHandler extends BaseHandlerWithTableFormatter {
 
 		return Task::create(
 			$taskFn,
-			[$this->payload, $this->manticoreClient, $this->tableFormatter]
+			[$this->payload, $this->manticoreClient]
 		)->run();
 	}
 }

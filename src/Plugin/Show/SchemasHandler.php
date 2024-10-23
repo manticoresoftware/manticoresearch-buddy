@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -44,24 +43,18 @@ class SchemasHandler extends BaseHandlerWithTableFormatter {
 		$taskFn = static function (
 			Payload $payload,
 			Client $manticoreClient,
-			TableFormatter $tableFormatter
 		): TaskResult {
-			$time0 = hrtime(true);
 			// First, get response from the manticore
 			$query = 'SHOW DATABASES';
 			/** @var array{0:array{data:array<mixed>}} */
-			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
-			$total = sizeof($result[0]['data']);
-			if ($payload->hasCliEndpoint) {
-				return TaskResult::raw($tableFormatter->getTable($time0, $result[0]['data'], $total));
-			}
+			$result = $manticoreClient->sendRequest($query)->getResult();
 			return TaskResult::withData($result[0]['data'])
 				->column('Database', Column::String);
 		};
 
 		return Task::create(
 			$taskFn,
-			[$this->payload, $this->manticoreClient, $this->tableFormatter]
+			[$this->payload, $this->manticoreClient]
 		)->run();
 	}
 }
