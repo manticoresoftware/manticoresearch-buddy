@@ -93,7 +93,7 @@ class JSONInsertParserTest extends TestCase {
 		$row = ['update' => ['table' => 'test', 'id' => 1, 'doc' => ['col1' => 10, 'col2' => 'a']]];
 		$this->expectException(QueryParseError::class);
 		//$this->expectExceptionMessage("Operation name 'insert' is missing");
-		$this->expectExceptionMessage("Mandatory request field 'index' is missing");
+		$this->expectExceptionMessage("Mandatory request field 'table' is missing");
 		$this->assertEquals([], self::$parser->parseJSONRow($row));
 	}
 
