@@ -105,7 +105,7 @@ class InsertQueryTest extends TestCase {
 		$result = [
 			'type' => 'index_not_found_exception',
 			'reason' => 'no such index [test]',
-			'index' => 'test',
+			'table' => 'test',
 		];
 		$this->assertEquals($result, $outData['error']);
 	}

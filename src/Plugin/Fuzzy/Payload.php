@@ -77,11 +77,11 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool}} $payload */
+		/** @var array{index:string,table?:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool}} $payload */
 		$payload = json_decode($request->payload, true);
 		$self = new static();
 		$self->path = $request->path;
-		$self->table = $payload['index'];
+		$self->table = $payload['table'] ?? $payload['index'];
 		$self->fuzzy = (bool)($payload['options']['fuzzy'] ?? 0);
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);

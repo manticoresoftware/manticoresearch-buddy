@@ -196,7 +196,7 @@ class UnsupportedStmtHandler extends BaseHandlerWithClient {
 			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
 			$data = $result[0]['data'];
 			return TaskResult::withData($data)
-				->column('Index', Column::String)
+				->column('Table', Column::String)
 				->column('Type', Column::String);
 		}
 		$matches = [];
@@ -205,7 +205,7 @@ class UnsupportedStmtHandler extends BaseHandlerWithClient {
 			/** @var array{0:array{data:array<int,array<mixed>>}} */
 			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
 			$tableNames = array_map(
-				fn($item) => $item['Index'] ?? '',
+				fn($item) => $item['Table'] ?? '',
 				$result[0]['data']
 			);
 			if (!$matches[1]) {

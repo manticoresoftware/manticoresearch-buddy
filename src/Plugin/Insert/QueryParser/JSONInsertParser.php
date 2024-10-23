@@ -48,13 +48,14 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 		if (!is_array($query)) {
 			throw new QueryParseError("Mandatory request field 'insert' must be an object");
 		}
-		if (!array_key_exists('index', $query)) {
-			throw new QueryParseError("Mandatory request field 'index' is missing");
+		$key = array_key_exists('index', $query) ? 'index' : 'table';
+		if (!isset($query[$key])) {
+			throw new QueryParseError("Mandatory request field '$key' is missing");
 		}
-		if (!is_string($query['index'])) {
-			throw new QueryParseError("Mandatory request field 'index' must be a string");
+		if (!is_string($query[$key])) {
+			throw new QueryParseError("Mandatory request field '$key' must be a string");
 		}
-		$this->name = $query['index'];
+		$this->name = $query[$key];
 		if (!array_key_exists('doc', $query)) {
 			throw new QueryParseError("Mandatory request field 'doc' is missing");
 		}

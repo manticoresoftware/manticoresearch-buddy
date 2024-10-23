@@ -214,18 +214,6 @@ final class Payload extends BasePayload {
 			return true;
 		}
 
-// 		if (stripos($request->payload, 'show index') === 0
-// 			|| stripos($request->payload, 'show keys') === 0) {
-// 			static::$type = 'index';
-// 			return true;
-// 		}
-
-// 		if (stripos($request->payload, 'show function status') === 0
-// 		|| stripos($request->payload, 'show procedure status') === 0) {
-// 			static::$type = 'function status';
-// 			return true;
-// 		}
-
 		$unsupportedStatements = [
 			'show tables from',
 			'show table status from',

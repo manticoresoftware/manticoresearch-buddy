@@ -84,17 +84,16 @@ class JSONInsertParserTest extends TestCase {
 		echo "\nTesting the extraction of Insert row data\n";
 
 		$parserCls = new \ReflectionClass(self::$parser);
-		//$query = ['insert' => ['index' => 'test', 'id' => 1, 'doc' => ['col1' => 10, 'col2' => 'a']]];
-		$query = ['index' => 'test', 'id' => 1, 'doc' => ['col1' => 10, 'col2' => 'a']];
+		$query = ['table' => 'test', 'id' => 1, 'doc' => ['col1' => 10, 'col2' => 'a']];
 		$resp = ['col1' => 10, 'col2' => 'a'];
 		$this->assertEquals($resp, self::$parser->parseJSONRow($query));
 		$this->assertEquals('test', $parserCls->getProperty('name')->getValue(self::$parser));
 		$this->assertEquals(['col1', 'col2'], $parserCls->getProperty('cols')->getValue(self::$parser));
 
-		$row = ['update' => ['index' => 'test', 'id' => 1, 'doc' => ['col1' => 10, 'col2' => 'a']]];
+		$row = ['update' => ['table' => 'test', 'id' => 1, 'doc' => ['col1' => 10, 'col2' => 'a']]];
 		$this->expectException(QueryParseError::class);
 		//$this->expectExceptionMessage("Operation name 'insert' is missing");
-		$this->expectExceptionMessage("Mandatory request field 'index' is missing");
+		$this->expectExceptionMessage("Mandatory request field 'table' is missing");
 		$this->assertEquals([], self::$parser->parseJSONRow($row));
 	}
 
