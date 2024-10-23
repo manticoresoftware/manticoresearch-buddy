@@ -84,7 +84,7 @@ final class Payload extends BasePayload
 		if (isset($parsedPayload['knn']['filter'])) {
 			$payload->condition = $parsedPayload['knn']['filter'];
 		}
-		$payload->table = $parsedPayload['index'];
+		$payload->table = $parsedPayload['table'] ?? $parsedPayload['index'];
 		$payload->field = $parsedPayload['knn']['field'];
 		$payload->k = (string)$parsedPayload['knn']['k'];
 		$payload->docId = (string)$parsedPayload['knn']['doc_id'];

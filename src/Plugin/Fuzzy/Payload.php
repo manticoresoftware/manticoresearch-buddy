@@ -81,7 +81,7 @@ final class Payload extends BasePayload {
 		$payload = json_decode($request->payload, true);
 		$self = new static();
 		$self->path = $request->path;
-		$self->table = $payload['index'];
+		$self->table = $payload['table'] ?? $payload['index'];
 		$self->fuzzy = (bool)($payload['options']['fuzzy'] ?? 0);
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);

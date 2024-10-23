@@ -108,7 +108,7 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private static function knnHttpQuery(Client $manticoreClient, Payload $payload, string $queryVector): array {
 		$query = [
-			'index' => $payload->table,
+			'table' => $payload->table,
 			'knn' => [
 				'field' => $payload->field,
 				'k' => (int)$payload->k,

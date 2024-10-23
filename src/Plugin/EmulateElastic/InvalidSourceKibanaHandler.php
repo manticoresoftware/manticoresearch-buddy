@@ -45,7 +45,7 @@ class InvalidSourceKibanaHandler extends BaseHandlerWithClient {
 				throw new Exception("Invalid request passed: {$payload->body}");
 			}
 			$request['_source'] = [];
-			$request['index'] = $payload->table;
+			$request['table'] = $payload->table;
 			if (isset($request['script_fields'])) {
 				unset($request['script_fields']);
 			}
