@@ -12,6 +12,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Closure;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -160,7 +161,7 @@ final class DropHandler extends BaseHandlerWithClient {
 					$type = $state['type'] ?? 'unknown';
 					$status = $state['status'] ?? 'processing';
 					if ($type === 'drop' && $status !== 'processing') {
-						return TaskResult::raw($state['result']);
+						return TaskResult::fromResponse(Response::fromBody($state['result']));
 					}
 				}
 				if ((time() - $ts) > $timeout) {

@@ -41,10 +41,9 @@ final class Handler extends BaseHandlerWithClient {
 				throw new RuntimeException('Failed to prepare query');
 			}
 
-			$queryResult = $manticoreClient
-				->sendRequest($query, $payload->path)
-				->getResult();
-			return TaskResult::raw($queryResult);
+			$resp = $manticoreClient
+				->sendRequest($query, $payload->path);
+			return TaskResult::fromResponse($resp);
 		};
 
 		return Task::create(

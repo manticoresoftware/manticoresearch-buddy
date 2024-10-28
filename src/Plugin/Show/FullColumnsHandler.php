@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -21,7 +21,7 @@ use RuntimeException;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class FullColumnsHandler extends BaseHandlerWithTableFormatter {
+class FullColumnsHandler extends BaseHandlerWithClient {
 	/**
 	 *  Initialize the executor
 	 *

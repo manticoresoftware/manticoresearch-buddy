@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -21,7 +21,7 @@ use RuntimeException;
 /**
  * This is a class to handle SHOW TABLES-like queries where MySQL syntax is used
  */
-class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
+class ExpandedTablesHandler extends BaseHandlerWithClient {
 	/**
 	 *  Initialize the executor
 	 *
@@ -55,7 +55,6 @@ class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
 			$result = $resp->getResult();
 			/** @var array{data:array<int,array<string,string>>,total?:int} $resultStruct */
 			$resultStruct = $result[0];
-			$total = $resultStruct['total'] ?? -1;
 			// Adjust result row to be mysql like
 			$resultData = $resultStruct['data'];
 			if ($resultData) {
