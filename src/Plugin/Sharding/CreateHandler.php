@@ -12,6 +12,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Closure;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -161,7 +162,7 @@ final class CreateHandler extends BaseHandlerWithClient {
 				$type = $value['type'] ?? 'unknown';
 				$status = $value['status'] ?? 'processing';
 				if ($type === 'create' && $status !== 'processing') {
-					return TaskResult::raw($value['result']);
+					return TaskResult::fromResponse(Response::fromBody($value['result']));
 				}
 				if ((time() - $ts) > $timeout) {
 					break;

@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -21,7 +21,7 @@ use RuntimeException;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class SchemasHandler extends BaseHandlerWithTableFormatter {
+class SchemasHandler extends BaseHandlerWithClient {
 	/**
 	 *  Initialize the executor
 	 *
@@ -41,7 +41,6 @@ class SchemasHandler extends BaseHandlerWithTableFormatter {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = static function (
-			Payload $payload,
 			Client $manticoreClient,
 		): TaskResult {
 			// First, get response from the manticore
@@ -54,7 +53,7 @@ class SchemasHandler extends BaseHandlerWithTableFormatter {
 
 		return Task::create(
 			$taskFn,
-			[$this->payload, $this->manticoreClient]
+			[$this->manticoreClient]
 		)->run();
 	}
 }

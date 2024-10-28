@@ -65,8 +65,7 @@ final class Payload extends BasePayload {
 		return match (static::$type) {
 			'expanded tables' => static::fromExpandedTablesRequest($request),
 			'create table' => static::fromCreateTableRequest($request),
-			'schemas', 'queries' => static::fromSimpleRequest($request),
-			'version' => static::fromVersionRequest($request),
+			'schemas', 'queries', 'version' => new static(),
 			'full columns' => static::fromColumnsRequest($request),
 			'unsupported' => static::fromUnsupportedStmtRequest($request),
 			default => throw new Exception('Failed to match type of request: ' . static::$type),
@@ -108,14 +107,6 @@ final class Payload extends BasePayload {
 	/**
 	 * @param Request $request
 	 * @return static
-	 */
-	protected static function fromVersionRequest(Request $request): static {
-		return new static();
-	}
-
-	/**
-	 * @param Request $request
-	 * @return static
 	 * @throws QueryParseError
 	 */
 	protected static function fromCreateTableRequest(Request $request): static {
@@ -136,17 +127,8 @@ final class Payload extends BasePayload {
 	 * @param Request $request
 	 * @return static
 	 */
-	protected static function fromSimpleRequest(Request $request): static {
-		return new static();
-	}
-
-	/**
-	 * @param Request $request
-	 * @return static
-	 */
 	protected static function fromUnsupportedStmtRequest(Request $request): static {
 		$self = new static();
-		[$self->path] = self::getEndpointInfo($request);
 		$self->query = $request->payload;
 		return $self;
 	}

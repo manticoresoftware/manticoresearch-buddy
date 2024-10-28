@@ -68,7 +68,7 @@ class Handler extends BaseHandlerWithClient {
 				throw new Exception('Empty queries to process');
 			}
 
-			return TaskResult::raw((array)json_decode($resp->getBody(), true));
+			return TaskResult::fromResponse($resp);
 		};
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
