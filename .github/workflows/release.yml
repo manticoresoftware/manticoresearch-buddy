@@ -6,6 +6,9 @@ on:
       - 'v*.*.*'
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 env:
   APP_NAME: 'manticore-buddy'
@@ -39,6 +42,7 @@ jobs:
           echo "deb_suffix=-${date}-$commit" >> $GITHUB_OUTPUT
 
   build-artifact:
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-22.04
     needs:
       - vars
@@ -194,6 +198,7 @@ jobs:
           prerelease: false
 
   deploy:
+    if: ${{ github.event_name != 'pull_request' }}
     needs:
       - build-artifact
       - build-linux-packages
@@ -265,11 +270,10 @@ jobs:
   update-manticoresearch-deps:
     needs:
       - vars
-      - deploy
     runs-on: ubuntu-22.04
     steps:
       - name: Update deps
-        uses: manticoresoftware/manticoresearch/actions/update-deps@master
+        uses: manticoresoftware/manticoresearch/actions/update-deps@fix/new-update-deps-ci
         with:
           name: buddy
           version: "${{ needs.vars.outputs.app_version }} ${{ needs.vars.outputs.app_date }} ${{ needs.vars.outputs.app_commit }}"
