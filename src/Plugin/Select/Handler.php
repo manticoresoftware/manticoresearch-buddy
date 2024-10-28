@@ -538,7 +538,7 @@ final class Handler extends BaseHandler {
 		$response = $manticoreClient->sendRequest($selectQuery);
 		if ($isLikeOp) {
 			$filterFn = static::getFilterRegexFieldFn();
-			$response->filterResult($filterFn);
+			$response->apply($filterFn);
 		}
 		return TaskResult::fromResponse($response);
 	}

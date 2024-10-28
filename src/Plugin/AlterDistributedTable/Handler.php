@@ -96,12 +96,12 @@ final class Handler extends BaseHandlerWithClient
 			}
 		}
 
-		$request = $manticoreClient->sendRequest($sql);
-		if ($request->hasError()) {
-			throw ManticoreSearchResponseError::create((string)$request->getError());
+		$response = $manticoreClient->sendRequest($sql);
+		if ($response->hasError()) {
+			throw ManticoreSearchResponseError::create((string)$response->getError());
 		}
 
-		return TaskResult::raw($request->getResult());
+		return TaskResult::fromResponse($response);
 	}
 
 	/**
