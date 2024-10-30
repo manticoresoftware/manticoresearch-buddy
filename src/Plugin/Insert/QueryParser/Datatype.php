@@ -16,6 +16,7 @@ enum Datatype: string {
 	case Multi = 'multi';
 	case Multi64 = 'multi64';
 	case Float = 'float';
+	case FloatVector = 'float_vector';
 	case Int = 'int';
 	case Bigint = 'bigint';
 	case Text = 'text';

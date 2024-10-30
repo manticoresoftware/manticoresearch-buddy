@@ -129,10 +129,12 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 		$returnType = Datatype::Multi;
 		foreach ($val as $subVal) {
 			$subValType = self::detectValType($subVal);
-			if ($subValType === Datatype::Bigint) {
+			if ($returnType === Datatype::Multi && $subValType === Datatype::Bigint) {
 				$returnType = Datatype::Multi64;
+			} elseif ($returnType !== Datatype::FloatVector && $subValType === Datatype::Float) {
+				$returnType = Datatype::FloatVector;
 			}
-			if ($subValType !== Datatype::Bigint && $subValType !== Datatype::Int) {
+			if ($subValType !== Datatype::Bigint && $subValType !== Datatype::Int && $subValType !== Datatype::Float) {
 				return Datatype::Json;
 			}
 		}

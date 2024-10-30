@@ -245,13 +245,17 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 				$v = trim($v);
 			}
 		);
+		$returnType = Datatype::Multi;
 		foreach ($subVals as $v) {
-			if (self::detectValType($v) === Datatype::Bigint) {
-				return Datatype::Multi64;
+			$subValType = self::detectValType($v);
+			if ($returnType !== Datatype::Multi64 && $subValType === Datatype::Bigint) {
+				$returnType = Datatype::Multi64;
+			} elseif ($subValType === Datatype::Float) {
+				return Datatype::FloatVector;
 			}
 		}
 
-		return Datatype::Multi;
+		return $returnType;
 	}
 
 	/**

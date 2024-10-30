@@ -46,9 +46,10 @@ class JSONInsertParserTest extends TestCase {
 		$this->assertEquals(Datatype::Text, self::invokeMethod($parser, 'detectValType', ['11111111111']));
 		$this->assertEquals(Datatype::Int, self::invokeMethod($parser, 'detectValType', [1]));
 		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', [['a' => 1]]));
+		$this->assertEquals(Datatype::FloatVector, self::invokeMethod($parser, 'detectValType', [[2, 0.5]]));
 		$this->assertEquals(Datatype::Multi64, self::invokeMethod($parser, 'detectValType', [[1, 1111111111111]]));
 		$this->assertEquals(Datatype::Multi, self::invokeMethod($parser, 'detectValType', [[11, 1]]));
-		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', [[1, 0.1]]));
+		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', [[1, 'a']]));
 		$this->assertEquals(Datatype::String, self::invokeMethod($parser, 'detectValType', ['testmail@google.com']));
 		$this->assertEquals(Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01']));
 		$this->assertEquals(Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01:01']));
@@ -115,11 +116,13 @@ class JSONInsertParserTest extends TestCase {
 
 		$query = '{"index" : "test", "id" : 1, "doc": { "col1" : "m1@google.com", "col2": 1,'
 			. '"col3": 111111111111, "col4": {"b": 2}, "col5": [1, 2], "col6": [1, 222222222222], "col7": "c",'
-			. '"col8": 0.1, "@timestamp": "2000-01-01T12:00:00Z" } }';
+			. '"col8": 0.1, "col9": [0.1, 0.2], "@timestamp": "2000-01-01T12:00:00Z" } }';
 		$res = [
 			'name' => 'test',
-			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', '@timestamp'],
-			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi64', 'text', 'float', 'timestamp'],
+			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', 'col9', '@timestamp'],
+			'colTypes' => [
+				'string', 'int', 'bigint', 'json', 'multi', 'multi64', 'text', 'float', 'float_vector', 'timestamp'
+			],
 		];
 		$this->assertEquals($res, self::$parser->parse($query));
 
