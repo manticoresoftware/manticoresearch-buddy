@@ -35,8 +35,8 @@ final class Handler extends BaseHandlerWithClient {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $client): TaskResult {
 			$q = "{$payload->type} table {$payload->table} {$payload->structure} {$payload->extra}";
-			$result = $client->sendRequest($q, disableAgentHeader: true)->getResult();
-			return TaskResult::raw([$result]);
+			$resp = $client->sendRequest($q, disableAgentHeader: true);
+			return TaskResult::fromResponse($resp);
 		};
 
 		$task = Task::create(

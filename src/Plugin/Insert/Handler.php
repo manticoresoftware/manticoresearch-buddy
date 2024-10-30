@@ -61,6 +61,7 @@ class Handler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 			for ($i = 0, $maxI = sizeof($payload->queries) - 1; $i <= $maxI; $i++) {
 				$query = $payload->queries[$i];
+
 				$resp = $manticoreClient->sendRequest($query, $i === 0 ? null : $payload->path);
 			}
 
@@ -68,7 +69,7 @@ class Handler extends BaseHandlerWithClient {
 				throw new Exception('Empty queries to process');
 			}
 
-			return TaskResult::raw((array)json_decode($resp->getBody(), true));
+			return TaskResult::fromResponse($resp);
 		};
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
