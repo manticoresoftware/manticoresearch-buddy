@@ -309,10 +309,10 @@ trait TestFunctionalTrait {
 				? 'Content-type: application/x-www-form-urlencoded'
 				: 'Content-type: application/json'
 			);
-		exec(
-			"curl -s 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect",
-			$output
-		);
+
+		$command = "curl -s 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect";
+		echo 'Commmand: ' . $command . PHP_EOL;
+		exec($command, $output);
 
 		/** @var array{error:string}|array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = match ($path) {
