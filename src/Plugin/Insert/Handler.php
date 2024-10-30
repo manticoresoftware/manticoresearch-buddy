@@ -62,6 +62,7 @@ class Handler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 			for ($i = 0, $maxI = sizeof($payload->queries) - 1; $i <= $maxI; $i++) {
 				$query = $payload->queries[$i];
+
 				$resp = $manticoreClient->sendRequest($query, $i === 0 ? null : $payload->path);
 			}
 
