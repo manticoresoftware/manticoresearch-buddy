@@ -120,7 +120,7 @@ class SQLInsertParserTest extends TestCase {
 		$query = 'INSERT INTO test(col1,col2,col3,col4,col5,col6,col7,col8,@timestamp) VALUES'
 			. "('m1@google.com', 1, 111, '{\"b\":2}', (1,2), (1,11111111111), (0.2,0.8), 'c', '2000-01-01T12:00:00Z'),"
 			. "('m2@google.com', 2, 222222222222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222222222222),"
-				. " 'qqq', '2000-01-01T12:00:30Z')";
+			. " (0.8,0.2), 'qqq', '2000-01-01T12:00:30Z')";
 		$res = [
 			'name' => 'test',
 			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', '@timestamp'],
@@ -142,9 +142,9 @@ class SQLInsertParserTest extends TestCase {
 		$parser = new SQLInsertParser();
 		$query = 'INSERT INTO test(col1,col2,col3,col4,col5,col6,col7,col8) VALUES'
 			. "\n"
-			. "('m1@google.com', 1, 111111111111, '{\"b\":2}', (1,2), (1,111), (0.5,0.5), 'c'),"
+			. "('m1@google.com', 1, 111111111111, '{\"b\":2}', (1,2), (1,111), (1,2), 'c'),"
 			. "\n"
-			. "('some text', 2, 222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222), (1,2), 'qqq')";
+			. "('some text', 2, 222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222), (0.5,1), 'qqq')";
 		$res = [
 			'name' => 'test',
 			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8'],
