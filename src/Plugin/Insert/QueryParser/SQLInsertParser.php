@@ -251,7 +251,7 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 			if ($returnType !== Datatype::Multi64 && $subValType === Datatype::Bigint) {
 				$returnType = Datatype::Multi64;
 			} elseif ($subValType === Datatype::Float) {
-				return Datatype::FloatVector;
+				return Datatype::Json;
 			}
 		}
 

@@ -32,9 +32,7 @@ class SQLInsertParserTest extends TestCase {
 		$this->assertEquals(Datatype::Bigint, self::invokeMethod($parser, 'detectValType', ['11111111111']));
 		$this->assertEquals(Datatype::Int, self::invokeMethod($parser, 'detectValType', [1]));
 		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', ['\'{"a":1}\'']));
-		$this->assertEquals(
-			Datatype::FloatVector, self::invokeMethod($parser, 'detectValType', ['(1, 1.5)'])
-		);
+		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', ['(1, 1.5)']));
 		$this->assertEquals(
 			Datatype::Multi64, self::invokeMethod($parser, 'detectValType', ['(1, 1111111111111)'])
 		);
@@ -126,7 +124,7 @@ class SQLInsertParserTest extends TestCase {
 		$res = [
 			'name' => 'test',
 			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', '@timestamp'],
-			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi64', 'float_vector', 'text', 'timestamp'],
+			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi64', 'json', 'text', 'timestamp'],
 		];
 		$this->assertEquals($res, self::$parser->parse($query));
 
@@ -137,7 +135,7 @@ class SQLInsertParserTest extends TestCase {
 		$res = [
 			'name' => 'test',
 			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8'],
-			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi', 'float_vector', 'text'],
+			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi', 'json', 'text'],
 		];
 		$this->assertEquals($res, $parser->parse($query));
 
@@ -150,7 +148,7 @@ class SQLInsertParserTest extends TestCase {
 		$res = [
 			'name' => 'test',
 			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8'],
-			'colTypes' => ['text', 'int', 'bigint', 'json', 'multi', 'multi', 'float_vector', 'text'],
+			'colTypes' => ['text', 'int', 'bigint', 'json', 'multi', 'multi', 'json', 'text'],
 		];
 		$this->assertEquals($res, $parser->parse($query));
 	}

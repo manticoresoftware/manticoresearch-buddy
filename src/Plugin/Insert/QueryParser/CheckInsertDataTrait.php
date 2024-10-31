@@ -102,7 +102,7 @@ trait CheckInsertDataTrait {
 	): void {
 		$typeBundles = [
 			[Datatype::Json, Datatype::Null],
-			[Datatype::FloatVector, Datatype::Multi64, Datatype::Multi, Datatype::Null],
+			[Datatype::Multi64, Datatype::Multi, Datatype::Null],
 			[Datatype::Float, Datatype::Bigint, Datatype::Int, Datatype::Null],
 			[Datatype::Text, Datatype::String, Datatype::Null],
 			[Datatype::Text, Datatype::Timestamp, Datatype::Null],
