@@ -127,7 +127,8 @@ class QueueProcess extends BaseProcessor {
 		try {
 			$worker = $this->process->getWorker($id);
 			$this->process->removeWorker($worker);
-		} catch (Throwable) {
+		} catch (Throwable $exception) {
+			Buddy::debugv($exception->getMessage());
 		} finally {
 			return true;
 		}
