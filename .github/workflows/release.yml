@@ -35,7 +35,8 @@ jobs:
         run: |
           version=$(<APP_VERSION)
           date=$( date +%y%m%d%H )
-          commit=${GITHUB_SHA:0:7}
+          commit=${{ github.event.pull_request.head.sha || github.sha }}
+          commit=${commit:0:7}
 
           echo "app_version=$version" >> $GITHUB_OUTPUT
           echo "app_date=$date" >> $GITHUB_OUTPUT
