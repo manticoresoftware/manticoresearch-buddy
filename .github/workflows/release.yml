@@ -29,11 +29,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref || github.ref }}
       - id: vars
         run: |
           version=$(<APP_VERSION)
           date=$( date +%y%m%d%H )
-          commit=${GITHUB_SHA:0:7}
+          commit=${{ github.event.pull_request.head.sha || github.sha }}
+          commit=${commit:0:7}
 
           echo "app_version=$version" >> $GITHUB_OUTPUT
           echo "app_date=$date" >> $GITHUB_OUTPUT
@@ -273,7 +276,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Update deps
-        uses: manticoresoftware/manticoresearch/actions/update-deps@fix/new-update-deps-ci
+        uses: manticoresoftware/manticoresearch/actions/update-deps@master
         with:
           name: buddy
           version: "${{ needs.vars.outputs.app_version }} ${{ needs.vars.outputs.app_date }} ${{ needs.vars.outputs.app_commit }}"
