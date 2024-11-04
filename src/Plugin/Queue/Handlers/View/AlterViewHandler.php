@@ -176,11 +176,19 @@ final class AlterViewHandler extends BaseHandlerWithClient {
 	/**
 	 * @param array<string, string> $instance
 	 * @param array<string, string> $row
+	 *
 	 * @return void
-	 */
+	 * @throws ManticoreSearchClientError
+*/
 	private function handleProcessWorkers(array $instance, array $row): void {
-
 		$value = $this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
+
+		if ((string)$row['suspended'] === $value) {
+			throw ManticoreSearchClientError::create(
+				'Selected materialized view has already '.
+				($value === '0' ? 'resumed' : 'suspended')
+			);
+		}
 
 		if ($value === '0') {
 			$instance['destination_name'] = $row['destination_name'];
