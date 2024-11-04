@@ -45,6 +45,9 @@ final class Handler extends BaseHandlerWithClient
 			}
 
 			if ($client->hasTable($payload->destinationTableName)) {
+				if ($payload->notExists) {
+					return TaskResult::none();
+				}
 				throw GenericError::create("Destination table $payload->destinationTableName already exists");
 			}
 
