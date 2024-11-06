@@ -76,7 +76,7 @@ class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
 				}
 				$result->offsetSet(0, $resultData);
 			}
-			
+
 			if ($payload->hasCliEndpoint) {
 				return TaskResult::raw($tableFormatter->getTable($time0, $result[0]['data'], $total));
 			}
