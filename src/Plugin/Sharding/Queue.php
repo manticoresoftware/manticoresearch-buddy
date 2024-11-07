@@ -4,6 +4,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Ds\Vector;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
@@ -173,9 +174,9 @@ final class Queue {
 	/**
 	 * Execute query and return info
 	 * @param  QueryItem  $query
-	 * @return array<mixed>
+	 * @return Struct<int|string, mixed>
 	 */
-	protected function executeQuery(array $query): array {
+	protected function executeQuery(array $query): Struct {
 		// TODO: this is a temporary hack, remove when job is done on searchd
 		$this->runMkdir($query['query']);
 		return $this->client->sendRequest($query['query'])->getResult();

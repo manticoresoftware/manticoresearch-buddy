@@ -77,18 +77,20 @@ class QueueProcess extends BaseProcessor {
 			}
 
 			$results = $results->getResult();
-			if (is_array($results[0]) && !isset($results[0]['data'][0])) {
+			/** @var array{data:array<int,array<string,string>>} $resultStruct */
+			$resultStruct = $results[0];
+			if (is_array($resultStruct) && !isset($resultStruct['data'][0])) {
 				Buddy::debug("Can't find view with source_name {$instance['full_name']}");
 				continue;
 			}
 
-			if (!empty($results[0]['data'][0]['suspended'])) {
+			if (!empty($resultStruct['data'][0]['suspended'])) {
 				Buddy::debugv("Worker {$instance['full_name']} is suspended. Skip running");
 				continue;
 			}
 
-			$instance['destination_name'] = $results[0]['data'][0]['destination_name'];
-			$instance['query'] = $results[0]['data'][0]['query'];
+			$instance['destination_name'] = $resultStruct['data'][0]['destination_name'];
+			$instance['query'] = $resultStruct['data'][0]['query'];
 			$this->execute('runWorker',	[$instance]);
 		}
 	}

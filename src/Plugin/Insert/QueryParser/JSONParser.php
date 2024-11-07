@@ -29,13 +29,13 @@ abstract class JSONParser extends BaseParser implements JSONParserInterface {
 		$this->cols = $this->colTypes = [];
 		$struct = Struct::fromJson($query);
 		$row = $struct->toArray();
-		if (!is_array($row)) {
+		if (!$row || !is_array($row)) {
 			// checking if query has ndjson format
 			$queries = static::parseNdJSON($query);
 			foreach ($queries as $query) {
 				$struct = Struct::fromJson($query);
 				$row = $struct->toArray();
-				if (!is_array($row)) {
+				if (!$row || !is_array($row)) {
 					throw new QueryParseError('Invalid JSON in query');
 				}
 				$this->isNdJSON = true;

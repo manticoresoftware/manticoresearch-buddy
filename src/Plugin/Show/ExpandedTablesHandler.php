@@ -53,13 +53,14 @@ class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
 				$query .= " LIKE '{$payload->like}'";
 			}
 			$resp = $manticoreClient->sendRequest($query, $payload->path);
-			/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:int,columns?:string}> $result */
 			$result = $resp->getResult();
-			$total = $result[0]['total'] ?? -1;
+			/** @var array{data:array<int,array<string,string>>,total?:int} $resultStruct */
+			$resultStruct = $result[0];
+			$total = $resultStruct['total'] ?? -1;
 			// Adjust result row to be mysql like
-			if ($result[0]['data']) {
-				$resultData = $result[0];
-				foreach ($resultData['data'] as &$row) {
+			$resultData = $resultStruct['data'];
+			if ($resultData) {
+				foreach ($resultData as &$row) {
 					$row = match ($payload->tableType) {
 						'full' => [
 							"Tables_in_{$payload->database}" => $row['Table'],
@@ -74,18 +75,17 @@ class ExpandedTablesHandler extends BaseHandlerWithTableFormatter {
 						default => throw new \Exception("Unknown table type {$payload->tableType} passed"),
 					};
 				}
-				$result->offsetSet(0, $resultData);
 			}
 
 			if ($payload->hasCliEndpoint) {
-				return TaskResult::raw($tableFormatter->getTable($time0, $result[0]['data'], $total));
+				return TaskResult::raw($tableFormatter->getTable($time0, $resultData, $total));
 			}
 
 			return match ($payload->tableType) {
-				'full' => TaskResult::withData($result[0]['data'])
+				'full' => TaskResult::withData($resultData)
 					->column("Tables_in_{$payload->database}", Column::String)
 					->column('Table_type', Column::String),
-				'open' => TaskResult::withData($result[0]['data'])
+				'open' => TaskResult::withData($resultData)
 					->column('Database', Column::String)
 					->column('Table', Column::String)
 					->column('In_Use', Column::Long)
