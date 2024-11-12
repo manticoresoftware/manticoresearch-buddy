@@ -76,12 +76,13 @@ abstract class BaseGetHandler extends BaseHandlerWithClient {
 			}
 
 			$rawResult = $rawResult->getResult();
-
-			if (is_array($rawResult[0]) && empty($rawResult[0]['data'])) {
+			/** @var array{data:array<int,array<string,string>>} $rawResultStruct */
+			$rawResultStruct = $rawResult[0];
+			if (is_array($rawResultStruct) && empty($rawResultStruct['data'])) {
 				return TaskResult::none();
 			}
 
-			$formattedResult = static::formatResult($rawResult[0]['data'][0]['original_query']);
+			$formattedResult = static::formatResult($rawResultStruct['data'][0]['original_query']);
 
 			$resultData = [
 				$type => $name,
@@ -92,7 +93,7 @@ abstract class BaseGetHandler extends BaseHandlerWithClient {
 				if ($field === 'original_query') {
 					continue;
 				}
-				$resultData[$field] = $rawResult[0]['data'][0][$field];
+				$resultData[(string)$field] = $rawResultStruct['data'][0][$field];
 			}
 
 			return self::prepareTaskResult($resultData, $type, $fields);

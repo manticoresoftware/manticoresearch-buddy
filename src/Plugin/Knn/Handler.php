@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
+use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -72,9 +73,14 @@ final class Handler extends BaseHandlerWithClient {
 		}
 		$document = $request->getResult();
 
-		if (is_array($document) && !empty($document[0]['data'])) {
-			if (!empty($document[0]['data'][0][$payload->field])) {
-				return $document[0]['data'][0][$payload->field];
+		if (!isset($document[0])) {
+			return false;
+		}
+		/** @var array{data:array<int,array<string,string>>} $documentStruct */
+		$documentStruct = $document[0];
+		if (!empty($documentStruct['data'])) {
+			if (!empty($documentStruct['data'][0][$payload->field])) {
+				return $documentStruct['data'][0][$payload->field];
 			}
 			return false;
 		}
@@ -87,10 +93,10 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
 	 * @param string $queryVector
-	 * @return array <string, string>
+	 * @return Struct<int|string, mixed>
 	 * @throws ManticoreSearchClientError|QueryParseError
 	 */
-	private static function getKnnResult(Client $manticoreClient, Payload $payload, string $queryVector): array {
+	private static function getKnnResult(Client $manticoreClient, Payload $payload, string $queryVector): Struct {
 		if ($payload->endpointBundle === Endpoint::Search) {
 			return self::knnHttpQuery($manticoreClient, $payload, $queryVector);
 		}
@@ -103,10 +109,10 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param Payload $payload
 	 * @param string $queryVector
 	 *
-	 * @return array <string, string>
+	 * @return Struct<int|string, mixed>
 	 * @throws ManticoreSearchClientError|GenericError
 	 */
-	private static function knnHttpQuery(Client $manticoreClient, Payload $payload, string $queryVector): array {
+	private static function knnHttpQuery(Client $manticoreClient, Payload $payload, string $queryVector): Struct {
 		$query = [
 			'table' => $payload->table,
 			'knn' => [
@@ -156,10 +162,10 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
 	 * @param string $queryVector
-	 * @return array <string, string>
+	 * @return Struct<int|string, mixed>
 	 * @throws QueryParseError|ManticoreSearchClientError|GenericError
 	 */
-	private static function knnSqlQuery(Client $manticoreClient, Payload $payload, string $queryVector): array {
+	private static function knnSqlQuery(Client $manticoreClient, Payload $payload, string $queryVector): Struct {
 
 		self::substituteParsedQuery($payload, $queryVector);
 
@@ -172,12 +178,13 @@ final class Handler extends BaseHandlerWithClient {
 		$result = $request->getResult();
 
 		if (is_array($result[0])) {
-			foreach ($result[0]['data'] as $k => $v) {
+			$resultStruct = &$result[0];
+			foreach ($resultStruct['data'] as $k => $v) {
 				if (!isset($v['id']) || $v['id'] !== (int)$payload->docId) {
 					continue;
 				}
 
-				unset($result[0]['data'][$k]);
+				unset($resultStruct[0]['data'][$k]);
 			}
 		}
 
