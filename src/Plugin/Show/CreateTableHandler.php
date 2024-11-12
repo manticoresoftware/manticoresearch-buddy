@@ -48,15 +48,16 @@ class CreateTableHandler extends BaseHandlerWithTableFormatter {
 			$time0 = hrtime(true);
 			// First, get response from the manticore
 			$query = "SHOW CREATE TABLE {$payload->table}";
-			/** @var array{0:array{data:array<mixed>}} */
 			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+			/** @var array{data:array<int,array<string,string>>} $resultStruct */
+			$resultStruct = $result[0];
 			if ($payload->hasCliEndpoint) {
-				$total = sizeof($result[0]['data']);
-				return TaskResult::raw($tableFormatter->getTable($time0, $result[0]['data'], $total));
+				$total = sizeof($resultStruct['data']);
+				return TaskResult::raw($tableFormatter->getTable($time0, $resultStruct['data'], $total));
 			}
 
 			// It's important to have ` and 2 spaces for Apache Superset
-			foreach ($result[0]['data'] as &$row) {
+			foreach ($resultStruct['data'] as &$row) {
 				/** @var array{'Create Table':string} $row */
 				$lines = explode("\n", $row['Create Table']);
 				$lastN = sizeof($lines) - 1;
@@ -70,6 +71,7 @@ class CreateTableHandler extends BaseHandlerWithTableFormatter {
 				}
 				$row['Create Table'] = implode("\n", $lines);
 			}
+			$result->offsetSet(0, $resultStruct);
 			return TaskResult::raw($result);
 		};
 

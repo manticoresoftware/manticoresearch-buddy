@@ -144,15 +144,17 @@ final class Handler extends BaseHandlerWithClient {
 
 		if (is_array($result['hits']) && isset($result['hits']['hits'])) {
 			// Removing requested doc from result set
+			$resultHits = $result['hits'];
 			$filteredResults = [];
-			foreach ($result['hits']['hits'] as $v) {
+			foreach ($resultHits['hits'] as $v) {
 				if ($v['_id'] === (int)$payload->docId) {
 					continue;
 				}
 
 				$filteredResults[] = $v;
 			}
-			$result['hits']['hits'] = $filteredResults;
+			$resultHits['hits'] = $filteredResults;
+			$result->offsetSet('hits', $resultHits);
 		}
 
 		return $result;
@@ -178,14 +180,15 @@ final class Handler extends BaseHandlerWithClient {
 		$result = $request->getResult();
 
 		if (is_array($result[0])) {
-			$resultStruct = &$result[0];
+			$resultStruct = $result[0];
 			foreach ($resultStruct['data'] as $k => $v) {
 				if (!isset($v['id']) || $v['id'] !== (int)$payload->docId) {
 					continue;
 				}
 
-				unset($resultStruct[0]['data'][$k]);
+				unset($resultStruct['data'][$k]);
 			}
+			$result->offsetSet(0, $resultStruct);
 		}
 
 
