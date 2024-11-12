@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -50,12 +51,12 @@ final class VersionHandler extends BaseHandlerWithClient
 	}
 
 	/**
-	 * @param  mixed  $result
+	 * @param Struct<int|string, mixed> $result
 	 * @return array<int<0, max>, array<string, string>>
 	 */
-	private static function parseVersions(mixed $result):array {
+	private static function parseVersions(Struct $result):array {
 		$versions = [];
-		if (is_array($result) && isset($result[0]['data'][0]['Value'])) {
+		if (is_array($result[0]) && isset($result[0]['data'][0]['Value'])) {
 			$value = $result[0]['data'][0]['Value'];
 
 			$splittedVersions = explode('(', $value);
