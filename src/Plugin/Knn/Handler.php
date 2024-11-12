@@ -186,7 +186,7 @@ final class Handler extends BaseHandlerWithClient {
 					continue;
 				}
 
-				unset($resultStruct[0]['data'][$k]);
+				unset($resultStruct['data'][$k]);
 			}
 			$result->offsetSet(0, $resultStruct);
 		}
