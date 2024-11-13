@@ -102,6 +102,11 @@ final class Payload extends BasePayload {
 		preg_match('/FROM\s+(\w+)\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
+		// Check that we have match
+		if (!preg_match('/match\s*\(\'(.*?)\'\)/ius', $query, $matches)) {
+			throw QueryParseError::create("The 'fuzzy' option requires a full-text query");
+		}
+
 		// Parse fuzzy and use default 0 if missing
 		if (!preg_match('/fuzzy\s*=\s*(\d+)/ius', $query, $matches)) {
 			throw QueryParseError::create('Invalid value for option \'fuzzy\'');
@@ -380,7 +385,6 @@ final class Payload extends BasePayload {
 	 */
 	public static function hasMatch(Request $request): bool {
 		$hasMatch = stripos($request->payload, 'select') === 0
-			&& stripos($request->payload, 'match') !== false
 			&& stripos($request->payload, 'option') !== false
 			&& stripos($request->payload, 'fuzzy') !== false
 			&& stripos($request->error, 'unknown option') !== false
