@@ -48,7 +48,8 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		return ($request->payload === '' && $request->endpointBundle !== Endpoint::Elastic) ||
+		return ($request->payload === ''
+			&& $request->endpointBundle !== Endpoint::Bulk && $request->endpointBundle !== Endpoint::Elastic) ||
 			stripos($request->payload, 'set sql_quote_show_create') === 0 ||
 			stripos($request->payload, 'set @saved_cs_client') === 0 ||
 			stripos($request->payload, 'set @@session') === 0 ||
