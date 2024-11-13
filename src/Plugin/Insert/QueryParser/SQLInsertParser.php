@@ -267,7 +267,9 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 			// numeric types
 			is_numeric($val) => self::detectNumericValType($val),
 			// json type
-			(substr($val, 1, 1) === '{' && substr($val, -2, 1) === '}') => Datatype::Json,
+			((substr($val, 1, 1) === '{' && substr($val, -2, 1) === '}') ||
+			(substr($val, 1, 1) === '[' && substr($val, -2, 1) === ']'))
+			&& json_validate(substr($val, 1, -1)) => Datatype::Json,
 			// mva types
 			(substr($val, 0, 1) === '(' && substr($val, -1) === ')') => self::detectMvaTypes($val),
 			self::isManticoreString($val) => Datatype::String,
