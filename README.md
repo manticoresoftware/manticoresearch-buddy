@@ -196,6 +196,7 @@ The request from Manticore Search to Buddy is made in JSON format no matter how 
 | `error` | An object containg information about error(error message, etc.) to be returned to the user, if any. |
 | `message` | An object containing details such as `path_query` (specific to JSON over HTTP requests), `http_method`  (`HEAD`, `GET`, etc) and `body` which holds the main content of the request. For JSON over HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for SQL over HTTP/mysql, it remains empty (`""`). `http_method` is set to `""` for SQL over HTTP/mysql |
 | `version` | The maximum protocol version supported by the sender. |
+| `meta` | A JSON object containing additional information about the response or null. |
 
 Example of the request:
 
@@ -224,7 +225,8 @@ The response JSON structure:
 | `type` | Set to `json response` if the request type was `unknown json request` and `sql response` for `unknown sql request`. |
 | `message` | A JSON object potentially containing an `error` message for displaying and/or logging. This is what Manticore Search will forward to the end-user. |
 | `error_code` | An integer representing the HTTP error code which will be a part of the HTTP response to the user making a JSON over HTTP request. For SQL over HTTP/mysql communications, this field is ignored. |
-| `version` | Indicates the current protocol version being used. Current version is 3. |
+| `version` | The maximum protocol version supported by the sender. |
+| `meta` | A JSON object containing additional information about the response or null. |
 
 
 Example of HTTP Response:
@@ -251,6 +253,9 @@ Example of HTTP Response:
     "b": "abc"
   },
   "error_code": 0,
+  "meta": {
+    ...
+  },
   "version": 3
 }
 ```
@@ -317,6 +322,9 @@ Example of MySQL Response:
     }
   ],
   "error_code": 0,
+  "meta": {
+    ...
+  },
   "version": 3
 }
 ```
