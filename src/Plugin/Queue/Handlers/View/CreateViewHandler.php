@@ -142,7 +142,7 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 
 			$result = $manticoreClient->sendRequest($sql)->getResult();
 
-			if (is_array($result[0]) && empty($result['data'])) {
+			if (is_array($result[0]) && empty($result[0]['data'])) {
 				throw ManticoreSearchClientError::create('Chosen source not exist');
 			}
 
