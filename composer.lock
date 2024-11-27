@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f8b8f7446a01b57af60c5fcd61adb8c7",
+    "content-hash": "67ab5785ecd81c475a3fa60b813e04d0",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -711,16 +711,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-feature/distributed-inserts",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "2a7d828a411d95926f04bae69c7db24d06d3396e"
+                "reference": "92f237f025348745a493e22e2a68b864c4dd6627"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/2a7d828a411d95926f04bae69c7db24d06d3396e",
-                "reference": "2a7d828a411d95926f04bae69c7db24d06d3396e",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/92f237f025348745a493e22e2a68b864c4dd6627",
+                "reference": "92f237f025348745a493e22e2a68b864c4dd6627",
                 "shasum": ""
             },
             "require": {
@@ -736,7 +736,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -757,9 +756,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/distributed-inserts"
             },
-            "time": "2024-12-20T16:30:39+00:00"
+            "time": "2024-11-27T04:06:14+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -5052,8 +5051,8 @@
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.1.0"
     },
