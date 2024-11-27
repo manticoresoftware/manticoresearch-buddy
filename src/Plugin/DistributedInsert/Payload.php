@@ -99,7 +99,7 @@ final class Payload extends BasePayload {
 	 * @throws QueryParseError
 	 */
 	protected static function parsePayload(Request $request): array {
-		if ($request->endpointBundle !== Endpoint::Bulk) {
+		if ($request->endpointBundle === Endpoint::Bulk) {
 			return static::parseBulkPayload($request);
 		}
 
@@ -111,32 +111,6 @@ final class Payload extends BasePayload {
 	 * @return Batch
 	 */
 	protected static function parseBulkPayload(Request $request): array {
-		$struct = Struct::fromJson($request->payload);
-		/** @var string $table */
-		$table = $struct['table'] ?? $struct['index'];
-
-		// We support 2 ways of cluster: as key or in table as prefix:
-		/** @var string $cluster */
-		$cluster = $struct['cluster'] ?? '';
-		if (!$cluster) {
-			[$cluster, $table] = static::parseCluster($table);
-		}
-
-		unset($struct['table'], $struct['index'], $struct['cluster']);
-		$struct['table'] = '%table%';
-		if (!isset($struct['id'])) {
-			$struct['id'] = '%id%';
-		}
-
-		return ["$cluster:$table" => [$struct]];
-	}
-
-	/**
-	 * @param Request $request
-	 * @return Batch
-	 * @throws QueryParseError
-	 */
-	protected static function parseSinglePayload(Request $request): array {
 		$batch = [];
 		$cluster = '';
 		$table = '';
@@ -157,11 +131,6 @@ final class Payload extends BasePayload {
 				/** @var string $table */
 				$table = $index['_index'];
 				[$cluster, $table] = static::parseCluster($table);
-				$index['_index'] = '%table%';
-
-				if (!isset($struct['index']['_id'])) {
-					$index['_id'] = '%id%';
-				}
 
 				$struct['index'] = $index;
 				$batch["$cluster:$table"][] = $struct;
@@ -176,6 +145,26 @@ final class Payload extends BasePayload {
 		}
 		/** @var Batch $batch */
 		return $batch;
+	}
+
+	/**
+	 * @param Request $request
+	 * @return Batch
+	 * @throws QueryParseError
+	 */
+	protected static function parseSinglePayload(Request $request): array {
+		$struct = Struct::fromJson($request->payload);
+		/** @var string $table */
+		$table = $struct['table'] ?? $struct['index'];
+
+		// We support 2 ways of cluster: as key or in table as prefix:
+		/** @var string $cluster */
+		$cluster = $struct['cluster'] ?? '';
+		if (!$cluster) {
+			[$cluster, $table] = static::parseCluster($table);
+		}
+
+		return ["$cluster:$table" => [$struct]];
 	}
 
 	/**
