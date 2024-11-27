@@ -87,7 +87,7 @@ final class DropHandler extends BaseHandlerWithClient {
 			return static::getErrorTask(
 				"table '{$this->payload->table}' is missing: "
 					. 'DROP SHARDED TABLE failed: '
-					."table '{$this->payload->table}' must exists"
+					."table '{$this->payload->table}' must exist"
 			);
 		}
 

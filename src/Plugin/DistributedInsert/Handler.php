@@ -49,29 +49,24 @@ final class Handler extends BaseHandlerWithFlagCache {
 				$rows = [];
 				foreach ($batch as $struct) {
 					/** @var Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct */
-					// TODO: we have issue here we need id but at this moment
-					// we do not know exact shard to use for it
-					$id = (string)($struct['index']['_id'] ?? $struct['id'] ?? '');
-					if ($id === '%id%') {
-						$id = (string)array_pop($idPool);
+					if ($this->shouldAssignId($struct)) {
+						$id = $this->assignId($struct, $idPool);
+						$idStr = (string)$id;
+						$positions[$idStr] = [
+							'n' => $n++,
+							'table' => $table,
+							'cluster' => $cluster,
+						];
+						$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
+						$info = $shards[$shard];
+						$shardName = $info['name'];
+						$this->assignTable($struct, $cluster, $shardName);
 					}
-					$positions[$id] = [
-						'n' => $n++,
-						'table' => $table,
-						'cluster' => $cluster,
-					];
-					$shard = hexdec(substr(md5($id), 0, 8)) % $shardCount;
-					$info = $shards[$shard];
-					$shardName = $info['name'];
-					$json = $struct->toJson();
-					$row = strtr(
-						$json, [
-						'%id%' => $id,
-						'%table%' => $cluster ? "$cluster:$shardName" : $shardName,
-						]
-					);
+					$rows[] = $struct->toJson();
+				}
 
-					$rows[] = $row;
+				if (!isset($info)) {
+					throw new ManticoreSearchClientError('Failed to prepare docs for insertion');
 				}
 
 				$requests[] = [
@@ -80,7 +75,6 @@ final class Handler extends BaseHandlerWithFlagCache {
 					'request' => implode(PHP_EOL, $rows) . PHP_EOL,
 				];
 			}
-
 			return $this->processRequests($requests, $positions);
 		};
 
@@ -172,7 +166,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 	/**
 	 * @param array<array{url:string,path:string,request:string}> $requests
-	 * @param array<string,array{n:int,table:string,cluster:string}> $positions
+	 * @param array<string|int,array{n:int,table:string,cluster:string}> $positions
 	 * @return TaskResult
 	 * @throws ManticoreSearchClientError
 	 */
@@ -187,7 +181,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 	/**
 	 * @param array<array{url:string,path:string,request:string}> $requests
-	 * @param array<string,array{n:int,table:string,cluster:string}> $positions
+	 * @param array<string|int,array{n:int,table:string,cluster:string}> $positions
 	 * @return array{took:int,errors:bool,items:array<array{index:array{_id:string,_index:string}}>}
 	 * @throws ManticoreSearchClientError
 	 */
@@ -222,7 +216,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	/**
 	 * Process simple single request like insert or whatever
 	 * @param array<array{url:string,path:string,request:string}> $requests
-	 * @param array<string,array{n:int,table:string,cluster:string}> $positions
+	 * @param array<string|int,array{n:int,table:string,cluster:string}> $positions
 	 * @return array<mixed>
 	 * @throws ManticoreSearchClientError
 	 */
@@ -235,11 +229,73 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$table = $info['cluster'] ? "{$info['cluster']}:{$info['table']}" : $info['table'];
 		if (isset($result['error'])) {
 			$result['error']['index'] = $table;
-		} elseif (isset($result['_id'])) {
+		} elseif ($this->payload->type === 'bulk') {
 			$result['_index'] = $table;
 		} else {
-			throw new ManticoreSearchClientError('Do not know how to handle response');
+			$result['table'] = $table;
 		}
 		return $result;
+	}
+
+	/**
+	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
+	 * @param array<int> $idPool
+	 * @return int
+	 */
+	protected function assignId(Struct $struct, array $idPool): int {
+		$id = match (true) {
+			isset($struct['index']['_id']) => $struct['index']['_id'],
+			isset($struct['id']) => $struct['id'],
+			default => array_pop($idPool),
+		};
+		// When id = 0 we generate
+		if (!$id) {
+			$id = array_pop($idPool);
+		}
+		if (!$id) {
+			throw new ManticoreSearchClientError('Failed to assign id');
+		}
+		if ($this->payload->type === 'bulk') {
+			/** @var Struct<"index",array{_id:string|int,_index:string}> $struct */
+			/** @var array{_id:string|int,_index:string} $index */
+			$index = $struct['index'];
+			$index['_id'] = "$id";
+			$struct['index'] = $index;
+		} else {
+			/** @var Struct<"id",string|int> $struct */
+			$struct['id'] = $id;
+		}
+		return (int)$id;
+	}
+
+	/**
+	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
+	 * @param string $cluster
+	 * @param string $shardName
+	 * @return void
+	 */
+	protected function assignTable(Struct $struct, string $cluster, string $shardName): void {
+		$table = $cluster ? "$cluster:$shardName" : $shardName;
+		if ($this->payload->type === 'bulk') {
+			/** @var Struct<"index",array{_id:string|int,_index:string}> $struct */
+			/** @var array{_id:string|int,_index:string} $index */
+			$index = $struct['index'];
+			$index['_index'] = $table;
+			$struct['index'] = $index;
+		} else {
+			/** @var Struct<string,string|int> $struct */
+			$struct['table'] = $table;
+		}
+	}
+
+	/**
+	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
+	 * @return bool
+	 */
+	protected function shouldAssignId(Struct $struct): bool {
+		if ($this->payload->type === 'bulk' && !isset($struct['index'])) {
+			return false;
+		}
+		return true;
 	}
 }
