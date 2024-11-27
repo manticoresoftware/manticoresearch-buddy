@@ -100,40 +100,65 @@ final class Payload extends BasePayload {
 	 */
 	protected static function parsePayload(Request $request): array {
 		if ($request->endpointBundle !== Endpoint::Bulk) {
-			$struct = Struct::fromJson($request->payload);
-			/** @var string $table */
-			$table = $struct['table'] ?? $struct['index'];
-
-			// We support 2 ways of cluster: as key or in table as prefix:
-			/** @var string $cluster */
-			$cluster = $struct['cluster'] ?? '';
-			if (!$cluster) {
-				[$cluster, $table] = static::parseClaster($table);
-			}
-
-			unset($struct['table'], $struct['index'], $struct['cluster']);
-			$struct['table'] = '%table%';
-			if (!isset($struct['id'])) {
-				$struct['id'] = '%id%';
-			}
-
-			return ["$cluster:$table" => [$struct]];
+			return static::parseBulkPayload($request);
 		}
 
+		return static::parseSinglePayload($request);
+	}
+
+	/**
+	 * @param Request $request
+	 * @return Batch
+	 */
+	protected static function parseBulkPayload(Request $request): array {
+		$struct = Struct::fromJson($request->payload);
+		/** @var string $table */
+		$table = $struct['table'] ?? $struct['index'];
+
+		// We support 2 ways of cluster: as key or in table as prefix:
+		/** @var string $cluster */
+		$cluster = $struct['cluster'] ?? '';
+		if (!$cluster) {
+			[$cluster, $table] = static::parseCluster($table);
+		}
+
+		unset($struct['table'], $struct['index'], $struct['cluster']);
+		$struct['table'] = '%table%';
+		if (!isset($struct['id'])) {
+			$struct['id'] = '%id%';
+		}
+
+		return ["$cluster:$table" => [$struct]];
+	}
+
+	/**
+	 * @param Request $request
+	 * @return Batch
+	 * @throws QueryParseError
+	 */
+	protected static function parseSinglePayload(Request $request): array {
 		$batch = [];
 		$cluster = '';
 		$table = '';
-		$rows = array_filter(explode("\n", $request->payload));
-		foreach ($rows as &$row) {
+		$rows = explode("\n", trim($request->payload));
+		$rowCount = sizeof($rows);
+
+		for ($i = 0; $i < $rowCount; $i++) {
+			if (empty($rows[$i])) {
+				continue;
+			}
+
 			/** @var Struct<int|string,array<string,mixed>> $struct */
-			$struct = Struct::fromJson($row);
+			$struct = Struct::fromJson($rows[$i]);
+
 			if (isset($struct['index']['_index'])) {
 				/** @var array{_index:string,_id?:string} $index */
 				$index = $struct['index'];
 				/** @var string $table */
 				$table = $index['_index'];
-				[$cluster, $table] = static::parseClaster($table);
+				[$cluster, $table] = static::parseCluster($table);
 				$index['_index'] = '%table%';
+
 				if (!isset($struct['index']['_id'])) {
 					$index['_id'] = '%id%';
 				}
@@ -157,12 +182,12 @@ final class Payload extends BasePayload {
 	 * @param string $table
 	 * @return array{0:string,1:string}
 	 */
-	protected static function parseClaster(string $table): array {
+	public static function parseCluster(string $table): array {
 		$cluster = '';
-		$ex = explode(':', $table);
-		if (sizeof($ex) > 1) {
-			$cluster = $ex[0];
-			$table = $ex[1];
+		$pos = strpos($table, ':');
+		if ($pos !== false) {
+			$cluster = substr($table, 0, $pos);
+			$table = substr($table, $pos + 1);
 		}
 		return [$cluster, $table];
 	}

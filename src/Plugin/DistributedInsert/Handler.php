@@ -12,7 +12,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\DistributedInsert;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -43,8 +42,10 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$positions = [];
 			$n = 0;
 			foreach ($this->payload->batch as $table => $batch) {
-				[$cluster, $table] = explode(':', $table);
+				[$cluster, $table] = $this->payload::parseCluster($table);
 				$shards = $this->getShards($table);
+				$shardCount = sizeof($shards);
+				$idPool = $this->getNewDocIds(sizeof($batch));
 				$rows = [];
 				foreach ($batch as $struct) {
 					/** @var Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct */
@@ -52,14 +53,14 @@ final class Handler extends BaseHandlerWithFlagCache {
 					// we do not know exact shard to use for it
 					$id = (string)($struct['index']['_id'] ?? $struct['id'] ?? '');
 					if ($id === '%id%') {
-						$id = (string)$this->getNewDocId($this->manticoreClient);
+						$id = (string)array_pop($idPool);
 					}
 					$positions[$id] = [
 						'n' => $n++,
 						'table' => $table,
 						'cluster' => $cluster,
 					];
-					$shard = hexdec(substr(md5($id), 0, 8)) % sizeof($shards);
+					$shard = hexdec(substr(md5($id), 0, 8)) % $shardCount;
 					$info = $shards[$shard];
 					$shardName = $info['name'];
 					$json = $struct->toJson();
@@ -73,7 +74,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 					$rows[] = $row;
 				}
 
-				$requests[$info['url']] = [
+				$requests[] = [
+					'url' => $info['url'],
 					'path' => $this->payload->path,
 					'request' => implode(PHP_EOL, $rows) . PHP_EOL,
 				];
@@ -86,20 +88,25 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * Generate new document id for document by using manticore query
-	 * @param Client $client
-	 * @return int
+	 * Generate new document ids for document by using manticore query
+	 * @return array<int>
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	protected function getNewDocId(Client $client): int {
-		/** @var array{0:array{data:array<array{"uuid_short()":string}>}} */
-		$res = $client->sendRequest('SELECT uuid_short()')->getResult();
-		$id = (int)$res[0]['data'][0]['uuid_short()'];
-		if (!$id) {
-			throw new ManticoreSearchResponseError('Failed to get new document id');
+	protected function getNewDocIds(int $count = 1): array {
+		$ids = [];
+		$requests = array_fill(0, $count, ['url' => '', 'request' => 'SELECT uuid_short()']);
+		$responses = $this->manticoreClient->sendMultiRequest($requests);
+		foreach ($responses as $response) {
+			/** @var array{0:array{data:array<array{"uuid_short()":string}>}} */
+			$res = $response->getResult()->toArray();
+			$id = (int)$res[0]['data'][0]['uuid_short()'];
+			if (!$id) {
+				throw new ManticoreSearchResponseError('Failed to get new document id');
+			}
+			$ids[] = $id;
 		}
-		return $id;
+		return $ids;
 	}
 
 	/**
@@ -109,6 +116,10 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 * @throws RuntimeException
 	 */
 	protected function getShards(string $table): array {
+		static $map = [];
+		if (isset($map[$table])) {
+			return $map[$table];
+		}
 		[$locals, $agents] = $this->parseShards($table);
 
 		$shards = [];
@@ -130,6 +141,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 				'url' => "$host:$port",
 			];
 		}
+		$map[$table] = $shards;
 		return $shards;
 	}
 
@@ -159,7 +171,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * @param array<array{path:string,request:string}> $requests
+	 * @param array<array{url:string,path:string,request:string}> $requests
 	 * @param array<string,array{n:int,table:string,cluster:string}> $positions
 	 * @return TaskResult
 	 * @throws ManticoreSearchClientError
@@ -174,7 +186,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * @param array<array{path:string,request:string}> $requests
+	 * @param array<array{url:string,path:string,request:string}> $requests
 	 * @param array<string,array{n:int,table:string,cluster:string}> $positions
 	 * @return array{took:int,errors:bool,items:array<array{index:array{_id:string,_index:string}}>}
 	 * @throws ManticoreSearchClientError
@@ -209,7 +221,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 	/**
 	 * Process simple single request like insert or whatever
-	 * @param array<array{path:string,request:string}> $requests
+	 * @param array<array{url:string,path:string,request:string}> $requests
 	 * @param array<string,array{n:int,table:string,cluster:string}> $positions
 	 * @return array<mixed>
 	 * @throws ManticoreSearchClientError
