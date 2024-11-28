@@ -239,10 +239,10 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 	/**
 	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
-	 * @param array<int> $idPool
+	 * @param array<int> &$idPool
 	 * @return int
 	 */
-	protected function assignId(Struct $struct, array $idPool): int {
+	protected function assignId(Struct $struct, array &$idPool): int {
 		$id = match (true) {
 			isset($struct['index']['_id']) => $struct['index']['_id'],
 			isset($struct['id']) => $struct['id'],
