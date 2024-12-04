@@ -120,7 +120,7 @@ final class DropHandler extends BaseHandlerWithClient {
 	 */
 	protected function getTableState(string $table): array {
 		// TODO: think about the way to refactor it and remove duplication
-		$q = "select value[0] as value from _sharding_state where `key` = 'table:{$table}'";
+		$q = "select value[0] as value from system.sharding_state where `key` = 'table:{$table}'";
 		$resp = $this->manticoreClient->sendRequest($q);
 
 		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
