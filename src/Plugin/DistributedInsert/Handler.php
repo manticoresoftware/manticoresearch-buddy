@@ -89,16 +89,10 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 */
 	protected function getNewDocIds(int $count = 1): array {
 		$ids = [];
-		$requests = array_fill(0, $count, ['url' => '', 'request' => 'SELECT uuid_short()']);
-		$responses = $this->manticoreClient->sendMultiRequest($requests);
-		foreach ($responses as $response) {
-			/** @var array{0:array{data:array<array{"uuid_short()":string}>}} */
-			$res = $response->getResult()->toArray();
-			$id = (int)$res[0]['data'][0]['uuid_short()'];
-			if (!$id) {
-				throw new ManticoreSearchResponseError('Failed to get new document id');
-			}
-			$ids[] = $id;
+		/** @var array{0:array{data:array<array{"uuid_short()":int}>}} */
+		$result = $this->manticoreClient->sendRequest("CALL UUID_SHORT($count)")->getResult();
+		foreach ($result[0]['data'] as $row) {
+			$ids[] = $row['uuid_short()'];
 		}
 		return $ids;
 	}
