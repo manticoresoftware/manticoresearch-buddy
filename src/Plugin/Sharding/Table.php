@@ -27,7 +27,7 @@ final class Table {
 		protected readonly string $structure,
 		protected readonly string $extra
 	) {
-		$this->table = '_sharding_table';
+		$this->table = 'system.sharding_table';
 	}
 
 	/**
