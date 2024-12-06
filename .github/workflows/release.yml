@@ -6,9 +6,6 @@ on:
       - 'v*.*.*'
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 env:
   APP_NAME: 'manticore-buddy'
