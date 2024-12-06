@@ -28,6 +28,13 @@ jobs:
             git clone https://github.com/manticoresoftware/phar_builder.git
             bin/test
 
+  clt:
+    uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@feature/buddy-ci
+    with:
+      docker_image: ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
+      repository: manticoresoftware/manticoresearch
+      ref: master
+
   codestyle:
     name: PHPCS validation
     runs-on: ubuntu-22.04
