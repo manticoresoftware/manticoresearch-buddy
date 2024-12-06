@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  GHCR_REPO: ghcr.io/manticoresoftware/manticoresearch
 jobs:
   test:
     name: Run unit tests
@@ -27,6 +29,70 @@ jobs:
             composer install --prefer-dist
             git clone https://github.com/manticoresoftware/phar_builder.git
             bin/test
+
+  test_kit:
+    name: Build test kit Docker image
+    runs-on: ubuntu-22.04
+    outputs:
+      docker_repo: ${{ steps.vars.outputs.docker_repo }}
+      docker_tag: ${{ steps.vars.outputs.docker_tag }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set variables
+        id: vars
+        run: |
+          set -e
+          BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          DOCKER_TAG=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-' | tr '.' '-' | tr '@' '-' | tr ':' '-' | tr ' ' '-' | tr '[A-Z]' '[a-z]')
+          DOCKER_TAG="test-kit-${DOCKER_TAG,,}"
+          COMMIT=${GITHUB_SHA::8}
+          IMAGE="${GHCR_REPO}:${DOCKER_TAG}"
+          IMAGE_COMMIT="${GHCR_REPO}:test-kit-${COMMIT,,}"
+          echo "docker_repo=${GHCR_REPO}" >> $GITHUB_OUTPUT
+          echo "docker_tag=${DOCKER_TAG}" >> $GITHUB_OUTPUT
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "image_commit=${IMAGE_COMMIT}" >> $GITHUB_OUTPUT
+          echo "Docker Image: ${IMAGE}" >> $GITHUB_STEP_SUMMARY
+          echo "Docker Image commit: ${IMAGE_COMMIT}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ vars.GHCR_USER }}
+          password: ${{ secrets.GHCR_PASSWORD }}
+
+      - name: Pull base image
+        run: docker pull ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
+
+      - name: Create and push test kit image
+        run: |
+          docker create --name temp ghcr.io/manticoresoftware/manticoresearch:test-kit-latest tail -f /dev/null
+          docker start temp
+          docker exec temp sh -c 'cp /usr/share/manticore/modules/manticore-buddy/bin/manticore-buddy /tmp/manticore-buddy'
+          docker exec temp sh -c 'rm -rf /usr/share/manticore/modules/manticore-buddy && mkdir -p /usr/share/manticore/modules/manticore-buddy'
+          docker cp . temp:/usr/share/manticore/modules/manticore-buddy/
+          docker exec temp sh -c 'cd /usr/share/manticore/modules/manticore-buddy/ && composer install --prefer-dist'
+          docker exec temp sh -c 'mkdir -p /usr/share/manticore/modules/manticore-buddy/bin && mv /tmp/manticore-buddy /usr/share/manticore/modules/manticore-buddy/bin/manticore-buddy'
+          docker commit temp ${{ steps.vars.outputs.image }}
+          docker commit temp ${{ steps.vars.outputs.image_commit }}
+          docker push ${{ steps.vars.outputs.image }}
+          docker push ${{ steps.vars.outputs.image_commit }}
+          docker rm -f temp
+
+  clt:
+    name: Run CLT tests
+    needs: test_kit
+    uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@master
+    with:
+      docker_image: ${{ needs.test_kit.outputs.docker_repo }}:${{ needs.test_kit.outputs.docker_tag }}
+      repository: manticoresoftware/manticoresearch
+      ref: master
 
   codestyle:
     name: PHPCS validation
