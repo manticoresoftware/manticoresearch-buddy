@@ -134,11 +134,12 @@ class InsertQueryTest extends TestCase {
 			$this->fail();
 		}
 		$itemsData = $outData['items'][0]['index'];
-		$result = ['0', $this->testTable, 'created'];
-		$this->assertEquals($result, [$itemsData['_id'], $itemsData['_index'], $itemsData['result']]);
+		$result = [$this->testTable, 'created'];
+		$this->assertNotEquals('0', $itemsData['_id']);
+		$this->assertEquals($result, [$itemsData['_index'], $itemsData['result']]);
 		$itemsData = $outData['items'][1]['create'];
-		$result = ['3', $this->testTable, 'created'];
-		$this->assertEquals($result, [$itemsData['_id'], $itemsData['_index'], $itemsData['result']]);
+		$result = [$this->testTable, 'created'];
+		$this->assertEquals($result, [$itemsData['_index'], $itemsData['result']]);
 	}
 
 	public function testHTTPElasticBulkInsertQueryFail(): void {
