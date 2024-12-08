@@ -58,7 +58,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-fuzzy',
 	'manticoresoftware/buddy-plugin-create',
 	'manticoresoftware/buddy-plugin-drop',
-	'manticoresoftware/buddy-plugin-insert',
+	/* 'manticoresoftware/buddy-plugin-insert', */
 	'manticoresoftware/buddy-plugin-alias',
 	'manticoresoftware/buddy-plugin-select',
 	'manticoresoftware/buddy-plugin-show',
@@ -75,6 +75,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-sharding',
 	'manticoresoftware/buddy-plugin-update',
 	'manticoresoftware/buddy-plugin-autocomplete',
+	'manticoresoftware/buddy-plugin-distributed-insert',
 ];
 // Filtering out the plugins that we don't need
 $plugins = array_filter(
