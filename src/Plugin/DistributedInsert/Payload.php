@@ -53,6 +53,7 @@ final class Payload extends BasePayload {
 
 		$self->batch = static::parsePayload($request);
 		$self->type = match ($request->endpointBundle) {
+			Endpoint::Sql, Endpoint::Cli => 'sql',
 			Endpoint::Insert => 'insert',
 			Endpoint::Replace => 'replace',
 			Endpoint::Bulk => 'bulk',
@@ -90,6 +91,14 @@ final class Payload extends BasePayload {
 			$hasMatch = $request->endpointBundle === Endpoint::Delete;
 		}
 
+		// SQL
+		if (!$hasMatch) {
+			$isSqlEndpoint = $request->endpointBundle === Endpoint::Sql
+				|| $request->endpointBundle === Endpoint::Cli;
+			$hasMatch = $isSqlEndpoint &&
+				strpos($request->error, 'not support insert') !== true;
+		}
+
 		return $hasMatch;
 	}
 
@@ -101,6 +110,11 @@ final class Payload extends BasePayload {
 	protected static function parsePayload(Request $request): array {
 		if ($request->endpointBundle === Endpoint::Bulk) {
 			return static::parseBulkPayload($request);
+		}
+
+		if ($request->endpointBundle === Endpoint::Cli
+			|| $request->endpointBundle === Endpoint::Sql) {
+			return static::parseSqlPayload($request);
 		}
 
 		return static::parseSinglePayload($request);
@@ -125,14 +139,18 @@ final class Payload extends BasePayload {
 			/** @var Struct<int|string,array<string,mixed>> $struct */
 			$struct = Struct::fromJson($rows[$i]);
 
-			if (isset($struct['index']['_index'])) {
-				/** @var array{_index:string,_id?:string} $index */
-				$index = $struct['index'];
+			if (isset($struct['index']['_index'])) { // _bulk
 				/** @var string $table */
-				$table = $index['_index'];
+				$table = $struct['index']['_index'];
 				[$cluster, $table] = static::parseCluster($table);
+				$batch["$cluster:$table"][] = $struct;
+				continue;
+			}
 
-				$struct['index'] = $index;
+			if (isset($struct['insert'])) { // bulk
+				/** @var string $table */
+				$table = $struct['insert']['table'] ?? $struct['insert']['index'];
+				[$cluster, $table] = static::parseCluster($table);
 				$batch["$cluster:$table"][] = $struct;
 				continue;
 			}
@@ -165,6 +183,57 @@ final class Payload extends BasePayload {
 		}
 
 		return ["$cluster:$table" => [$struct]];
+	}
+
+	/**
+	 * Parse the SQL request
+	 * @param Request $request
+	 * @return Batch
+	 */
+	protected static function parseSqlPayload(Request $request): array {
+		preg_match('/^insert\s+into\s+`?([^ ]+?)`?(?:\s+\(([^)]+)\))?\s+values/ius', $request->payload, $matches);
+		$table = $matches[1] ?? null;
+		$fields = [];
+		if (isset($matches[2])) {
+			$fields = array_map('trim', explode(',', $matches[2]));
+			$fields = array_map(
+				function ($field) {
+					return trim($field, '`');
+				}, $fields
+			);
+		}
+		if (!$table) {
+			throw QueryParseError::create('Failed to parse table from the query');
+		}
+		[$cluster, $table] = static::parseCluster($table);
+
+		// It's time to parse values
+		$pattern = '/values\s*\((.*)\)/ius';
+		preg_match($pattern, $request->payload, $matches);
+
+		if (!isset($matches[1])) {
+			throw QueryParseError::create('Failed to parse values from the query');
+		}
+
+		$values = $matches[1];
+		$pattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\}/";
+		preg_match_all($pattern, $values, $matches);
+		$values = array_map(trim(...), $matches[0]);
+		$batch = [];
+
+		$fieldCount = sizeof($fields);
+		$valueCount = sizeof($values);
+		for ($i = 0; $i < $valueCount; $i += $fieldCount) {
+			$slice = array_slice($values, $i, $fieldCount);
+			$doc = array_combine($fields, $slice);
+			if (isset($doc['id'])) {
+				$doc['id'] = (int)$doc['id'];
+			}
+			$struct = Struct::fromData(['insert' => $doc]);
+			$batch[] = $struct;
+		}
+		/** @var Batch */
+		return ["$cluster:$table" => $batch];
 	}
 
 	/**

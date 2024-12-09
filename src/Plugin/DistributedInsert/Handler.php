@@ -69,16 +69,26 @@ final class Handler extends BaseHandlerWithFlagCache {
 					throw new ManticoreSearchClientError('Failed to prepare docs for insertion');
 				}
 
-				$requests[] = [
-					'url' => $info['url'],
-					'path' => $this->payload->path,
-					'request' => implode(PHP_EOL, $rows) . PHP_EOL,
-				];
+				$requests[] = $this->getRequest($info, $rows);
 			}
 			return $this->processRequests($requests, $positions);
 		};
 
 		return Task::create($taskFn)->run();
+	}
+
+	/**
+	 * @param array{name:string,url:string} $info
+	 * @param array<string> $rows
+	 * @return array{url:string,path:string,request:string}
+	 */
+	protected function getRequest(array $info, array $rows): array {
+		return [
+			'url' => $info['url'],
+			// We use for sql and default for others
+			'path' => $this->payload->type === 'sql' ? 'bulk' : $this->payload->path,
+			'request' => implode(PHP_EOL, $rows) . PHP_EOL,
+		];
 	}
 
 	/**
@@ -167,6 +177,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	protected function processRequests(array $requests, array $positions): TaskResult {
 		$result = match ($this->payload->type) {
 			'bulk' => $this->processBulk($requests, $positions),
+			'sql' => $this->processSql($requests, $positions),
 			default => $this->processSingle($requests, $positions),
 		};
 
@@ -189,13 +200,23 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$current = $response->getResult()->toArray();
 			$errors = $errors || $current['errors'];
 			foreach ($current['items'] as &$item) {
-				$id = $item['index']['_id'];
-				$info = $positions[$id];
-				$index = $item['index'];
-				$index['_index'] = $info['cluster'] ? "{$info['cluster']}:{$info['table']}" : $info['table'];
-				$item['index'] = $index;
-				$n = $info['n'];
-				$items[$n] = $item;
+				if ($this->payload->type === 'bulk') {
+					$id = $item['index']['_id'];
+					$info = $positions[$id];
+					$index = $item['index'];
+					$index['_index'] = $info['cluster'] ? "{$info['cluster']}:{$info['table']}" : $info['table'];
+					$item['index'] = $index;
+					$n = $info['n'];
+					$items[$n] = $item;
+				} else {
+					/* $id = $item['insert']['id']; */
+					/* $info = $positions[$id]; */
+					/* $doc = $item['insert']; */
+					/* $doc['table'] = $info['cluster'] ? "{$info['cluster']}:{$info['table']}" : $info['table']; */
+					/* $item['insert'] = $doc; */
+					/* $n = $info['n']; */
+					/* $items[$n] = $item; */
+				}
 			}
 		}
 		$took = hrtime(true) - $start;
@@ -232,14 +253,34 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
+	 * @param array<array{url:string,path:string,request:string}> $requests
+	 * @param array<string|int,array{n:int,table:string,cluster:string}> $positions
+	 * @return array<mixed>
+	 * @throws ManticoreSearchClientError
+	 */
+	protected function processSql(array $requests, array $positions): array {
+		$result = $this->processBulk($requests, $positions);
+		if ($result['errors'] && $this->payload->type === 'sql') {
+			throw ManticoreSearchClientError::create('Failed to insert docs');
+		}
+
+		/** @var array<mixed> */
+		return TaskResult::none()->getStruct();
+	}
+
+	/**
 	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
 	 * @param array<int> &$idPool
 	 * @return int
 	 */
 	protected function assignId(Struct $struct, array &$idPool): int {
 		$id = match (true) {
+			// _bulk
 			isset($struct['index']['_id']) => $struct['index']['_id'],
+			// insert, deletc etc
 			isset($struct['id']) => $struct['id'],
+			// bulk
+			isset($struct['insert']['id']) => $struct['insert']['id'],
 			default => array_pop($idPool),
 		};
 		// When id = 0 we generate
@@ -255,6 +296,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$index = $struct['index'];
 			$index['_id'] = "$id";
 			$struct['index'] = $index;
+		} elseif ($this->payload->type === 'sql') {
+			/** @var Struct<"insert",array{id:string|int}> $struct */
+			$insert = $struct['insert'];
+			$insert['id'] = (int)$id;
+			$struct['insert'] = $insert;
 		} else {
 			/** @var Struct<"id",string|int> $struct */
 			$struct['id'] = $id;
@@ -276,6 +322,12 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$index = $struct['index'];
 			$index['_index'] = $table;
 			$struct['index'] = $index;
+		} elseif ($this->payload->type === 'sql') {
+			/** @var Struct<"insert",array{table:string}> $struct */
+			$insert = $struct['insert'];
+			/** @var array{table:string} $insert */
+			$insert['table'] = $table;
+			$struct['insert'] = $insert;
 		} else {
 			/** @var Struct<string,string|int> $struct */
 			$struct['table'] = $table;
