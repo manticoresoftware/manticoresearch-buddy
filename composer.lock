@@ -715,12 +715,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "ba2762e932eccb847ba40d0d9b0b66ebc6598053"
+                "reference": "2a8b94fdbcfad1ef6fe8cb5bbec43acb97f000b6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/ba2762e932eccb847ba40d0d9b0b66ebc6598053",
-                "reference": "ba2762e932eccb847ba40d0d9b0b66ebc6598053",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/2a8b94fdbcfad1ef6fe8cb5bbec43acb97f000b6",
+                "reference": "2a8b94fdbcfad1ef6fe8cb5bbec43acb97f000b6",
                 "shasum": ""
             },
             "require": {
@@ -758,7 +758,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/cli-table-output"
             },
-            "time": "2024-12-10T02:45:24+00:00"
+            "time": "2024-12-10T03:22:00+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
