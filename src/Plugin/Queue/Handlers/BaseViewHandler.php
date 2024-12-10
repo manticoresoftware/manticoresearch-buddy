@@ -56,12 +56,12 @@ abstract class BaseViewHandler extends BaseHandlerWithClient {
 
 			$sql = /** @lang manticore */
 				"SELECT name FROM $tableName GROUP BY name";
-			$result = $manticoreClient->sendRequest($sql);
-			if ($result->hasError()) {
-				throw ManticoreSearchClientError::create((string)$result->getError());
+			$resp = $manticoreClient->sendRequest($sql);
+			if ($resp->hasError()) {
+				throw ManticoreSearchClientError::create((string)$resp->getError());
 			}
 
-			return TaskResult::raw($result->getResult());
+			return TaskResult::fromResponse($resp);
 		};
 
 		return Task::create(

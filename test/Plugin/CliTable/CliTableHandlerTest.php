@@ -15,7 +15,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\Buddy\CoreTest\Trait\TestInEnvironmentTrait;
@@ -55,20 +54,18 @@ class CliTableHandlerTest extends TestCase {
 		$serverUrl = self::setUpMockManticoreServer(false);
 		$manticoreClient = new HTTPClient($serverUrl);
 		$manticoreClient->setForceSync(true);
-		$tableFormatter = new TableFormatter();
 		Payload::$type = 'queries';
 		$payload = Payload::fromRequest($request);
 		$handler = new Handler($payload);
 		$refCls = new ReflectionClass($handler);
 		$refCls->getProperty('manticoreClient')->setValue($handler, $manticoreClient);
-		$refCls->getProperty('tableFormatter')->setValue($handler, $tableFormatter);
 		go(
 			function () use ($handler, $respBody) {
 				$task = $handler->run();
 				$task->wait(true);
 
 				$this->assertEquals(true, $task->isSucceed());
-				$result = $task->getResult()->getStruct();
+				$result = $task->getResult()->getTableFormatted(0);
 				$this->assertIsString($result);
 				$this->assertStringContainsString($respBody, $result);
 				self::finishMockManticoreServer();

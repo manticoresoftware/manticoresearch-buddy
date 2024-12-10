@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -21,7 +21,7 @@ use RuntimeException;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class FullColumnsHandler extends BaseHandlerWithTableFormatter {
+class FullColumnsHandler extends BaseHandlerWithClient {
 	/**
 	 *  Initialize the executor
 	 *
@@ -53,7 +53,7 @@ class FullColumnsHandler extends BaseHandlerWithTableFormatter {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 			$query = "DESC {$payload->table}";
 			/** @var array{0:array{data:array<mixed>}} */
-			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+			$result = $manticoreClient->sendRequest($query)->getResult();
 			$base = [
 				'Field' => '',
 				'Type' => '',

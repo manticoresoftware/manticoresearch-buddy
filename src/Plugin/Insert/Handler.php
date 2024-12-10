@@ -15,7 +15,6 @@ use Exception;
 use Manticoresearch\Buddy\Base\Plugin\Insert\Error\AutoSchemaDisabledError;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -62,6 +61,7 @@ class Handler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 			for ($i = 0, $maxI = sizeof($payload->queries) - 1; $i <= $maxI; $i++) {
 				$query = $payload->queries[$i];
+
 				$resp = $manticoreClient->sendRequest($query, $i === 0 ? null : $payload->path);
 			}
 
@@ -69,10 +69,7 @@ class Handler extends BaseHandlerWithClient {
 				throw new Exception('Empty queries to process');
 			}
 
-			$struct = Struct::fromJson(
-				$resp->getBody()
-			);
-			return TaskResult::raw($struct);
+			return TaskResult::fromResponse($resp);
 		};
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
