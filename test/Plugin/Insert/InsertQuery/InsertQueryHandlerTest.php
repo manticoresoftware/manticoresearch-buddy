@@ -75,7 +75,7 @@ class InsertQueryHandlerTest extends TestCase {
 				$this->assertEquals(true, $task->isSucceed());
 				/** @var Struct<string,mixed> */
 				$result = $task->getResult()->getStruct();
-				$this->assertEquals($resp, $result->toJson());
+				$this->assertEquals($resp, json_encode($result));
 			}
 		);
 		\Swoole\Event::wait();
