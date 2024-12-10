@@ -103,7 +103,6 @@ final class EventHandler {
 
 			$response = Response::fromResult($result, $request->format);
 		} catch (Throwable $e) {
-			Buddy::error($e, "[$id] processing error");
 			if (isset($request)) {
 				/** @var string $originalError */
 				$originalError = $request->error;
@@ -122,6 +121,7 @@ final class EventHandler {
 				/** @var GenericError $e */
 				$e->setResponseError($originalError);
 				$e->setResponseErrorBody($originalErrorBody);
+				Buddy::error($e, "[$id] processing error");
 			} elseif (!is_a($e, GenericError::class)) {
 				$e = GenericError::create($originalError);
 			}
