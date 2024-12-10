@@ -125,7 +125,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 */
 	public function sortSuggestions(array &$suggestions, array $phrases): void {
 		uasort(
-			$suggestions, function ($a, $b) use ($phrases) {
+			$suggestions, function (string $a, string $b) use ($phrases) {
 				return $this->compareSuggestions($a, $b, $phrases);
 			}
 		);
