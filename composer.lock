@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f8b8f7446a01b57af60c5fcd61adb8c7",
+    "content-hash": "57a5f0629e78fef78a60ae6a6f41ac6d",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -711,16 +711,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-fix/no-such-table-error",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "60e85c4839ed2a5de017513816bbf155977ea5a2"
+                "reference": "495b9b47e74b613360f1f0999ebd698198b904f5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/60e85c4839ed2a5de017513816bbf155977ea5a2",
-                "reference": "60e85c4839ed2a5de017513816bbf155977ea5a2",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/495b9b47e74b613360f1f0999ebd698198b904f5",
+                "reference": "495b9b47e74b613360f1f0999ebd698198b904f5",
                 "shasum": ""
             },
             "require": {
@@ -736,7 +736,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -757,9 +756,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/no-such-table-error"
             },
-            "time": "2024-12-12T08:00:26+00:00"
+            "time": "2024-12-12T08:52:54+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
