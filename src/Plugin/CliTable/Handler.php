@@ -12,8 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\CliTable;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
@@ -21,7 +20,7 @@ use RuntimeException;
 /**
  * This is the class to return response to the '/cli' endpoint in table format
  */
-final class Handler extends BaseHandlerWithTableFormatter {
+final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 *  Initialize the executor
@@ -44,42 +43,18 @@ final class Handler extends BaseHandlerWithTableFormatter {
 		$taskFn = static function (
 			Payload $payload,
 			Client $manticoreClient,
-			?TableFormatter $tableFormatter
 		): TaskResult {
-			$time0 = hrtime(true);
 			$resp = $manticoreClient->sendRequest(
 				$payload->query,
 				$payload->path,
 				disableAgentHeader: true
 			);
-			$data = null;
-			$total = -1;
-			$respBody = $resp->getBody();
-			$result = (array)json_decode($respBody, true);
-			if ($tableFormatter === null
-			 || (!isset($result['error']) && (!isset($result[0]) || !is_array($result[0])))
-			) {
-				return TaskResult::raw($result);
-			}
-			// Convert JSON response from Manticore to table format
-			if (isset($result['error'])) {
-				/** @var string $errorMsg */
-				$errorMsg = $result['error'];
-				if ($errorMsg !== '') {
-					return TaskResult::raw($tableFormatter->getTable($time0, $data, $total, $errorMsg));
-				}
-			}
-
-			if (isset($result[0]) && is_array($result[0])) {
-				static::processResultInfo($result[0], $data, $total);
-			}
-
-			return TaskResult::raw($tableFormatter->getTable($time0, $data, $total));
+			return TaskResult::fromResponse($resp);
 		};
 
 		return Task::create(
 			$taskFn,
-			[$this->payload, $this->manticoreClient, $this->tableFormatter]
+			[$this->payload, $this->manticoreClient]
 		)->run();
 	}
 

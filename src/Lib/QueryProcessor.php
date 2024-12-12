@@ -224,6 +224,7 @@ class QueryProcessor {
 			foreach ($plugins as $plugin) {
 				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
 				/** @var BasePayload<T> $pluginPayloadClass */
+
 				$pluginPayloadClass = "$pluginPrefix\\Payload";
 				$pluginPayloadClass::setParser(static::$sqlQueryParser);
 				$hasMatch = $pluginPayloadClass::hasMatch($request);

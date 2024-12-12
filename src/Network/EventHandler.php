@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\Network\OutputFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Task\Column;
@@ -87,6 +88,8 @@ final class EventHandler {
 	 */
 	public static function process(string $id, string $payload): Response {
 		try {
+			/** @var int $startTime */
+			$startTime = hrtime(true);
 			$request = Request::fromString($payload, $id);
 			$handler = QueryProcessor::process($request)->run();
 
@@ -101,7 +104,18 @@ final class EventHandler {
 				$result = $handler->getResult();
 			}
 
-			$response = Response::fromResult($result, $request->format);
+			// Check if this is a cli and we need to activate Table Formatter
+			$outputFormat = $request->getOutputFormat();
+			$message = match ($outputFormat) {
+				// TODO: Maybe later we can use meta for time, but not now cuz no time for non select
+				OutputFormat::Table => $result->getTableFormatted($startTime),
+				default => $result->getStruct(),
+			};
+			$response = Response::fromMessageAndMeta(
+				$message,
+				$result->getMeta(),
+				$request->format,
+			);
 		} catch (Throwable $e) {
 			if (isset($request)) {
 				/** @var string $originalError */
