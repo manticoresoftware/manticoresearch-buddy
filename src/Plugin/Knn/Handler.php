@@ -178,21 +178,17 @@ final class Handler extends BaseHandlerWithClient {
 			ManticoreSearchResponseError::throw((string)$resp->getError());
 		}
 
-		$result = $resp->getResult();
+		$result = $resp->getResult()->toArray();
 		if (is_array($result[0])) {
 			$docId = (int)$payload->docId;
-			$resp->apply(
-				static function ($result) use ($docId) {
-					foreach ($result[0]['data'] as $k => $v) {
-						if (!isset($v['id']) || $v['id'] !== $docId) {
-							continue;
-						}
-
-						unset($result[0]['data'][$k]);
-					}
-					return $result;
+			foreach ($result[0]['data'] as $k => $v) {
+				if (!isset($v['id']) || $v['id'] !== $docId) {
+					continue;
 				}
-			);
+
+				unset($result[0]['data'][$k]);
+			}
+			$resp = Response::fromBody((string)json_encode($result));
 		}
 
 		return $resp;
