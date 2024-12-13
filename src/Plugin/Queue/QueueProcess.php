@@ -104,6 +104,7 @@ class QueueProcess extends BaseProcessor {
 	 *    buffer_table:string,
 	 *    destination_name:string,
 	 *    query:string,
+	 *    custom_mapping: string,
 	 *    attrs:string } $instance
 	 * @param bool $shouldStart
 	 * @throws \Exception
