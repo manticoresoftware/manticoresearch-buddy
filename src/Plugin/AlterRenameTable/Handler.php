@@ -14,6 +14,7 @@ use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -60,11 +61,11 @@ final class Handler extends BaseHandlerWithClient
 			}
 			self::createTableLike($payload->sourceTableName, $payload->destinationTableName, $client);
 
-			$result = self::attachTable($payload->sourceTableName, $payload->destinationTableName, $client);
+			$resp = self::attachTable($payload->sourceTableName, $payload->destinationTableName, $client);
 
 			self::dropTable($payload->sourceTableName, $client);
 
-			return TaskResult::raw($result);
+			return TaskResult::fromResponse($resp);
 		};
 
 		return Task::create(
@@ -103,7 +104,7 @@ final class Handler extends BaseHandlerWithClient
 	 * @param string $sourceTableName
 	 * @param string $destinationTableName
 	 * @param Client $client
-	 * @return mixed
+	 * @return Response
 	 * @throws GenericError
 	 * @throws ManticoreSearchClientError
 	 */
@@ -111,7 +112,7 @@ final class Handler extends BaseHandlerWithClient
 		string $sourceTableName,
 		string $destinationTableName,
 		Client $client
-	): mixed {
+	): Response {
 
 		$sql = /** @lang ManticoreSearch */
 			"ATTACH TABLE $sourceTableName TO TABLE $destinationTableName";
@@ -122,7 +123,7 @@ final class Handler extends BaseHandlerWithClient
 				'Reason: ' . $result->getError()
 			);
 		}
-		return $result->getResult();
+		return $result;
 	}
 
 

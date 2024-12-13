@@ -15,7 +15,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request as NetRequest;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
+
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\Buddy\CoreTest\Trait\TestInEnvironmentTrait;
@@ -62,7 +62,6 @@ class ShowQueriesHandlerTest extends TestCase {
 
 		$handler = new Handler($payload);
 		$handler->setManticoreClient($manticoreClient);
-		$handler->setTableFormatter(new TableFormatter());
 		go(
 			function () use ($handler, $respBody) {
 				$task = $handler->run();
