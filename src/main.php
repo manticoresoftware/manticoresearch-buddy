@@ -145,7 +145,7 @@ if (is_telemetry_enabled()) {
 			Buddy::debugv('running metric snapshot');
 			MetricThread::instance()->execute(
 				'checkAndSnapshot',
-				[(int)(getenv('TELEMETRY_PERIOD', true) ?: 300)]
+				[(int)(getenv('TELEMETRY_PERIOD', true) ?: 10)]
 			);
 		}, 10
 	);

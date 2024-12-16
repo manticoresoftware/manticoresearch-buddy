@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f8b8f7446a01b57af60c5fcd61adb8c7",
+    "content-hash": "8a58fa3d9c93af992111b6b91c0ba808",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -711,16 +711,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-fix/process-serialization",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "7f6b6941d62930b35dd23ca336af1a850860284b"
+                "reference": "8d8f682f8e3e941fcefc8e87525cfb6f600b4d23"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/7f6b6941d62930b35dd23ca336af1a850860284b",
-                "reference": "7f6b6941d62930b35dd23ca336af1a850860284b",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/8d8f682f8e3e941fcefc8e87525cfb6f600b4d23",
+                "reference": "8d8f682f8e3e941fcefc8e87525cfb6f600b4d23",
                 "shasum": ""
             },
             "require": {
@@ -736,7 +736,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -757,9 +756,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/process-serialization"
             },
-            "time": "2024-12-13T07:40:19+00:00"
+            "time": "2024-12-16T06:24:06+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
