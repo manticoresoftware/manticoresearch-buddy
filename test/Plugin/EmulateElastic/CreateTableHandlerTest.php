@@ -225,18 +225,18 @@ class CreateTableHandlerTest extends TestCase {
 				'dimension' => 3,
 			],
 		];
-		$columnExpression = 'location json,title text indexed,blob string,name text,some_boolean bool,' .
-			'some_completion string,some_date timestamp,some_date_nanos bigint,some_dense_vector json,' .
-			'some_flattened json,some_geo_point json,some_geo_shape json,some_histogram json,ip_addr string,' .
-			'some_object json,long_numeric bigint,integer_numeric int,short_numeric int,byte_numeric int,' .
-			'float_numeric float,half_float_numeric float,scaled_float_numeric float,unsigned_long_numeric int,' .
-			'some_point json,some_integer_range json,some_float_range json,some_long_range json,' .
-			'some_date_range json,some_ip_range json,text_search_as_you_type text,some_shape json,' .
-			'some_match_only_text text indexed,release string,some_keyword string,flat_object json,' .
-			'knn_vector_with_settings float_vector knn_type=\'hnsw\' knn_dims=\'2\' hnsw_similarity=\'ip\' ' .
-			'hnsw_m=\'24\' hnsw_ef_construction=\'128\',' .
-			'knn_vector_by_default float_vector knn_type=\'hnsw\' knn_dims=\'3\' hnsw_similarity=\'l2\' ' .
-			'hnsw_m=\'16\' hnsw_ef_construction=\'100\'';
+		$columnExpression = '`location` json,`title` string indexed attribute,`blob` string,`name` text,'
+			. '`some_boolean` bool,`some_completion` string,`some_date` timestamp,`some_date_nanos` bigint,'
+			. '`some_dense_vector` json,`some_flattened` json,`some_geo_point` json,`some_geo_shape` json,'
+			. '`some_histogram` json,`ip_addr` string,`some_object` json,`long_numeric` bigint,`integer_numeric` int,'
+			. '`short_numeric` int,`byte_numeric` int,`float_numeric` float,`half_float_numeric` float,'
+			. '`scaled_float_numeric` float,`unsigned_long_numeric` int,`some_point` json,`some_integer_range` json,'
+			. '`some_float_range` json,`some_long_range` json,`some_date_range` json,`some_ip_range` json,'
+			. '`text_search_as_you_type` text,`some_shape` json,`some_match_only_text` string indexed attribute,'
+			. '`release` string,`some_keyword` string,`flat_object` json,`knn_vector_with_settings` '
+			. "float_vector knn_type='hnsw' knn_dims='2' hnsw_similarity='ip' hnsw_m='24' hnsw_ef_construction='128',"
+			. "`knn_vector_by_default` float_vector knn_type='hnsw' knn_dims='3' hnsw_similarity='l2' hnsw_m='16' "
+			. "hnsw_ef_construction='100'";
 		$payload = new Payload();
 		// Use a dummy Payload here just to initilaize a handler instance
 		$handler = new Handler($payload);
