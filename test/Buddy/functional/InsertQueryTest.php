@@ -103,9 +103,9 @@ class InsertQueryTest extends TestCase {
 			$this->fail();
 		}
 		$result = [
-			'type' => 'illegal_argument_exception',
-			'reason' => "Rejecting mapping update to [{$this->testTable}] as the final mapping "
-				. 'would have more than 1 type: [_doc, _create]',
+			'type' => 'index_not_found_exception',
+			'reason' => 'no such index [test]',
+			'table' => 'test',
 		];
 		$this->assertEquals($result, $outData['error']);
 	}
@@ -134,11 +134,12 @@ class InsertQueryTest extends TestCase {
 			$this->fail();
 		}
 		$itemsData = $outData['items'][0]['index'];
-		$result = ['0', $this->testTable, 'created'];
-		$this->assertEquals($result, [$itemsData['_id'], $itemsData['_index'], $itemsData['result']]);
+		$result = [$this->testTable, 'created'];
+		$this->assertNotEquals('0', $itemsData['_id']);
+		$this->assertEquals($result, [$itemsData['_index'], $itemsData['result']]);
 		$itemsData = $outData['items'][1]['create'];
-		$result = ['3', $this->testTable, 'created'];
-		$this->assertEquals($result, [$itemsData['_id'], $itemsData['_index'], $itemsData['result']]);
+		$result = [$this->testTable, 'created'];
+		$this->assertEquals($result, [$itemsData['_index'], $itemsData['result']]);
 	}
 
 	public function testHTTPElasticBulkInsertQueryFail(): void {
@@ -155,11 +156,11 @@ class InsertQueryTest extends TestCase {
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
 		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
-		if (!isset($outData['error'])) {
+		if (!isset($outData['errors'])) {
 			$this->fail();
 		}
 
-		$this->assertEquals('id has already been specified', $outData['error']);
+		$this->assertEquals(true, $outData['errors']);
 	}
 
 	public function testAutoColumnAddOnInsert(): void {

@@ -9,6 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -40,7 +41,7 @@ final class DirectRequestTest extends TestCase {
 		$table = 'test_' . uniqid();
 		$response = static::runHttpBuddyRequest(
 			"INSERT INTO $table (name, value) values ('Hello', 10), ('World', 100)",
-			"table $table absent"
+			['message' => "table $table absent"],
 		);
 		$this->assertBasicChecks($response);
 		static::runSqlQuery("DROP TABLE IF EXISTS $table");
@@ -54,7 +55,7 @@ final class DirectRequestTest extends TestCase {
 		$this->assertEquals(true, isset($response['type']));
 		$this->assertEquals('json response', $response['type']);
 		$this->assertEquals(true, isset($response['version']));
-		$this->assertEquals(2, $response['version']);
+		$this->assertEquals(Buddy::PROTOCOL_VERSION, $response['version']);
 		$this->assertIsArray($response['message']);
 
 		$this->assertEquals(1, sizeof($response['message']));

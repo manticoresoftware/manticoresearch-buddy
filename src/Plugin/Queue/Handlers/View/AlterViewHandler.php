@@ -101,9 +101,11 @@ final class AlterViewHandler extends BaseHandlerWithClient {
 	private function processAlter(Response $rawResult): TaskResult {
 
 		$ids = [];
-
-		if (is_array($rawResult->getResult())) {
-			foreach ($rawResult->getResult()[0]['data'] as $row) {
+		$result = $rawResult->getResult();
+		if (isset($result[0])) {
+			/** @var array{data:array<int,array<string,string>>} $resultStruct */
+			$resultStruct = $result[0];
+			foreach ($resultStruct['data'] as $row) {
 				$ids[] = $row['id'];
 
 				$sourceQuery /** @lang Manticore */ = 'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
@@ -113,13 +115,15 @@ final class AlterViewHandler extends BaseHandlerWithClient {
 					throw ManticoreSearchClientError::create((string)$instance->getError());
 				}
 
-				$instance = $instance->getResult();
-				if (is_array($instance[0]) && empty($instance[0]['data'])) {
+				$instanceResult = $instance->getResult();
+				/** @var array{data:array<int,array<string,string>>} $instanceResultStruct */
+				$instanceResultStruct = $instanceResult[0];
+				if (is_array($instanceResultStruct) && empty($instanceResultStruct['data'])) {
 					return TaskResult::withError(
 						"Can't ALTER view without referred source. Create source ({$row['source_name']}) first"
 					);
 				}
-				$this->handleProcessWorkers($instance[0]['data'][0], $row);
+				$this->handleProcessWorkers($instanceResultStruct['data'][0], $row);
 			}
 
 			if ($ids !== []) {
@@ -176,11 +180,19 @@ final class AlterViewHandler extends BaseHandlerWithClient {
 	/**
 	 * @param array<string, string> $instance
 	 * @param array<string, string> $row
+	 *
 	 * @return void
-	 */
+	 * @throws ManticoreSearchClientError
+*/
 	private function handleProcessWorkers(array $instance, array $row): void {
-
 		$value = $this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
+
+		if ((string)$row['suspended'] === $value) {
+			throw ManticoreSearchClientError::create(
+				'Selected materialized view has already '.
+				($value === '0' ? 'resumed' : 'suspended')
+			);
+		}
 
 		if ($value === '0') {
 			$instance['destination_name'] = $row['destination_name'];

@@ -9,14 +9,15 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Base\Plugin\Show\Payload as ShowFullTablesPayload;
+use Manticoresearch\Buddy\Base\Plugin\Show\Payload as ShowFullOrOpenTablesPayload;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use PHPUnit\Framework\TestCase;
 
-class ShowFullTablesPayloadTest extends TestCase {
+class ShowFullOrOpenTablesPayloadTest extends TestCase {
 	const PARSING_SETS = [
 		[ #1
 			'args' => [
@@ -57,16 +58,18 @@ class ShowFullTablesPayloadTest extends TestCase {
 
 	public function testSQLQueryParsing(): void {
 		echo 'Testing queries:' . PHP_EOL;
-		ShowFullTablesPayload::$type = 'full tables';
+		ShowFullOrOpenTablesPayload::$type = 'expanded tables';
 		foreach (static::PARSING_SETS as ['args' => $args, 'checks' => $checks]) {
-			$payload = ShowFullTablesPayload::fromRequest(
-				Request::fromArray(static::buildSQLQuery($args))
-			);
-			$this->assertEquals(true, is_a($payload, ShowFullTablesPayload::class));
+			foreach (['FULL', 'OPEN'] as $queryType) {
+				$payload = ShowFullOrOpenTablesPayload::fromRequest(
+					Request::fromArray(static::buildSQLQuery($args, $queryType))
+				);
+				$this->assertEquals(true, is_a($payload, ShowFullOrOpenTablesPayload::class));
 
-			$checks = array_replace($args, $checks);
-			foreach ($checks as $key => $val) {
-				$this->assertEquals($val, $payload->{$key});
+				$checks = array_replace($args, $checks);
+				foreach ($checks as $key => $val) {
+					$this->assertEquals($val, $payload->{$key});
+				}
 			}
 		}
 	}
@@ -80,14 +83,16 @@ class ShowFullTablesPayloadTest extends TestCase {
 			'show full tables from Database',
 			"show full tables like   'Hello%'",
 			"show full tables from `Database`  like   'Hello%'",
+			'show open tables',
+			"show open tables like   'Hello%'",
 		];
 
 		foreach ($testingSet as $query) {
 			try {
-				ShowFullTablesPayload::fromRequest(
+				ShowFullOrOpenTablesPayload::fromRequest(
 					Request::fromArray(
 						[
-							'version' => 2,
+							'version' => Buddy::PROTOCOL_VERSION,
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
@@ -117,10 +122,10 @@ class ShowFullTablesPayloadTest extends TestCase {
 
 		foreach ($testingSet as $query) {
 			try {
-				ShowFullTablesPayload::fromRequest(
+				ShowFullOrOpenTablesPayload::fromRequest(
 					Request::fromArray(
 						[
-							'version' => 2,
+							'version' => Buddy::PROTOCOL_VERSION,
 							'error' => '',
 							'payload' => $query,
 							'format' => RequestFormat::SQL,
@@ -143,6 +148,7 @@ class ShowFullTablesPayloadTest extends TestCase {
 
   /**
    * @param array{database?:string,like?:string} $args
+   * @param string $queryType
    * @return array{
    *  version:int,
    *  error:string,
@@ -152,8 +158,8 @@ class ShowFullTablesPayloadTest extends TestCase {
    *  path:string
    * }
    */
-	protected static function buildSQLQuery(array $args): array {
-		$query = 'SHOW FULL TABLES';
+	protected static function buildSQLQuery(array $args, string $queryType): array {
+		$query = "SHOW {$queryType} TABLES";
 
 		if (isset($args['database'])) {
 			$query .= " FROM `{$args['database']}`";
@@ -164,7 +170,7 @@ class ShowFullTablesPayloadTest extends TestCase {
 		}
 		echo $query . PHP_EOL;
 		return [
-			'version' => 2,
+			'version' => Buddy::PROTOCOL_VERSION,
 			'error' => '',
 			'payload' => $query,
 			'format' => RequestFormat::SQL,

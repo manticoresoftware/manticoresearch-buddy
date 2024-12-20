@@ -227,6 +227,36 @@ final class Operator {
 	}
 
 	/**
+	 * Drop table the whole sharded table
+	 * @param array{name:string,cluster:string} $table
+	 * @return void
+	 */
+	public function drop(array $table): void {
+		// Get the current stats first
+		/** @var array{result:string,status:string,structure:string,extra:string}|null $currentState */
+		$currentState = $this->state->get("table:{$table['name']}");
+		if (!$currentState) {
+			return;
+		}
+
+		// Prepare cluster and Table to operate with
+		$cluster = new Cluster(
+			$this->client,
+			$table['cluster'],
+			Node::findId($this->client),
+		);
+		$table = new Table(
+			$this->client,
+			$cluster,
+			$table['name'],
+			$currentState['structure'],
+			$currentState['extra']
+		);
+		$result = $table->drop($this->getQueue());
+		$this->state->set("table:{$table->name}", $result);
+	}
+
+	/**
 	 * Helper to run table status checker on pings
 	 * It should return true when we done or false to repeat
 	 * @param  string $table
@@ -234,7 +264,7 @@ final class Operator {
 	 */
 	public function checkTableStatus(string $table): bool {
 		$stateKey = "table:{$table}";
-		/** @var array{}|array{queue_ids:array<int>,status:string} */
+		/** @var array{}|array{queue_ids:array<int>,status:string,type:string} */
 		$result = $this->state->get($stateKey);
 		Buddy::debugv("Sharding: table status of {$table}: " . json_encode($result));
 		if (!$result) {
@@ -257,9 +287,9 @@ final class Operator {
 		// Update the state
 		if ($isProcessed) {
 			$result['status'] = 'done';
-			$result['result'] = getenv('DEBUG')
-				? $this->client->sendRequest("SHOW CREATE TABLE {$table}")->getResult()
-				: TaskResult::none()->getStruct();
+			$result['result'] = getenv('DEBUG') && $result['type'] === 'create'
+			? $this->client->sendRequest("SHOW CREATE TABLE {$table}")->getBody()
+			: TaskResult::none()->toString();
 			$this->state->set($stateKey, $result);
 		}
 

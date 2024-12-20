@@ -57,6 +57,20 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	public static function fromRequest(Request $request): static {
+		$type = strtolower(strtok(trim($request->payload), ' ') ?: '');
+		return match ($type) {
+			'create', 'alter' => static::fromCreate($request),
+			'drop' => static::fromDrop($request),
+			default => throw new QueryParseError('Failed to parse query'),
+		};
+	}
+
+	/**
+	 * @param Request $request
+	 * @return static
+	 * @throws QueryParseError
+	 */
+	protected static function fromCreate(Request $request): static {
 		$pattern = '/(?:CREATE\s+TABLE|ALTER\s+TABLE)\s+'
 			. '(?:(?P<cluster>[^:\s]+):)?(?P<table>[^:\s\()]+)\s*'
 			. '(?:\((?P<structure>.+?)\)\s*)?'
@@ -95,17 +109,42 @@ final class Payload extends BasePayload {
 
 	/**
 	 * @param Request $request
+	 * @return static
+	 * @throws QueryParseError
+	 */
+	protected static function fromDrop(Request $request): static {
+		$pattern = '/DROP\s+SHARDED\s+TABLE\s+'
+			. '(?:(?P<cluster>[^:\s]+):)?(?P<table>[^:\s\()]+)/ius';
+		if (!preg_match($pattern, $request->payload, $matches)) {
+			throw QueryParseError::create('Failed to parse query');
+		}
+
+		$self = new static();
+		$self->path = $request->path;
+		$self->type = 'drop';
+		$self->cluster = $matches['cluster'];
+		$self->table = $matches['table'];
+		$self->structure = '';
+		$self->options = [];
+		$self->extra = '';
+		$self->validate();
+		return $self;
+	}
+
+	/**
+	 * @param Request $request
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
 		return stripos($request->error, 'syntax error')
 			&& strpos($request->error, 'P03') === 0
 			&& (
-				stripos($request->payload, 'create table') === 0
-				)
-			&& stripos($request->payload, 'rf') !== false
-			&& stripos($request->payload, 'shards') !== false
-			&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/', $request->payload);
+				(stripos($request->payload, 'create table') === 0
+					&& stripos($request->payload, 'rf') !== false
+					&& stripos($request->payload, 'shards') !== false
+					&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/', $request->payload)
+				) || stripos($request->payload, 'drop') === 0
+			);
 	}
 
 	/**
@@ -113,7 +152,7 @@ final class Payload extends BasePayload {
 	 * @return void
 	 */
 	protected function validate(): void {
-		if (!$this->cluster && $this->options['rf'] > 1) {
+		if (!$this->cluster && $this->type !== 'drop' && $this->options['rf'] > 1) {
 			throw QueryParseError::create('You cannot set rf greater than 1 when creating single node sharded table.');
 		}
 
@@ -137,18 +176,39 @@ final class Payload extends BasePayload {
 	 * table:array{cluster:string,name:string,structure:string,extra:string},
 	 * replicationFactor:int,
 	 * shardCount:int
-	 * }
+	 * }|array{table:array{cluster:string,name:string}}
 	 */
-	public function toShardArgs(): array {
-		return [
-			'table' => [
-				'cluster' => $this->cluster,
-				'name' => $this->table,
-				'structure' => $this->structure,
-				'extra' => $this->extra,
+	public function toHookArgs(): array {
+		return match ($this->type) {
+			'create' => [
+				'table' => [
+					'cluster' => $this->cluster,
+					'name' => $this->table,
+					'structure' => $this->structure,
+					'extra' => $this->extra,
+				],
+				'replicationFactor' => (int)($this->options['rf'] ?? 1),
+				'shardCount' => (int)($this->options['shards'] ?? 2),
 			],
-			'replicationFactor' => (int)($this->options['rf'] ?? 1),
-			'shardCount' => (int)($this->options['shards'] ?? 2),
-		];
+			'drop' => [
+				'table' => [
+					'cluster' => $this->cluster,
+					'name' => $this->table,
+				],
+			],
+			default => throw new \Exception('Unsupported sharding type'),
+		};
+	}
+
+	/**
+	 * Get handler class to process depending on the type
+	 * @return string
+	 */
+	public function getHandlerClassName(): string {
+		return match ($this->type) {
+			'create' => CreateHandler::class,
+			'drop' => DropHandler::class,
+			default => throw new \Exception('Unsupported sharding type'),
+		};
 	}
 }

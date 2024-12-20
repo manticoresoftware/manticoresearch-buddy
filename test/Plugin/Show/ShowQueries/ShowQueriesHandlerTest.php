@@ -14,9 +14,9 @@ use Manticoresearch\Buddy\Base\Plugin\Show\QueriesHandler as Handler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Request as NetRequest;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
+
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\Buddy\CoreTest\Trait\TestInEnvironmentTrait;
 use PHPUnit\Framework\TestCase;
@@ -47,7 +47,7 @@ class ShowQueriesHandlerTest extends TestCase {
 			[
 				'error' => "P01: syntax error, unexpected identifier, expecting VARIABLES near 'QUERIES'",
 				'payload' => 'SHOW QUERIES',
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'format' => RequestFormat::SQL,
 				'endpointBundle' => ManticoreEndpoint::Sql,
 				'path' => 'sql?mode=raw',
@@ -55,14 +55,13 @@ class ShowQueriesHandlerTest extends TestCase {
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);
 		self::setBuddyVersion();
-		$manticoreClient = new HTTPClient(new Response(), $serverUrl);
+		$manticoreClient = new HTTPClient($serverUrl);
 		$manticoreClient->setForceSync(true);
 		Payload::$type = 'queries';
 		$payload = Payload::fromRequest($request);
 
 		$handler = new Handler($payload);
 		$handler->setManticoreClient($manticoreClient);
-		$handler->setTableFormatter(new TableFormatter());
 		go(
 			function () use ($handler, $respBody) {
 				$task = $handler->run();

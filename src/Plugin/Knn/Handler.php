@@ -11,17 +11,19 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Knn;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient
-{
+final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Initialize the executor
 	 *
@@ -44,7 +46,8 @@ final class Handler extends BaseHandlerWithClient
 			if ($queryVector === false) {
 				return TaskResult::none();
 			}
-			return TaskResult::raw(self::getKnnResult($manticoreClient, $payload, $queryVector));
+			$resp = self::getKnnResult($manticoreClient, $payload, $queryVector);
+			return TaskResult::fromResponse($resp);
 		};
 
 		return Task::create(
@@ -55,16 +58,32 @@ final class Handler extends BaseHandlerWithClient
 	/**
 	 * @param Client $client
 	 * @param Payload $payload
+	 *
 	 * @return string|false
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|GenericError
 	 */
 	private static function getQueryVectorValue(Client $client, Payload $payload): string|false {
-		$document = $client
-			->sendRequest('SELECT * FROM ' . $payload->table . ' WHERE id = ' . $payload->docId)
-			->getResult();
+		$request = $client
+			->sendRequest(
+				'SELECT * FROM ' . $payload->table .
+				' WHERE id = ' . $payload->docId
+			);
 
-		if (is_array($document) && !empty($document[0]['data'])) {
-			return $document[0]['data'][0][$payload->field] ?? false;
+		if ($request->hasError()) {
+			ManticoreSearchResponseError::throw((string)$request->getError());
+		}
+		$document = $request->getResult();
+
+		if (!isset($document[0])) {
+			return false;
+		}
+		/** @var array{data:array<int,array<string,string>>} $documentStruct */
+		$documentStruct = $document[0];
+		if (!empty($documentStruct['data'])) {
+			if (!empty($documentStruct['data'][0][$payload->field])) {
+				return $documentStruct['data'][0][$payload->field];
+			}
+			return false;
 		}
 
 		return false;
@@ -75,10 +94,10 @@ final class Handler extends BaseHandlerWithClient
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
 	 * @param string $queryVector
-	 * @return array <string, string>
+	 * @return Response
 	 * @throws ManticoreSearchClientError|QueryParseError
 	 */
-	private static function getKnnResult(Client $manticoreClient, Payload $payload, string $queryVector): array {
+	private static function getKnnResult(Client $manticoreClient, Payload $payload, string $queryVector): Response {
 		if ($payload->endpointBundle === Endpoint::Search) {
 			return self::knnHttpQuery($manticoreClient, $payload, $queryVector);
 		}
@@ -90,12 +109,13 @@ final class Handler extends BaseHandlerWithClient
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
 	 * @param string $queryVector
-	 * @return array <string, string>
-	 * @throws ManticoreSearchClientError
+	 *
+	 * @return Response
+	 * @throws ManticoreSearchClientError|GenericError
 	 */
-	private static function knnHttpQuery(Client $manticoreClient, Payload $payload, string $queryVector): array {
+	private static function knnHttpQuery(Client $manticoreClient, Payload $payload, string $queryVector): Response {
 		$query = [
-			'index' => $payload->table,
+			'table' => $payload->table,
 			'knn' => [
 				'field' => $payload->field,
 				'k' => (int)$payload->k,
@@ -115,52 +135,63 @@ final class Handler extends BaseHandlerWithClient
 			$query['knn']['filter'] = $payload->condition;
 		}
 
-		$result = $manticoreClient
-			->sendRequest((string)json_encode($query), Endpoint::Search->value)
-			->getResult();
+		$resp = $manticoreClient
+			->sendRequest((string)json_encode($query), Endpoint::Search->value);
 
-		if (is_array($result['hits']) && isset($result['hits']['hits'])) {
-			// Removing requested doc from result set
-			$filteredResults = [];
-			foreach ($result['hits']['hits'] as $v) {
-				if ($v['_id'] === (int)$payload->docId) {
-					continue;
-				}
-
-				$filteredResults[] = $v;
-			}
-			$result['hits']['hits'] = $filteredResults;
+		if ($resp->hasError()) {
+			ManticoreSearchResponseError::throw((string)$resp->getError());
 		}
 
-		return $result;
+		$docId = (int)$payload->docId;
+		$resp->apply(
+			static function ($result) use ($docId) {
+			// Removing requested doc from result set
+				$filteredResults = [];
+				foreach ($result['hits']['hits'] as $v) {
+					if ($v['_id'] === $docId) {
+						continue;
+					}
+
+					$filteredResults[] = $v;
+				}
+				return $filteredResults;
+			}
+		);
+		return $resp;
 	}
 
 	/**
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
 	 * @param string $queryVector
-	 * @return array <string, string>
-	 * @throws QueryParseError|ManticoreSearchClientError
+	 * @return Response
+	 * @throws QueryParseError|ManticoreSearchClientError|GenericError
 	 */
-	private static function knnSqlQuery(Client $manticoreClient, Payload $payload, string $queryVector): array {
+	private static function knnSqlQuery(Client $manticoreClient, Payload $payload, string $queryVector): Response {
 
 		self::substituteParsedQuery($payload, $queryVector);
-			$result = $manticoreClient
-				->sendRequest($payload::$sqlQueryParser::getCompletedPayload())
-				->getResult();
 
+		$resp = $manticoreClient
+				->sendRequest($payload::$sqlQueryParser::getCompletedPayload());
+
+		if ($resp->hasError()) {
+			ManticoreSearchResponseError::throw((string)$resp->getError());
+		}
+
+		$result = $resp->getResult()->toArray();
 		if (is_array($result[0])) {
+			$docId = (int)$payload->docId;
 			foreach ($result[0]['data'] as $k => $v) {
-				if ($v['id'] !== (int)$payload->docId) {
+				if (!isset($v['id']) || $v['id'] !== $docId) {
 					continue;
 				}
 
 				unset($result[0]['data'][$k]);
 			}
+			$resp = Response::fromBody((string)json_encode($result));
 		}
 
-
-		return $result;
+		return $resp;
 	}
 
 	/**

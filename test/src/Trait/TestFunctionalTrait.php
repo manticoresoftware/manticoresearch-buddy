@@ -12,6 +12,7 @@
 namespace Manticoresearch\BuddyTest\Trait;
 
 use Exception;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 trait TestFunctionalTrait {
 
@@ -308,10 +309,10 @@ trait TestFunctionalTrait {
 				? 'Content-type: application/x-www-form-urlencoded'
 				: 'Content-type: application/json'
 			);
-		exec(
-			"curl -s 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect",
-			$output
-		);
+
+		$command = "curl -s 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect";
+		echo 'Commmand: ' . $command . PHP_EOL;
+		exec($command, $output);
 
 		/** @var array{error:string}|array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
 		$result = match ($path) {
@@ -333,21 +334,21 @@ trait TestFunctionalTrait {
 	 * Run direct HTTP request to the Buddy
 	 *
 	 * @param string $query
-	 * @param string $error
+	 * @param array{message:string} $error
 	 * @param bool $redirectOutput
 	 * @return array{version:int,type:string,message:array<int,array{columns:array<string>,data:array<int,array<string,string>>}>}
 	 * @throws Exception
 	 */
 	protected static function runHttpBuddyRequest(
 		string $query,
-		string $error = '',
+		array $error = ['message' => ''],
 		bool $redirectOutput = true
 	): array {
 		$port = static::$listenBuddyPort;
 		$request = [
 			'type' => 'unknown json request',
 			'error' => $error,
-			'version' => 2,
+			'version' => Buddy::PROTOCOL_VERSION,
 			'message' => [
 				'path_query' => '/sql?mode=raw',
 				'body' => $query,

@@ -26,6 +26,7 @@ final class Payload extends BasePayload
 
 	public string $destinationTableName;
 	public string $sourceTableName;
+	public bool $notExists = false;
 
 	/**
 	 * Get description for this plugin
@@ -89,6 +90,7 @@ final class Payload extends BasePayload
 			case 'Handler':
 				$self->destinationTableName = $payload['TABLE']['no_quotes']['parts'][0];
 				$self->sourceTableName = $payload['LIKE']['no_quotes']['parts'][0];
+				$self->notExists = $payload['CREATE']['not-exists'];
 				break;
 			case 'WithEngineHandler':
 				$self->destinationTableName = (string)array_pop($payload['TABLE']['no_quotes']['parts']);

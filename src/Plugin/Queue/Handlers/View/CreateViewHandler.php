@@ -140,15 +140,16 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 				'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
 				" WHERE name='$sourceName'";
 
-			$sourceRecords = $manticoreClient->sendRequest($sql)->getResult();
+			$result = $manticoreClient->sendRequest($sql)->getResult();
 
-			if (is_array($sourceRecords[0]) && empty($sourceRecords[0]['data'])) {
+			if (is_array($result[0]) && empty($result[0]['data'])) {
 				throw ManticoreSearchClientError::create('Chosen source not exist');
 			}
 
 			unset($parsedPayload['CREATE'], $parsedPayload['VIEW']);
-
-			$sourceRecords = $sourceRecords[0]['data'];
+			/** @var array{data:array<int,array<string,string>>} $resultStruct */
+			$resultStruct = $result[0];
+			$sourceRecords = $resultStruct['data'];
 
 			$newViews = self::createViewRecords(
 				$manticoreClient, $viewName, $parsedPayload,

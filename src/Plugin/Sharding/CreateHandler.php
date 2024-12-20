@@ -12,13 +12,14 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Closure;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 use Swoole\Coroutine;
 
-final class Handler extends BaseHandlerWithClient {
+final class CreateHandler extends BaseHandlerWithClient {
 	/**
 	 * Initialize the executor
 	 *
@@ -44,9 +45,31 @@ final class Handler extends BaseHandlerWithClient {
 			$taskFn,
 			[$this->payload, $this->manticoreClient]
 		);
-		$args = $this->payload->toShardArgs();
-		$task->on('run', fn() => static::processHook('shard', [$args]));
+		/** @var array{
+		 * table:array{cluster:string,name:string,structure:string,extra:string},
+		 * replicationFactor:int,
+		 * shardCount:int
+		 * } $args
+		 */
+		$args = $this->payload->toHookArgs();
+		$task->on('run', fn() => static::runInBackground($args));
 		return $task->run();
+	}
+
+	/**
+	 * @param array{
+	 * table:array{cluster:string,name:string,structure:string,extra:string},
+	 * replicationFactor:int,
+	 * shardCount:int
+	 * } $args
+	 * @return void
+	 */
+	public static function runInBackground(array $args): void {
+		$processor = Payload::getProcessors()[0];
+		$processor->execute('shard', $args);
+
+		$table = $args['table']['name'];
+		$processor->addTicker(fn() => $processor->status($table), 1);
 	}
 
 	/**
@@ -134,10 +157,12 @@ final class Handler extends BaseHandlerWithClient {
 				if (isset($result[0]['data'][0]['value'])) {
 					$value = json_decode($result[0]['data'][0]['value'], true);
 				}
-				/** @var array{result:string,status?:string} $value */
+
+				/** @var array{result:string,status?:string,type?:string} $value */
+				$type = $value['type'] ?? 'unknown';
 				$status = $value['status'] ?? 'processing';
-				if ($status !== 'processing') {
-					return TaskResult::raw($value['result']);
+				if ($type === 'create' && $status !== 'processing') {
+					return TaskResult::fromResponse(Response::fromBody($value['result']));
 				}
 				if ((time() - $ts) > $timeout) {
 					break;

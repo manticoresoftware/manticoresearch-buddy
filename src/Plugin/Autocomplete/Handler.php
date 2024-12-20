@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Autocomplete;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\QueryValidationError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\TableValidator;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -76,24 +77,15 @@ final class Handler extends BaseHandlerWithFlagCache {
 	/**
 	 * Perform validation, method should be run inside coroutine
 	 * @return void
+	 * @throws QueryValidationError
 	 */
 	protected function validate(): void {
-		$cacheKey = "autocomplete:validate:{$this->payload->table}";
-		if ($this->flagCache->has($cacheKey)) {
+		$validator = new TableValidator($this->manticoreClient, $this->flagCache, 30);
+		if ($validator->hasMinInfixLen($this->payload->table)) {
 			return;
 		}
-		/** @var array{error?:string} */
-		$result = $this->manticoreClient->sendRequest('SHOW CREATE TABLE ' . $this->payload->table)->getResult();
-		if (isset($result['error'])) {
-			QueryValidationError::throw($result['error']);
-		}
 
-		/** @var array{0:array{data:array<array{'Create Table':string}>}} $result */
-		$schema  = $result[0]['data'][0]['Create Table'];
-		if (false === str_contains($schema, 'min_infix_len')) {
-			QueryValidationError::throw('Autocomplete plugin requires min_infix_len to be set');
-		}
-		$this->flagCache->set($cacheKey, true, 30);
+		QueryValidationError::throw('Autocomplete requires min_infix_len to be set');
 	}
 
 	/**
@@ -107,7 +99,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$combinationSets = [];
 		$count = 0;
 		foreach ($phrases as $phrase) {
-			$suggestions = $this->processPhrase($phrase);
+			$suggestions = $this->processPhrase($phrase, $maxCount);
 			$count += sizeof($suggestions);
 			$combinationSets[] = $suggestions;
 			// Do early return when enough suggestions found
@@ -117,8 +109,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		}
 
 		// Combine it in relevant order
+		// We need to use unique to avoid duplicates in case
+		// we're dealing with multiple languages and it results in a single character change
+		// so in the end, we wind up with multiple suggestions for the same phrase
 		/** @var array<string> $suggestions */
-		$suggestions = Arrays::blend(...$combinationSets);
+		$suggestions = array_unique(Arrays::blend(...$combinationSets));
 		return $suggestions;
 	}
 
@@ -130,7 +125,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 */
 	public function sortSuggestions(array &$suggestions, array $phrases): void {
 		uasort(
-			$suggestions, function ($a, $b) use ($phrases) {
+			$suggestions, function (string $a, string $b) use ($phrases) {
 				return $this->compareSuggestions($a, $b, $phrases);
 			}
 		);
@@ -202,11 +197,12 @@ final class Handler extends BaseHandlerWithFlagCache {
 	/**
 	 * Process the given phrase and return the list of suggestions
 	 * @param string $phrase
+	 * @param int $maxCount
 	 * @return array<string>
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 */
-	public function processPhrase(string $phrase): array {
+	public function processPhrase(string $phrase, int $maxCount = 10): array {
 		$words = $scoreMap = [];
 		// Do query only in case we have fuzzy activated
 		$distance = $this->getLevenshteinDistance($phrase);
@@ -214,6 +210,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			[$words, $scoreMap] = $this->manticoreClient->fetchFuzzyVariations(
 				$phrase,
 				$this->payload->table,
+				$this->payload->preserve,
 				$distance
 			);
 		}
@@ -242,14 +239,70 @@ final class Handler extends BaseHandlerWithFlagCache {
 			// 4. Make sure we have unique fill up
 			$words[$lastIndex] = array_unique($words[$lastIndex]);
 		}
-		$combinations = Arrays::getPositionalCombinations($words, $scoreMap);
-		/** @var array<string> $combinations */
-		$combinations = array_map(fn($v) => implode(' ', $v), $combinations);
 		// If the original phrase in the list, we add it to the beginning to boost weight
+		$combinations = static::buildRelevantCombinations($words, $scoreMap, $maxCount);
 		$combinations = Arrays::boostListValues($combinations, [$phrase]);
 		/** @var array<string> $combinations */
 		return $combinations;
 	}
+
+	/**
+	 * Most effecitve way to find MOST scored relevant combinations by score map and return it with maxCount
+	 * @param array<array<string>> $words
+	 * @param array<string,float> $scoreMap
+	 * @param int $maxCount
+	 * @return array<string>
+	 */
+	private static function buildRelevantCombinations(array $words, array $scoreMap, int $maxCount): array {
+		if (empty($words)) {
+			return [];
+		}
+
+		$combinations = ['' => 0.0];
+		$positions = array_keys($words);
+
+		foreach ($positions as $position) {
+			$combinations = static::processCombinations($combinations, $words[$position], $scoreMap, $maxCount);
+		}
+
+		arsort($combinations);
+		return array_slice(array_filter(array_keys($combinations)), 0, $maxCount);
+	}
+
+	/**
+	 * @param array<string,float> $combinations
+	 * @param array<string> $positionWords
+	 * @param array<string,float> $scoreMap
+	 * @param int $maxCount
+	 * @return array<string,float>
+	 */
+	private static function processCombinations(
+		array $combinations,
+		array $positionWords,
+		array $scoreMap,
+		int $maxCount
+	): array {
+		$newCombinations = [];
+		foreach ($combinations as $combination => $score) {
+			foreach ($positionWords as $word) {
+				$newCombination = trim($combination . ' ' . $word);
+				$newScore = $score + ($scoreMap[$word] ?? 0);
+				if (sizeof($newCombinations) >= $maxCount && $newScore <= min($newCombinations)) {
+					continue;
+				}
+
+				$newCombinations[$newCombination] = $newScore;
+				if (sizeof($newCombinations) <= $maxCount) {
+					continue;
+				}
+
+				arsort($newCombinations);
+				array_pop($newCombinations);
+			}
+		}
+		return $newCombinations;
+	}
+
 
 	/**
 	 * Get levenshtein distance for the given word on auto or not algorithm
@@ -429,7 +482,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$documents, static function ($doc) use ($avgDocs, $threshold) {
 				// Keep documents with docs count above average * threshold
 				$minDocs = (int)round($avgDocs * $threshold);
-				return $doc['docs'] >= $minDocs;
+				return $doc['docs'] > $minDocs;
 			}
 		);
 

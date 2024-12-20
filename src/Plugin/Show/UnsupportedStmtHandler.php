@@ -193,19 +193,19 @@ class UnsupportedStmtHandler extends BaseHandlerWithClient {
 		if (preg_match('/^show( open)? tables from (Manticore|`Manticore`)(\s.*|$)/is', $payload->query)) {
 			$query = 'SHOW TABLES';
 			/** @var array{0:array{data:array<mixed>}} */
-			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+			$result = $manticoreClient->sendRequest($query)->getResult();
 			$data = $result[0]['data'];
 			return TaskResult::withData($data)
-				->column('Index', Column::String)
+				->column('Table', Column::String)
 				->column('Type', Column::String);
 		}
 		$matches = [];
 		if (preg_match('/^show table status from( Manticore| `Manticore`)?(\s*.*|$)/is', $payload->query, $matches)) {
 			$query = 'SHOW TABLES';
 			/** @var array{0:array{data:array<int,array<mixed>>}} */
-			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+			$result = $manticoreClient->sendRequest($query)->getResult();
 			$tableNames = array_map(
-				fn($item) => $item['Index'] ?? '',
+				fn($item) => $item['Table'] ?? '',
 				$result[0]['data']
 			);
 			if (!$matches[1]) {
@@ -294,7 +294,7 @@ class UnsupportedStmtHandler extends BaseHandlerWithClient {
 		if (stripos($payload->query, 'show variables') === 0) {
 			$query = 'SHOW VARIABLES';
 			/** @var array{0:array{data:array<int,array<mixed>>}} */
-			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+			$result = $manticoreClient->sendRequest($query)->getResult();
 			$condData = static::getVariablesWithCondition($result[0]['data'], $payload->query);
 			return TaskResult::withData($condData)
 				->column('Variable_name', Column::String)

@@ -44,6 +44,9 @@ final class Payload extends BasePayload {
 	/** @var array<string> */
 	public array $layouts;
 
+	/** @var bool */
+	public bool $preserve = false;
+
 	public function __construct() {
 	}
 
@@ -80,16 +83,17 @@ final class Payload extends BasePayload {
 					append?: int,
 					prepend?: int,
 					expansion_len?: int,
-					layouts?: string
+					layouts?: string,
+					preserve?: int
 			}
 		} $payload */
 		$payload = json_decode($request->payload, true);
 		if (!isset($payload['query']) || !is_string($payload['query'])) {
-			throw new QueryParseError('Failed to parse query: make sure you have query and it is a string');
+			throw QueryParseError::create('Failed to parse query: make sure you have query and it is a string');
 		}
 
 		if (!isset($payload['table']) || !is_string($payload['table'])) {
-			throw new QueryParseError('Failed to parse query: make sure you have table and it is a string');
+			throw QueryParseError::create('Failed to parse query: make sure you have table and it is a string');
 		}
 
 		$self = new static();
@@ -100,6 +104,7 @@ final class Payload extends BasePayload {
 		$self->append = !!($payload['options']['append'] ?? true);
 		$self->expansionLen = (int)($payload['options']['expansion_len'] ?? 10);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
+		$self->preserve = !!($payload['options']['preserve'] ?? false);
 		$self->validate();
 		return $self;
 	}
@@ -111,11 +116,11 @@ final class Payload extends BasePayload {
 	 */
 	private function validate(): void {
 		if ($this->fuzziness < 0 || $this->fuzziness > 2) {
-			throw new QueryParseError('Fuzziness must be greater than 0 and lower than 3');
+			throw QueryParseError::create('Fuzziness must be greater than 0 and lower than 3');
 		}
 
 		if ($this->expansionLen < 0 || $this->expansionLen > 20) {
-			throw new QueryParseError('Expansion limit must be greater than 0 and lower than 20');
+			throw QueryParseError::create('Expansion limit must be greater than 0 and lower than 20');
 		}
 	}
 
@@ -125,11 +130,11 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromSqlRequest(Request $request): static {
-		$pattern = '/autocomplete\(\s*\'([^\']+)\'\s*,\s*\'([^\']+)\'\s*'
+		$pattern = '/autocomplete\(\s*\'([^\']*)\'\s*,\s*\'([^\']+)\'\s*'
 			. '((?:,\s*(?:(\d+)|\'([^\']*)\')\s+as\s+(\w+))*)\s*\)/ius';
 		preg_match($pattern, $request->payload, $matches);
 		if (!$matches) {
-			throw new QueryParseError('Failed to parse query');
+			throw QueryParseError::create('Failed to parse query');
 		}
 
 		$self = new static();
@@ -190,7 +195,7 @@ final class Payload extends BasePayload {
 			$value = (int)$value;
 		}
 
-		if ($key === 'prepend' || $key === 'append') {
+		if ($key === 'prepend' || $key === 'append' || $key === 'preserve') {
 			$value = (bool)$value;
 		}
 

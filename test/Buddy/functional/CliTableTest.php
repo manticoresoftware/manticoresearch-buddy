@@ -32,7 +32,7 @@ class CliTableTest extends TestCase {
 		if (isset($out[0]['columns'])) {
 			$result = preg_match(
 				"/\+-+\+-+\+\n"
-				. "\| Index\s+\| Type\s+\|\n"
+				. "\| Table\s+\| Type\s+\|\n"
 				. "\+-+\+-+\+\n"
 				. "\| test\s+\| rt\s+\|\n"
 				. "\+-+\+-+\+\n"
@@ -106,11 +106,10 @@ class CliTableTest extends TestCase {
 		if (!isset($out[0]['columns'])) {
 			return;
 		}
-
 		$pattern = "/\+-+\+-+\+-+\+-+\+-+\+\n".
 			"\| id\s+\| query\s+\| time\s+\| protocol \| host\s+\|\n".
 			"\+-+\+-+\+-+\+-+\+-+\+\n".
-			"(\| \d+\s+\| [^\s]+\s+\| \d+us( ago)?\s+\| http\s+\| 127\.0\.0\.1:\d+ \|\n)+?".
+			"(\| \d+\s+\| (SHOW QUERIES|[^\s]+)\s+\| \d+(m|u)s( ago)?\s+\| http\s+\| 127\.0\.0\.1:\d+ \|\n)+?".
 			"\+-+\+-+\+-+\+-+\+-+\+\n".
 			"\d row(s)? in set \(\d\.\d{3} sec\)\n/";
 		$this->assertMatchesRegularExpression($pattern, $out[0]['columns']);

@@ -26,11 +26,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref || github.ref }}
       - id: vars
         run: |
           version=$(<APP_VERSION)
           date=$( date +%y%m%d%H )
-          commit=${GITHUB_SHA:0:7}
+          commit=${{ github.event.pull_request.head.sha || github.sha }}
+          commit=${commit:0:7}
 
           echo "app_version=$version" >> $GITHUB_OUTPUT
           echo "app_date=$date" >> $GITHUB_OUTPUT
@@ -39,6 +42,7 @@ jobs:
           echo "deb_suffix=-${date}-$commit" >> $GITHUB_OUTPUT
 
   build-artifact:
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-22.04
     needs:
       - vars
@@ -194,6 +198,7 @@ jobs:
           prerelease: false
 
   deploy:
+    if: ${{ github.event_name != 'pull_request' }}
     needs:
       - build-artifact
       - build-linux-packages
@@ -265,7 +270,6 @@ jobs:
   update-manticoresearch-deps:
     needs:
       - vars
-      - deploy
     runs-on: ubuntu-22.04
     steps:
       - name: Update deps

@@ -9,6 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -90,7 +91,7 @@ class BenchLoadTest extends TestCase {
 		$request = [
 			'type' => 'unknown json request',
 			'error' => '',
-			'version' => 2,
+			'version' => Buddy::PROTOCOL_VERSION,
 			'message' => [
 				'path_query' => '/cli_json',
 				'body' => $query,

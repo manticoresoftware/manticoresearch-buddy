@@ -12,8 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithTableFormatter;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
+use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
@@ -21,7 +20,7 @@ use RuntimeException;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class CreateTableHandler extends BaseHandlerWithTableFormatter {
+class CreateTableHandler extends BaseHandlerWithClient {
 	/**
 	 *  Initialize the executor
 	 *
@@ -42,40 +41,37 @@ class CreateTableHandler extends BaseHandlerWithTableFormatter {
 		// We just waiting for a thread to be done
 		$taskFn = static function (
 			Payload $payload,
-			Client $manticoreClient,
-			TableFormatter $tableFormatter
+			Client $manticoreClient
 		): TaskResult {
-			$time0 = hrtime(true);
 			// First, get response from the manticore
 			$query = "SHOW CREATE TABLE {$payload->table}";
-			/** @var array{0:array{data:array<mixed>}} */
-			$result = $manticoreClient->sendRequest($query, $payload->path)->getResult();
-			if ($payload->hasCliEndpoint) {
-				$total = sizeof($result[0]['data']);
-				return TaskResult::raw($tableFormatter->getTable($time0, $result[0]['data'], $total));
-			}
+			$resp = $manticoreClient->sendRequest($query);
 
 			// It's important to have ` and 2 spaces for Apache Superset
-			foreach ($result[0]['data'] as &$row) {
+			$resp->mapData(
+				static function (array $row): array {
 				/** @var array{'Create Table':string} $row */
-				$lines = explode("\n", $row['Create Table']);
-				$lastN = sizeof($lines) - 1;
-				foreach ($lines as $n => &$line) {
-					if ($n === 0 || $n === $lastN) {
-						continue;
+					$lines = explode("\n", $row['Create Table']);
+					$lastN = sizeof($lines) - 1;
+					foreach ($lines as $n => &$line) {
+						if ($n === 0 || $n === $lastN) {
+							continue;
+						}
+						$parts = explode(' ', $line);
+						$parts[0] = '`' . trim($parts[0], '`') . '`';
+						$line = '  ' . trim(implode(' ', $parts));
 					}
-					$parts = explode(' ', $line);
-					$parts[0] = '`' . trim($parts[0], '`') . '`';
-					$line = '  ' . trim(implode(' ', $parts));
+					$row['Create Table'] = implode("\n", $lines);
+					return $row;
 				}
-				$row['Create Table'] = implode("\n", $lines);
-			}
-			return TaskResult::raw($result);
+			);
+
+			return TaskResult::fromResponse($resp);
 		};
 
 		return Task::create(
 			$taskFn,
-			[$this->payload, $this->manticoreClient, $this->tableFormatter]
+			[$this->payload, $this->manticoreClient]
 		)->run();
 	}
 }

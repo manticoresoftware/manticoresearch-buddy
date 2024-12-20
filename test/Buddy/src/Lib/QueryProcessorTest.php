@@ -24,6 +24,8 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -34,7 +36,7 @@ class QueryProcessorTest extends TestCase {
 		echo "\nTesting the processing of execution command\n";
 		$request = Request::fromArray(
 			[
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => 'BACKUP TO /tmp',
 				'format' => RequestFormat::SQL,
@@ -42,8 +44,10 @@ class QueryProcessorTest extends TestCase {
 				'path' => '',
 			]
 		);
+		$settings = static::getSettings();
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('settings', static::getSettings());
+		$refCls->setStaticPropertyValue('settings', $settings);
+		$refCls->setStaticPropertyValue('pluggable', static::getPluggable($settings));
 		$executor = QueryProcessor::process($request);
 		$this->assertInstanceOf(BackupHandler::class, $executor);
 		$refCls = new ReflectionClass($executor);
@@ -52,7 +56,7 @@ class QueryProcessorTest extends TestCase {
 
 		$request = Request::fromArray(
 			[
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => 'SHOW QUERIES',
 				'format' => RequestFormat::SQL,
@@ -73,7 +77,7 @@ class QueryProcessorTest extends TestCase {
 		$this->expectExceptionMessage('Failed to handle query: Some command');
 		$request = Request::fromArray(
 			[
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => 'Some command',
 				'format' => RequestFormat::SQL,
@@ -81,8 +85,10 @@ class QueryProcessorTest extends TestCase {
 				'path' => '',
 			]
 		);
+		$settings = static::getSettings();
 		$refCls = new ReflectionClass(QueryProcessor::class);
-		$refCls->setStaticPropertyValue('settings', static::getSettings());
+		$refCls->setStaticPropertyValue('settings', $settings);
+		$refCls->setStaticPropertyValue('pluggable', static::getPluggable($settings));
 		QueryProcessor::process($request);
 	}
 
@@ -91,7 +97,7 @@ class QueryProcessorTest extends TestCase {
 
 		$request = Request::fromArray(
 			[
-				'version' => 2,
+				'version' => Buddy::PROTOCOL_VERSION,
 				'error' => "table 'test' absent, or does not support INSERT",
 				'payload' => 'INSERT INTO test(col1) VALUES("test")',
 				'format' => RequestFormat::SQL,
@@ -226,5 +232,13 @@ class QueryProcessorTest extends TestCase {
 		}
 
 		return ManticoreSettings::fromVector($vector);
+	}
+
+	/**
+	 * @param ManticoreSettings $settings
+	 * @return Pluggable
+	 */
+	protected static function getPluggable(ManticoreSettings $settings): Pluggable {
+		return new Pluggable($settings);
 	}
 }

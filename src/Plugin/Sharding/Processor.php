@@ -90,6 +90,16 @@ final class Processor extends BaseProcessor {
 	}
 
 	/**
+	 * Process the drop event
+	 * @param  mixed ...$args
+	 * @return void
+	 */
+	public function drop(mixed ...$args): void {
+		/** @var array{table:array{cluster:string,name:string}} $args */
+		$this->getOperator()->drop(...$args);
+	}
+
+	/**
 	 * Validate the final status of the sharded table
 	 * @param string $table
 	 * @return bool True when is done and false when need to repeat

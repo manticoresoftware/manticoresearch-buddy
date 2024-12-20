@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\Network\OutputFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Task\Column;
@@ -87,6 +88,8 @@ final class EventHandler {
 	 */
 	public static function process(string $id, string $payload): Response {
 		try {
+			/** @var int $startTime */
+			$startTime = hrtime(true);
 			$request = Request::fromString($payload, $id);
 			$handler = QueryProcessor::process($request)->run();
 
@@ -101,20 +104,38 @@ final class EventHandler {
 				$result = $handler->getResult();
 			}
 
-			$response = Response::fromMessage($result->getStruct(), $request->format);
-		} catch (Throwable $e) {
-			Buddy::error($e, "[$id] processing error");
-			/** @var string $originalError */
-			$originalError = match (true) {
-				isset($request) => $request->error,
-				default => ((array)json_decode($payload, true))['error'] ?? '',
+			// Check if this is a cli and we need to activate Table Formatter
+			$outputFormat = $request->getOutputFormat();
+			$message = match ($outputFormat) {
+				// TODO: Maybe later we can use meta for time, but not now cuz no time for non select
+				OutputFormat::Table => $result->getTableFormatted($startTime),
+				default => $result->getStruct(),
 			};
+			$response = Response::fromMessageAndMeta(
+				$message,
+				$result->getMeta(),
+				$request->format,
+			);
+		} catch (Throwable $e) {
+			if (isset($request)) {
+				/** @var string $originalError */
+				$originalError = $request->error;
+				/** @var array<mixed> $originalErrorBody */
+				$originalErrorBody = $request->errorBody;
+			} else {
+				/** @var array{error?:array{message:string,body?:array{error:string}}} $payloadInfo */
+				$payloadInfo = (array)json_decode($payload, true);
+				$originalError = $payloadInfo['error']['message'] ?? '';
+				$originalErrorBody = $payloadInfo['error']['body'] ?? [];
+			}
 
 			// We proxy original error in case when we do not know how to handle query
 			// otherwise we send our custom error
 			if (static::shouldProxyError($e)) {
 				/** @var GenericError $e */
 				$e->setResponseError($originalError);
+				$e->setResponseErrorBody($originalErrorBody);
+				Buddy::error($e, "[$id] processing error");
 			} elseif (!is_a($e, GenericError::class)) {
 				$e = GenericError::create($originalError);
 			}
