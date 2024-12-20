@@ -15,7 +15,7 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Hi
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Term;
 
 /**
- *  Adds rows to the Kibana response which correspond to missing histogram intervals in the Manticore response,
+ *  Adds rows corresponding to missing histogram intervals to the response,
  *  thus imitating Elastic's behaviour
  */
 class HistogramExtending extends BaseLogic {
@@ -52,8 +52,6 @@ class HistogramExtending extends BaseLogic {
 	}
 
 	/**
-	 * Checks if the logic needs to be applied
-	 *
 	 * @return bool
 	 */
 	public function isAvailable(): bool {
@@ -94,7 +92,6 @@ class HistogramExtending extends BaseLogic {
 			if (!$this->isGroupFieldSetChanged($curRow)) {
 				$rowInd += $this->updateRows($rowInd, $curRow, $curValSet, $rowValSet);
 			} elseif (isset($this->histLimits)) {
-				// Considering histogram limits if such exist
 				$maxValSet = $this->calcLimitSet('max', $curValSet);
 				$rowInd += $this->updateRows($rowInd, $prevRow, $curValSet, $maxValSet, true);
 				$minValSet = $this->calcLimitSet('min', $rowValSet);
@@ -208,8 +205,6 @@ class HistogramExtending extends BaseLogic {
 	}
 
 	/**
-	 * Adding extra rows with initially missed histogram values to the response data
-	 *
 	 * @param array<string,mixed> $curRow
 	 * @param array<int> $valSetFrom
 	 * @param array<int> $valSetTo
@@ -243,8 +238,6 @@ class HistogramExtending extends BaseLogic {
 	}
 
 	/**
-	 * Extracting the limits for each histogram fields if such exist
-	 *
 	 * @param string $setType
 	 * @param array<string,int> $rowValSet
 	 * @return array<int>

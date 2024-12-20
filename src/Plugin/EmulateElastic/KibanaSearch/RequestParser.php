@@ -15,18 +15,16 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Ba
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Factory;
 
 /**
- *  Parses search request from Kibana splitting it into separate 'node' objects
+ *  Parses search request from Kibana
  */
 class RequestParser {
 
-	// The root-level keys of Kibana's request object we need to process
-	const HANDLED_ROOT_KEYS = ['aggs', 'query'];
+	const HANDLED_ROOT_NODES = ['aggs', 'query'];
 
-	// The types of sub-nodes in Kibana's request object
-	const NAME_NODE_TYPE = 1; // node with a name of aggregation operation, corresponds to a 'node' object we build
-	const AGG_NODE_TYPE = 2; // parent node of some Kibana aggregation
-	const FILTER_WRAPPER_NODE_TYPE = 3; // wrapper node
-	const AGG_WRAPPER_NODE_TYPE = 4; // wrapper node
+	const NAME_NODE_TYPE = 1;
+	const AGG_NODE_TYPE = 2;
+	const FILTER_WRAPPER_NODE_TYPE = 3;
+	const AGG_WRAPPER_NODE_TYPE = 4;
 
 	/**
 	 * @param array<mixed> $request
@@ -108,8 +106,6 @@ class RequestParser {
 	}
 
 	/**
-	 * Sorting the keys of Kibana's request object following Elastic's logic
-	 *
 	 * string|int $parentKey
 	 * @param array<string|int> $keys
 	 * @return array<string|int>
@@ -117,7 +113,7 @@ class RequestParser {
 	protected function sortKeysByParsePriority(string|int $parentKey, array $keys): array {
 		switch ($parentKey) {
 			case '':
-				return static::HANDLED_ROOT_KEYS;
+				return static::HANDLED_ROOT_NODES;
 			case 'aggs':
 				usort($keys, fn ($k1) => is_numeric($k1) ? 1 : -1);
 				return $keys;

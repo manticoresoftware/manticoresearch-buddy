@@ -17,7 +17,7 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\In
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Interfaces\FilterNodeInterface;
 
 /**
- *  Filter node of Kibana search request used for filtering Kibana aggregations
+ *  Filter node of Kibana search request
  */
 class GroupFilter extends AggNode implements AliasedNodeInterface, FilterNodeInterface {
 
@@ -139,8 +139,6 @@ class GroupFilter extends AggNode implements AliasedNodeInterface, FilterNodeInt
 		if ($this->isDirect) {
 			$this->request->addWhereExpr($this->whereExpr);
 		} else {
-			// If a filter cannot be added directly in the request, we apply Manticore's IF expression instead
-			// to use the result later while post-processing Manticore response
 			$this->ifField = "if($this->whereExpr,1,0)";
 			$this->request->addField($this->ifField, $this->fieldAlias);
 			$groupField = $this->fieldAlias ?: $this->ifField;
@@ -177,16 +175,13 @@ class GroupFilter extends AggNode implements AliasedNodeInterface, FilterNodeInt
 		}
 		$buckets = &$subNode['buckets'];
 		$count = array_key_exists($this->countField, $dataRow) ? $dataRow[$this->countField] : 0;
-
 		$isWrapperFilter = !array_key_exists($this->fieldAlias, $dataRow);
 		$dataField = $this->fieldAlias ?: $this->field;
 		$isMatchingFilter = $isWrapperFilter || $dataRow[$dataField];
 		if (!array_key_exists($this->name, $buckets)) {
-			// Create a new bucket for the filter data
 			$buckets[$this->name] = [
 				'doc_count' => $isMatchingFilter ? $count : 0,
 			];
-			// Create an empty object for the bucket's sub-data if it doesn't exist yet
 			if ($nextNodeKey !== $this->key && !array_key_exists($nextNodeKey, $buckets[$this->name])) {
 				$buckets[$this->name][$nextNodeKey] = [
 					'buckets' => [],
@@ -196,7 +191,6 @@ class GroupFilter extends AggNode implements AliasedNodeInterface, FilterNodeInt
 			$buckets[$this->name]['doc_count'] += $count;
 		}
 
-		// We return an empty result if a filter is not matched in the current node sub-tree
 		return $isMatchingFilter ? [$this->key, 'buckets', $this->name] : [];
 	}
 

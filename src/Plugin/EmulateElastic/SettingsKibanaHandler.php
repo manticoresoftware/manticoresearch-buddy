@@ -38,7 +38,7 @@ class SettingsKibanaHandler extends BaseHandler {
 	public function run(): Task {
 		self::initQueryMap('Settings');
 
-		return self::getResponseByQuery($this->payload->path);
+		return self::getResponseByQuery('Settings', $this->payload->path);
 	}
 
 	/**

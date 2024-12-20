@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Response\Sorting\Metric;
 
-// Represents aggregation operations performed by Kibana
 enum Operation: string {
 	case MAX = 'max';
 	case MIN = 'min';

@@ -58,7 +58,6 @@ final class Histogram extends GroupExprNode {
 		$docCount = $dataRow[$this->countField];
 		$bucketKey = $this->findBucket($buckets, 'key', $dataFieldVal);
 		if ($bucketKey === -1) {
-			// Creating a new histogram bucket
 			$bucketKey = sizeof($buckets);
 			$buckets[$bucketKey] = [
 				'key' => $dataFieldVal,

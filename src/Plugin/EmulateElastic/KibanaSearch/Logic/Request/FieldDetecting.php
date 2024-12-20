@@ -21,7 +21,6 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\TableFieldInfo
 
 /**
  *  Checks if Kibana's request fields exist in the given table
- *  Used in cases when the Kibana request relates to multiple tables
  */
 class FieldDetecting implements FailableLogicInterface {
 
@@ -62,15 +61,12 @@ class FieldDetecting implements FailableLogicInterface {
 		$tableFields = $this->tableFieldInfo->getFieldNamesByTable(
 			$this->sphinxQLRequest->getTable()
 		);
-		// If a table misses all fields necessary for the given request, skip it
 		if ($this->areCrucialFieldsMissing($tableFields)) {
 			$this->isFailed = true;
 			$this->disableAllNodes();
 
 			return $this;
 		}
-		// If multiple tables present, we don't peform direct grouping for argument fields in Kibana metric nodes
-		// so we disable such nodes
 		foreach (array_keys($this->argFieldInfo) as $i) {
 			if (!array_diff($this->argFieldInfo[$i], $tableFields)) {
 				continue;

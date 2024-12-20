@@ -132,8 +132,6 @@ class Sorting extends BaseLogic {
 	}
 
 	/**
-	 * Getting helpers to calculate aggregate values for metric fields
-	 *
 	 * @param string $fieldName
 	 * @return MetricCalculatorInterface
 	 */
@@ -164,8 +162,6 @@ class Sorting extends BaseLogic {
 	}
 
 	/**
-	 * Creating sortField objects based on data from the fields that need to be sorted
-	 *
 	 * @return void
 	 */
 	protected function createSortFields(): void {

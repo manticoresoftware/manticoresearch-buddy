@@ -15,8 +15,8 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Response
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\GroupFilter;
 
 /**
- *  Processes 'concurrent' filters from the Kibana request,
- *  i.e. the ones, that must be treated as if the parts of the MySQL UNION query
+ *  Processes search responses from Manticore setting the values of aggregation fields empty for the rows
+ *  that must be filtered out by Kibana's filtering rules
  */
 class Processing extends BaseLogic {
 

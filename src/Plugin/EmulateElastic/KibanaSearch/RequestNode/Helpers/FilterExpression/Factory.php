@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Helpers\FilterExpression;
 
 /**
- *  Creates logical expression objects to be used for filter nodes
+ *  Builds logical expressions for filter nodes
  */
 final class Factory {
 

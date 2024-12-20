@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch;
 
 /**
- *  Handles the creation of SphinxQL search requests sent to Manticore
+ *  Handles the creation of SphinxQL search requests to Manticore
  */
 final class SphinxQLRequest {
 
@@ -58,7 +58,6 @@ final class SphinxQLRequest {
 		$this->checkForCountField();
 
 		$query = '';
-		// Building necessary query clauses according to the request data
 		if ($this->whereExprs) {
 			$whereClause = implode(' AND ', $this->whereExprs);
 			$query .= " WHERE $whereClause";
@@ -178,7 +177,7 @@ final class SphinxQLRequest {
 	}
 
 	/**
-	 * The Count field must always exist in the query
+	 * The Count field must present in the query anyway
 	 *
 	 * @return void
 	 */

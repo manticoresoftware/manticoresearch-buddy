@@ -14,7 +14,8 @@ namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Re
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\Logic\Response\Interfaces\ResponseLogicInterface;
 
 /**
- *  Base class for the implementation of response post-processing logic
+ *  Processes search responses from Manticore setting the values of aggregation fields empty for the rows
+ *  that must be filtered out by Kibana's filtering rules
  */
 abstract class BaseLogic implements ResponseLogicInterface {
 

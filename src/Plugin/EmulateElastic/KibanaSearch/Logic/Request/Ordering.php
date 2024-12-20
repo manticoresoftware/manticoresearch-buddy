@@ -50,8 +50,6 @@ class Ordering implements RequestLogicInterface {
 		$orderFields = $this->determineOrderFields();
 		$this->determineIfComplex();
 		foreach ($this->orderedNodes as $i => $node) {
-			// If there's a complex ordering, we just use the default order of the node field
-			// and perform actual ordering later, in post-processing
 			if ($this->isComplex) {
 				$node->setDefaultOrder(true);
 			}
@@ -76,8 +74,6 @@ class Ordering implements RequestLogicInterface {
 			)
 		);
 		$groupNodeCount = $orderedNodeCount + $filterNodeCount + $this->groupExprNodeCount;
-		// If there're multiple group fields to be ordered or ordering includes metric fields,
-		// it can not be executed directly by Manticore
 		$this->isComplex = ($groupNodeCount > 1)
 			&& ($this->hasMetricOrders || ($groupNodeCount > $orderedNodeCount));
 	}
@@ -104,17 +100,18 @@ class Ordering implements RequestLogicInterface {
 	}
 
 	/**
-	 * Determines which request fields need to be ordered
-	 *
 	 * @return array<int,string>
 	 */
 	protected function determineOrderFields(): array {
-		$orderFields = [];
+		$orderFields = $orderInfo = [];
 		$this->hasMetricOrders = false;
 		foreach ($this->orderedNodes as $i => $node) {
 			$origOrderField = $node->getOrderField();
 			$nodeField = $node->getField();
-			if ($origOrderField === $nodeField) {
+			if (!$orderInfo) {
+				$orderInfo = [$origOrderField, $node->getOrder()];
+			}
+			if (($origOrderField === $nodeField)) {
 				$orderFields[$i] = '';
 				continue;
 			}

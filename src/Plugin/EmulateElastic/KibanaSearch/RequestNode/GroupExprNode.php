@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode;
 
 /**
- *  Node of Kibana search request representing Kibana expressions that include grouping functions
+ *  Node of Kibana search request
  */
 abstract class GroupExprNode extends ExprNode {
 

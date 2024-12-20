@@ -14,7 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestN
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\SphinxQLRequest;
 
 /**
- *  Node of Kibana search request representing Kibana aggregation
+ *  Node of Kibana search request
  */
 abstract class AggNode extends BaseNode {
 
@@ -44,7 +44,6 @@ abstract class AggNode extends BaseNode {
 	 * @return void
 	 */
 	protected function makeResponseBucketsIfNotExist(array &$responseNode, array $extraData = []): void {
-		// If a bucket for the given key exists already, skip
 		if (array_key_exists($this->key, $responseNode)
 			&& (is_array($responseNode[$this->key]) && array_key_exists('buckets', $responseNode[$this->key]))
 		) {

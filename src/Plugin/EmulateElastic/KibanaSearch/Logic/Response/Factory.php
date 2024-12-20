@@ -25,7 +25,7 @@ use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Me
 use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\KibanaSearch\RequestNode\Term;
 
 /**
- * Creates response logic objects
+ * Creates node objects from Kibana request data
  */
 class Factory extends RequestFactory {
 
