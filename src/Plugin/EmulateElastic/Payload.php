@@ -23,6 +23,12 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  */
 final class Payload extends BasePayload {
 
+	// Endpoint position in Kibana request path
+	const KIBANA_ENDPOINT_PATH_POS = [
+		0 => ['_aliases', '_alias', '_cat', 'field_caps', '_template'],
+		1 => ['_create', '_doc', '_update', 'field_caps'],
+	];
+
 	/**
 	 * @var string $requestTarget
 	 */
@@ -65,21 +71,10 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$pathParts = explode('/', ltrim($request->path, '/'));
 		$self->path = $request->path;
-		static::$requestTarget = end($pathParts);
-		// As of now, we process all telemetry/metric related requests from Kibana in the same way
-		if (str_ends_with(static::$requestTarget, 'telemetry')) {
-			static::$requestTarget = 'telemetry';
-		} elseif (str_starts_with(static::$requestTarget, 'ui-metric')) {
-			static::$requestTarget = 'metric';
-		} elseif (str_contains(static::$requestTarget, 'config')) {
-			static::$requestTarget = 'config';
-		} elseif (str_contains(static::$requestTarget, 'space')) {
-			static::$requestTarget = 'space';
-		} elseif (str_contains(static::$requestTarget, 'index-pattern')) {
-			$self->path = (string)preg_replace('/index-pattern%3A\S+$/', 'index-pattern', $self->path);
-			static::$requestTarget = 'index-pattern';
-		}
+		self::detectRequestTarget($pathParts, $self);
 		switch (static::$requestTarget) {
+			case '_cat':
+			case '_count':
 			case '_license':
 			case '_nodes':
 			case '_xpack':
@@ -94,9 +89,22 @@ final class Payload extends BasePayload {
 			case 'telemetry':
 			case 'stats':
 				break;
-			case '_search':
-				static::$requestError = $request->error;
-				$self->table = $pathParts[0];
+			case '_doc':
+				static::$requestTarget .= '_' . strtolower($request->httpMethod);
+				$self->body = $request->payload;
+				break;
+			case '_create':
+			case '_bulk':
+			case '_update':
+			case '_mget':
+				$self->body = $request->payload;
+				break;
+			case '_alias':
+				$self->table = end($pathParts);
+				break;
+			case '_aliases':
+			case '_field_caps':
+				$self->table = static::$requestTarget;
 				$self->body = $request->payload;
 				break;
 			case '_mapping':
@@ -112,6 +120,15 @@ final class Payload extends BasePayload {
 				$self->columnInfo = $requestBody['properties'];
 				$self->table = $pathParts[0];
 				break;
+			case '_search':
+				static::$requestError = $request->error;
+				$self->table = $pathParts[0];
+				$self->body = $request->payload;
+				break;
+			case '_template':
+				$self->table = end($pathParts);
+				$self->body = $request->payload;
+				break;
 			default:
 				if ($pathParts[0] === '_index_template') {
 					// Need this to avoid sending the 404 response for Elasticdump's requests which causes its failure
@@ -123,6 +140,36 @@ final class Payload extends BasePayload {
 		}
 
 		return $self;
+	}
+
+	/**
+	 * @param array<string> $pathParts
+	 * @param Payload $payload
+	 * @return void
+	 */
+	protected static function detectRequestTarget(array $pathParts, Payload &$payload): void {
+		$requestTarget = (string)end($pathParts);
+		foreach (self::KIBANA_ENDPOINT_PATH_POS as $pos => $endpoints) {
+			if (isset($pathParts[$pos]) && in_array($pathParts[$pos], $endpoints)) {
+				$requestTarget = $pathParts[$pos];
+				break;
+			}
+		}
+		// As of now, we process all telemetry/metric related requests from Kibana in the same way
+		if (str_ends_with($requestTarget, 'telemetry')) {
+			static::$requestTarget = 'telemetry';
+		} elseif (str_starts_with($requestTarget, 'ui-metric')) {
+			static::$requestTarget = 'metric';
+		} elseif (str_contains($requestTarget, 'config')) {
+			static::$requestTarget = 'config';
+		} elseif (str_contains($requestTarget, 'space')) {
+			static::$requestTarget = 'space';
+		} elseif (str_contains($requestTarget, 'index-pattern')) {
+			$payload->path = (string)preg_replace('/index-pattern%3A\S+$/', 'index-pattern', $payload->path);
+			static::$requestTarget = 'index-pattern';
+		} else {
+			static::$requestTarget = $requestTarget;
+		}
 	}
 
 	/**
@@ -140,9 +187,19 @@ final class Payload extends BasePayload {
 		if (!isset(static::$requestError)) {
 			throw new Exception('Error type is not defined');
 		}
-
+		if (str_starts_with(static::$requestError, 'not supported index')) {
+			return 'TableKibanaHandler';
+		}
 		if (str_starts_with(static::$requestError, '"_source" property should be')) {
 			return 'InvalidSourceKibanaHandler';
+		}
+		if (preg_match('/bucket \'\S+\' without aggregate items/', static::$requestError)
+			|| str_contains(static::$requestError, 'invalid sorting order')
+			|| str_contains(static::$requestError, "sort-by attribute '_key' not found")
+			|| str_contains(static::$requestError, '"field" property missing')
+			|| str_contains(static::$requestError, 'nested "aggs" is not supported')
+		) {
+			return 'KibanaSearch\Handler';
 		}
 
 		throw new Exception('Cannot find handler for error: ' . static::$requestError);
@@ -154,15 +211,27 @@ final class Payload extends BasePayload {
 	public function getHandlerClassName(): string {
 		$namespace = __NAMESPACE__ . '\\';
 		$handlerName = match (static::$requestTarget) {
+			'_alias' => 'GetAliasesHandler',
+			'_aliases' => 'AddAliasHandler',
+			'_bulk' => 'ImportKibanaHandler',
+			'_cat' => 'CatHandler',
+			'_count' => 'CountInfoKibanaHandler',
+			'_create', '_doc_post' => 'AddEntityHandler',
+			'_doc_get' => 'GetEntityHandler',
+			'_mget' => 'MgetKibanaHandler',
+			'_field_caps' => 'FieldCapsHandler',
 			'_license' => 'LicenseHandler',
 			'_nodes' => 'NodesInfoKibanaHandler',
 			'_xpack' => 'XpackInfoKibanaHandler',
-			'.kibana', 'config', 'space', 'index-pattern' => 'SettingsKibanaHandler',
+			'.kibana', '.kibana_task_manager' => 'InitKibanaHandler',
+			'config', 'space', 'index-pattern' => 'SettingsKibanaHandler',
 			'_mapping' => 'CreateTableHandler',
-			'.kibana_task_manager', '_update_by_query' => 'ManagerSettingsKibanaHandler',
+			'_update_by_query' => 'ManagerSettingsKibanaHandler',
 			'settings', 'stats' => 'ClusterKibanaHandler',
 			'metric' => 'MetricKibanaHandler',
 			'telemetry' => 'TelemetryKibanaHandler',
+			'_template' => 'AddTemplateHandler',
+			'_update' => 'UpdateEntityHandler',
 			'_search' => self::getKibanaSearchRequestHandler(),
 			default => throw new Exception('Cannot find handler for request type: ' . static::$requestTarget),
 		};

@@ -38,7 +38,7 @@ class ClusterKibanaHandler extends BaseHandler {
 	public function run(): Task {
 		self::initQueryMap('Cluster');
 
-		return self::getResponseByQuery($this->payload->path);
+		return self::getResponseByQuery('Cluster', $this->payload->path);
 	}
 
 	/**
