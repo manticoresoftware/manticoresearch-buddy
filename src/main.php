@@ -51,8 +51,9 @@ $server = Server::create(
 	'reactor_num' => $threads,
 	'worker_num' => max(1, (int)($threads / 4)),
 	'enable_reuse_port' => true,
-	'input_buffer_size' => 2097152,
-	'buffer_output_size' => 32 * 1024 * 1024, // byte in unit
+	'input_buffer_size' => 4 * 1024 * 1024,
+	'package_max_length' => 16 * 1024 * 1024, // byte in unit
+	'buffer_output_size' => 64 * 1024 * 1024, // byte in unit
 	'tcp_fastopen' => true,
 	// better not change, different oses different behaviour
 	// 'max_conn' => $threads * 2,
