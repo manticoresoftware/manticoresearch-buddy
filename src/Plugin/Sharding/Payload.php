@@ -140,7 +140,6 @@ final class Payload extends BasePayload {
 			&& strpos($request->error, 'P03') === 0
 			&& (
 				(stripos($request->payload, 'create table') === 0
-					&& stripos($request->payload, 'rf') !== false
 					&& stripos($request->payload, 'shards') !== false
 					&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/', $request->payload)
 				) || stripos($request->payload, 'drop') === 0
@@ -152,6 +151,10 @@ final class Payload extends BasePayload {
 	 * @return void
 	 */
 	protected function validate(): void {
+		if ($this->type === 'create' && !isset($this->options['rf'])) {
+			throw QueryParseError::create('Sharded table requires `rf=n`');
+		}
+
 		if (!$this->cluster && $this->type !== 'drop' && $this->options['rf'] > 1) {
 			throw QueryParseError::create('You cannot set rf greater than 1 when creating single node sharded table.');
 		}
