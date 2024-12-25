@@ -270,7 +270,7 @@ final class Queue {
 				'Trying to initialize while already initialized.'
 			);
 		}
-		$query = "CREATE TABLE `{$this->table}` (
+		$query = "CREATE TABLE {$this->table} (
 			`node` string,
 			`query` string,
 			`wait_for_id` bigint,
