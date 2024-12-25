@@ -710,7 +710,7 @@ final class Table {
 				'Trying to initialize while already initialized.'
 			);
 		}
-		$query = "CREATE TABLE `{$this->table}` (
+		$query = "CREATE TABLE {$this->table} (
 		`cluster` string,
 		`node` string,
 		`table` string,
