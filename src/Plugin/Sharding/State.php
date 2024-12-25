@@ -151,7 +151,7 @@ final class State {
 				'Trying to initialize while already initialized.'
 			);
 		}
-		$query = "CREATE TABLE `{$this->table}` (
+		$query = "CREATE TABLE {$this->table} (
 			`key` string,
 			`value` json,
 			`updated_at` timestamp
