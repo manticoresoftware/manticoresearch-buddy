@@ -75,21 +75,21 @@ class InsertQueryTest extends TestCase {
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
 		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
-		if (!isset($outData['_index'], $outData['result'])) {
+		if (!isset($outData['table'], $outData['result'])) {
 			$this->fail();
 		}
 		$result = [$this->testTable, 'created'];
-		$this->assertEquals($result, [$outData['_index'], $outData['result']]);
+		$this->assertEquals($result, [$outData['table'], $outData['result']]);
 
 		$out = static::runHttpQuery($query, true, "{$this->testTable}/_doc/2");
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
 		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
-		if (!isset($outData['_id'], $outData['_index'], $outData['result'])) {
+		if (!isset($outData['_id'], $outData['table'], $outData['result'])) {
 			$this->fail();
 		}
 		$result = [2, $this->testTable, 'updated'];
-		$this->assertEquals($result, [$outData['_id'], $outData['_index'], $outData['result']]);
+		$this->assertEquals($result, [$outData['_id'], $outData['table'], $outData['result']]);
 	}
 
 	public function testHTTPElasticInsertQueryFail(): void {
