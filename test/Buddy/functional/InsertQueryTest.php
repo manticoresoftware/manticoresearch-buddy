@@ -102,11 +102,7 @@ class InsertQueryTest extends TestCase {
 		if (!isset($outData['error'])) {
 			$this->fail();
 		}
-		$result = [
-			'type' => 'index_not_found_exception',
-			'reason' => 'no such index [test]',
-			'table' => 'test',
-		];
+		$result = '/test/_create - unsupported endpoint';
 		$this->assertEquals($result, $outData['error']);
 	}
 
