@@ -88,7 +88,7 @@ class InsertQueryTest extends TestCase {
 		if (!isset($outData['_id'], $outData['table'], $outData['result'])) {
 			$this->fail();
 		}
-		$result = [2, $this->testTable, 'updated'];
+		$result = [2, $this->testTable, 'created'];
 		$this->assertEquals($result, [$outData['_id'], $outData['table'], $outData['result']]);
 	}
 
