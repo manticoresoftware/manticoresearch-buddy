@@ -29,10 +29,10 @@ return [
 		'version_conflicts' => 0,
 	],
 	'.kibana_task_manager' => [
-		'.kibana_task_manager_1' => [
-			'aliases' => [
-				'.kibana_task_manager' => [],
-			],
+		//'.kibana_task_manager_1' => [
+		//	'aliases' => [
+		//		'.kibana_task_manager' => [],
+		//	],
 			'mappings' => [
 				'dynamic' => 'strict',
 				'_meta' => [
@@ -154,6 +154,6 @@ return [
 					],
 				],
 			],
-		],
+		//],
 	],
 ];

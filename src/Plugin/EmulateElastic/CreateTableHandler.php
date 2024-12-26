@@ -105,12 +105,19 @@ class CreateTableHandler extends BaseHandlerWithClient {
 				throw new \Exception("Unsupported data type $dataType found in the data schema");
 			}
 			$colType = $dataTypeMap[$dataType];
+
+			$isIndexedText = ($colType === 'text' && isset($colInfo['fields'], $colInfo['fields']['keyword']));
+			if ($isIndexedText) {
+				$colType = 'string';
+			}
+
 			$dataTypeOptions = match (true) {
 				($dataType === 'knn_vector') => self::buildKnnFieldSettings($colInfo),
-				($colType === 'text' && isset($colInfo['fields'], $colInfo['fields']['keyword'])) => ' indexed',
+				$isIndexedText => ' indexed attribute',
 				default => '',
 			};
-			$colDefs[] = "$colName $colType" . $dataTypeOptions;
+
+			$colDefs[] = "`$colName` $colType" . $dataTypeOptions;
 		}
 
 		return implode(',', $colDefs);

@@ -17,36 +17,40 @@ use RuntimeException;
 
 trait QueryMapLoaderTrait {
 
-	/** @var array<mixed> $queryMap */
-	protected static $queryMap = null;
+	/** @var array<string,array<string,mixed>> $queryMap */
+	protected static $queryMap = [];
 
 	/**
 	 * @param string $mapName
 	 * @return void
 	 */
 	protected static function initQueryMap(string $mapName): void {
-		if (static::$queryMap !== null) {
+		if (isset(static::$queryMap[$mapName])) {
 			return;
 		}
 		$queryMapFilePattern = __DIR__ . '/QueryMap/%MAP_NAME%.php';
 		/** @var array<mixed> $queryMap */
 		$queryMap = include (string)str_replace('%MAP_NAME%', $mapName, $queryMapFilePattern);
-		static::$queryMap = $queryMap;
+		static::$queryMap[$mapName] = $queryMap;
 	}
 
 	/**
 	 * @param string $query
+	 * @param string $mapName
 	 * @param ?\Closure $preprocessor
 	 * @return Task
 	 * @throws RuntimeException
 	 */
-	protected static function getResponseByQuery(string $query, ?\Closure $preprocessor = null): Task {
-		if (!isset(self::$queryMap[$query])) {
+	protected static function getResponseByQuery(string $mapName, string $query, ?\Closure $preprocessor = null): Task {
+		if (!isset(self::$queryMap[$mapName])) {
+			throw new \Exception("Unknown error on $mapName query map load");
+		}
+		if (!isset(self::$queryMap[$mapName][$query])) {
 			throw new \Exception("Unknown request path passed: $query");
 		}
 
 		/** @var array<mixed> $resp */
-		$resp = self::$queryMap[$query];
+		$resp = self::$queryMap[$mapName][$query];
 		if ($preprocessor !== null) {
 			$preprocessor($resp);
 		}
