@@ -363,11 +363,10 @@ final class CreateKafka extends BaseCreateSourceHandler {
 	public static function parseMapping(array $fields): array {
 		$schema = [];
 		$customMapping = [];
+		$pattern = '/^`?([a-zA-Z0-9_]+)`?\s*[\'"]+(.*)[\'"]+\s([a-zA-Z]+)$/usi';
 
 		foreach ($fields as $field) {
 			$definition = strtolower($field['base_expr']);
-
-			$pattern = '/^`?([a-zA-Z0-9_]+)`?\s*[\'"]+(.*)[\'"]+\s([a-zA-Z]+)$/usi';
 
 			if (preg_match($pattern, $definition, $matches)) {
 				$schema[] = $matches[1].' '.$matches[3];
