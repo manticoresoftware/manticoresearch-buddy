@@ -130,8 +130,6 @@ final class CreateKafka extends BaseCreateSourceHandler {
 		$options = self::parseOptions($payload);
 
 
-		Buddy::debugv('---------->'.json_encode($options));
-
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
 			" WHERE match('@name \"" . $options->name . "\"')";
