@@ -25,7 +25,7 @@ final class State {
 	public function __construct(
 		protected Client $client
 	) {
-		$this->table = '_sharding_state';
+		$this->table = 'system.sharding_state';
 	}
 
 	/**
@@ -143,7 +143,7 @@ final class State {
 				'Trying to initialize while already initialized.'
 			);
 		}
-		$query = "CREATE TABLE `{$this->table}` (
+		$query = "CREATE TABLE {$this->table} (
 			`key` string,
 			`value` string,
 			`updated_at` timestamp
