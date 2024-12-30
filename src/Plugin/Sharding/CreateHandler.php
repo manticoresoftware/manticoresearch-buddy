@@ -150,19 +150,21 @@ final class CreateHandler extends BaseHandlerWithClient {
 			$timeout = $payload->getShardingTimeout();
 			while (true) {
 				// TODO: think about the way to refactor it and remove duplication
-				$q = "select `value` from _sharding_state where `key` = 'table:{$payload->table}'";
+				$q = "select value[0] as value from _sharding_state where `key` = 'table:{$payload->table}'";
 				$resp = $client->sendRequest($q);
 				$result = $resp->getResult();
 				/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
-				if (isset($result[0]['data'][0]['value'])) {
-					$value = json_decode($result[0]['data'][0]['value'], true);
-				}
+				$value = json_decode($result[0]['data'][0]['value'] ?? '[]', true);
 
 				/** @var array{result:string,status?:string,type?:string} $value */
 				$type = $value['type'] ?? 'unknown';
 				$status = $value['status'] ?? 'processing';
 				if ($type === 'create' && $status !== 'processing') {
-					return TaskResult::fromResponse(Response::fromBody($value['result']));
+					// We have multiple encode decode cuz manticore does not support json inside json and says
+					// TOK_IDENT we should fix it when possible and review
+					/** @var string */
+					$body = json_encode($value['result']);
+					return TaskResult::fromResponse(Response::fromBody($body));
 				}
 				if ((time() - $ts) > $timeout) {
 					break;
