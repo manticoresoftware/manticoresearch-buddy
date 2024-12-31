@@ -25,8 +25,8 @@ final class Payload extends BasePayload {
 
 	// Endpoint position in Kibana request path
 	const KIBANA_ENDPOINT_PATH_POS = [
-		0 => ['_aliases', '_alias', '_cat', 'field_caps', '_template'],
-		1 => ['_create', '_doc', '_update', 'field_caps'],
+		0 => ['_aliases', '_alias', '_cat', '_field_caps', '_template'],
+		1 => ['_create', '_doc', '_update', '_field_caps'],
 	];
 
 	/**
