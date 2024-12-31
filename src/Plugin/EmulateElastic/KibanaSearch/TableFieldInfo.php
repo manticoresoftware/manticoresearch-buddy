@@ -82,7 +82,8 @@ class TableFieldInfo {
 		 */
 		$requestTableInfo = $this->manticoreClient->sendRequest(
 			'{"fields":"*"}',
-			$requestTable . static::REQUEST_TABLE_INFO_ENDPOINT
+			$requestTable . static::REQUEST_TABLE_INFO_ENDPOINT,
+			true
 		)->getResult();
 
 		if ($table) {
