@@ -56,18 +56,19 @@ final class State {
 			: $this->table
 		;
 		$now = time();
-		$encodedValue = addcslashes(json_encode($value) ?: '', "'");
+		$encodedValue = addcslashes(json_encode($value) ?: 'null', "'");
+
 		$query = match ($this->fetch($key)) {
 			null => "
 				INSERT INTO {$table}
 					(`key`, `value`, `updated_at`)
 						VALUES
-					('{$key}', '{$encodedValue}', {$now})
+					('{$key}', '[{$encodedValue}]', {$now})
 			",
 			default => "
 				UPDATE {$table} SET
 					`updated_at` = {$now},
-					`value` = '{$encodedValue}'
+					`value` = '[{$encodedValue}]'
 				WHERE `key` = '{$key}'
 			",
 		};
@@ -100,7 +101,7 @@ final class State {
 		/** @var array{0:array{data?:array{0?:array{key:string,value:string}}}} $res */
 		$res = $this->client
 			->sendRequest(
-				"SELECT `key`, `value` FROM {$this->table} WHERE REGEX(`key`, '{$regex}')"
+				"SELECT `key`, value[0] AS value FROM {$this->table} WHERE REGEX(`key`, '{$regex}')"
 			)
 			->getResult();
 
@@ -124,11 +125,18 @@ final class State {
 	protected function fetch(string $key): mixed {
 		$res = $this->client
 			->sendRequest(
-				"SELECT value FROM {$this->table} WHERE key = '$key'"
+				"SELECT value[0] as value FROM {$this->table} WHERE key = '$key'"
 			)
 			->getResult();
 		/** @var array{0:array{data:array{0?:array{value:string}}}} $res */
-		$value = isset($res[0]['data'][0]) ? $res[0]['data'][0]['value'] : null;
+		$value = $res[0]['data'][0]['value'] ?? null;
+		if (is_string($value)) {
+			$value = trim($value);
+			// Manticore returns unquoted string for empty string
+			if (!str_starts_with($value, '{') && !str_ends_with($value, '}')) {
+				return $value;
+			}
+		}
 		return isset($value) ? json_decode($value, true) : null;
 	}
 
@@ -145,7 +153,7 @@ final class State {
 		}
 		$query = "CREATE TABLE `{$this->table}` (
 			`key` string,
-			`value` string,
+			`value` json,
 			`updated_at` timestamp
 		)";
 		$this->client->sendRequest($query);
