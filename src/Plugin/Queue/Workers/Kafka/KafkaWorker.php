@@ -28,9 +28,9 @@ class KafkaWorker implements WorkerRunnerInterface
 
 	private Client $client;
 	private string $brokerList;
-	/** @var array{string: string}  */
+	/** @var array<string, string> */
 	private array $customMapping;
-	/** @var array|string[] */
+	/** @var array<int, string> */
 	private array $topicList;
 	private string $consumerGroup;
 	private string $bufferTable;
@@ -65,7 +65,7 @@ class KafkaWorker implements WorkerRunnerInterface
 		$this->consumerGroup = $attrs['group'];
 		$this->brokerList = $attrs['broker'];
 
-		/** @var array{string:string} $decodedMapping */
+		/** @var array<string,string> $decodedMapping */
 		$decodedMapping = json_decode($instance['custom_mapping'], true);
 		$this->customMapping = $decodedMapping;
 		$this->bufferTable = $instance['buffer_table'];

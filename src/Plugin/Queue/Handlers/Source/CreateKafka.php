@@ -13,7 +13,9 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\CreateViewHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Error\QueryValidationError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -358,8 +360,10 @@ final class CreateKafka extends BaseCreateSourceHandler {
 	 *                          }[]
 	 *                      }[]
 	 *                  }[] $fields
+   *
    * @return array{customMapping: non-empty-string|false, schema:non-falsy-string}
-	 */
+	 * @throws GenericError
+*/
 	public static function parseMapping(array $fields): array {
 		$schema = [];
 		$customMapping = [];
@@ -377,8 +381,12 @@ final class CreateKafka extends BaseCreateSourceHandler {
 			$schema[] = $definition	;
 		}
 
+		$encodedMapping = json_encode($customMapping);
+		if ($encodedMapping === false) {
+			QueryValidationError::throw('Incorrect custom mapping provided');
+		}
 		return [
-			'customMapping' => json_encode($customMapping),
+			'customMapping' => $encodedMapping,
 			'schema' => '('.implode(',', $schema).')',
 		];
 	}
