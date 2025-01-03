@@ -95,7 +95,8 @@ final class DropSourceHandler extends BaseDropHandler {
 			/** @lang Manticore */
 			"DROP TABLE {$sourceRow['buffer_table']}",
 			/** @lang Manticore */
-			"UPDATE _views SET suspended=1 WHERE match('@source_name \"{$sourceRow['full_name']}\"')",
+			'UPDATE '.Payload::VIEWS_TABLE_NAME.' SET suspended=1 '.
+			"WHERE match('@source_name \"{$sourceRow['full_name']}\"')",
 			/** @lang Manticore */
 			"DELETE FROM _sources WHERE id = {$sourceRow['id']}",
 		];
@@ -103,6 +104,12 @@ final class DropSourceHandler extends BaseDropHandler {
 		foreach ($queries as $query) {
 			$request = $client->sendRequest($query);
 			if ($request->hasError()) {
+				if (str_contains(
+					(string)$request->getError(),
+					"unknown table '".Payload::VIEWS_TABLE_NAME."' in update request"
+				)) {
+					continue;
+				}
 				throw ManticoreSearchClientError::create((string)$request->getError());
 			}
 		}
