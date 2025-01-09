@@ -222,13 +222,18 @@ class QueryProcessor {
 		$disabledPlugins = static::getDisabledPlugins();
 		foreach ($list as $prefix => $plugins) {
 			foreach ($plugins as $plugin) {
+				$t = microtime(true);
 				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
 				/** @var BasePayload<T> $pluginPayloadClass */
 
 				$pluginPayloadClass = "$pluginPrefix\\Payload";
 				$pluginPayloadClass::setParser(static::$sqlQueryParser);
 				$hasMatch = $pluginPayloadClass::hasMatch($request);
-				Buddy::debugv('matching: ' . $plugin['short'] . ' - ' . ($hasMatch ? 'yes' : 'no'));
+				$duration = (int)((microtime(true) - $t) * 1000);
+				$debugMessage = '[' . $duration . 'ms] matching: ' .
+					$plugin['short'] . ' - ' .
+					($hasMatch ? 'yes' : 'no');
+				Buddy::debugv($debugMessage);
 				if (!$hasMatch) {
 					continue;
 				}
