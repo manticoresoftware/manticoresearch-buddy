@@ -142,22 +142,19 @@ final class Handler extends BaseHandlerWithClient {
 			ManticoreSearchResponseError::throw((string)$resp->getError());
 		}
 
+		/** @var array{hits:array{hits:array<array{_id?:int}>}} $result */
+		$result = $resp->getResult()->toArray();
 		$docId = (int)$payload->docId;
-		$resp->apply(
-			static function ($result) use ($docId) {
-			// Removing requested doc from result set
-				$filteredResults = [];
-				foreach ($result['hits']['hits'] as $v) {
-					if ($v['_id'] === $docId) {
-						continue;
-					}
-
-					$filteredResults[] = $v;
-				}
-				return $filteredResults;
+		$hits = [];
+		foreach ($result['hits']['hits'] as $v) {
+			if (isset($v['_id']) && $v['_id'] === $docId) {
+				continue;
 			}
-		);
-		return $resp;
+
+			$hits[] = $v;
+		}
+		$result['hits']['hits'] = $hits;
+		return Response::fromBody((string)json_encode($result));
 	}
 
 	/**
