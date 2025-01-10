@@ -99,8 +99,8 @@ final class Payload extends BasePayload {
 			$isSqlEndpoint = $request->endpointBundle === Endpoint::Sql
 				|| $request->endpointBundle === Endpoint::Cli;
 			$hasMatch = $isSqlEndpoint
-				&& strpos($request->error, 'not support insert') !== true
-				&& strpos($request->payload, 'insert') === 0;
+				&& $hasErrorMessage
+				&& stripos($request->payload, 'insert') === 0;
 		}
 
 		return $hasMatch;
