@@ -199,7 +199,7 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 		$results = [];
 
 		for ($i = $startFrom; $i < $iterations; $i++) {
-			$bufferTableName = "_buffer_{$sourceName}_$i";
+			$bufferTableName = Payload::BUFFER_TABLE_PREFIX.$sourceName."_$i";
 			$sourceFullName = "{$sourceName}_$i";
 
 			$parsedQuery['FROM'][0]['table'] = $bufferTableName;
