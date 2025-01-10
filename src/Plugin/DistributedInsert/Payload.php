@@ -195,7 +195,11 @@ final class Payload extends BasePayload {
 	 * @return Batch
 	 */
 	protected static function parseSqlPayload(Request $request): array {
-		preg_match('/^insert\s+into\s+`?([^ ]+?)`?(?:\s+\(([^)]+)\))?\s+values/ius', $request->payload, $matches);
+		$pattern = '/^insert\s+into\s+'
+			. '`?([a-z][a-z\_\-0-9]*)`?'
+			. '(?:\s*\(([^)]+)\))?\s+'
+			. 'values/ius';
+		preg_match($pattern, $request->payload, $matches);
 		$table = $matches[1] ?? null;
 		$fields = [];
 		if (isset($matches[2])) {
