@@ -70,7 +70,8 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		$hasErrorMessage = str_contains($request->error, 'not support insert');
+		$hasErrorMessage = stripos($request->error, 'not support insert') !== false;
+
 		// Insert or Replace
 		$hasMatch = ($request->endpointBundle === Endpoint::Insert
 			|| $request->endpointBundle === Endpoint::Replace)
