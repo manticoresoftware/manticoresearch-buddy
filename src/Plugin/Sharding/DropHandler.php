@@ -161,7 +161,9 @@ final class DropHandler extends BaseHandlerWithClient {
 					$type = $state['type'] ?? 'unknown';
 					$status = $state['status'] ?? 'processing';
 					if ($type === 'drop' && $status !== 'processing') {
-						return TaskResult::fromResponse(Response::fromBody($state['result']));
+						/** @var string */
+						$body = json_encode($state['result']);
+						return TaskResult::fromResponse(Response::fromBody($body));
 					}
 				}
 				if ((time() - $ts) > $timeout) {
