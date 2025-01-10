@@ -65,8 +65,13 @@ class KafkaWorker implements WorkerRunnerInterface
 		$this->consumerGroup = $attrs['group'];
 		$this->brokerList = $attrs['broker'];
 
-		/** @var array<string,string> $decodedMapping */
 		$decodedMapping = json_decode($instance['custom_mapping'], true);
+		if ($decodedMapping === false) {
+			GenericError::throw(
+				'Custom mapping decoding error: '.json_last_error_msg()
+			);
+		}
+		/** @var array<string,string> $decodedMapping */
 		$this->customMapping = $decodedMapping;
 		$this->bufferTable = $instance['buffer_table'];
 		$this->topicList = array_map(fn($item) => trim($item), explode(',', $attrs['topic']));
@@ -216,8 +221,7 @@ class KafkaWorker implements WorkerRunnerInterface
 		$row = [];
 		foreach ($this->fields as $fieldName => $fieldType) {
 			$inputKeyName = $fieldName;
-			if ($this->customMapping !== []
-				&& isset($this->customMapping[$fieldName])) {
+			if (isset($this->customMapping[$fieldName])) {
 				$inputKeyName = $this->customMapping[$fieldName];
 			}
 			if (isset($message[$inputKeyName])) {
