@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use SplFixedArray;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
@@ -224,9 +225,8 @@ final class Payload extends BasePayload {
 		static $insertPattern = '/^insert\s+into\s+'
 			. '`?([a-z][a-z\_\-0-9]*)`?'
 			. '(?:\s*\(([^)]+)\))?\s+'
-			. 'values/ius';
-		static $allValuesPattern = '/values\s*\((.*)\)/ius';
-		static $singleValuePattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'"
+			. 'values\s*\((.*)\)/ius';
+		static $valuePattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'"
 			. '|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\}/';
 
 
@@ -247,26 +247,35 @@ final class Payload extends BasePayload {
 		[$cluster, $table] = static::parseCluster($table);
 
 		// It's time to parse values
-		preg_match($allValuesPattern, $request->payload, $matches);
-		if (!isset($matches[1])) {
+		if (!isset($matches[3])) {
 			throw QueryParseError::create('Failed to parse values from the query');
 		}
 
-		$values = $matches[1];
-		preg_match_all($singleValuePattern, $values, $matches);
-		$values = array_map(trim(...), $matches[0]);
-		$batch = [];
+		$values = &$matches[3];
+		preg_match_all($valuePattern, $values, $matches);
+		$values = &$matches[0];
+		/* $values = array_map(trim(...), $matches[0]); */
 
 		$fieldCount = sizeof($fields);
 		$valueCount = sizeof($values);
-		for ($i = 0; $i < $valueCount; $i += $fieldCount) {
-			$slice = array_slice($values, $i, $fieldCount);
-			$doc = array_combine($fields, $slice);
-			if (isset($doc['id'])) {
-				$doc['id'] = (int)$doc['id'];
+		$batch = new SplFixedArray($valueCount / $fieldCount);
+		$n = 0;
+		$doc = [];
+		for ($i = 0; $i < $valueCount; $i++) {
+			$index = $i % $fieldCount;
+			$doc[$fields[$index]] = trim($values[$i], "'");
+			$isLast = ($index - 1) === 0;
+			if (!$isLast) {
+				continue;
 			}
-			$struct = Struct::fromData(['insert' => $doc]);
-			$batch[] = $struct;
+			$insert = [];
+			if (isset($doc['id'])) {
+				$insert['id'] = (int)$doc['id'];
+				unset($doc['id']);
+			}
+			$insert['doc'] = $doc;
+			$batch[$n++] = Struct::fromData(['insert' => $insert]);
+			$doc = [];
 		}
 		/** @var Batch */
 		return ["$cluster:$table" => $batch];
