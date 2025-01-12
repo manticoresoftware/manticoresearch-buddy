@@ -134,6 +134,7 @@ final class Payload extends BasePayload {
 		$table = '';
 		$rows = explode("\n", trim($request->payload));
 		$rowCount = sizeof($rows);
+		$tableMap = [];
 
 		for ($i = 0; $i < $rowCount; $i++) {
 			if (empty($rows[$i])) {
@@ -142,31 +143,56 @@ final class Payload extends BasePayload {
 
 			/** @var Struct<int|string,array<string,mixed>> $struct */
 			$struct = Struct::fromJson($rows[$i]);
-
-			if (isset($struct['index']['_index'])) { // _bulk
-				/** @var string $table */
-				$table = $struct['index']['_index'];
-				[$cluster, $table] = static::parseCluster($table);
-				$batch["$cluster:$table"][] = $struct;
-				continue;
-			}
-
-			if (isset($struct['insert'])) { // bulk
-				/** @var string $table */
-				$table = $struct['insert']['table'] ?? $struct['insert']['index'];
-				[$cluster, $table] = static::parseCluster($table);
-				$batch["$cluster:$table"][] = $struct;
-				continue;
-			}
-
-			if (!$table) {
-				throw new QueryParseError('Cannot find table name');
-			}
-
-			$batch["$cluster:$table"][] = $struct;
+			[$cluster, $table] = static::processBulkRow($struct, $batch, $tableMap, $cluster, $table);
 		}
 		/** @var Batch $batch */
 		return $batch;
+	}
+
+	/**
+	 * @param Struct<int|string,array<string,mixed>> $struct
+	 * @param Batch &$batch
+	 * @param array &$tableMap
+	 * @param string $cluster
+	 * @param string $table
+	 * @return array{0:string,1:string}
+	 * @throws QueryParseError
+	 */
+	protected static function processBulkRow(
+		Struct $struct,
+		array &$batch,
+		array &$tableMap,
+		string $cluster,
+		string $table
+	): array {
+		if (isset($struct['index']['_index'])) { // _bulk
+			/** @var string $table */
+			$table = $struct['index']['_index'];
+			if (!isset($tableMap[$table])) {
+				$tableMap[$table] = static::parseCluster($table);
+			}
+			[$cluster, $table] = $tableMap[$table];
+			$batch["$cluster:$table"][] = $struct;
+			return [$cluster, $table];
+		}
+
+		if (isset($struct['insert'])) { // bulk
+			/** @var string $table */
+			$table = $struct['insert']['table'] ?? $struct['insert']['index'];
+			if (!isset($tableMap[$table])) {
+				$tableMap[$table] = static::parseCluster($table);
+			}
+			[$cluster, $table] = $tableMap[$table];
+			$batch["$cluster:$table"][] = $struct;
+			return [$cluster, $table];
+		}
+
+		if (!$table) {
+			throw new QueryParseError('Cannot find table name');
+		}
+
+		$batch["$cluster:$table"][] = $struct;
+		return [$cluster, $table];
 	}
 
 	/**
@@ -195,11 +221,16 @@ final class Payload extends BasePayload {
 	 * @return Batch
 	 */
 	protected static function parseSqlPayload(Request $request): array {
-		$pattern = '/^insert\s+into\s+'
+		static $insertPattern = '/^insert\s+into\s+'
 			. '`?([a-z][a-z\_\-0-9]*)`?'
 			. '(?:\s*\(([^)]+)\))?\s+'
 			. 'values/ius';
-		preg_match($pattern, $request->payload, $matches);
+		static $allValuesPattern = '/values\s*\((.*)\)/ius';
+		static $singleValuePattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'"
+			. '|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\}/';
+
+
+		preg_match($insertPattern, $request->payload, $matches);
 		$table = $matches[1] ?? null;
 		$fields = [];
 		if (isset($matches[2])) {
@@ -216,16 +247,13 @@ final class Payload extends BasePayload {
 		[$cluster, $table] = static::parseCluster($table);
 
 		// It's time to parse values
-		$pattern = '/values\s*\((.*)\)/ius';
-		preg_match($pattern, $request->payload, $matches);
-
+		preg_match($allValuesPattern, $request->payload, $matches);
 		if (!isset($matches[1])) {
 			throw QueryParseError::create('Failed to parse values from the query');
 		}
 
 		$values = $matches[1];
-		$pattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\}/";
-		preg_match_all($pattern, $values, $matches);
+		preg_match_all($singleValuePattern, $values, $matches);
 		$values = array_map(trim(...), $matches[0]);
 		$batch = [];
 

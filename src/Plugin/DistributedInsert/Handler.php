@@ -45,32 +45,49 @@ final class Handler extends BaseHandlerWithFlagCache {
 				[$cluster, $table] = $this->payload::parseCluster($table);
 				$shards = $this->getShards($table);
 				$shardCount = sizeof($shards);
-				$idPool = $this->getNewDocIds(sizeof($batch));
-				$rows = [];
+
+				// Group rows by shard
+				$shardRows = [];
+				$n = 0;
+
 				foreach ($batch as $struct) {
-					/** @var Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct */
-					if ($this->shouldAssignId($struct)) {
-						$id = $this->assignId($struct, $idPool);
-						$idStr = (string)$id;
-						$positions[$idStr] = [
-							'n' => $n++,
-							'table' => $table,
-							'cluster' => $cluster,
-						];
-						$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
-						$info = $shards[$shard];
-						$shardName = $info['name'];
-						$this->assignTable($struct, $cluster, $shardName);
+					if (!$this->shouldAssignId($struct)) {
+						continue;
 					}
-					$rows[] = $struct->toJson();
+
+					$id = $this->assignId($struct);
+					$idStr = (string)$id;
+					$positions[$idStr] = [
+						'n' => $n++,
+						'table' => $table,
+						'cluster' => $cluster,
+					];
+
+					$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
+					$info = $shards[$shard];
+					$shardName = $info['name'];
+					$this->assignTable($struct, $cluster, $shardName);
+
+					if (!isset($shardRows[$shardName])) {
+						$shardRows[$shardName] = [
+							'info' => $info,
+							'rows' => [],
+						];
+					}
+
+					$shardRows[$shardName]['rows'][] = $struct->toJson();
 				}
 
-				if (!isset($info)) {
+				if (empty($shardRows)) {
 					throw new ManticoreSearchClientError('Failed to prepare docs for insertion');
 				}
 
-				$requests[] = $this->getRequest($info, $rows);
+				// Create requests for each shard
+				foreach ($shardRows as $shardName => $shardData) {
+					$requests[] = $this->getRequest($shardData['info'], $shardData['rows']);
+				}
 			}
+
 			return $this->processRequests($requests, $positions);
 		};
 
@@ -270,10 +287,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 	/**
 	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
-	 * @param array<int> &$idPool
 	 * @return int
 	 */
-	protected function assignId(Struct $struct, array &$idPool): int {
+	protected function assignId(Struct $struct): int {
+		static $idPool = [];
+
 		$id = match (true) {
 			// _bulk
 			isset($struct['index']['_id']) => $struct['index']['_id'],
@@ -285,6 +303,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		};
 		// When id = 0 we generate
 		if (!$id) {
+			// When we have no pool we fetch it by batches for performance
+			if (!$idPool) {
+				$idPool = $this->getNewDocIds(1000);
+			}
+
 			$id = array_pop($idPool);
 		}
 		if (!$id) {

@@ -48,18 +48,34 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		return ($request->payload === ''
-			&& $request->endpointBundle !== Endpoint::Bulk && $request->endpointBundle !== Endpoint::Elastic) ||
-			stripos($request->payload, 'set sql_quote_show_create') === 0 ||
-			stripos($request->payload, 'set @saved_cs_client') === 0 ||
-			stripos($request->payload, 'set @@session') === 0 ||
-			stripos($request->payload, 'set character_set_client') === 0 ||
-			stripos($request->payload, 'set session character_set_results') === 0 ||
-			stripos($request->payload, 'set session transaction') === 0 || // DataGrip
-			stripos($request->payload, 'set SQL_SELECT_LIMIT') === 0
-				|| // DataGrip
-			stripos($request->payload, 'create database') === 0 ||
-			stripos($request->payload, 'lock tables') === 0 ||
-			stripos($request->payload, 'unlock tables') === 0;
+		$payload = strtolower($request->payload);
+		if ($request->payload === ''
+			&& $request->endpointBundle !== Endpoint::Bulk
+			&& $request->endpointBundle !== Endpoint::Elastic) {
+			return true;
+		}
+		if ($request->command === 'set') {
+			$setPatterns = [
+				'sql_quote_show_create',
+				'@saved_cs_client',
+				'@@session',
+				'character_set_client',
+				'session character_set_results',
+				'session transaction',
+				'sql_select_limit',
+			];
+			foreach ($setPatterns as $pattern) {
+				if (stripos($payload, $pattern) === 4) {
+					return true;
+				}
+			}
+		}
+
+		return match ($request->command) {
+			'create' => stripos($payload, 'create database') === 0,
+			'lock' => stripos($payload, 'lock tables') === 0,
+			'unlock' => stripos($payload, 'unlock tables') === 0,
+			default => false,
+		};
 	}
 }

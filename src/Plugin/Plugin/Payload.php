@@ -92,12 +92,24 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		return stripos($request->payload, 'create plugin') === 0
-			|| stripos($request->payload, 'create buddy plugin') === 0
-			|| stripos($request->payload, 'delete buddy plugin') === 0
-			|| strtolower($request->payload) === 'show buddy plugins'
-			|| stripos($request->payload, 'disable buddy plugin') === 0
-			|| stripos($request->payload, 'enable buddy plugin') === 0;
+		static $commandMap = [
+			'create' => 1,
+			'delete' => 1,
+			'show' => 1,
+			'disable' => 1,
+			'enable' => 1,
+		];
+		if (!isset($commandMap[$request->command])) {
+			return false;
+		}
+		return stripos($request->payload, 'plugin') !== false && (
+			stripos($request->payload, 'create plugin') === 0
+				|| stripos($request->payload, 'create buddy plugin') === 0
+				|| stripos($request->payload, 'delete buddy plugin') === 0
+				|| strtolower($request->payload) === 'show buddy plugins'
+				|| stripos($request->payload, 'disable buddy plugin') === 0
+				|| stripos($request->payload, 'enable buddy plugin') === 0
+		);
 	}
 
 	/**

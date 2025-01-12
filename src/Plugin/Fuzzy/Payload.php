@@ -384,20 +384,19 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		$hasMatch = stripos($request->payload, 'select') === 0
+		$hasMatch = $request->command === 'select'
 			&& stripos($request->payload, 'option') !== false
 			&& stripos($request->payload, 'fuzzy') !== false
 			&& stripos($request->error, 'unknown option') !== false
 		;
-
-
-		if (!$hasMatch) {
-			$hasMatch = $request->endpointBundle === Endpoint::Search
-				&& stripos($request->error, 'unknown option') !== false
-			;
+		if ($hasMatch) {
+			return true;
 		}
 
-		return $hasMatch;
+
+		return $request->endpointBundle === Endpoint::Search
+			&& stripos($request->error, 'unknown option') !== false
+		;
 	}
 
 	/**

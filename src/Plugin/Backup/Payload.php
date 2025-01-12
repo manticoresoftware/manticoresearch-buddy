@@ -245,6 +245,6 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		return stripos($request->payload, 'backup') === 0;
+		return strtok($request->payload, ' ') === 'backup';
 	}
 }
