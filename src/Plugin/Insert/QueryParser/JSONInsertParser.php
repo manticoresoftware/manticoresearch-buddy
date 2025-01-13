@@ -23,6 +23,18 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	protected ?int $id = null;
 
 	/**
+	 * @var bool $isElasticQuery
+	 */
+	protected bool $isElasticQuery;
+
+	/**
+	 * @return void
+	 */
+	public function __construct() {
+		$this->isElasticQuery = false;
+	}
+
+	/**
 	 * @param string $query
 	 * @return array{name:string,cols:array<string>,colTypes:array<string>}
 	 */
@@ -163,8 +175,8 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	 * @param mixed $val
 	 * @return Datatype
 	 */
-	protected static function detectValType(mixed $val): Datatype {
-		return match (true) {
+	protected function detectValType(mixed $val): Datatype {
+		$type = match (true) {
 			($val === null) => Datatype::Null,
 			is_float($val) => Datatype::Float,
 			is_int($val) => self::detectIntVal($val),
@@ -172,5 +184,10 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 			is_string($val) => self::detectStringVal($val),
 			default => Datatype::Text,
 		};
+		if ($this->isElasticQuery && ($type === Datatype::Text || $type === Datatype::String)) {
+			$type = Datatype::Indexedstring;
+		}
+
+		return $type;
 	}
 }

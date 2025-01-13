@@ -20,6 +20,7 @@ enum Datatype: string {
 	case Bigint = 'bigint';
 	case Text = 'text';
 	case String = 'string';
+	case Indexedstring = 'string attribute indexed';
 	case Timestamp = 'timestamp';
 	case Null = 'null';
 }
