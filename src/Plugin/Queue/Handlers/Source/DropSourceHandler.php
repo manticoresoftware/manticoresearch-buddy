@@ -98,7 +98,7 @@ final class DropSourceHandler extends BaseDropHandler {
 			'UPDATE '.Payload::VIEWS_TABLE_NAME.' SET suspended=1 '.
 			"WHERE match('@source_name \"{$sourceRow['full_name']}\"')",
 			/** @lang Manticore */
-			"DELETE FROM _sources WHERE id = {$sourceRow['id']}",
+			'DELETE FROM '.Payload::SOURCE_TABLE_NAME." WHERE id = {$sourceRow['id']}",
 		];
 
 		foreach ($queries as $query) {

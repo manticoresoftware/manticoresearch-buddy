@@ -87,7 +87,7 @@ final class DropHandler extends BaseHandlerWithClient {
 			return static::getErrorTask(
 				"table '{$this->payload->table}' is missing: "
 					. 'DROP SHARDED TABLE failed: '
-					."table '{$this->payload->table}' must exists"
+					."table '{$this->payload->table}' must exist"
 			);
 		}
 
@@ -120,7 +120,7 @@ final class DropHandler extends BaseHandlerWithClient {
 	 */
 	protected function getTableState(string $table): array {
 		// TODO: think about the way to refactor it and remove duplication
-		$q = "select `value` from _sharding_state where `key` = 'table:{$table}'";
+		$q = "select value[0] as value from _sharding_state where `key` = 'table:{$table}'";
 		$resp = $this->manticoreClient->sendRequest($q);
 
 		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
@@ -161,7 +161,9 @@ final class DropHandler extends BaseHandlerWithClient {
 					$type = $state['type'] ?? 'unknown';
 					$status = $state['status'] ?? 'processing';
 					if ($type === 'drop' && $status !== 'processing') {
-						return TaskResult::fromResponse(Response::fromBody($state['result']));
+						/** @var string */
+						$body = json_encode($state['result']);
+						return TaskResult::fromResponse(Response::fromBody($body));
 					}
 				}
 				if ((time() - $ts) > $timeout) {

@@ -106,6 +106,10 @@ final class Payload extends BasePayload
 	 * @throws GenericError
 	 */
 	public static function hasMatch(Request $request): bool {
+		if ($request->command !== 'create') {
+			return false;
+		}
+
 		/**
 		 * @var array{
 		 *       CREATE?: array{

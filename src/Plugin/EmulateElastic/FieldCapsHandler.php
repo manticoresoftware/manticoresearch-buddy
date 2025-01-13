@@ -28,6 +28,7 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 		'timestamp' => 'date',
 		'bigint' => 'long',
 		'int' => 'integer',
+		'uint' => 'integer',
 		'json' => 'object',
 		'float_vector' => 'knn_vector',
 	];
