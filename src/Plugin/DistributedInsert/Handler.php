@@ -42,48 +42,13 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$positions = [];
 			$n = 0;
 			foreach ($this->payload->batch as $table => $batch) {
-				[$cluster, $table] = $this->payload::parseCluster($table);
-				$shards = $this->getShards($table);
-				$shardCount = sizeof($shards);
-
-				// Group rows by shard
-				$shardRows = [];
-				$n = 0;
-
-				foreach ($batch as $struct) {
-					if (!$this->shouldAssignId($struct)) {
-						continue;
-					}
-
-					$id = $this->assignId($struct);
-					$idStr = (string)$id;
-					$positions[$idStr] = [
-						'n' => $n++,
-						'table' => $table,
-						'cluster' => $cluster,
-					];
-
-					$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
-					$info = $shards[$shard];
-					$shardName = $info['name'];
-					$this->assignTable($struct, $cluster, $shardName);
-
-					if (!isset($shardRows[$shardName])) {
-						$shardRows[$shardName] = [
-							'info' => $info,
-							'rows' => [],
-						];
-					}
-
-					$shardRows[$shardName]['rows'][] = $struct->toJson();
-				}
-
-				if (empty($shardRows)) {
+				$shardRows = $this->processBatch($batch, $n, $positions, $table);
+				if (!$shardRows) {
 					throw new ManticoreSearchClientError('Failed to prepare docs for insertion');
 				}
 
 				// Create requests for each shard
-				foreach ($shardRows as $shardName => $shardData) {
+				foreach ($shardRows as $shardData) {
 					$requests[] = $this->getRequest($shardData['info'], $shardData['rows']);
 				}
 			}
@@ -92,6 +57,58 @@ final class Handler extends BaseHandlerWithFlagCache {
 		};
 
 		return Task::create($taskFn)->run();
+	}
+
+	/**
+	 * @param array<int|string,Struct> $batch
+	 * @param int &$n
+	 * @param array<string,array{n:int,table:string,cluster:string}> &$positions
+	 * @param string $table
+	 * @return array{string:array{info:array{name:string,url:string},rows:array<string>}}
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	protected function processBatch(
+		array $batch,
+		int &$n,
+		array &$positions,
+		string $table,
+	): array {
+		[$cluster, $table] = $this->payload::parseCluster($table);
+		$shards = $this->getShards($table);
+		$shardCount = sizeof($shards);
+
+		// Group rows by shard
+		$shardRows = [];
+		foreach ($batch as $struct) {
+			if (!$this->shouldAssignId($struct)) {
+				continue;
+			}
+
+			$id = $this->assignId($struct);
+			$idStr = (string)$id;
+			$positions[$idStr] = [
+				'n' => $n++,
+				'table' => $table,
+				'cluster' => $cluster,
+			];
+
+			$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
+			$info = $shards[$shard];
+			$shardName = $info['name'];
+			$this->assignTable($struct, $cluster, $shardName);
+
+			if (!isset($shardRows[$shardName])) {
+				$shardRows[$shardName] = [
+					'info' => $info,
+					'rows' => [],
+				];
+			}
+
+			$shardRows[$shardName]['rows'][] = $struct->toJson();
+		}
+
+		return $shardRows;
 	}
 
 	/**

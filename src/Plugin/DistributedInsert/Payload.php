@@ -153,7 +153,7 @@ final class Payload extends BasePayload {
 	/**
 	 * @param Struct<int|string,array<string,mixed>> $struct
 	 * @param Batch &$batch
-	 * @param array &$tableMap
+	 * @param array<string,array{0:string,1:string}> &$tableMap
 	 * @param string $cluster
 	 * @param string $table
 	 * @return array{0:string,1:string}
@@ -258,7 +258,7 @@ final class Payload extends BasePayload {
 
 		$fieldCount = sizeof($fields);
 		$valueCount = sizeof($values);
-		$batch = new SplFixedArray($valueCount / $fieldCount);
+		$batch = new SplFixedArray((int)($valueCount / $fieldCount));
 		$n = 0;
 		$doc = [];
 		for ($i = 0; $i < $valueCount; $i++) {
