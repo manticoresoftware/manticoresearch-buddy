@@ -5,6 +5,3 @@ parameters:
 	level: 9
 	inferPrivatePropertyTypeFromConstructor: true
 	checkGenericClassInNonGenericObjectType: true
-	### No idea how to fix it in PHPStan but it just cant see declared property
-	ignoreErrors:
-		- '#Access to an undefined property Manticoresearch\\Buddy\\Core\\Network\\Request::\$command#'
