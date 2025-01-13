@@ -60,11 +60,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * @param array<int|string,Struct> $batch
+	 * @param array<int|string,Struct<int|string,mixed>> $batch
 	 * @param int &$n
 	 * @param array<string,array{n:int,table:string,cluster:string}> &$positions
 	 * @param string $table
-	 * @return array{string:array{info:array{name:string,url:string},rows:array<string>}}
+	 * @return array{string:array{info:array{name:string,url:string},rows:array<string>}}|array{}
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
@@ -81,6 +81,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 		// Group rows by shard
 		$shardRows = [];
 		foreach ($batch as $struct) {
+			/** @var Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct */
 			if (!$this->shouldAssignId($struct)) {
 				continue;
 			}
