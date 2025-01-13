@@ -153,6 +153,11 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
+		// Return early for performance cuz we have lots of logic here
+		if ($request->command !== 'show') {
+			return false;
+		}
+
 		if (stripos($request->payload, 'show full tables') === 0
 		|| stripos($request->payload, 'show open tables') === 0) {
 			static::$type = 'expanded tables';

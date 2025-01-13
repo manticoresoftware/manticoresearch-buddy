@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use SplFixedArray;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
@@ -134,6 +135,7 @@ final class Payload extends BasePayload {
 		$table = '';
 		$rows = explode("\n", trim($request->payload));
 		$rowCount = sizeof($rows);
+		$tableMap = [];
 
 		for ($i = 0; $i < $rowCount; $i++) {
 			if (empty($rows[$i])) {
@@ -142,31 +144,56 @@ final class Payload extends BasePayload {
 
 			/** @var Struct<int|string,array<string,mixed>> $struct */
 			$struct = Struct::fromJson($rows[$i]);
-
-			if (isset($struct['index']['_index'])) { // _bulk
-				/** @var string $table */
-				$table = $struct['index']['_index'];
-				[$cluster, $table] = static::parseCluster($table);
-				$batch["$cluster:$table"][] = $struct;
-				continue;
-			}
-
-			if (isset($struct['insert'])) { // bulk
-				/** @var string $table */
-				$table = $struct['insert']['table'] ?? $struct['insert']['index'];
-				[$cluster, $table] = static::parseCluster($table);
-				$batch["$cluster:$table"][] = $struct;
-				continue;
-			}
-
-			if (!$table) {
-				throw new QueryParseError('Cannot find table name');
-			}
-
-			$batch["$cluster:$table"][] = $struct;
+			[$cluster, $table] = static::processBulkRow($struct, $batch, $tableMap, $cluster, $table);
 		}
 		/** @var Batch $batch */
 		return $batch;
+	}
+
+	/**
+	 * @param Struct<int|string,array<string,mixed>> $struct
+	 * @param Batch &$batch
+	 * @param array<string,array{0:string,1:string}> &$tableMap
+	 * @param string $cluster
+	 * @param string $table
+	 * @return array{0:string,1:string}
+	 * @throws QueryParseError
+	 */
+	protected static function processBulkRow(
+		Struct $struct,
+		array &$batch,
+		array &$tableMap,
+		string $cluster,
+		string $table
+	): array {
+		if (isset($struct['index']['_index'])) { // _bulk
+			/** @var string $table */
+			$table = $struct['index']['_index'];
+			if (!isset($tableMap[$table])) {
+				$tableMap[$table] = static::parseCluster($table);
+			}
+			[$cluster, $table] = $tableMap[$table];
+			$batch["$cluster:$table"][] = $struct;
+			return [$cluster, $table];
+		}
+
+		if (isset($struct['insert'])) { // bulk
+			/** @var string $table */
+			$table = $struct['insert']['table'] ?? $struct['insert']['index'];
+			if (!isset($tableMap[$table])) {
+				$tableMap[$table] = static::parseCluster($table);
+			}
+			[$cluster, $table] = $tableMap[$table];
+			$batch["$cluster:$table"][] = $struct;
+			return [$cluster, $table];
+		}
+
+		if (!$table) {
+			throw new QueryParseError('Cannot find table name');
+		}
+
+		$batch["$cluster:$table"][] = $struct;
+		return [$cluster, $table];
 	}
 
 	/**
@@ -195,11 +222,15 @@ final class Payload extends BasePayload {
 	 * @return Batch
 	 */
 	protected static function parseSqlPayload(Request $request): array {
-		$pattern = '/^insert\s+into\s+'
+		static $insertPattern = '/^insert\s+into\s+'
 			. '`?([a-z][a-z\_\-0-9]*)`?'
 			. '(?:\s*\(([^)]+)\))?\s+'
-			. 'values/ius';
-		preg_match($pattern, $request->payload, $matches);
+			. 'values\s*\((.*)\)/ius';
+		static $valuePattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'"
+			. '|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\}/';
+
+
+		preg_match($insertPattern, $request->payload, $matches);
 		$table = $matches[1] ?? null;
 		$fields = [];
 		if (isset($matches[2])) {
@@ -216,29 +247,35 @@ final class Payload extends BasePayload {
 		[$cluster, $table] = static::parseCluster($table);
 
 		// It's time to parse values
-		$pattern = '/values\s*\((.*)\)/ius';
-		preg_match($pattern, $request->payload, $matches);
-
-		if (!isset($matches[1])) {
+		if (!isset($matches[3])) {
 			throw QueryParseError::create('Failed to parse values from the query');
 		}
 
-		$values = $matches[1];
-		$pattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\}/";
-		preg_match_all($pattern, $values, $matches);
-		$values = array_map(trim(...), $matches[0]);
-		$batch = [];
+		$values = &$matches[3];
+		preg_match_all($valuePattern, $values, $matches);
+		$values = &$matches[0];
+		/* $values = array_map(trim(...), $matches[0]); */
 
 		$fieldCount = sizeof($fields);
 		$valueCount = sizeof($values);
-		for ($i = 0; $i < $valueCount; $i += $fieldCount) {
-			$slice = array_slice($values, $i, $fieldCount);
-			$doc = array_combine($fields, $slice);
-			if (isset($doc['id'])) {
-				$doc['id'] = (int)$doc['id'];
+		$batch = new SplFixedArray((int)($valueCount / $fieldCount));
+		$n = 0;
+		$doc = [];
+		for ($i = 0; $i < $valueCount; $i++) {
+			$index = $i % $fieldCount;
+			$doc[$fields[$index]] = trim($values[$i], "'");
+			$isLast = ($index - 1) === 0;
+			if (!$isLast) {
+				continue;
 			}
-			$struct = Struct::fromData(['insert' => $doc]);
-			$batch[] = $struct;
+			$insert = [];
+			if (isset($doc['id'])) {
+				$insert['id'] = (int)$doc['id'];
+				unset($doc['id']);
+			}
+			$insert['doc'] = $doc;
+			$batch[$n++] = Struct::fromData(['insert' => $insert]);
+			$doc = [];
 		}
 		/** @var Batch */
 		return ["$cluster:$table" => $batch];
