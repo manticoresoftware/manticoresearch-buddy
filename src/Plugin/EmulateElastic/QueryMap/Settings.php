@@ -66,10 +66,10 @@ return [
 		'found' => true,
 	],
 	'.kibana' => [
-		'.kibana_1' => [
-			'aliases' => [
-				'.kibana' => [],
-			],
+		//'.kibana_1' => [
+		//	'aliases' => [
+		//		'.kibana' => [],
+		//	],
 			'mappings' => [
 				'_meta' => [
 					'migrationMappingPropertyHashes' => [
@@ -1490,6 +1490,6 @@ return [
 					],
 				],
 			],
-		],
+		//],
 	],
 ];

@@ -29,7 +29,7 @@ class Loader {
 		// Resolve the possible ambiguity with Manticore query format as it may not correspond to request format
 		$reqFormat = match ($reqEndpointBundle) {
 			ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson, ManticoreEndpoint::Sql => RequestFormat::SQL,
-			ManticoreEndpoint::Insert, ManticoreEndpoint::Bulk => RequestFormat::JSON,
+			ManticoreEndpoint::Insert, ManticoreEndpoint::Replace, ManticoreEndpoint::Bulk => RequestFormat::JSON,
 			default => throw new ParserLoadError("Unsupported endpoint bundle '{$reqEndpointBundle->value}' passed"),
 		};
 		$parserClass = match ($reqFormat) {

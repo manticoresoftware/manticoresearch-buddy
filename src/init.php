@@ -15,7 +15,6 @@ use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Loader;
 use Manticoresearch\Buddy\Core\Cache\Flag as FlagCache;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
-use Manticoresearch\Buddy\Core\Plugin\TableFormatter;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\ExpressionLanguage\Expression;
@@ -43,7 +42,6 @@ $container->register('QueryParserLoader', Loader::class);
 $container
 	->register('manticoreClient', HTTPClient::class)
 	->addArgument($opts['listen']);
-$container->register('tableFormatter', TableFormatter::class);
 $container->register('flagCache', FlagCache::class);
 
 $container
@@ -62,7 +60,6 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-alias',
 	'manticoresoftware/buddy-plugin-select',
 	'manticoresoftware/buddy-plugin-show',
-	'manticoresoftware/buddy-plugin-cli-table',
 	'manticoresoftware/buddy-plugin-plugin',
 	'manticoresoftware/buddy-plugin-test',
 	'manticoresoftware/buddy-plugin-alter-column',
@@ -75,6 +72,8 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-sharding',
 	'manticoresoftware/buddy-plugin-update',
 	'manticoresoftware/buddy-plugin-autocomplete',
+	'manticoresoftware/buddy-plugin-cli-table',
+	'manticoresoftware/buddy-plugin-distributed-insert',
 ];
 // Filtering out the plugins that we don't need
 $plugins = array_filter(

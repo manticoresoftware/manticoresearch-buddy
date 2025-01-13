@@ -220,14 +220,21 @@ class QueryProcessor {
 			Pluggable::EXTRA_NS_PREFIX => [...static::getExtraPlugins(), ...static::getLocalPlugins()],
 		];
 		$disabledPlugins = static::getDisabledPlugins();
+		$t0 = microtime(true);
 		foreach ($list as $prefix => $plugins) {
 			foreach ($plugins as $plugin) {
+				$t = microtime(true);
 				$pluginPrefix = $prefix . ucfirst(Strings::camelcaseBySeparator($plugin['short'], '-'));
 				/** @var BasePayload<T> $pluginPayloadClass */
+
 				$pluginPayloadClass = "$pluginPrefix\\Payload";
 				$pluginPayloadClass::setParser(static::$sqlQueryParser);
 				$hasMatch = $pluginPayloadClass::hasMatch($request);
-				Buddy::debugv('matching: ' . $plugin['short'] . ' - ' . ($hasMatch ? 'yes' : 'no'));
+				$duration = (int)((microtime(true) - $t) * 10000);
+				$debugMessage = '[' . sprintf('%.1f', $duration / 10) . 'ms] matching: ' .
+					$plugin['short'] . ' - ' .
+					($hasMatch ? 'yes' : 'no');
+				Buddy::debugv($debugMessage);
 				if (!$hasMatch) {
 					continue;
 				}
@@ -236,6 +243,10 @@ class QueryProcessor {
 				if (isset($disabledPlugins[$plugin['full']])) {
 					GenericError::throw("Plugin '{$plugin['short']}' is disabled");
 				}
+
+				$totalDuration = (int)((microtime(true) - $t0) * 10000);
+				$debugMessage = '[' . sprintf('%.1f', $totalDuration / 10) . 'ms] total';
+				Buddy::debugv($debugMessage);
 
 				return $pluginPrefix;
 			}

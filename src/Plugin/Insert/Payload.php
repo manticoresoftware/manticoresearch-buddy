@@ -54,8 +54,31 @@ final class Payload extends BasePayload {
 			$request->payload = trim($request->payload) . "\n";
 		}
 		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->payload));
-		$self->queries[] = $request->payload;
+		$self->queries[] = (str_contains($self->path, '_doc') || str_contains($self->path, '_create'))
+			? self::preprocessElasticLikeRequest($self->path, $request->payload)
+			: $request->payload;
+
 		return $self;
+	}
+
+	/**
+	 * @param string $path
+	 * @param string $payload
+	 * @return string
+	 */
+	protected static function preprocessElasticLikeRequest(string &$path, string $payload): string {
+		$pathParts = explode('/', $path);
+		$table = $pathParts[0];
+		$path = 'insert';
+		$query = [
+			'table' => $table,
+			'doc' => (array)json_decode($payload, true),
+		];
+		if (isset($pathParts[2]) && $pathParts[2]) {
+			$query['id'] = (int)$pathParts[2];
+		}
+
+		return (string)json_encode($query);
 	}
 
 	/**
@@ -98,7 +121,7 @@ final class Payload extends BasePayload {
 			default => false,
 		};
 		$isInsertHTTPQuery = match ($request->endpointBundle) {
-			ManticoreEndpoint::Insert => true,
+			ManticoreEndpoint::Insert, ManticoreEndpoint::Replace => true,
 			ManticoreEndpoint::Bulk => str_starts_with($queryLowercase, '"insert"')
 				|| str_starts_with($queryLowercase, '"create"')
 				|| str_starts_with($queryLowercase, '"index"'),

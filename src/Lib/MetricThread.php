@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Lib;
 
+use Manticoresearch\Buddy\Core\Process\ProcessReader;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\Strings;
 use Psr\Container\ContainerInterface;
@@ -91,16 +92,19 @@ final class MetricThread {
 				/** @var \Manticoresearch\Buddy\Core\ManticoreSearch\Client $client */
 				$client = static::$container->get('manticoreClient');
 				$metric = Metric::instance($client);
-				while ($msg = $worker->read()) {
-					if (!is_string($msg)) {
-						throw new \Exception('Incorrect data received');
+				while (true) {
+					$reader = ProcessReader::read($worker);
+					foreach ($reader as $msg) {
+						if (!is_string($msg)) {
+							throw new \Exception('Incorrect data received');
+						}
+						$msg = unserialize($msg);
+						if (!is_array($msg)) {
+							throw new \Exception('Incorrect data received');
+						}
+						[$method, $args] = $msg;
+						$metric->$method(...$args);
 					}
-					$msg = unserialize($msg);
-					if (!is_array($msg)) {
-						throw new \Exception('Incorrect data received');
-					}
-					[$method, $args] = $msg;
-					$metric->$method(...$args);
 				}
 			}, true, 2, true
 		);
@@ -118,7 +122,8 @@ final class MetricThread {
 	 */
 	public function execute(string $method, array $args = []): static {
 		Buddy::debugv("metric: $method " . json_encode($args));
-		$this->process->write(serialize([$method, $args]));
+		$packet = ProcessReader::packMessage([$method, $args]);
+		$this->process->write($packet);
 		return $this;
 	}
 }

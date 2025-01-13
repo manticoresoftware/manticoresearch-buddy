@@ -47,9 +47,6 @@ final class Payload extends BasePayload {
 
 	public string $tableType;
 
-	public string $path;
-	public bool $hasCliEndpoint;
-
 	/**
 	 * Get description for this plugin
 	 * @return string
@@ -68,8 +65,7 @@ final class Payload extends BasePayload {
 		return match (static::$type) {
 			'expanded tables' => static::fromExpandedTablesRequest($request),
 			'create table' => static::fromCreateTableRequest($request),
-			'schemas', 'queries' => static::fromSimpleRequest($request),
-			'version' => static::fromVersionRequest($request),
+			'schemas', 'queries', 'version' => new static(),
 			'full columns' => static::fromColumnsRequest($request),
 			'unsupported' => static::fromUnsupportedStmtRequest($request),
 			default => throw new Exception('Failed to match type of request: ' . static::$type),
@@ -105,17 +101,6 @@ final class Payload extends BasePayload {
 		} elseif ($m['where'] ?? '') {
 			$self->like = $m['where'];
 		}
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
-		return $self;
-	}
-
-	/**
-	 * @param Request $request
-	 * @return static
-	 */
-	protected static function fromVersionRequest(Request $request): static {
-		$self = new static();
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;
 	}
 
@@ -135,17 +120,6 @@ final class Payload extends BasePayload {
 		$self->database = $m[1];
 		$self->table = $m[2];
 
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
-		return $self;
-	}
-
-	/**
-	 * @param Request $request
-	 * @return static
-	 */
-	protected static function fromSimpleRequest(Request $request): static {
-		$self = new static();
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;
 	}
 
@@ -155,7 +129,6 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromUnsupportedStmtRequest(Request $request): static {
 		$self = new static();
-		[$self->path] = self::getEndpointInfo($request);
 		$self->query = $request->payload;
 		return $self;
 	}
@@ -173,7 +146,6 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->database = $m[2];
 		$self->table = $m[1];
-		[$self->path, $self->hasCliEndpoint] = self::getEndpointInfo($request);
 		return $self;
 	}
 	/**
@@ -181,6 +153,11 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
+		// Return early for performance cuz we have lots of logic here
+		if ($request->command !== 'show') {
+			return false;
+		}
+
 		if (stripos($request->payload, 'show full tables') === 0
 		|| stripos($request->payload, 'show open tables') === 0) {
 			static::$type = 'expanded tables';

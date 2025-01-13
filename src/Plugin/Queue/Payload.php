@@ -15,6 +15,7 @@ use Exception;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\SqlModelsHandler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
@@ -28,8 +29,9 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 final class Payload extends BasePayload
 {
 
-	const SOURCE_TABLE_NAME = '_sources';
-	const VIEWS_TABLE_NAME = '_views';
+	const SOURCE_TABLE_NAME = 'system.sources';
+	const VIEWS_TABLE_NAME = 'system.views';
+	const BUFFER_TABLE_PREFIX = 'system.buffer_';
 
 	const TYPE_SOURCE = 'source';
 	const TYPE_VIEW = 'view';
@@ -51,6 +53,7 @@ final class Payload extends BasePayload
 
 	/**
 	 * @param Request $request
+	 *
 	 * @return static
 	 */
 	public static function fromRequest(Request $request): static {
@@ -72,10 +75,41 @@ final class Payload extends BasePayload
 	}
 
 	public static function hasMatch(Request $request): bool {
+		// The current method is not supported over HTTP
+		if ($request->format === RequestFormat::JSON) {
+			return false;
+		}
+
 		/** @var T $parsedPayload */
 		$parsedPayload = static::$sqlQueryParser::parse(
 			$request->payload,
-			fn($payload) => (preg_match('/(create|show|alter|drop)\s+(source|mv|materialized)/usi', $payload)),
+			function (string $payload) {
+				// just to make it faster
+				$croppedString = strtolower(substr($payload, 0, 50));
+				$words = explode(' ', $croppedString);
+
+				$firstMatchWord = ['create', 'show', 'alter', 'drop'];
+				$secondMatchWord = ['source', 'sources', 'mv', 'mvs', 'materialized'];
+
+				if (!isset($words[0]) || !in_array($words[0], $firstMatchWord)) {
+					return false;
+				}
+
+				unset($words[0]);
+				// Attempting to find the second word and verify if it meets our conditions.
+				foreach ($words as $word) {
+					if ($word === '') {
+						continue;
+					}
+
+					if (in_array($word, $secondMatchWord)) {
+						return true;
+					}
+					break;
+				}
+
+				return false;
+			},
 			$request->payload
 		);
 

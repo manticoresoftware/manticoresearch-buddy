@@ -38,7 +38,7 @@ class ManagerSettingsKibanaHandler extends BaseHandler {
 	public function run(): Task {
 		self::initQueryMap('ManagerSettings');
 
-		return self::getResponseByQuery($this->payload->path);
+		return self::getResponseByQuery('ManagerSettings', $this->payload->path);
 	}
 
 	/**

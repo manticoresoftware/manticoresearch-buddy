@@ -43,19 +43,19 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		$hasError = str_contains($request->error, "unexpected \$undefined near '.*")
+		$hasError = stripos($request->error, 'near') !== false && (
+			str_contains($request->error, "unexpected \$undefined near '.*")
 			|| str_contains($request->error, "unexpected identifier, expecting SET near 't ")
 			|| (
 				str_contains($request->error, "expecting \$end near '")
 				&& str_contains($request->error, " t'")
-			);
-
-		$hasMatch = str_contains($request->payload, ' t.')
-			|| str_ends_with($request->payload, ' t');
-		if ($hasError && $hasMatch) {
-			return true;
+			)
+		);
+		if (!$hasError) {
+			return false;
 		}
 
-		return false;
+		return stripos($request->payload, ' t.') !== false
+			|| str_ends_with($request->payload, ' t');
 	}
 }
