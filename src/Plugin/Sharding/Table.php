@@ -27,7 +27,7 @@ final class Table {
 		protected readonly string $structure,
 		protected readonly string $extra
 	) {
-		$this->table = '_sharding_table';
+		$this->table = 'system.sharding_table';
 	}
 
 	/**
@@ -710,7 +710,7 @@ final class Table {
 				'Trying to initialize while already initialized.'
 			);
 		}
-		$query = "CREATE TABLE `{$this->table}` (
+		$query = "CREATE TABLE {$this->table} (
 		`cluster` string,
 		`node` string,
 		`table` string,
