@@ -32,6 +32,7 @@ class ElasticJSONInsertParser extends JSONInsertParser {
 	* @return void
 	*/
 	public function __construct(string $path) {
+		$this->isElasticQuery = true;
 		[$this->name, $this->id, $this->isBulkQuery] = $this->parseQueryPath($path);
 	}
 
