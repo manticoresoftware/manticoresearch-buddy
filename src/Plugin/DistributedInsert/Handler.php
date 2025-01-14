@@ -10,6 +10,7 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\DistributedInsert;
 
+use Ds\Vector;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
@@ -61,7 +62,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * @param array<int|string,Struct<int|string,mixed>> $batch
+	 * @param Vector<Struct<int|string,mixed>> $batch
 	 * @param int &$n
 	 * @param array<string,array{n:int,table:string,cluster:string}> &$positions
 	 * @param string $table
@@ -70,7 +71,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 * @throws ManticoreSearchResponseError
 	 */
 	protected function processBatch(
-		array $batch,
+		Vector $batch,
 		int &$n,
 		array &$positions,
 		string $table,
