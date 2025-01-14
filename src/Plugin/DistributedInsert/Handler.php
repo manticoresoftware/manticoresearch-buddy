@@ -12,6 +12,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\DistributedInsert;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -82,28 +83,31 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$shardRows = [];
 		foreach ($batch as $struct) {
 			/** @var Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct */
-			if (!$this->shouldAssignId($struct)) {
-				continue;
+			if ($this->shouldAssignId($struct)) {
+				$id = $this->assignId($struct);
+				$idStr = (string)$id;
+				$positions[$idStr] = [
+					'n' => $n++,
+					'table' => $table,
+					'cluster' => $cluster,
+				];
+
+				$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
+				$info = $shards[$shard];
+				$shardName = $info['name'];
+				$this->assignTable($struct, $cluster, $shardName);
 			}
 
-			$id = $this->assignId($struct);
-			$idStr = (string)$id;
-			$positions[$idStr] = [
-				'n' => $n++,
-				'table' => $table,
-				'cluster' => $cluster,
-			];
+			if (!isset($shardName)) {
+				throw QueryParseError::create('Cannot find shard for table');
+			}
 
-			$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
-			$info = $shards[$shard];
-			$shardName = $info['name'];
-			$this->assignTable($struct, $cluster, $shardName);
-
-			if (!isset($shardRows[$shardName])) {
+			if (!isset($shardRows[$shardName]) && isset($info)) {
 				$shardRows[$shardName] = [
 					'info' => $info,
 					'rows' => [],
 				];
+				unset($info);
 			}
 
 			$shardRows[$shardName]['rows'][] = $struct->toJson();
