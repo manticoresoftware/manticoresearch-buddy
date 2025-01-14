@@ -272,9 +272,10 @@ final class Payload extends BasePayload {
 		$batch = new Vector();
 		$doc = [];
 		for ($i = 0; $i < $valueCount; $i++) {
-			$index = $i % $fieldCount;
+			$index = ($i + 1) % $fieldCount;
 			$doc[$fields[$index]] = trim($values[$i], "'");
-			$isLast = ($index - 1) === 0;
+			// We have edge case when single field and last is first also
+			$isLast = $index === 0;
 			if (!$isLast) {
 				continue;
 			}
