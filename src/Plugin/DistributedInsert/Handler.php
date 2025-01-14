@@ -10,8 +10,10 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\DistributedInsert;
 
+use Ds\Vector;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -42,39 +44,77 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$positions = [];
 			$n = 0;
 			foreach ($this->payload->batch as $table => $batch) {
-				[$cluster, $table] = $this->payload::parseCluster($table);
-				$shards = $this->getShards($table);
-				$shardCount = sizeof($shards);
-				$idPool = $this->getNewDocIds(sizeof($batch));
-				$rows = [];
-				foreach ($batch as $struct) {
-					/** @var Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct */
-					if ($this->shouldAssignId($struct)) {
-						$id = $this->assignId($struct, $idPool);
-						$idStr = (string)$id;
-						$positions[$idStr] = [
-							'n' => $n++,
-							'table' => $table,
-							'cluster' => $cluster,
-						];
-						$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
-						$info = $shards[$shard];
-						$shardName = $info['name'];
-						$this->assignTable($struct, $cluster, $shardName);
-					}
-					$rows[] = $struct->toJson();
-				}
-
-				if (!isset($info)) {
+				$shardRows = $this->processBatch($batch, $n, $positions, $table);
+				if (!$shardRows) {
 					throw new ManticoreSearchClientError('Failed to prepare docs for insertion');
 				}
 
-				$requests[] = $this->getRequest($info, $rows);
+				// Create requests for each shard
+				foreach ($shardRows as $shardData) {
+					$requests[] = $this->getRequest($shardData['info'], $shardData['rows']);
+				}
 			}
+
 			return $this->processRequests($requests, $positions);
 		};
 
 		return Task::create($taskFn)->run();
+	}
+
+	/**
+	 * @param Vector<Struct<int|string,mixed>> $batch
+	 * @param int &$n
+	 * @param array<string,array{n:int,table:string,cluster:string}> &$positions
+	 * @param string $table
+	 * @return array{string:array{info:array{name:string,url:string},rows:array<string>}}|array{}
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	protected function processBatch(
+		Vector $batch,
+		int &$n,
+		array &$positions,
+		string $table,
+	): array {
+		[$cluster, $table] = $this->payload::parseCluster($table);
+		$shards = $this->getShards($table);
+		$shardCount = sizeof($shards);
+
+		// Group rows by shard
+		$shardRows = [];
+		foreach ($batch as $struct) {
+			/** @var Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct */
+			if ($this->shouldAssignId($struct)) {
+				$id = $this->assignId($struct);
+				$idStr = (string)$id;
+				$positions[$idStr] = [
+					'n' => $n++,
+					'table' => $table,
+					'cluster' => $cluster,
+				];
+
+				$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
+				$info = $shards[$shard];
+				$shardName = $info['name'];
+				$this->assignTable($struct, $cluster, $shardName);
+			}
+
+			if (!isset($shardName)) {
+				throw QueryParseError::create('Cannot find shard for table');
+			}
+
+			if (!isset($shardRows[$shardName]) && isset($info)) {
+				$shardRows[$shardName] = [
+					'info' => $info,
+					'rows' => [],
+				];
+				unset($info);
+			}
+
+			$shardRows[$shardName]['rows'][] = $struct->toJson();
+		}
+
+		return $shardRows;
 	}
 
 	/**
@@ -270,21 +310,28 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 	/**
 	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
-	 * @param array<int> &$idPool
 	 * @return int
 	 */
-	protected function assignId(Struct $struct, array &$idPool): int {
+	protected function assignId(Struct $struct): int {
+		static $idPool = [];
+
 		$id = match (true) {
 			// _bulk
 			isset($struct['index']['_id']) => $struct['index']['_id'],
-			// insert, deletc etc
+			// insert, delete etc
 			isset($struct['id']) => $struct['id'],
 			// bulk
 			isset($struct['insert']['id']) => $struct['insert']['id'],
+			isset($struct['replace']['id']) => $struct['replace']['id'],
 			default => array_pop($idPool),
 		};
 		// When id = 0 we generate
 		if (!$id) {
+			// When we have no pool we fetch it by batches for performance
+			if (!$idPool) {
+				$idPool = $this->getNewDocIds(1000);
+			}
+
 			$id = array_pop($idPool);
 		}
 		if (!$id) {
@@ -297,10 +344,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$index['_id'] = "$id";
 			$struct['index'] = $index;
 		} elseif ($this->payload->type === 'sql') {
-			/** @var Struct<"insert",array{id:string|int}> $struct */
-			$insert = $struct['insert'];
-			$insert['id'] = (int)$id;
-			$struct['insert'] = $insert;
+			/** @var Struct<"insert"|"replace",array{id:string|int}> $struct */
+			$key = isset($struct['replace']) ? 'replace' : 'insert';
+			$row = $struct[$key];
+			$row['id'] = (int)$id;
+			$struct[$key] = $row;
 		} else {
 			/** @var Struct<"id",string|int> $struct */
 			$struct['id'] = $id;
@@ -323,11 +371,12 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$index['_index'] = $table;
 			$struct['index'] = $index;
 		} elseif ($this->payload->type === 'sql') {
-			/** @var Struct<"insert",array{table:string}> $struct */
-			$insert = $struct['insert'];
-			/** @var array{table:string} $insert */
-			$insert['table'] = $table;
-			$struct['insert'] = $insert;
+			/** @var Struct<"insert"|"replace",array{table:string}> $struct */
+			$key = isset($struct['replace']) ? 'replace' : 'insert';
+			$row = $struct[$key];
+			/** @var array{table:string} $row */
+			$row['table'] = $table;
+			$struct[$key] = $row;
 		} else {
 			/** @var Struct<string,string|int> $struct */
 			$struct['table'] = $table;
