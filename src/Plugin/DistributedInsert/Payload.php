@@ -100,8 +100,9 @@ final class Payload extends BasePayload {
 			$isSqlEndpoint = $request->endpointBundle === Endpoint::Sql
 				|| $request->endpointBundle === Endpoint::Cli;
 			$hasMatch = $isSqlEndpoint
-				&& strpos($request->error, 'not support insert') !== true
-				&& strpos($request->payload, 'insert') === 0;
+				&& ($request->command === 'insert' || $request->command === 'replace')
+				&& $hasErrorMessage
+			;
 		}
 
 		return $hasMatch;
@@ -228,19 +229,19 @@ final class Payload extends BasePayload {
 	 * @return Batch
 	 */
 	protected static function parseSqlPayload(Request $request): array {
-		static $insertPattern = '/^insert\s+into\s+'
+		static $queryPattern = '/^(insert|replace)\s+into\s+'
 			. '`?([a-z][a-z\_\-0-9]*)`?'
 			. '(?:\s*\(([^)]+)\))?\s+'
 			. 'values\s*\((.*)\)/ius';
 		static $valuePattern = "/'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'"
 			. '|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\}/';
 
-
-		preg_match($insertPattern, $request->payload, $matches);
-		$table = $matches[1] ?? null;
+		preg_match($queryPattern, $request->payload, $matches);
+		$type = strtolower($matches[1]);
+		$table = $matches[2] ?? null;
 		$fields = [];
-		if (isset($matches[2])) {
-			$fields = array_map('trim', explode(',', $matches[2]));
+		if (isset($matches[3])) {
+			$fields = array_map('trim', explode(',', $matches[3]));
 			$fields = array_map(
 				function ($field) {
 					return trim($field, '`');
@@ -248,7 +249,7 @@ final class Payload extends BasePayload {
 			);
 		}
 		if (!$fields) {
-			throw QueryParseError::create('INSERT into a sharded table requires specifying the fields.');
+			throw QueryParseError::create(strtoupper($type) . ' into a sharded table requires specifying the fields.');
 		}
 		if (!$table) {
 			throw QueryParseError::create('Failed to parse table from the query');
@@ -256,11 +257,11 @@ final class Payload extends BasePayload {
 		[$cluster, $table] = static::parseCluster($table);
 
 		// It's time to parse values
-		if (!isset($matches[3])) {
+		if (!isset($matches[4])) {
 			throw QueryParseError::create('Failed to parse values from the query');
 		}
 
-		$values = &$matches[3];
+		$values = &$matches[4];
 		preg_match_all($valuePattern, $values, $matches);
 		$values = &$matches[0];
 		/* $values = array_map(trim(...), $matches[0]); */
@@ -277,13 +278,13 @@ final class Payload extends BasePayload {
 			if (!$isLast) {
 				continue;
 			}
-			$insert = [];
+			$row = [];
 			if (isset($doc['id'])) {
-				$insert['id'] = (int)$doc['id'];
+				$row['id'] = (int)$doc['id'];
 				unset($doc['id']);
 			}
-			$insert['doc'] = $doc;
-			$batch[] = Struct::fromData(['insert' => $insert]);
+			$row['doc'] = $doc;
+			$batch[] = Struct::fromData([$type => $row]);
 			$doc = [];
 		}
 		/** @var Batch */

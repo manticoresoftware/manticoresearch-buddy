@@ -318,10 +318,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$id = match (true) {
 			// _bulk
 			isset($struct['index']['_id']) => $struct['index']['_id'],
-			// insert, deletc etc
+			// insert, delete etc
 			isset($struct['id']) => $struct['id'],
 			// bulk
 			isset($struct['insert']['id']) => $struct['insert']['id'],
+			isset($struct['replace']['id']) => $struct['replace']['id'],
 			default => array_pop($idPool),
 		};
 		// When id = 0 we generate
@@ -343,10 +344,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$index['_id'] = "$id";
 			$struct['index'] = $index;
 		} elseif ($this->payload->type === 'sql') {
-			/** @var Struct<"insert",array{id:string|int}> $struct */
-			$insert = $struct['insert'];
-			$insert['id'] = (int)$id;
-			$struct['insert'] = $insert;
+			/** @var Struct<"insert"|"replace",array{id:string|int}> $struct */
+			$key = isset($struct['replace']) ? 'replace' : 'insert';
+			$row = $struct[$key];
+			$row['id'] = (int)$id;
+			$struct[$key] = $row;
 		} else {
 			/** @var Struct<"id",string|int> $struct */
 			$struct['id'] = $id;
@@ -369,11 +371,12 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$index['_index'] = $table;
 			$struct['index'] = $index;
 		} elseif ($this->payload->type === 'sql') {
-			/** @var Struct<"insert",array{table:string}> $struct */
-			$insert = $struct['insert'];
-			/** @var array{table:string} $insert */
-			$insert['table'] = $table;
-			$struct['insert'] = $insert;
+			/** @var Struct<"insert"|"replace",array{table:string}> $struct */
+			$key = isset($struct['replace']) ? 'replace' : 'insert';
+			$row = $struct[$key];
+			/** @var array{table:string} $row */
+			$row['table'] = $table;
+			$struct[$key] = $row;
 		} else {
 			/** @var Struct<string,string|int> $struct */
 			$struct['table'] = $table;
