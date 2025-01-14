@@ -97,7 +97,7 @@ final class Payload extends BasePayload {
 
 		$payload = preg_replace(
 			[
-				'/(?P<key>rf|shards)\s*=\s*(?P<value>\d+)/',
+				'/(?P<key>rf|shards|timeout)\s*=\s*(?P<value>\d+)/ius',
 				'/(?P<key>[a-zA-Z_]+)\s*=\s*\'(?P<value>[^\']+)\'/',
 			],
 			'', $request->payload
