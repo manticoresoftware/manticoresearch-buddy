@@ -97,7 +97,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		// We just need to do something, but actually its' just for PHPstan
 		$self->path = $request->path;
-		$self->type = strpos($request->payload, 'create') === 0 ? 'create' : 'alter';
+		$self->type = stripos($request->payload, 'create') === 0 ? 'create' : 'alter';
 		$self->cluster = $matches['cluster'] ?? '';
 		$self->table = $matches['table'];
 		$self->structure = $matches['structure'];
