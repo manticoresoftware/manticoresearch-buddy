@@ -11,16 +11,16 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\DistributedInsert;
 
+use Ds\Vector;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
-use SplFixedArray;
 
 /**
  * Request for Backup command that has parsed parameters from SQL
- * @phpstan-type Batch array<non-falsy-string,non-empty-array<int<0,max>, Struct<int|string,mixed>>>
+ * @phpstan-type Batch array<non-falsy-string,Vector<Struct<int|string,mixed>>>
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
@@ -173,6 +173,9 @@ final class Payload extends BasePayload {
 				$tableMap[$table] = static::parseCluster($table);
 			}
 			[$cluster, $table] = $tableMap[$table];
+			if (!isset($batch["$cluster:$table"])) {
+				$batch["$cluster:$table"] = new Vector();
+			}
 			$batch["$cluster:$table"][] = $struct;
 			return [$cluster, $table];
 		}
@@ -184,6 +187,9 @@ final class Payload extends BasePayload {
 				$tableMap[$table] = static::parseCluster($table);
 			}
 			[$cluster, $table] = $tableMap[$table];
+			if (!isset($batch["$cluster:$table"])) {
+				$batch["$cluster:$table"] = new Vector();
+			}
 			$batch["$cluster:$table"][] = $struct;
 			return [$cluster, $table];
 		}
@@ -213,7 +219,7 @@ final class Payload extends BasePayload {
 			[$cluster, $table] = static::parseCluster($table);
 		}
 
-		return ["$cluster:$table" => [$struct]];
+		return ["$cluster:$table" => new Vector([$struct])];
 	}
 
 	/**
@@ -261,8 +267,8 @@ final class Payload extends BasePayload {
 
 		$fieldCount = sizeof($fields);
 		$valueCount = sizeof($values);
-		$batch = new SplFixedArray((int)($valueCount / $fieldCount));
-		$n = 0;
+		/** @var Vector<Struct<int|string,mixed>> */
+		$batch = new Vector();
 		$doc = [];
 		for ($i = 0; $i < $valueCount; $i++) {
 			$index = $i % $fieldCount;
@@ -277,7 +283,7 @@ final class Payload extends BasePayload {
 				unset($doc['id']);
 			}
 			$insert['doc'] = $doc;
-			$batch[$n++] = Struct::fromData(['insert' => $insert]);
+			$batch[] = Struct::fromData(['insert' => $insert]);
 			$doc = [];
 		}
 		/** @var Batch */
