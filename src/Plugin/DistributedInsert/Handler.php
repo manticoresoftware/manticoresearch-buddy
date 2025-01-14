@@ -154,10 +154,6 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 * @throws RuntimeException
 	 */
 	protected function getShards(string $table): array {
-		static $map = [];
-		if (isset($map[$table])) {
-			return $map[$table];
-		}
 		[$locals, $agents] = $this->parseShards($table);
 
 		$shards = [];
