@@ -82,7 +82,7 @@ final class Payload extends BasePayload {
 		/** @var array{table:string,cluster?:string,structure:string,extra:string} $matches */
 		$options = [];
 		if ($matches['extra']) {
-			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*(?P<value>\'?\d+\'?)/';
+			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*(?P<value>\'?\d+\'?)/ius';
 			if (preg_match_all($pattern, $matches['extra'], $optionMatches, PREG_SET_ORDER)) {
 				foreach ($optionMatches as $optionMatch) {
 					$key = strtolower($optionMatch['key']);
@@ -141,7 +141,7 @@ final class Payload extends BasePayload {
 			&& (
 				(stripos($request->payload, 'create table') === 0
 					&& stripos($request->payload, 'shards') !== false
-					&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/', $request->payload)
+					&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/ius', $request->payload)
 				) || stripos($request->payload, 'drop') === 0
 			);
 	}
