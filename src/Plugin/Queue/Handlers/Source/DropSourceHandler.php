@@ -104,6 +104,12 @@ final class DropSourceHandler extends BaseDropHandler {
 		foreach ($queries as $query) {
 			$request = $client->sendRequest($query);
 			if ($request->hasError()) {
+				if (str_contains(
+					(string)$request->getError(),
+					"unknown table '".Payload::VIEWS_TABLE_NAME."' in update request"
+				)) {
+					continue;
+				}
 				throw ManticoreSearchClientError::create((string)$request->getError());
 			}
 		}
