@@ -100,6 +100,7 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 				}
 				break;
 		}
+
 		return false;
 	}
 
