@@ -261,6 +261,15 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 
 	/**
 	 * @param string $val
+	 * @return bool
+	 */
+	protected static function isValidJSONVal(string $val): bool {
+		/** @phpstan-ignore-next-line */
+		return json_validate(substr($val, 1, -1));
+	}
+
+	/**
+	 * @param string $val
 	 * @return Datatype
 	 */
 	protected static function detectValType(string $val): Datatype {
@@ -270,7 +279,7 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 			// json type
 			((substr($val, 1, 1) === '{' && substr($val, -2, 1) === '}') ||
 			(substr($val, 1, 1) === '[' && substr($val, -2, 1) === ']'))
-			&& json_validate(substr($val, 1, -1)) => Datatype::Json,
+			&& self::isValidJSONVal($val) => Datatype::Json,
 			// mva types
 			(substr($val, 0, 1) === '(' && substr($val, -1) === ')') => self::detectMvaTypes($val),
 			self::isManticoreString($val) => Datatype::String,
