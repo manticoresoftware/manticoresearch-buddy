@@ -241,6 +241,9 @@ final class Payload extends BasePayload {
 				}, $fields
 			);
 		}
+		if (!$fields) {
+			throw QueryParseError::create('INSERT into a sharded table requires specifying the fields.');
+		}
 		if (!$table) {
 			throw QueryParseError::create('Failed to parse table from the query');
 		}
