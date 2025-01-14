@@ -27,6 +27,7 @@ final class Payload extends BasePayload {
 	public string $table;
 	public string $structure;
 	public string $extra;
+	public bool $quiet;
 	/** @var array<string,int|string> */
 	public array $options;
 
@@ -97,7 +98,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		// We just need to do something, but actually its' just for PHPstan
 		$self->path = $request->path;
-		$self->type = stripos($request->payload, 'create') === 0 ? 'create' : 'alter';
+		$self->type = $request->command === 'create' ? 'create' : 'alter';
 		$self->cluster = $matches['cluster'] ?? '';
 		$self->table = $matches['table'];
 		$self->structure = $matches['structure'];
@@ -113,7 +114,7 @@ final class Payload extends BasePayload {
 	 * @throws QueryParseError
 	 */
 	protected static function fromDrop(Request $request): static {
-		$pattern = '/DROP\s+SHARDED\s+TABLE\s+'
+		$pattern = '/DROP\s+SHARDED\s+TABLE\s+(?P<quiet>IF\s+EXISTS\s+)?'
 			. '(?:(?P<cluster>[^:\s]+):)?(?P<table>[^:\s\()]+)/ius';
 		if (!preg_match($pattern, $request->payload, $matches)) {
 			throw QueryParseError::create('Failed to parse query');
@@ -122,6 +123,7 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$self->path = $request->path;
 		$self->type = 'drop';
+		$self->quiet = !!$matches['quiet'];
 		$self->cluster = $matches['cluster'];
 		$self->table = $matches['table'];
 		$self->structure = '';

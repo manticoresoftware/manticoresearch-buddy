@@ -84,7 +84,11 @@ final class DropHandler extends BaseHandlerWithClient {
 		 */
 		$result = $resp->getResult();
 		if (!isset($result[0]['data'][0])) {
-			return static::getErrorTask(
+			// In case quiet mode we have IF EXISTS so do nothing
+			if ($this->payload->quiet) {
+				return $this->getNoneTask();
+			}
+			return $this->getErrorTask(
 				"table '{$this->payload->table}' is missing: "
 					. 'DROP SHARDED TABLE failed: '
 					."table '{$this->payload->table}' must exist"
@@ -92,7 +96,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		}
 
 		if (false === stripos($result[0]['data'][0]['Create Table'], "type='distributed'")) {
-			return static::getErrorTask(
+			return $this->getErrorTask(
 				"table '{$this->payload->table}' is not distributed: "
 					. 'DROP SHARDED TABLE failed: '
 					."table '{$this->payload->table}' must be distributed"
@@ -102,7 +106,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		// In case we have no state, means table is not sharded
 		$state = $this->getTableState($this->payload->table);
 		if (!$state) {
-			return static::getErrorTask(
+			return $this->getErrorTask(
 				"table '{$this->payload->table}' is not sharded: "
 					. 'DROP SHARDED TABLE failed: '
 					."table '{$this->payload->table}' be created with sharding"
@@ -144,6 +148,19 @@ final class DropHandler extends BaseHandlerWithClient {
 		};
 		return Task::create(
 			$taskFn, [$message]
+		)->run();
+	}
+
+	/**
+	 * Get none task that does nothing for if exists
+	 * @return Task
+	 */
+	protected function getNoneTask(): Task {
+		$taskFn = static function (): TaskResult {
+			return TaskResult::none();
+		};
+		return Task::create(
+			$taskFn, []
 		)->run();
 	}
 
