@@ -6,6 +6,14 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use RuntimeException;
 
 final class Node {
+	const LISTEN_PATTERN = '/^(?:' .
+		'(?:[0-9]{1,3}\.){3}[0-9]{1,3}|' .
+		'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*' .
+		'[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]' .
+		')' .
+		'(?:\:([0-9]+))|([0-9]+)$' .
+		'/ius';
+
 	/** @var int */
 	public readonly int $seenAt;
 	public readonly string $status;
@@ -39,23 +47,10 @@ final class Node {
 		$listen = $settings->searchdListen->copy();
 		$listen->sort();
 		foreach ($listen as $line) {
-			if (!preg_match('/^([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\:)?([0-9]+)$/ius', $line)) {
-				continue;
+			$nodeId = static::parseNodeId($line);
+			if ($nodeId) {
+				break;
 			}
-
-			if (str_contains($line, ':')) {
-				[$ip, $port] = explode(':', $line);
-			} else {
-				$ip = '127.0.0.1';
-				$port = $line;
-			}
-
-			if ($ip === '0.0.0.0') {
-				$hostname = gethostname();
-				$ip = gethostbyname($hostname ?: '');
-			}
-			$nodeId = "$ip:$port";
-			break;
 		}
 
 		// This is critical and if no node id we cannot continue
@@ -64,6 +59,30 @@ final class Node {
 		}
 
 		return $nodeId;
+	}
+
+	/**
+	 * Parse node id from the line
+	 * @param string $line
+	 * @return null|string
+	 */
+	public static function parseNodeId(string $line): ?string {
+		if (!preg_match(static::LISTEN_PATTERN, $line, $matches)) {
+			return null;
+		}
+
+		if (str_contains($line, ':')) {
+			[$host, $port] = explode(':', $line);
+		} else {
+			$host = '0.0.0.0';
+			$port = $line;
+		}
+
+		if ($host === '0.0.0.0') {
+			$hostname = gethostname();
+			$host = gethostbyname($hostname ?: '');
+		}
+		return "$host:$port";
 	}
 
 	/**
