@@ -55,7 +55,7 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
-			$request = json_decode($payload->body, true);
+			$request = simdjson_decode($payload->body, true);
 			if (!is_array($request)) {
 				throw new \Exception('Cannot parse Kibana request');
 			}

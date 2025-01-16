@@ -110,7 +110,7 @@ final class State {
 		foreach (($res[0]['data'] ?? []) as $row) {
 			$list[] = [
 				'key' => $row['key'],
-				'value' => json_decode($row['value'], true),
+				'value' => simdjson_decode($row['value'], true),
 			];
 		}
 
@@ -137,7 +137,7 @@ final class State {
 				return $value;
 			}
 		}
-		return isset($value) ? json_decode($value, true) : null;
+		return isset($value) ? simdjson_decode($value, true) : null;
 	}
 
 	/**

@@ -54,7 +54,7 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 			$requestTables = self::getRequestTables($payload, $manticoreClient);
 
 			/** @var array<string,mixed> $request */
-			$request = json_decode($payload->body, true);
+			$request = simdjson_decode($payload->body, true);
 			$isEmptyRequest = !$request;
 			if (!$isEmptyRequest && !isset($request['fields'])) {
 				throw new \Exception('Cannot parse request');

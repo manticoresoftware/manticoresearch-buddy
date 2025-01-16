@@ -24,7 +24,7 @@ use Manticoresearch\Buddy\Core\Task\TaskPool;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Swoole\Coroutine;
-use Swoole\Coroutine\Channel;
+use Swoole\Coroutine\WaitGroup;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
 use Throwable;
@@ -63,18 +63,23 @@ final class EventHandler {
 		$startTime = hrtime(true);
 		$requestId = $request->header['Request-ID'] ?? uniqid(more_entropy: true);
 		$body = $request->rawContent() ?: '';
-		$channel = new Channel(1);
+		$waitGroup = new WaitGroup();
+		$waitGroup->add(1);
+		$result = '';
 		Coroutine::create(
-			static function () use ($requestId, $body, $channel, $startTime) {
-				Buddy::debug("[$requestId] request data: $body");
-				$result = (string)static::process($requestId, $body);
-				Buddy::debug("[$requestId] response data: $result");
-				Buddy::debug("[$requestId] response time: " . round((hrtime(true) - $startTime) / 1e6, 3) . ' ms');
-				$channel->push($result);
+			static function () use ($requestId, $body, $startTime, $waitGroup, &$result) {
+				try {
+					Buddy::debug("[$requestId] request data: $body");
+					$result = (string)static::process($requestId, $body);
+					Buddy::debug("[$requestId] response data: $result");
+					Buddy::debug("[$requestId] response time: " . round((hrtime(true) - $startTime) / 1e6, 3) . ' ms');
+				} finally {
+					$waitGroup->done();
+				}
 			}
 		);
-		/** @var string $result */
-		$result = $channel->pop();
+
+		$waitGroup->wait();
 		$response->header('Content-Type', 'application/json');
 		$response->status(200);
 		$response->end($result);
@@ -92,7 +97,6 @@ final class EventHandler {
 			$startTime = hrtime(true);
 			$request = Request::fromString($payload, $id);
 			$handler = QueryProcessor::process($request)->run();
-
 			// In case deferred we return the ID of the task not the request
 			if ($handler->isDeferred()) {
 				$doneFn = TaskPool::add($id, $request->payload);
@@ -124,7 +128,7 @@ final class EventHandler {
 				$originalErrorBody = $request->errorBody;
 			} else {
 				/** @var array{error?:array{message:string,body?:array{error:string}}} $payloadInfo */
-				$payloadInfo = (array)json_decode($payload, true);
+				$payloadInfo = (array)simdjson_decode($payload, true);
 				$originalError = $payloadInfo['error']['message'] ?? '';
 				$originalErrorBody = $payloadInfo['error']['body'] ?? [];
 			}

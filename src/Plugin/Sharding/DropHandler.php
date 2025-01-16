@@ -132,7 +132,7 @@ final class DropHandler extends BaseHandlerWithClient {
 
 		if (isset($result[0]['data'][0]['value'])) {
 			/** @var array{result:string,status?:string,type?:string} $value */
-			$value = json_decode($result[0]['data'][0]['value'], true);
+			$value = simdjson_decode($result[0]['data'][0]['value'], true);
 		}
 		return $value ?? [];
 	}

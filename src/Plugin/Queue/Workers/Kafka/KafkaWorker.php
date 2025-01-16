@@ -59,13 +59,13 @@ class KafkaWorker implements WorkerRunnerInterface
 	) {
 
 		/** @var array{group:string, broker:string, topic:string, batch:string } $attrs */
-		$attrs = json_decode($instance['attrs'], true);
+		$attrs = simdjson_decode($instance['attrs'], true);
 
 		$this->client = $client;
 		$this->consumerGroup = $attrs['group'];
 		$this->brokerList = $attrs['broker'];
 
-		$decodedMapping = json_decode($instance['custom_mapping'], true);
+		$decodedMapping = simdjson_decode($instance['custom_mapping'], true);
 		if ($decodedMapping === false) {
 			GenericError::throw(
 				'Custom mapping decoding error: '.json_last_error_msg()
@@ -199,7 +199,7 @@ class KafkaWorker implements WorkerRunnerInterface
 	private function mapMessages(array $batch): array {
 		$results = [];
 		foreach ($batch as $message) {
-			$parsedMessage = json_decode($message, true);
+			$parsedMessage = simdjson_decode($message, true);
 			if (is_array($parsedMessage)) {
 				$message = array_change_key_case($parsedMessage);
 			} else {

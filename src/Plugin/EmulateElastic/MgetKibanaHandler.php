@@ -39,7 +39,7 @@ class MgetKibanaHandler extends BaseEntityHandler {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			/** @var array{docs:array<array<string,string>>} $payloadBody */
-			$payloadBody = json_decode($payload->body, true);
+			$payloadBody = simdjson_decode($payload->body, true);
 			$entityInfo = $payloadBody['docs'];
 			$getEntitiesCond = self::buildEntitiesCond($entityInfo);
 			$query = 'SELECT _id, _index, _source FROM `' . self::ENTITY_TABLE . "` WHERE {$getEntitiesCond}";
@@ -58,7 +58,7 @@ class MgetKibanaHandler extends BaseEntityHandler {
 						'_index' => $entity['_index'],
 						'_primary_term' => 1,
 						'_seq_no' => 0,
-						'_source' => json_decode($entity['_source'], true),
+						'_source' => simdjson_decode($entity['_source'], true),
 						'_type' => '_doc',
 						'_version' => 1,
 						'found' => true,

@@ -61,8 +61,8 @@ class CatHandler extends BaseHandlerWithClient {
 				$catInfo[] = [
 					'name' => $entityInfo['name'],
 					'order' => 0,
-					'index_patterns' => json_decode($entityInfo['patterns'], true),
-				] + json_decode($entityInfo['content'], true);
+					'index_patterns' => simdjson_decode($entityInfo['patterns'], true),
+				] + simdjson_decode($entityInfo['content'], true);
 			}
 
 			return TaskResult::raw($catInfo);

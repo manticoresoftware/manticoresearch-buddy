@@ -43,7 +43,7 @@ class TableKibanaHandler extends BaseEntityHandler {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			/** @var array{aggs:array<string,mixed>} $payloadBody */
-			$payloadBody = json_decode($payload->body, true);
+			$payloadBody = simdjson_decode($payload->body, true);
 			$reqType = self::detectRequestType($payloadBody);
 			$aggNames = [];
 			if ($reqType === self::AGG_REQUEST_TYPE) {
@@ -109,7 +109,7 @@ class TableKibanaHandler extends BaseEntityHandler {
 				'_seq_no' => 1,
 				'_type' => '_doc',
 			];
-			$hit['_source'] = json_decode($hit['_source'], true);
+			$hit['_source'] = simdjson_decode($hit['_source'], true);
 			if (!array_key_exists('filter', $searchConds)) {
 				continue;
 			}
