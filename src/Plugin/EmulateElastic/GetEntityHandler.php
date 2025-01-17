@@ -85,7 +85,7 @@ class GetEntityHandler extends BaseEntityHandler {
 			'_index' => $entityIndex,
 			'_primary_term' => 1,
 			'_seq_no' => 0,
-			'_source' => (array)json_decode($queryResult[0]['data'][0]['_source'], true),
+			'_source' => (array)simdjson_decode($queryResult[0]['data'][0]['_source'], true),
 			'_type' => '_doc',
 			'_version' => 1,
 			'found' => true,

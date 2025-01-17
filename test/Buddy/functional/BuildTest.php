@@ -24,12 +24,12 @@ final class BuildTest extends TestCase {
 
 	public function testBuildHasRightComposerPackages(): void {
 		/** @var array{require:array<string,string>,require-dev:array<string,string>} $composer */
-		$composer = json_decode((string)file_get_contents('/workdir/composer.json'), true);
+		$composer = simdjson_decode((string)file_get_contents('/workdir/composer.json'), true);
 		$include = array_keys($composer['require']);
 		$exclude = array_keys($composer['require-dev']);
 		$vendorPath = 'build/share/modules/manticore-buddy/vendor';
 		/** @var array{dev:bool,dev-package-names:array<string,string>} $installed */
-		$installed = json_decode(
+		$installed = simdjson_decode(
 			(string)file_get_contents("$vendorPath/composer/installed.json"),
 			true
 		);

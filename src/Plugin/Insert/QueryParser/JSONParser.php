@@ -27,9 +27,8 @@ abstract class JSONParser extends BaseParser implements JSONParserInterface {
 	 */
 	public function parse($query): array {
 		$this->cols = $this->colTypes = [];
-		$struct = Struct::fromJson($query);
-		$row = $struct->toArray();
-		if (!$row || !is_array($row)) {
+		$isNdJson = !Struct::isValid($query);
+		if ($isNdJson) {
 			// checking if query has ndjson format
 			$queries = static::parseNdJSON($query);
 			foreach ($queries as $query) {
@@ -42,6 +41,8 @@ abstract class JSONParser extends BaseParser implements JSONParserInterface {
 				$this->parseJSONRow($row);
 			}
 		} else {
+			$struct = Struct::fromJson($query);
+			$row = $struct->toArray();
 			$this->parseJSONRow($row);
 		}
 

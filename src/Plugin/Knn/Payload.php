@@ -73,7 +73,7 @@ final class Payload extends BasePayload
 	private static function parseHttpRequest(self $payload, Request $request): void {
 		$payload->select = [];
 
-		$parsedPayload = json_decode($request->payload, true);
+		$parsedPayload = simdjson_decode($request->payload, true);
 		if (!is_array($parsedPayload)) {
 			return;
 		}
@@ -120,7 +120,7 @@ final class Payload extends BasePayload
 	 */
 	public static function hasMatch(Request $request): bool {
 		if ($request->endpointBundle === Endpoint::Search) {
-			$payload = json_decode($request->payload, true);
+			$payload = simdjson_decode($request->payload, true);
 			if (is_array($payload) && isset($payload['knn']['doc_id'])) {
 				return true;
 			}

@@ -105,7 +105,7 @@ trait StringFunctionsTrait {
 	 */
 	private function prepareMvaField(string $fieldValue): string {
 		if (isset($fieldValue[0]) && $fieldValue[0] === '[') {
-			$fieldValue = json_decode($fieldValue, true);
+			$fieldValue = simdjson_decode($fieldValue, true);
 		}
 
 

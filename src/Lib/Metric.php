@@ -442,7 +442,7 @@ final class Metric {
 		}
 		// Decode config and get all path for size calculation
 		/** @var array{indexes?:array<array{path:string}>} $jsonConfig */
-		$jsonConfig = json_decode($jsonContent, true);
+		$jsonConfig = simdjson_decode($jsonContent, true);
 		$indexes = $jsonConfig['indexes'] ?? [];
 		$paths = array_column($indexes, 'path');
 		$size = 0;

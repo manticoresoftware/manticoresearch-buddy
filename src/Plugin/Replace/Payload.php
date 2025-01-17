@@ -51,7 +51,7 @@ final class Payload extends BasePayload {
 
 		if ($self->isElasticLikePath) {
 			$pathChunks = explode('/', $request->path);
-			$payload = json_decode($request->payload, true);
+			$payload = simdjson_decode($request->payload, true);
 
 			self::parseClusterTableName($self, $pathChunks[0] ?? '');
 			$self->id = (int)$pathChunks[2];

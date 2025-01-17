@@ -98,7 +98,7 @@ class HungRequestTest extends TestCase {
 				$output = [];
 				exec("curl -s 127.0.0.1:$port/cli_json -d '$query' 2>&1", $output);
 				/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
-				$result = (array)json_decode($output[0] ?? '{}', true);
+				$result = (array)simdjson_decode($output[0] ?? '{}', true);
 				return TaskResult::raw($result);
 			},
 			$taskFnArgs,

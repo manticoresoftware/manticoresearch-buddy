@@ -93,7 +93,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 					'cluster' => $cluster,
 				];
 
-				$shard = hexdec(substr(md5($idStr), 0, 8)) % $shardCount;
+				$shard = jchash($idStr, $shardCount);
 				$info = $shards[$shard];
 				$shardName = $info['name'];
 				$this->assignTable($struct, $cluster, $shardName);

@@ -87,7 +87,7 @@ final class Payload extends BasePayload {
 					preserve?: int
 			}
 		} $payload */
-		$payload = json_decode($request->payload, true);
+		$payload = simdjson_decode($request->payload, true);
 		if (!isset($payload['query']) || !is_string($payload['query'])) {
 			throw QueryParseError::create('Failed to parse query: make sure you have query and it is a string');
 		}

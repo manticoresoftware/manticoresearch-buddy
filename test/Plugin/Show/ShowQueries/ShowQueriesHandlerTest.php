@@ -28,7 +28,7 @@ class ShowQueriesHandlerTest extends TestCase {
 
 	public function testShowQueriesExecutesProperly(): void {
 		echo "\nTesting the 'show queries' executes properly and we got the correct Manticore response received\n";
-		$respBody = json_decode(
+		$respBody = simdjson_decode(
 			"[{\n"
 			. '"columns":[{"id":{"type":"long long"}},{"query":{"type":"string"}},'
 			. '{"time":{"type":"string"}},{"protocol":{"type":"string"}},{"host":{"type":"string"}}],'
