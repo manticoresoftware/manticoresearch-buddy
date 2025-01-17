@@ -143,16 +143,14 @@ final class Payload extends BasePayload {
 				continue;
 			}
 
-			/** @var Struct<int|string,array<string,mixed>> $struct */
-			$struct = Struct::fromJson($rows[$i]);
-			[$cluster, $table] = static::processBulkRow($struct, $batch, $tableMap, $cluster, $table);
+			[$cluster, $table] = static::processBulkRow($rows[$i], $batch, $tableMap, $cluster, $table);
 		}
 		/** @var Batch $batch */
 		return $batch;
 	}
 
 	/**
-	 * @param Struct<int|string,array<string,mixed>> $struct
+	 * @param string $row
 	 * @param Batch &$batch
 	 * @param array<string,array{0:string,1:string}> &$tableMap
 	 * @param string $cluster
@@ -161,12 +159,14 @@ final class Payload extends BasePayload {
 	 * @throws QueryParseError
 	 */
 	protected static function processBulkRow(
-		Struct $struct,
+		string $row,
 		array &$batch,
 		array &$tableMap,
 		string $cluster,
 		string $table
 	): array {
+		/** @var Struct<int|string,array<string,mixed>> $struct */
+		$struct = Struct::fromJson($row);
 		if (isset($struct['index']['_index'])) { // _bulk
 			/** @var string $table */
 			$table = $struct['index']['_index'];

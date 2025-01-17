@@ -39,7 +39,7 @@ class UpdateEntityHandler extends BaseEntityHandler {
 			}
 			if (!$queryResult[0]['data']) {
 				/** @var array{doc?:array<mixed>} $payloadObj */
-				$payloadObj = json_decode($payload->body, true);
+				$payloadObj = simdjson_decode($payload->body, true);
 				$indexType = explode(':', $entityId)[0];
 				$entitySource = array_key_exists('doc', $payloadObj) ? $payloadObj['doc'] : $payloadObj;
 				AddEntityHandler::add(
@@ -86,18 +86,18 @@ class UpdateEntityHandler extends BaseEntityHandler {
 		HTTPClient $manticoreClient
 	): void {
 		/** @var array{doc?:array<mixed>} $sourceObj */
-		$sourceObj = json_decode($source, true);
+		$sourceObj = simdjson_decode($source, true);
 		if (!$sourceObj) {
 			$source = str_replace('\\"', '\\\\"', $source);
 			/** @var array{doc?:array<mixed>} $sourceObj */
-			$sourceObj = json_decode($source, true);
+			$sourceObj = simdjson_decode($source, true);
 		}
 		if (array_key_exists('doc', $sourceObj)) {
 			$sourceObj = $sourceObj['doc'];
 		}
 		if ($prevSource) {
 			/** @var array<int|string,mixed> $prevSourceObj */
-			$prevSourceObj = json_decode($prevSource, true);
+			$prevSourceObj = simdjson_decode($prevSource, true);
 		} else {
 			$prevSourceObj = [];
 		}
@@ -123,7 +123,7 @@ class UpdateEntityHandler extends BaseEntityHandler {
 	 * @throws \Exception
 	 */
 	protected static function buildUpdateData(string $source): array {
-		$sourceData = (array)json_decode($source, true);
+		$sourceData = (array)simdjson_decode($source, true);
 		$entityKey = array_key_first($sourceData);
 		if ($entityKey === null) {
 			throw new \Exception('Unknown error on Kibana entity update');

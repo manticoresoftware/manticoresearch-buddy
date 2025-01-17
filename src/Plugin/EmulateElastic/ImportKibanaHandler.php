@@ -73,7 +73,7 @@ class ImportKibanaHandler extends BaseEntityHandler {
 	 */
 	protected static function importFromQuery(string $query, HTTPClient $manticoreClient): int {
 		// Checking if the entity can be imported
-		$queryEntity = (array)json_decode($query, true);
+		$queryEntity = (array)simdjson_decode($query, true);
 		if (!array_key_exists('type', $queryEntity) || !in_array($queryEntity['type'], self::IMPORT_ENTITY_TYPES)) {
 			return 0;
 		}
@@ -168,7 +168,7 @@ class ImportKibanaHandler extends BaseEntityHandler {
 		HTTPClient $manticoreClient
 	): string {
 		/** @var array{index-pattern?:array{title:string},attributes:array{title:string}} $pattern */
-		$pattern = json_decode($patternSource, true);
+		$pattern = simdjson_decode($patternSource, true);
 		$indexName = isset($pattern['index-pattern'])
 			? $pattern['index-pattern']['title'] : $pattern['attributes']['title'];
 		$query = 'SELECT _id, _source FROM ' . parent::ENTITY_TABLE . " WHERE _type='{$indexType}'";
@@ -179,7 +179,7 @@ class ImportKibanaHandler extends BaseEntityHandler {
 		}
 		foreach ($queryResult[0]['data'] as $patternInfo) {
 			/** @var array{index-pattern?:array{title:string},attributes:array{title:string}} $savedPattern */
-			$savedPattern = json_decode($patternInfo['_source'], true);
+			$savedPattern = simdjson_decode($patternInfo['_source'], true);
 			$savedIndexName = isset($savedPattern['index-pattern'])
 				? $savedPattern['index-pattern']['title'] : $savedPattern['attributes']['title'];
 			if ($savedIndexName === $indexName) {
@@ -215,7 +215,7 @@ class ImportKibanaHandler extends BaseEntityHandler {
 		}
 		foreach ($queryResult[0]['data'] as $entityInfo) {
 			/** @var array{references:array{0:array{id:string}}} $entitySource */
-			$entitySource = json_decode($entityInfo['_source'], true);
+			$entitySource = simdjson_decode($entityInfo['_source'], true);
 			if ($entitySource['references'][0]['id'] !== $importedId) {
 				return;
 			}

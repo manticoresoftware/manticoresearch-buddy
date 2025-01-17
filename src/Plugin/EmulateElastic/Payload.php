@@ -113,7 +113,7 @@ final class Payload extends BasePayload {
 				 * properties?:array<string,array{properties?:array<mixed>,type?:string,fields?:array<mixed>}>
 				 * } $requestBody
 				 */
-				$requestBody = (array)json_decode($request->payload, true);
+				$requestBody = (array)simdjson_decode($request->payload, true);
 				if ($requestBody === [] || !isset($requestBody['properties'])) {
 					throw new Exception("Unvalid request body in {$request->path}: $request->payload");
 				}
