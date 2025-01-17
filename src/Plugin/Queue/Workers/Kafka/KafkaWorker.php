@@ -105,7 +105,7 @@ class KafkaWorker implements WorkerRunnerInterface
 
 		// Set a rebalance callback to log partition assignments (optional)
 		$conf->setRebalanceCb(
-			function (KafkaConsumer $kafka, $err, array $partitions = null) {
+			function (KafkaConsumer $kafka, $err, ?array $partitions = null) {
 				switch ($err) {
 					case RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS:
 						$kafka->assign($partitions);
