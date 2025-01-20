@@ -27,7 +27,7 @@ final class Table {
 		protected readonly string $structure,
 		protected readonly string $extra
 	) {
-		$this->table = '_sharding_table';
+		$this->table = 'system.sharding_table';
 	}
 
 	/**
@@ -618,7 +618,7 @@ final class Table {
 		// We can call this method on rebalancing, that means
 		// table may exist, so to suppress error we use
 		// if not exists to keep logic simpler
-		return "CREATE TABLE IF NOT EXISTS `{$this->getTableShardName($shard)}` {$structure} {$this->extra}";
+		return "CREATE TABLE IF NOT EXISTS {$this->getTableShardName($shard)} {$structure} {$this->extra}";
 	}
 
 	/**
@@ -627,7 +627,7 @@ final class Table {
 	 * @return string
 	 */
 	protected function getTableShardName(int $shard): string {
-		return "{$this->name}_s{$shard}";
+		return "system.{$this->name}_s{$shard}";
 	}
 
 	/**
@@ -639,7 +639,7 @@ final class Table {
 		// Calculate local tables
 		$locals = new Set;
 		foreach ($shards as $shard) {
-			$locals->add("local='{$this->name}_s{$shard}'");
+			$locals->add("local='{$this->getTableShardName($shard)}'");
 		}
 
 		// Calculate external tables
@@ -649,8 +649,9 @@ final class Table {
 		foreach ($nodes as $row) {
 			foreach ($row['shards'] as $shard) {
 				$map[$shard] ??= new Set;
+				$shardName = $this->getTableShardName($shard);
 				// @phpstan-ignore-next-line
-				$map[$shard]->add("{$row['node']}:{$this->name}_s{$shard}");
+				$map[$shard]->add("{$row['node']}:{$shardName}");
 			}
 		}
 
@@ -710,7 +711,7 @@ final class Table {
 				'Trying to initialize while already initialized.'
 			);
 		}
-		$query = "CREATE TABLE `{$this->table}` (
+		$query = "CREATE TABLE {$this->table} (
 		`cluster` string,
 		`node` string,
 		`table` string,

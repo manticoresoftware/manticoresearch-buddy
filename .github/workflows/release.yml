@@ -2,10 +2,11 @@ name: release
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
     branches:
       - main
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 env:
   APP_NAME: 'manticore-buddy'
@@ -15,14 +16,33 @@ env:
   LIBCURL_VERSION: '7.29.0'
 
 jobs:
+  update-version:
+    if: >
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      github.event_name == 'pull_request' && contains(
+            github.event.pull_request.labels.*.name, 'pack'
+          )
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.semver-tagger.outputs.version }}
+      version_full: ${{ steps.semver-tagger.outputs.version_full }}
+      version_rpm: ${{ steps.semver-tagger.outputs.version_rpm }}
+      version_deb: ${{ steps.semver-tagger.outputs.version_deb }}
+      target: ${{ steps.semver-tagger.outputs.target }}
+    permissions:
+      contents: write
+    steps:
+      - id: semver-tagger
+        uses: manticoresoftware/semver-tagger-action@main
   vars:
+    needs: update-version
+    if: needs.update-version.outputs.version != ''
     runs-on: ubuntu-22.04
     outputs:
-      app_version: ${{ steps.vars.outputs.app_version }}
-      app_date: ${{ steps.vars.outputs.app_date }}
-      app_commit: ${{ steps.vars.outputs.app_commit }}
-      rpm_suffix: ${{ steps.vars.outputs.rpm_suffix }}
-      deb_suffix: ${{ steps.vars.outputs.deb_suffix }}
+      target: ${{ steps.vars.outputs.target }}
+      version_full: ${{ steps.vars.outputs.version_full }}
+      version_rpm: ${{ steps.vars.outputs.version_rpm }}
+      version_deb: ${{ steps.vars.outputs.version_deb }}
 
     steps:
       - uses: actions/checkout@v3
@@ -30,19 +50,18 @@ jobs:
           ref: ${{ github.head_ref || github.ref }}
       - id: vars
         run: |
-          version=$(<APP_VERSION)
-          date=$( date +%y%m%d%H )
-          commit=${{ github.event.pull_request.head.sha || github.sha }}
-          commit=${commit:0:7}
+          # Use version and target from update-version job
+          version_full="${{ needs.update-version.outputs.version_full }}"
+          version_rpm="${{ needs.update-version.outputs.version_rpm }}"
+          version_deb="${{ needs.update-version.outputs.version_deb }}"
+          target="${{ needs.update-version.outputs.target }}"
 
-          echo "app_version=$version" >> $GITHUB_OUTPUT
-          echo "app_date=$date" >> $GITHUB_OUTPUT
-          echo "app_commit=$commit" >> $GITHUB_OUTPUT
-          echo "rpm_suffix=_${date}.$commit" >> $GITHUB_OUTPUT
-          echo "deb_suffix=-${date}-$commit" >> $GITHUB_OUTPUT
+          echo "version_full=$version_full" >> $GITHUB_OUTPUT
+          echo "version_rpm=$version_rpm" >> $GITHUB_OUTPUT
+          echo "version_deb=$version_deb" >> $GITHUB_OUTPUT
+          echo "target=$target" >> $GITHUB_OUTPUT
 
   build-artifact:
-    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-22.04
     needs:
       - vars
@@ -60,8 +79,9 @@ jobs:
 
       - name: Create artifact
         run: |
-          name="${{ env.APP_NAME }}_${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.rpm_suffix }}"
+          name="${{ env.APP_NAME }}_${{ needs.vars.outputs.version_full }}"
           echo "$name"
+          echo "${{ needs.vars.outputs.version_full }}" > build/APP_VERSION
           mkdir build/bin
           cp build/${{ env.APP_NAME }} build/bin/${{ env.APP_NAME }}
           tar czf "$name.tar.gz" -C build bin/${{ env.APP_NAME }} share
@@ -93,6 +113,8 @@ jobs:
           cp -rp build/share/modules/${{ env.APP_NAME }}/* .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/
           cp -r build/${{ env.APP_NAME }} .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
           cp -r build/${{ env.APP_NAME }} .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
+          echo "${{ needs.vars.outputs.version_full }}" > .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/APP_VERSION
+          echo "${{ needs.vars.outputs.version_full }}" > .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/APP_VERSION
           sudo chown -R root:root .debpkg
           sudo chown -R root:root .rpmpkg
       - uses: manticoresoftware/actions-build-deb-action@master
@@ -101,7 +123,7 @@ jobs:
           package: ${{ env.APP_NAME }}
           package_root: .debpkg
           maintainer: ${{ env.MAINTAINER }}
-          version: ${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.deb_suffix }}
+          version: ${{ needs.vars.outputs.version_deb }}
           arch: 'all'
           desc: '${{ env.DESC }}'
           depends: '${{ env.LIBCURL_NAME }}4 (>= ${{ env.LIBCURL_VERSION}})'
@@ -124,7 +146,7 @@ jobs:
 
           # Prepare spec file for RPM
           sed -i 's/{{ NAME }}/${{ env.APP_NAME }}/g' $spec_file
-          sed -i 's/{{ VERSION }}/${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.rpm_suffix }}/g' $spec_file
+          sed -i 's/{{ VERSION }}/${{ needs.vars.outputs.version_rpm }}/g' $spec_file
           sed -i 's/{{ MAINTAINER }}/${{ env.MAINTAINER }}/g' $spec_file
           sed -i 's/{{ DESC }}/${{ env.DESC }}/g' $spec_file
           sed -i 's/{{ LIBCURL_NAME }}/${{ env.LIBCURL_NAME }}/g' $spec_file
@@ -142,14 +164,13 @@ jobs:
       - name: Rename packages to proper name
         run: |
           ls -la ./*.rpm
-          version=${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.rpm_suffix }}
+          version=${{ needs.vars.outputs.version_rpm }}
           rpm_path="./${{ env.APP_NAME }}-${version}-1.noarch.rpm"
           cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el7.noarch.rpm"
           cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el8.noarch.rpm"
           cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el9.noarch.rpm"
 
           ls -la ./*.deb
-          version=${{ needs.vars.outputs.app_version }}${{ needs.vars.outputs.deb_version }}
 
       - uses: manticoresoftware/upload_artifact_with_retries@main
         with:
@@ -172,11 +193,11 @@ jobs:
           path: ./*.el9.noarch.rpm
 
   create-release:
+    if: needs.update-version.outputs.target == 'release'
     runs-on: ubuntu-22.04
     needs:
       - build-artifact
       - build-linux-packages
-    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v3
         with:
@@ -198,10 +219,12 @@ jobs:
           prerelease: false
 
   deploy:
-    if: ${{ github.event_name != 'pull_request' }}
     needs:
+      - vars
       - build-artifact
       - build-linux-packages
+    env:
+      target: ${{ needs.vars.outputs.target }}
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -276,5 +299,5 @@ jobs:
         uses: manticoresoftware/manticoresearch/actions/update-deps@master
         with:
           name: buddy
-          version: "${{ needs.vars.outputs.app_version }} ${{ needs.vars.outputs.app_date }} ${{ needs.vars.outputs.app_commit }}"
+          version: ${{ needs.vars.outputs.version_full }}
           token: ${{ secrets.PR_TOKEN }}

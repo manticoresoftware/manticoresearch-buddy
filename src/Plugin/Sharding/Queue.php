@@ -35,7 +35,7 @@ final class Queue {
 		protected Cluster $cluster,
 		protected Client $client
 	) {
-		$this->table = '_sharding_queue';
+		$this->table = 'system.sharding_queue';
 	}
 
 	/**
@@ -270,7 +270,7 @@ final class Queue {
 				'Trying to initialize while already initialized.'
 			);
 		}
-		$query = "CREATE TABLE `{$this->table}` (
+		$query = "CREATE TABLE {$this->table} (
 			`node` string,
 			`query` string,
 			`wait_for_id` bigint,

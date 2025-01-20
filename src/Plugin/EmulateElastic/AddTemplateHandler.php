@@ -42,7 +42,7 @@ class AddTemplateHandler extends BaseHandlerWithClient {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			/** @var array<string,mixed> */
-			$request = json_decode($payload->body, true);
+			$request = simdjson_decode($payload->body, true);
 			if (!is_array($request) || !isset($request['index_patterns'])) {
 				throw new \Exception('Cannot parse request');
 			}

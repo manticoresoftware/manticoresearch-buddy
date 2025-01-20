@@ -72,7 +72,7 @@ final class Payload extends BasePayload {
 		$path = 'insert';
 		$query = [
 			'table' => $table,
-			'doc' => (array)json_decode($payload, true),
+			'doc' => (array)simdjson_decode($payload, true),
 		];
 		if (isset($pathParts[2]) && $pathParts[2]) {
 			$query['id'] = (int)$pathParts[2];

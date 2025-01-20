@@ -100,6 +100,7 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 				}
 				break;
 		}
+
 		return false;
 	}
 
@@ -245,13 +246,26 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 				$v = trim($v);
 			}
 		);
+		$returnType = Datatype::Multi;
 		foreach ($subVals as $v) {
-			if (self::detectValType($v) === Datatype::Bigint) {
-				return Datatype::Multi64;
+			$subValType = self::detectValType($v);
+			if ($returnType !== Datatype::Multi64 && $subValType === Datatype::Bigint) {
+				$returnType = Datatype::Multi64;
+			} elseif ($subValType === Datatype::Float) {
+				return Datatype::Json;
 			}
 		}
 
-		return Datatype::Multi;
+		return $returnType;
+	}
+
+	/**
+	 * @param string $val
+	 * @return bool
+	 */
+	protected static function isValidJSONVal(string $val): bool {
+		/** @phpstan-ignore-next-line */
+		return json_validate(substr($val, 1, -1));
 	}
 
 	/**
@@ -263,7 +277,9 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 			// numeric types
 			is_numeric($val) => self::detectNumericValType($val),
 			// json type
-			(substr($val, 1, 1) === '{' && substr($val, -2, 1) === '}') => Datatype::Json,
+			((substr($val, 1, 1) === '{' && substr($val, -2, 1) === '}') ||
+			(substr($val, 1, 1) === '[' && substr($val, -2, 1) === ']'))
+			&& self::isValidJSONVal($val) => Datatype::Json,
 			// mva types
 			(substr($val, 0, 1) === '(' && substr($val, -1) === ')') => self::detectMvaTypes($val),
 			self::isManticoreString($val) => Datatype::String,

@@ -28,7 +28,9 @@ class KafkaWorker implements WorkerRunnerInterface
 
 	private Client $client;
 	private string $brokerList;
-	/** @var array|string[] */
+	/** @var array<string, string> */
+	private array $customMapping;
+	/** @var array<int, string> */
 	private array $topicList;
 	private string $consumerGroup;
 	private string $bufferTable;
@@ -45,6 +47,7 @@ class KafkaWorker implements WorkerRunnerInterface
 	 *   full_name:string,
 	 *   buffer_table:string,
 	 *   destination_name:string,
+	 *   custom_mapping: string,
 	 *   query:string,
 	 *   attrs:string } $instance
 	 *
@@ -56,11 +59,20 @@ class KafkaWorker implements WorkerRunnerInterface
 	) {
 
 		/** @var array{group:string, broker:string, topic:string, batch:string } $attrs */
-		$attrs = json_decode($instance['attrs'], true);
+		$attrs = simdjson_decode($instance['attrs'], true);
 
 		$this->client = $client;
 		$this->consumerGroup = $attrs['group'];
 		$this->brokerList = $attrs['broker'];
+
+		$decodedMapping = simdjson_decode($instance['custom_mapping'], true);
+		if ($decodedMapping === false) {
+			GenericError::throw(
+				'Custom mapping decoding error: '.json_last_error_msg()
+			);
+		}
+		/** @var array<string,string> $decodedMapping */
+		$this->customMapping = $decodedMapping;
 		$this->bufferTable = $instance['buffer_table'];
 		$this->topicList = array_map(fn($item) => trim($item), explode(',', $attrs['topic']));
 		$this->batchSize = (int)$attrs['batch'];
@@ -93,7 +105,7 @@ class KafkaWorker implements WorkerRunnerInterface
 
 		// Set a rebalance callback to log partition assignments (optional)
 		$conf->setRebalanceCb(
-			function (KafkaConsumer $kafka, $err, array $partitions = null) {
+			function (KafkaConsumer $kafka, $err, ?array $partitions = null) {
 				switch ($err) {
 					case RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS:
 						$kafka->assign($partitions);
@@ -187,7 +199,7 @@ class KafkaWorker implements WorkerRunnerInterface
 	private function mapMessages(array $batch): array {
 		$results = [];
 		foreach ($batch as $message) {
-			$parsedMessage = json_decode($message, true);
+			$parsedMessage = simdjson_decode($message, true);
 			if (is_array($parsedMessage)) {
 				$message = array_change_key_case($parsedMessage);
 			} else {
@@ -208,8 +220,12 @@ class KafkaWorker implements WorkerRunnerInterface
 	private function handleRow(array $message): array {
 		$row = [];
 		foreach ($this->fields as $fieldName => $fieldType) {
-			if (isset($message[$fieldName])) {
-				$row[$fieldName] = $this->morphValuesByFieldType($message[$fieldName], $fieldType);
+			$inputKeyName = $fieldName;
+			if (isset($this->customMapping[$fieldName])) {
+				$inputKeyName = $this->customMapping[$fieldName];
+			}
+			if (isset($message[$inputKeyName])) {
+				$row[$fieldName] = $this->morphValuesByFieldType($message[$inputKeyName], $fieldType);
 			} else {
 				if (in_array(
 					$fieldType, [Fields::TYPE_INT,

@@ -25,7 +25,7 @@ final class State {
 	public function __construct(
 		protected Client $client
 	) {
-		$this->table = '_sharding_state';
+		$this->table = 'system.sharding_state';
 	}
 
 	/**
@@ -110,7 +110,7 @@ final class State {
 		foreach (($res[0]['data'] ?? []) as $row) {
 			$list[] = [
 				'key' => $row['key'],
-				'value' => json_decode($row['value'], true),
+				'value' => simdjson_decode($row['value'], true),
 			];
 		}
 
@@ -137,7 +137,7 @@ final class State {
 				return $value;
 			}
 		}
-		return isset($value) ? json_decode($value, true) : null;
+		return isset($value) ? simdjson_decode($value, true) : null;
 	}
 
 	/**
@@ -151,7 +151,7 @@ final class State {
 				'Trying to initialize while already initialized.'
 			);
 		}
-		$query = "CREATE TABLE `{$this->table}` (
+		$query = "CREATE TABLE {$this->table} (
 			`key` string,
 			`value` json,
 			`updated_at` timestamp

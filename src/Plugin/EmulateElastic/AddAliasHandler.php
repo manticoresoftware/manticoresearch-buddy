@@ -41,7 +41,7 @@ class AddAliasHandler extends BaseEntityHandler {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			/** @var array{actions:array<mixed>} */
-			$request = json_decode($payload->body, true);
+			$request = simdjson_decode($payload->body, true);
 			if (!is_array($request)) {
 				throw new \Exception('Cannot parse request');
 			}

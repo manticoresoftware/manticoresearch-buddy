@@ -78,7 +78,7 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromJsonRequest(Request $request): static {
 		/** @var array{index:string,table?:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool}} $payload */
-		$payload = json_decode($request->payload, true);
+		$payload = simdjson_decode($request->payload, true);
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $payload['table'] ?? $payload['index'];
@@ -384,20 +384,19 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		$hasMatch = stripos($request->payload, 'select') === 0
+		$hasMatch = $request->command === 'select'
 			&& stripos($request->payload, 'option') !== false
 			&& stripos($request->payload, 'fuzzy') !== false
 			&& stripos($request->error, 'unknown option') !== false
 		;
-
-
-		if (!$hasMatch) {
-			$hasMatch = $request->endpointBundle === Endpoint::Search
-				&& stripos($request->error, 'unknown option') !== false
-			;
+		if ($hasMatch) {
+			return true;
 		}
 
-		return $hasMatch;
+
+		return $request->endpointBundle === Endpoint::Search
+			&& stripos($request->error, 'unknown option') !== false
+		;
 	}
 
 	/**

@@ -150,11 +150,11 @@ final class CreateHandler extends BaseHandlerWithClient {
 			$timeout = $payload->getShardingTimeout();
 			while (true) {
 				// TODO: think about the way to refactor it and remove duplication
-				$q = "select value[0] as value from _sharding_state where `key` = 'table:{$payload->table}'";
+				$q = "select value[0] as value from system.sharding_state where `key` = 'table:{$payload->table}'";
 				$resp = $client->sendRequest($q);
 				$result = $resp->getResult();
 				/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
-				$value = json_decode($result[0]['data'][0]['value'] ?? '[]', true);
+				$value = simdjson_decode($result[0]['data'][0]['value'] ?? '[]', true);
 
 				/** @var array{result:string,status?:string,type?:string} $value */
 				$type = $value['type'] ?? 'unknown';

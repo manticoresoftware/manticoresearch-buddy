@@ -72,7 +72,7 @@ class InitKibanaHandler extends BaseEntityHandler {
 						'aliases' => [
 							$alias => [],
 						],
-					] + json_decode($entity['_source'], true);
+					] + simdjson_decode($entity['_source'], true);
 				}
 			}
 

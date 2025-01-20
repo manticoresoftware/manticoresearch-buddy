@@ -32,10 +32,10 @@ class SQLInsertParserTest extends TestCase {
 		$this->assertEquals(Datatype::Bigint, self::invokeMethod($parser, 'detectValType', ['11111111111']));
 		$this->assertEquals(Datatype::Int, self::invokeMethod($parser, 'detectValType', [1]));
 		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', ['\'{"a":1}\'']));
+		$this->assertEquals(Datatype::Json, self::invokeMethod($parser, 'detectValType', ['(1, 1.5)']));
 		$this->assertEquals(
 			Datatype::Multi64, self::invokeMethod($parser, 'detectValType', ['(1, 1111111111111)'])
 		);
-		$this->assertEquals(Datatype::Multi, self::invokeMethod($parser, 'detectValType', ['(1, 0.1)']));
 		$this->assertEquals(Datatype::Multi, self::invokeMethod($parser, 'detectValType', ['(11, 1)']));
 		$this->assertEquals(Datatype::String, self::invokeMethod($parser, 'detectValType', ['testmail@google.com']));
 		$this->assertEquals(Datatype::Timestamp, self::invokeMethod($parser, 'detectValType', ['2000-01-01T01']));
@@ -117,38 +117,38 @@ class SQLInsertParserTest extends TestCase {
 	public function testParseOk(): void {
 		echo "\nTesting the parsing of SQL insert request\n";
 
-		$query = 'INSERT INTO test(col1,col2,col3,col4,col5,col6,col7,@timestamp) VALUES'
-			. "('m1@google.com', 1, 111, '{\"b\":2}', (1,2), (1,11111111111), 'c', '2000-01-01T12:00:00Z'),"
+		$query = 'INSERT INTO test(col1,col2,col3,col4,col5,col6,col7,col8,@timestamp) VALUES'
+			. "('m1@google.com', 1, 111, '{\"b\":2}', (1,2), (1,11111111111), (0.2,0.8), 'c', '2000-01-01T12:00:00Z'),"
 			. "('m2@google.com', 2, 222222222222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222222222222),"
-				. " 'qqq', '2000-01-01T12:00:30Z')";
+			. " (0.8,0.2), 'qqq', '2000-01-01T12:00:30Z')";
 		$res = [
 			'name' => 'test',
-			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', '@timestamp'],
-			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi64', 'text', 'timestamp'],
+			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', '@timestamp'],
+			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi64', 'json', 'text', 'timestamp'],
 		];
 		$this->assertEquals($res, self::$parser->parse($query));
 
 		$parser = new SQLInsertParser();
-		$query = 'INSERT INTO test(col1,col2,col3,col4,col5, col6, col7) VALUES'
-			. "('m1@google.com', 1, 111111111111, '{\"b\":2}', (1,2), (1,111), 'c'),"
-			. "('m2@google.com', 2, 222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222), 'qqq')";
+		$query = 'INSERT INTO test(col1,col2,col3,col4,col5,col6,col7,col8) VALUES'
+			. "('m1@google.com', 1, 111111111111, '{\"b\":2}', (1,2), (1,111), (0.2,1), 'c'),"
+			. "('m2@google.com', 2, 222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222), (1,0.2), 'qqq')";
 		$res = [
 			'name' => 'test',
-			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7'],
-			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi', 'text'],
+			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8'],
+			'colTypes' => ['string', 'int', 'bigint', 'json', 'multi', 'multi', 'json', 'text'],
 		];
 		$this->assertEquals($res, $parser->parse($query));
 
 		$parser = new SQLInsertParser();
-		$query = 'INSERT INTO test(col1,col2,col3,col4,col5, col6, col7) VALUES'
+		$query = 'INSERT INTO test(col1,col2,col3,col4,col5,col6,col7,col8) VALUES'
 			. "\n"
-			. "('m1@google.com', 1, 111111111111, '{\"b\":2}', (1,2), (1,111), 'c'),"
+			. "('m1@google.com', 1, 111111111111, '{\"b\":2}', (1,2), (1,111), (1,2), 'c'),"
 			. "\n"
-			. "('some text', 2, 222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222), 'qqq')";
+			. "('some text', 2, 222, '{\"a\": \"(2,3)\"}', (2,3,4,5), (222), (0.5,1), 'qqq')";
 		$res = [
 			'name' => 'test',
-			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7'],
-			'colTypes' => ['text', 'int', 'bigint', 'json', 'multi', 'multi', 'text'],
+			'cols' => ['col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8'],
+			'colTypes' => ['text', 'int', 'bigint', 'json', 'multi', 'multi', 'json', 'text'],
 		];
 		$this->assertEquals($res, $parser->parse($query));
 	}

@@ -204,7 +204,7 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		$isSelect = stripos($request->payload, 'select') === 0;
+		$isSelect = $request->command === 'select';
 		if ($isSelect) {
 			foreach (array_keys(static::HANDLED_TABLES) as $table) {
 				[$db, $dbTable] = explode('.', $table);
