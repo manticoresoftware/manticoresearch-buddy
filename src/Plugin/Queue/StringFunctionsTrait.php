@@ -88,7 +88,7 @@ trait StringFunctionsTrait {
 			Fields::TYPE_TIMESTAMP => is_numeric($fieldValue)
 				? (int)$fieldValue
 				: "'" . self::escapeSting($fieldValue) . "'",
-			Fields::TYPE_BOOL => (bool)$fieldValue,
+			Fields::TYPE_BOOL => ((bool)$fieldValue) ? 1 : 0,
 			Fields::TYPE_FLOAT => (float)$fieldValue,
 			Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
 				"'" . $this->escapeSting($fieldValue) . "'",
