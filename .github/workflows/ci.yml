@@ -39,6 +39,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Set variables
         id: vars
@@ -74,11 +78,10 @@ jobs:
         run: |
           docker create --name temp ghcr.io/manticoresoftware/manticoresearch:test-kit-latest tail -f /dev/null
           docker start temp
-          docker exec temp sh -c 'cp /usr/share/manticore/modules/manticore-buddy/bin/manticore-buddy /tmp/manticore-buddy'
           docker exec temp sh -c 'rm -rf /usr/share/manticore/modules/manticore-buddy && mkdir -p /usr/share/manticore/modules/manticore-buddy'
           docker cp . temp:/usr/share/manticore/modules/manticore-buddy/
           docker exec temp sh -c 'cd /usr/share/manticore/modules/manticore-buddy/ && composer install --prefer-dist'
-          docker exec temp sh -c 'mkdir -p /usr/share/manticore/modules/manticore-buddy/bin && mv /tmp/manticore-buddy /usr/share/manticore/modules/manticore-buddy/bin/manticore-buddy'
+          docker exec temp sh -c 'git config --system --add safe.directory /usr/share/manticore/modules/manticore-buddy'
           docker commit temp ${{ steps.vars.outputs.image }}
           docker commit temp ${{ steps.vars.outputs.image_commit }}
           docker push ${{ steps.vars.outputs.image }}

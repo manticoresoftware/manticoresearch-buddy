@@ -10,6 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Base\Lib\CliArgsProcessor;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -53,7 +54,7 @@ class CliArgsProcessorTest extends TestCase {
 		CliArgsProcessor::run();
 
 		echo "\nTesting the processing of the `version` argument\n";
-		$version = trim((string)file_get_contents(__DIR__ . '/../../../../APP_VERSION'));
+		$version = Buddy::getVersion();
 		$res = "Manticore Buddy v$version\n"
 			. "Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)\n";
 		$this->assertEquals($res, self::invokeMethod(CliArgsProcessor::class, 'version'));
