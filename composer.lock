@@ -763,16 +763,16 @@
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
-            "version": "1.7.3",
+            "version": "1.7.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/manticoresearch-backup.git",
-                "reference": "8d5596736125fb1bd6e0f8105de06e2a32fb71e7"
+                "reference": "5d57c1a333145cec0659355b446c4bc423409b72"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/8d5596736125fb1bd6e0f8105de06e2a32fb71e7",
-                "reference": "8d5596736125fb1bd6e0f8105de06e2a32fb71e7",
+                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/5d57c1a333145cec0659355b446c4bc423409b72",
+                "reference": "5d57c1a333145cec0659355b446c4bc423409b72",
                 "shasum": ""
             },
             "require": {
@@ -812,9 +812,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/manticoresearch-backup/issues",
-                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/1.7.3"
+                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/1.7.4"
             },
-            "time": "2025-01-20T07:01:41+00:00"
+            "time": "2025-01-24T09:11:40+00:00"
         },
         {
             "name": "manticoresoftware/openmetrics",
@@ -5056,10 +5056,10 @@
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.1.0"
     },
-    "plugin-api-version": "2.2.0"
+    "plugin-api-version": "2.6.0"
 }
