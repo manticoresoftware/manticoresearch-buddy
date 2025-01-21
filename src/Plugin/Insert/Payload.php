@@ -92,14 +92,14 @@ final class Payload extends BasePayload {
 			',',
 			array_map(
 				function ($a, $b) {
-					return "$a $b";
+					return "`$a` $b";
 				},
 				$cols,
 				$colTypes
 			)
 		);
 		$repls = ['%NAME%' => $name, '%COL_EXPR%' => $colExpr];
-		return strtr('CREATE TABLE IF NOT EXISTS %NAME% (%COL_EXPR%)', $repls);
+		return strtr('CREATE TABLE IF NOT EXISTS `%NAME%` (%COL_EXPR%)', $repls);
 	}
 
 	/**
