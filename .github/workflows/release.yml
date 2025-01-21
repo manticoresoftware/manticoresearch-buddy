@@ -289,6 +289,7 @@ jobs:
           artifact: ${{ matrix.artifact }}
           type: ${{ matrix.type }}
           delimiter: ${{ matrix.delimiter }}
+          target: ${{ env.target }}
 
   update-manticoresearch-deps:
     needs:
