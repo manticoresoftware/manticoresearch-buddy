@@ -33,6 +33,9 @@ set_error_handler(buddy_error_handler(...)); // @phpstan-ignore-line
 Buddy::setVersionFile(__DIR__ . '/../APP_VERSION');
 
 $opts = CliArgsProcessor::run();
+$authToken = getenv('BUDDY_TOKEN') ?: null;
+// Reset token
+putenv('BUDDY_TOKEN=');
 
 // Build container dependencies
 // TODO: probably it's a good idea to get rid out of this container at all
@@ -41,7 +44,8 @@ $container = new ContainerBuilder();
 $container->register('QueryParserLoader', Loader::class);
 $container
 	->register('manticoreClient', HTTPClient::class)
-	->addArgument($opts['listen']);
+	->addArgument($opts['listen'])
+	->addArgument($authToken);
 $container->register('flagCache', FlagCache::class);
 
 $container
