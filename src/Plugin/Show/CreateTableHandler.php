@@ -44,7 +44,7 @@ class CreateTableHandler extends BaseHandlerWithClient {
 			Client $manticoreClient
 		): TaskResult {
 			// First, get response from the manticore
-			$query = "SHOW CREATE TABLE {$payload->table}";
+			$query = "SHOW CREATE TABLE {$payload->table} OPTION force=1";
 			$resp = $manticoreClient->sendRequest($query);
 
 			// It's important to have ` and 2 spaces for Apache Superset

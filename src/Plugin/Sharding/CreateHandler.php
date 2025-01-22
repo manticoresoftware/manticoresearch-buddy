@@ -84,7 +84,7 @@ final class CreateHandler extends BaseHandlerWithClient {
 		}
 
 		// Try to validate that we do not create the same table we have
-		$q = "SHOW CREATE TABLE {$this->payload->table}";
+		$q = "SHOW CREATE TABLE {$this->payload->table} OPTION force=1";
 		$resp = $this->manticoreClient->sendRequest($q);
 		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
 		$result = $resp->getResult();
@@ -160,11 +160,7 @@ final class CreateHandler extends BaseHandlerWithClient {
 				$type = $value['type'] ?? 'unknown';
 				$status = $value['status'] ?? 'processing';
 				if ($type === 'create' && $status !== 'processing') {
-					// We have multiple encode decode cuz manticore does not support json inside json and says
-					// TOK_IDENT we should fix it when possible and review
-					/** @var string */
-					$body = json_encode($value['result']);
-					return TaskResult::fromResponse(Response::fromBody($body));
+					return TaskResult::fromResponse(Response::fromBody($value['result']));
 				}
 				if ((time() - $ts) > $timeout) {
 					break;

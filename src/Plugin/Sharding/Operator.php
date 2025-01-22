@@ -3,7 +3,6 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
@@ -289,8 +288,8 @@ final class Operator {
 		if ($isProcessed) {
 			$result['status'] = 'done';
 			$result['result'] = getenv('DEBUG') && $result['type'] === 'create'
-			? Struct::fromJson($this->client->sendRequest("SHOW CREATE TABLE {$table}")->getBody())
-			: TaskResult::none()->getStruct();
+			? $this->client->sendRequest("SHOW CREATE TABLE {$table} OPTION force=1")->getBody()
+			: TaskResult::none()->toString();
 			$this->state->set($stateKey, $result);
 		}
 
