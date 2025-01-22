@@ -53,7 +53,7 @@ final class DescHandler extends BaseHandlerWithClient {
 
 			$q = match ($this->payload->type) {
 				'show' => "SHOW CREATE TABLE {$shard}",
-				'desc' => "DESC {$shard}",
+				'desc', 'describe' => "DESC {$shard}",
 				default => throw new RuntimeException("Unknown type: {$this->payload->type}"),
 			};
 			$resp = $this->manticoreClient->sendRequest($q);
