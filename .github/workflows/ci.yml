@@ -85,14 +85,51 @@ jobs:
           docker push ${{ steps.vars.outputs.image_commit }}
           docker rm -f temp
 
+  ref_detection:
+    name: Detect CLT tests ref
+    runs-on: ubuntu-22.04
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - name: Get current branch name
+        id: current_branch
+        run: |
+          BRANCH=${{ github.head_ref || github.ref_name }}
+          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+
+      - name: Checkout manticoresearch repository
+        uses: actions/checkout@v4
+        with:
+          repository: manticoresoftware/manticoresearch
+          path: manticoresearch
+          fetch-depth: 0
+
+      - name: Check if branch exists in manticoresearch
+        id: check_branch
+        working-directory: manticoresearch
+        run: |
+          git ls-remote --heads origin ${{ steps.current_branch.outputs.branch }} | grep -q . && \
+          echo "exists=true" >> $GITHUB_OUTPUT || echo "exists=false" >> $GITHUB_OUTPUT
+
+      - name: Detect ref
+        id: ref
+        run: |
+          set -e
+          if [[ "${{ steps.check_branch.outputs.exists }}" == "true" ]]; then
+            REF="${{ steps.current_branch.outputs.branch }}"
+          else
+            REF="master"
+          fi
+          echo "ref=${REF}" >> $GITHUB_OUTPUT
+          echo "Ref: ${REF}" >> $GITHUB_STEP_SUMMARY
   clt:
     name: Run CLT tests
-    needs: test_kit
+    needs: [test_kit, ref_detection]
     uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@master
     with:
       docker_image: ${{ needs.test_kit.outputs.docker_repo }}:${{ needs.test_kit.outputs.docker_tag }}
       repository: manticoresoftware/manticoresearch
-      ref: master
+      ref: ${{ needs.ref_detection.outputs.ref }}
 
   codestyle:
     name: PHPCS validation

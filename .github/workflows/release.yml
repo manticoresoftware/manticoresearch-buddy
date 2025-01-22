@@ -37,8 +37,8 @@ jobs:
       - id: semver-tagger
         uses: manticoresoftware/semver-tagger-action@main
   vars:
+    if: steps.semver-tagger.outputs.version != ''
     needs: update-version
-    if: needs.update-version.outputs.version != ''
     runs-on: ubuntu-22.04
     outputs:
       target: ${{ steps.vars.outputs.target }}
