@@ -56,7 +56,7 @@ final class State {
 			: $this->table
 		;
 		$now = time();
-		$encodedValue = addcslashes(json_encode($value) ?: 'null', "'");
+		$encodedValue = addcslashes(json_encode($value) ?: 'null', "'\\");
 
 		$query = match ($this->fetch($key)) {
 			null => "

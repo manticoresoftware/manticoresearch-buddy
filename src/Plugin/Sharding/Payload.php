@@ -138,7 +138,7 @@ final class Payload extends BasePayload {
 	 * @throws QueryParseError
 	 */
 	protected static function fromDrop(Request $request): static {
-		$pattern = '/DROP\s+SHARDED\s+TABLE\s+(?P<quiet>IF\s+EXISTS\s+)?'
+		$pattern = '/DROP\s+TABLE\s+(?P<quiet>IF\s+EXISTS\s+)?'
 			. '(?:(?P<cluster>[^:\s]+):)?(?P<table>[^:\s\()]+)/ius';
 		if (!preg_match($pattern, $request->payload, $matches)) {
 			throw QueryParseError::create('Failed to parse query');
@@ -170,8 +170,9 @@ final class Payload extends BasePayload {
 			return true;
 		}
 		// Create and Drop
-		return stripos($request->error, 'syntax error')
-			&& strpos($request->error, 'P03') === 0
+		return (stripos($request->error, 'syntax error')
+				|| stripos($request->error, 'contains system table')
+			)
 			&& (
 				(stripos($request->payload, 'create table') === 0
 					&& stripos($request->payload, 'shards') !== false
