@@ -58,12 +58,36 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	public static function fromRequest(Request $request): static {
-		$type = strtolower(strtok(trim($request->payload), ' ') ?: '');
-		return match ($type) {
+		return match ($request->command) {
 			'create', 'alter' => static::fromCreate($request),
 			'drop' => static::fromDrop($request),
+			'desc', 'show' => static::fromDesc($request),
 			default => throw new QueryParseError('Failed to parse query'),
 		};
+	}
+
+	/**
+	 * @param Request $request
+	 * @return static
+	 * @throws QueryParseError
+	 */
+	protected static function fromDesc(Request $request): static {
+		$pattern = '/(?:DESC|SHOW\s+CREATE\s+TABLE)\s+(?P<table>[^:\s\()]+)/ius';
+		if (!preg_match($pattern, $request->payload, $matches)) {
+			throw QueryParseError::create('Failed to parse query');
+		}
+
+		$self = new static();
+		$self->path = $request->path;
+		$self->type = $request->command;
+		$self->cluster = '';
+		$self->table = $matches['table'];
+		$self->structure = '';
+		$self->options = [];
+		$self->quiet = false;
+		$self->extra = '';
+		$self->validate();
+		return $self;
 	}
 
 	/**
@@ -138,6 +162,14 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
+		// Desc and Show distributed table first
+		if ($request->command === 'desc' && strpos($request->error, 'contains system') !== false) {
+			return true;
+		}
+		if ($request->command === 'show' && strpos($request->error, 'error in your query') !== false) {
+			return true;
+		}
+		// Create and Drop
 		return stripos($request->error, 'syntax error')
 			&& strpos($request->error, 'P03') === 0
 			&& (
@@ -157,7 +189,7 @@ final class Payload extends BasePayload {
 			throw QueryParseError::create('Sharded table requires `rf=n`');
 		}
 
-		if (!$this->cluster && $this->type !== 'drop' && $this->options['rf'] > 1) {
+		if (!$this->cluster && ($this->type === 'create' || $this->type === 'alter') && $this->options['rf'] > 1) {
 			throw QueryParseError::create('You cannot set rf greater than 1 when creating single node sharded table.');
 		}
 
@@ -213,6 +245,7 @@ final class Payload extends BasePayload {
 		return match ($this->type) {
 			'create' => CreateHandler::class,
 			'drop' => DropHandler::class,
+			'desc' => DescHandler::class,
 			default => throw new \Exception('Unsupported sharding type'),
 		};
 	}
