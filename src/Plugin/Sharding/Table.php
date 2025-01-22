@@ -432,7 +432,7 @@ final class Table {
 			/** @var Set<int> */
 			$queueIds = new Set;
 			foreach ($newSchema as $row) {
-				$sql = "DROP TABLE {$this->name}";
+				$sql = "DROP TABLE {$this->name} OPTION force=1";
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);
 				// Do nothing when no shards present for this node
@@ -461,7 +461,7 @@ final class Table {
 		$removedClusters = new Set;
 		/** @var Set<int> */
 		$queueIds = new Set;
-		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$this->name}");
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$this->name} OPTION force=1");
 
 		foreach ($shards as $shard) {
 			$connections = $this->getConnectedNodes(new Set([$shard]));
