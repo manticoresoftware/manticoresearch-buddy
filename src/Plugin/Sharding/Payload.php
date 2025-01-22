@@ -61,7 +61,7 @@ final class Payload extends BasePayload {
 		return match ($request->command) {
 			'create', 'alter' => static::fromCreate($request),
 			'drop' => static::fromDrop($request),
-			'desc', 'show' => static::fromDesc($request),
+			'desc', 'describe', 'show' => static::fromDesc($request),
 			default => throw new QueryParseError('Failed to parse query'),
 		};
 	}
@@ -72,7 +72,7 @@ final class Payload extends BasePayload {
 	 * @throws QueryParseError
 	 */
 	protected static function fromDesc(Request $request): static {
-		$pattern = '/(?:DESC|SHOW\s+CREATE\s+TABLE)\s+(?P<table>[^:\s\()]+)/ius';
+		$pattern = '/(?:DESC|DESCRIBE|SHOW\s+CREATE\s+TABLE)\s+(?P<table>[^:\s\()]+)/ius';
 		if (!preg_match($pattern, $request->payload, $matches)) {
 			throw QueryParseError::create('Failed to parse query');
 		}
@@ -163,7 +163,9 @@ final class Payload extends BasePayload {
 	 */
 	public static function hasMatch(Request $request): bool {
 		// Desc and Show distributed table first
-		if ($request->command === 'desc' && strpos($request->error, 'contains system') !== false) {
+		if (($request->command === 'desc' || $request->command === 'describe')
+				&& strpos($request->error, 'contains system') !== false
+		) {
 			return true;
 		}
 		if ($request->command === 'show' && strpos($request->error, 'error in your query') !== false) {
@@ -246,7 +248,7 @@ final class Payload extends BasePayload {
 		return match ($this->type) {
 			'create' => CreateHandler::class,
 			'drop' => DropHandler::class,
-			'desc' => DescHandler::class,
+			'desc', 'describe', 'show' => DescHandler::class,
 			default => throw new \Exception('Unsupported sharding type'),
 		};
 	}
