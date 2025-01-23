@@ -39,7 +39,8 @@ class InsertQueryPayloadTest extends TestCase {
 		$this->assertEquals(2, sizeof($payload->queries));
 		$this->assertEquals(
 			[
-				'CREATE TABLE IF NOT EXISTS test (int_col int,string_col text,float_col float,@timestamp timestamp)',
+				'CREATE TABLE IF NOT EXISTS `test` (`int_col` int,`string_col` text,`float_col` float,'
+					. '`@timestamp` timestamp)',
 				'INSERT INTO test(int_col, string_col, float_col, @timestamp) VALUES(1, \'string\', 2.22,'
 					. ' \'2000-01-01T12:00:00Z\')',
 			], $payload->queries

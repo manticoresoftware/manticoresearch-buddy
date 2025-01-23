@@ -20,6 +20,8 @@ enum Datatype: string {
 	case Bigint = 'bigint';
 	case Text = 'text';
 	case String = 'string';
+	case Indexedjson = "json secondary_index='1'";
+	case Indexedstring = 'string attribute indexed';
 	case Timestamp = 'timestamp';
 	case Null = 'null';
 }
