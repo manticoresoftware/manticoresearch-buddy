@@ -367,7 +367,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 		$lastWordLen = strlen($lastWord);
 		$maxEdits = $this->payload->expansionLen;
-		$optionsString = "{$maxEdits} as max_edits, 100 as limit, 1 as result_stats";
+		$optionsString = "{$maxEdits} as max_edits, 100 as limit, 1 as result_stats, 1 as non_char";
 		$match = $this->getExpansionWordMatch($lastWord);
 		$q = "CALL SUGGEST('{$match}', '{$this->payload->table}', {$optionsString})";
 		/** @var array{0:array{data?:array<suggestion>}} $result */
