@@ -20,6 +20,9 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
+
+	const ELASTIC_LIKE_TABLE_OPTIONS = ["min_infix_len='2'"];
+
 	/** @var array<string> */
 	public array $queries = [];
 
@@ -53,7 +56,11 @@ final class Payload extends BasePayload {
 			$self->path = '_bulk';
 			$request->payload = trim($request->payload) . "\n";
 		}
-		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->payload));
+		$createTableQuery = $self->buildCreateTableQuery(...$parser->parse($request->payload));
+		if (Loader::isElasticLikeRequest($request->path, $request->endpointBundle)) {
+			$createTableQuery .= ' ' . implode(' ', self::ELASTIC_LIKE_TABLE_OPTIONS);
+		}
+		$self->queries[] = $createTableQuery;
 		$self->queries[] = (str_contains($self->path, '_doc') || str_contains($self->path, '_create'))
 			? self::preprocessElasticLikeRequest($self->path, $request->payload)
 			: $request->payload;
