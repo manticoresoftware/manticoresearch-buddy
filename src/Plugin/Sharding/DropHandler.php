@@ -68,7 +68,7 @@ final class DropHandler extends BaseHandlerWithClient {
 	 */
 	protected function validate(): ?Task {
 		// Try to validate that we do not create the same table we have
-		$q = "SHOW CREATE TABLE {$this->payload->table}";
+		$q = "SHOW CREATE TABLE {$this->payload->table} OPTION force=1";
 		$resp = $this->manticoreClient->sendRequest($q);
 		/**
 		 * @var array{
@@ -90,7 +90,7 @@ final class DropHandler extends BaseHandlerWithClient {
 			}
 			return $this->getErrorTask(
 				"table '{$this->payload->table}' is missing: "
-					. 'DROP SHARDED TABLE failed: '
+					. 'DROP TABLE failed: '
 					."table '{$this->payload->table}' must exist"
 			);
 		}
@@ -98,7 +98,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		if (false === stripos($result[0]['data'][0]['Create Table'], "type='distributed'")) {
 			return $this->getErrorTask(
 				"table '{$this->payload->table}' is not distributed: "
-					. 'DROP SHARDED TABLE failed: '
+					. 'DROP TABLE failed: '
 					."table '{$this->payload->table}' must be distributed"
 			);
 		}
@@ -108,7 +108,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		if (!$state) {
 			return $this->getErrorTask(
 				"table '{$this->payload->table}' is not sharded: "
-					. 'DROP SHARDED TABLE failed: '
+					. 'DROP TABLE failed: '
 					."table '{$this->payload->table}' be created with sharding"
 			);
 		}
@@ -178,9 +178,7 @@ final class DropHandler extends BaseHandlerWithClient {
 					$type = $state['type'] ?? 'unknown';
 					$status = $state['status'] ?? 'processing';
 					if ($type === 'drop' && $status !== 'processing') {
-						/** @var string */
-						$body = json_encode($state['result']);
-						return TaskResult::fromResponse(Response::fromBody($body));
+						return TaskResult::fromResponse(Response::fromBody($state['result']));
 					}
 				}
 				if ((time() - $ts) > $timeout) {
