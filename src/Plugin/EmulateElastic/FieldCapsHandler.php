@@ -26,12 +26,16 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 		'string' => 'keyword',
 		'bool' => 'boolean',
 		'timestamp' => 'date',
+		'float' => 'float',
 		'bigint' => 'long',
 		'int' => 'integer',
 		'uint' => 'integer',
 		'json' => 'object',
 		'float_vector' => 'knn_vector',
 	];
+
+	/** @var FieldCapsHandlerHelper $helper */
+	protected FieldCapsHandlerHelper $helper;
 
 	/**
 	 *  Initialize the executor
@@ -40,6 +44,7 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 	 * @return void
 	 */
 	public function __construct(public Payload $payload) {
+		$this->helper = new FieldCapsHandlerHelper();
 	}
 
 	/**
@@ -49,12 +54,15 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 	 * @throws RuntimeException
 	 */
 	public function run(): Task {
-		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
+		$taskFn = static function (
+			Payload $payload,
+			HTTPClient $manticoreClient,
+			FieldCapsHandlerHelper $helper
+		): TaskResult {
 			/** @var array<string> $requestTables */
 			$requestTables = self::getRequestTables($payload, $manticoreClient);
-
 			/** @var array<string,mixed> $request */
-			$request = simdjson_decode($payload->body, true);
+			$request = $payload->body ? simdjson_decode($payload->body, true) : [];
 			$isEmptyRequest = !$request;
 			if (!$isEmptyRequest && !isset($request['fields'])) {
 				throw new \Exception('Cannot parse request');
@@ -69,12 +77,13 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 			 */
 			$fieldCaps = [];
 			foreach ($requestTables as $table) {
-				/** @var array{error?:string,0:array{data:array<array{Field:string,Type:string}>}} */
+				/** @var array{error?:string,0:array{data:array<array{Field:string,Type:string,Properties:string}>}} */
 				$queryResult = $manticoreClient->sendRequest("DESC {$table}")->getResult();
 				if (isset($queryResult['error'])) {
 					throw new \Exception('Unknown error');
 				}
-				self::updateFieldCaps($queryResult[0]['data'], $table, $requestFields, $fieldCaps);
+				$helper->setTable($table);
+				self::buildFieldCaps($queryResult[0]['data'], $table, $helper, $requestFields, $fieldCaps);
 			}
 			self::checkFieldIndices($requestTables, $fieldCaps);
 
@@ -150,8 +159,9 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 			return TaskResult::raw($fieldCapsInfo);
 		};
 
+		$this->helper->setManticoreClient($this->manticoreClient);
 		return Task::create(
-			$taskFn, [$this->payload, $this->manticoreClient]
+			$taskFn, [$this->payload, $this->manticoreClient, $this->helper]
 		)->run();
 	}
 
@@ -201,15 +211,38 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param array<array{Field:string,Type:string}> $tableFieldsInfo
 	 * @param string $table
+	 * @param string $fieldType
+	 * @param bool $isAggregatable
+	 * @param bool $isSearchable
+	 * @return array<string,mixed>
+	 */
+	protected static function buildFieldInfo(
+		string $table,
+		string $fieldType,
+		bool $isAggregatable,
+		bool $isSearchable,
+	): array {
+		return [
+			'aggregatable' => $isAggregatable,
+			'searchable' => $isSearchable,
+			'type' => $fieldType,
+			'indices' => [$table],
+		];
+	}
+
+	/**
+	 * @param array<array{Field:string,Type:string,Properties:string}> $tableFieldsInfo
+	 * @param string $table
+	 * @param FieldCapsHandlerHelper $helper
 	 * @param array<string> $requestFields
 	 * @param array<string,array<string,array<string,mixed>>> $fieldCaps
 	 * @return void
 	 */
-	protected static function updateFieldCaps(
+	protected static function buildFieldCaps(
 		array $tableFieldsInfo,
 		string $table,
+		FieldCapsHandlerHelper $helper,
 		array $requestFields,
 		array &$fieldCaps
 	): void {
@@ -218,29 +251,69 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 			if ($requestFields && !in_array($fieldName, $requestFields)) {
 				continue;
 			}
-			$isAggregatable = ($fieldData['Type'] !== 'text');
 			$fieldType = array_key_exists($fieldData['Type'], self::DATA_TYPE_MAP)
 				? self::DATA_TYPE_MAP[$fieldData['Type']] : $fieldData['Type'];
-			$newFieldInfo = [
-				'aggregatable' => $isAggregatable,
-				'searchable' => true,
-				'type' => $fieldType,
-				'indices' => [$table],
-			];
-			if (!isset($fieldCaps[$fieldName])) {
-				$fieldCaps[$fieldName] = [
-					$fieldType => $newFieldInfo,
-				];
-				continue;
+			$isSearchable = true;
+			$isAggregatable = !in_array($fieldType, ['text', 'object']);
+			$isIndexed = str_contains($fieldData['Properties'], 'indexed');
+			// Extra processing of json/objects fields to get info of their properties too
+			if ($fieldType === 'object') {
+				$isSearchable = false;
+				$subFieldInfo = $helper->getJsonSubFieldsInfo($fieldName, $isIndexed);
+				foreach ($subFieldInfo as $subFieldName => $subFieldType) {
+					$isSubAggregatable = $isSubSearchable = ($subFieldType !== 'object');
+					self::updateFieldCaps(
+						$fieldCaps,
+						$table,
+						$subFieldName,
+						$subFieldType,
+						true,
+						$isSubAggregatable,
+						$isSubSearchable,
+					);
+				}
 			}
-			if (!isset($fieldCaps[$fieldName][$fieldType])) {
-				$fieldCaps[$fieldName] = [$fieldType => $newFieldInfo];
-			} else {
-				/** @var array<mixed> $indices */
-				$indices = $fieldCaps[$fieldName][$fieldType]['indices'];
-				$indices[] = $table;
-				$fieldCaps[$fieldName][$fieldType]['indices'] = $indices;
-			}
+
+			self::updateFieldCaps($fieldCaps, $table, $fieldName, $fieldType, false, $isAggregatable, $isSearchable);
 		}
+	}
+
+	/**
+	 * @param array<string,array<string,array<string,mixed>>> $fieldCaps
+	 * @param string $table
+	 * @param string $fieldName
+	 * @param string $fieldType
+	 * @param bool $isJsonSubField
+	 * @param bool $isAggregatable
+	 * @param bool $isSearchable
+	 * @return void
+	 */
+	protected static function updateFieldCaps(
+		array &$fieldCaps,
+		string $table,
+		string $fieldName,
+		string $fieldType,
+		bool $isJsonSubField,
+		bool $isAggregatable,
+		bool $isSearchable,
+	): void {
+		$fieldInfo = self::buildFieldInfo($table, $fieldType, $isAggregatable, $isSearchable);
+		if (!isset($fieldCaps[$fieldName])) {
+			$fieldCaps[$fieldName] = [
+				$fieldType => $fieldInfo,
+			];
+			return;
+		}
+		if (!isset($fieldCaps[$fieldName][$fieldType])) {
+			$fieldCaps[$fieldName] = [$fieldType => $fieldInfo];
+			return;
+		}
+		if ($isJsonSubField) {
+			return;
+		}
+		/** @var array<mixed> $indices */
+		$indices = $fieldCaps[$fieldName][$fieldType]['indices'];
+		$indices[] = $table;
+		$fieldCaps[$fieldName][$fieldType]['indices'] = $indices;
 	}
 }
