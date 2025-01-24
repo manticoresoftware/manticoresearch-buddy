@@ -39,6 +39,7 @@ rm -rf %{buildroot}
 %dir /usr/share/manticore/modules/{{ NAME }}/bin
 /usr/share/manticore/modules/{{ NAME }}/src/*
 /usr/share/manticore/modules/{{ NAME }}/vendor/*
+/usr/share/manticore/modules/{{ NAME }}/APP_VERSION
 /usr/share/manticore/modules/{{ NAME }}/composer.json
 /usr/share/manticore/modules/{{ NAME }}/composer.lock
 %attr(1755, root, root) /usr/share/manticore/modules/{{ NAME }}/bin/{{ NAME }}
