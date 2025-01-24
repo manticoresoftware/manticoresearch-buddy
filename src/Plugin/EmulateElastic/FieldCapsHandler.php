@@ -180,8 +180,8 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 		$queryResult = $manticoreClient->sendRequest("SHOW TABLES $likeCond")->getResult();
 		$requestTables = [];
 		foreach ($queryResult[0]['data'] as $tableData) {
-			// Exclude Manticore tables with meta data
-			if (in_array(substr($tableData['Table'], 0, 1), ['_', '.'])) {
+			// Exclude Manticore tables with meta data and distributed tables
+			if ($tableData['Type'] === 'distributed' || in_array(substr($tableData['Table'], 0, 1), ['_', '.'])) {
 				continue;
 			}
 			$requestTables[] = $tableData['Table'];
@@ -247,6 +247,9 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 		array &$fieldCaps
 	): void {
 		foreach ($tableFieldsInfo as $fieldData) {
+			if (!array_key_exists('Field', $fieldData)) {
+				continue;
+			}
 			$fieldName = $fieldData['Field'];
 			if ($requestFields && !in_array($fieldName, $requestFields)) {
 				continue;
