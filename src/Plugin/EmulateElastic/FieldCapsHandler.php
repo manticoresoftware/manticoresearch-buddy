@@ -176,12 +176,12 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 		$likeCond = (sizeof($pathParts) > 1)
 			? "LIKE '" . str_replace('*', '%', $pathParts[0]) . "'"
 			: '';
-		/** @var array{0:array{data:array<array{Table:string}>}} */
+		/** @var array{0:array{data:array<array{Table:string,Type:string}>}} */
 		$queryResult = $manticoreClient->sendRequest("SHOW TABLES $likeCond")->getResult();
 		$requestTables = [];
 		foreach ($queryResult[0]['data'] as $tableData) {
 			// Exclude Manticore tables with meta data
-			if (in_array(substr($tableData['Table'], 0, 1), ['_', '.'])) {
+			if ($tableData['Type'] === 'distributed' || in_array(substr($tableData['Table'], 0, 1), ['_', '.'])) {
 				continue;
 			}
 			$requestTables[] = $tableData['Table'];
@@ -232,7 +232,7 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param array<array{Field:string,Type:string,Properties:string}> $tableFieldsInfo
+	 * @param array<array{Field?:string,Type:string,Properties:string}> $tableFieldsInfo
 	 * @param string $table
 	 * @param FieldCapsHandlerHelper $helper
 	 * @param array<string> $requestFields
@@ -247,6 +247,9 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 		array &$fieldCaps
 	): void {
 		foreach ($tableFieldsInfo as $fieldData) {
+			if (!array_key_exists('Field', $fieldData)) {
+				continue;
+			}
 			$fieldName = $fieldData['Field'];
 			if ($requestFields && !in_array($fieldName, $requestFields)) {
 				continue;
