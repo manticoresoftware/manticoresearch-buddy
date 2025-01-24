@@ -39,6 +39,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Set variables
         id: vars
@@ -77,6 +81,7 @@ jobs:
           docker exec temp sh -c 'rm -rf /usr/share/manticore/modules/manticore-buddy && mkdir -p /usr/share/manticore/modules/manticore-buddy'
           docker cp . temp:/usr/share/manticore/modules/manticore-buddy/
           docker exec temp sh -c 'cd /usr/share/manticore/modules/manticore-buddy/ && composer install --prefer-dist'
+          docker exec temp sh -c 'git config --system --add safe.directory /usr/share/manticore/modules/manticore-buddy'
           docker commit temp ${{ steps.vars.outputs.image }}
           docker commit temp ${{ steps.vars.outputs.image_commit }}
           docker push ${{ steps.vars.outputs.image }}

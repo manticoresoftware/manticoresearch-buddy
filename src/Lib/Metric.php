@@ -138,25 +138,18 @@ final class Metric {
 	 * @return array<string,string>
 	 */
 	public function getVersions(): array {
-		$buddyVersion = trim(
-			(string)file_get_contents(
-				__DIR__ . DIRECTORY_SEPARATOR . '..'
-				. DIRECTORY_SEPARATOR. '..'
-				. DIRECTORY_SEPARATOR . 'APP_VERSION'
-			)
-		);
-
+		$buddyVersion = Buddy::getVersion();
 		$statusMap = $this->getStatusMap();
 		if (!isset($statusMap['version'])) {
 			Buddy::debug('metric: failed to get version from SHOW STATUS query');
 			return [];
 		}
 
-		$verPattern = 'v?(\d+\.\d+\.\d+[^\(\)]*)';
-		$matchExpr = "/^{$verPattern}(\(columnar\s{$verPattern}\))?"
-			. "([^\(]*\(secondary\s{$verPattern}\))?"
-			. "([^\(]*\(knn\s{$verPattern}\))?"
-			. "([^\(]*\(buddy\s{$verPattern}\))?$/ius"
+		$verPattern = 'v?((?:x\.x\.x|\d+\.\d+\.\d+)[^\(\)]*)';
+		$matchExpr = "/^{$verPattern}(\s+\(columnar\s{$verPattern}\))?"
+			. "(\s+\(secondary\s{$verPattern}\))?"
+			. "(\s+\(knn\s{$verPattern}\))?"
+			. "(\s+\(buddy\s{$verPattern}\))?$/ius"
 		;
 		/** @var string $version */
 		$version = $statusMap['version'];
