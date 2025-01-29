@@ -103,12 +103,12 @@ class TableKibanaHandler extends BaseEntityHandler {
 		$resultData = $queryResult[0];
 		$resp['hits']['total'] = sizeof($resultData['data']);
 		foreach ($resultData['data'] as $i => &$hit) {
-			$hit += [
+			$hit = [
 				'_primary_term' => 1,
 				'_score' => 0.0,
 				'_seq_no' => 1,
 				'_type' => '_doc',
-			];
+			] + $hit;
 			$hit['_source'] = simdjson_decode($hit['_source'], true);
 			if (!array_key_exists('filter', $searchConds)) {
 				continue;

@@ -100,14 +100,14 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 					'_field_names' => [
 						'_field_names' => [
 							'aggregatable' => false,
-							'searchable' => false,
+							'searchable' => true,
 							'type' => '_field_names',
 						],
 					],
 					'_id' => [
 						'_id' => [
-							'aggregatable' => false,
-							'searchable' => false,
+							'aggregatable' => true,
+							'searchable' => true,
 							'type' => '_id',
 						],
 					],
@@ -120,8 +120,8 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 					],
 					'_index' => [
 						'_index' => [
-							'aggregatable' => false,
-							'searchable' => false,
+							'aggregatable' => true,
+							'searchable' => true,
 							'type' => '_index',
 						],
 					],
@@ -141,8 +141,8 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 					],
 					'_type' => [
 						'_type' => [
-							'aggregatable' => false,
-							'searchable' => false,
+							'aggregatable' => true,
+							'searchable' => true,
 							'type' => '_type',
 						],
 					],

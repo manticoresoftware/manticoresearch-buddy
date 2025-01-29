@@ -38,7 +38,7 @@ class MgetKibanaHandler extends BaseEntityHandler {
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
-			/** @var array{docs:array<array<string,string>>} $payloadBody */
+			/** @var array{docs:array<array{_id:string,_index:string}>} $payloadBody */
 			$payloadBody = simdjson_decode($payload->body, true);
 			$entityInfo = $payloadBody['docs'];
 			$getEntitiesCond = self::buildEntitiesCond($entityInfo);
@@ -52,18 +52,7 @@ class MgetKibanaHandler extends BaseEntityHandler {
 			if (isset($queryResult['error']) || !isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
 				$respDocs = [];
 			} else {
-				foreach ($queryResult[0]['data'] as $entity) {
-					$respDocs[] = [
-						'_id' => $entity['_id'],
-						'_index' => $entity['_index'],
-						'_primary_term' => 1,
-						'_seq_no' => 0,
-						'_source' => simdjson_decode($entity['_source'], true),
-						'_type' => '_doc',
-						'_version' => 1,
-						'found' => true,
-					];
-				}
+				$respDocs = self::buildResponseDocs($entityInfo, $queryResult[0]['data']);
 			}
 			$resp = [
 				'docs' => $respDocs,
@@ -75,6 +64,35 @@ class MgetKibanaHandler extends BaseEntityHandler {
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
 		)->run();
+	}
+
+	/**
+	 * @param array<array{_id:string,_index:string}> $entitiesInfo
+	 * @param array<array{_source:string,_id:string,_index:string}> $queryData
+	 * @return array<mixed>
+	 */
+	protected static function buildresponseDocs(array $entitiesInfo, array $queryData): array {
+		$respDocs = [];
+		foreach ($entitiesInfo as $entityInfo) {
+			foreach ($queryData as $dataRow) {
+				if ($entityInfo['_id'] !== $dataRow['_id']) {
+					continue;
+				}
+				$respDocs[] = [
+					'_id' => $entityInfo['_id'],
+					'_index' => $entityInfo['_index'],
+					'_primary_term' => 1,
+					'_seq_no' => 0,
+					'_source' => simdjson_decode($dataRow['_source'], true),
+					'_type' => '_doc',
+					'_version' => 1,
+					'found' => true,
+				];
+				break;
+			}
+		}
+
+		return $respDocs;
 	}
 
 	/**

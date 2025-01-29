@@ -60,7 +60,8 @@ class UpdateEntityHandler extends BaseEntityHandler {
 				);
 			}
 
-			$response = self::buildResponse($entityId, $entityIndex, 'updated') + self::buildUpdateData($payload->body);
+			$response = self::buildResponse($entityId, $entityIndex, 'updated')
+				+ self::buildUpdateData($payload->body);
 			return TaskResult::raw($response);
 		};
 
