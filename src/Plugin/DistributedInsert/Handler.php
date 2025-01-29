@@ -186,7 +186,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 */
 	protected function parseShards($table): array {
 		/** @var array{0:array{data:array<array{"Create Table":string}>}} */
-		$res = $this->manticoreClient->sendRequest("SHOW CREATE TABLE $table")->getResult();
+		$res = $this->manticoreClient->sendRequest("SHOW CREATE TABLE $table OPTION force=1")->getResult();
 		$tableSchema = $res[0]['data'][0]['Create Table'] ?? '';
 		if (!$tableSchema) {
 			throw new RuntimeException("There is no such table: {$table}");
