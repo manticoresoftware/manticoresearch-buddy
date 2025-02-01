@@ -107,10 +107,10 @@ final class Payload extends BasePayload {
 				&& stripos($request->payload, 'where') !== false),
 			$request
 		);
-		
+
 		return (isset($payload['REPLACE'])
 			&& isset($payload['SET'])
-			&& isset($payload['WHERE'][0]['base_expr']) && $payload['WHERE'][0]['no_quotes']['parts'][0] === 'id'
+			&& isset($payload['WHERE'][0]['no_quotes']['parts'][0]) && $payload['WHERE'][0]['no_quotes']['parts'][0] === 'id'
 			&& isset($payload['WHERE'][1]['base_expr']) && $payload['WHERE'][1]['base_expr'] === '='
 			&& isset($payload['WHERE'][2]['base_expr']) && is_numeric($payload['WHERE'][2]['base_expr'])
 			&& sizeof($payload['WHERE']) === 3);
