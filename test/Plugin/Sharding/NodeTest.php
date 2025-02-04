@@ -20,6 +20,8 @@ final class NodeTest extends \PHPUnit\Framework\TestCase {
 		'127.0.0.1:9312' => '127.0.0.1:9312',
 		'127.0.0.1:9306:mysql' => null,
 		'127.0.0.1:9308:http' => '127.0.0.1:9308',
+		'9333' => '127.0.0.1:9333',
+		'9234:http' => '127.0.0.1:9234',
 	];
 
 	/**
@@ -33,8 +35,7 @@ final class NodeTest extends \PHPUnit\Framework\TestCase {
 		$hostname = gethostname();
 		$host = gethostbyname($hostname ?: '');
 		$map['0.0.0.0:9552'] = "$host:9552";
-		$map['9333'] = "$host:9333";
-		$map['9234:http'] = "$host:9234";
+		$map['0.0.0.0:9552:http'] = "$host:9552";
 		foreach ($map as $line => $expected) {
 			// PHP has a bug and converts string into ints when can
 			$nodeId = Node::parseNodeId((string)$line);

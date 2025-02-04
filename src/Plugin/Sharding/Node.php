@@ -80,13 +80,13 @@ final class Node {
 		if (str_contains($line, ':')) {
 			$parts = explode(':', $line);
 			if (sizeof($parts) === 2 && is_numeric($parts[0])) {
-				$host = '0.0.0.0';
+				$host = '127.0.0.1';
 				[$port] = $parts;
 			} else {
 				[$host, $port] = $parts;
 			}
 		} else {
-			$host = '0.0.0.0';
+			$host = '127.0.0.1';
 			$port = $line;
 		}
 
