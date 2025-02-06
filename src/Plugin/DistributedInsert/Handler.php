@@ -83,7 +83,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 		// Group rows by shard
 		$shardRows = [];
 		foreach ($batch as $struct) {
-			/** @var Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct */
+			/** @var Struct<string,array{_id:string|int,_index:string}|string|int> $struct */
 			if ($this->shouldAssignId($struct)) {
 				$id = $this->assignId($struct);
 				$idStr = (string)$id;
@@ -98,6 +98,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 				$shardName = $info['name'];
 				$this->assignTable($struct, $cluster, $shardName);
 			}
+
 
 			if (!isset($shardName)) {
 				throw QueryParseError::create('Cannot find shard for table');
@@ -223,7 +224,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	/**
 	 * @param array<array{url:string,path:string,request:string}> $requests
 	 * @param array<string|int,array{n:int,table:string,cluster:string}> $positions
-	 * @return array{took:int,errors:bool,items:array<array{index:array{_id:string,_index:string}}>}
+	 * @return array{took:int,errors:bool,items:array<array<string,array{_id:string,_index:string}>>}
 	 * @throws ManticoreSearchClientError
 	 */
 	protected function processBulk(array $requests, array $positions): array {
@@ -237,11 +238,12 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$errors = $errors || $current['errors'];
 			foreach ($current['items'] as &$item) {
 				if ($this->payload->type === 'bulk') {
-					$id = $item['index']['_id'];
+					$key = static::detectKeyWithTable($item);
+					$id = $item[$key]['_id'];
 					$info = $positions[$id];
-					$index = $item['index'];
+					$index = $item[$key];
 					$index['_index'] = $info['cluster'] ? "{$info['cluster']}:{$info['table']}" : $info['table'];
-					$item['index'] = $index;
+					$item[$key] = $index;
 					$n = $info['n'];
 					$items[$n] = $item;
 				} else {
@@ -305,7 +307,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
+	 * @param Struct<string,string|int>|Struct<string,array{_id:string|int,_index:string}|string|int> $struct
 	 * @return int
 	 */
 	protected function assignId(Struct $struct): int {
@@ -314,11 +316,16 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$id = match (true) {
 			// _bulk
 			isset($struct['index']['_id']) => $struct['index']['_id'],
+			isset($struct['create']['_id']) => $struct['create']['_id'],
+			isset($struct['delete']['_id']) => $struct['delete']['_id'],
+			isset($struct['update']['_id']) => $struct['update']['_id'],
 			// insert, delete etc
 			isset($struct['id']) => $struct['id'],
 			// bulk
 			isset($struct['insert']['id']) => $struct['insert']['id'],
 			isset($struct['replace']['id']) => $struct['replace']['id'],
+			isset($struct['update']['id']) => $struct['update']['id'],
+			isset($struct['delete']['id']) => $struct['delete']['id'],
 			default => array_pop($idPool),
 		};
 		// When id = 0 we generate
@@ -353,7 +360,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
+	 * @param Struct<string,string|int>|Struct<string,array{_id:string|int,_index:string}|string|int> $struct
 	 * @param string $cluster
 	 * @param string $shardName
 	 * @return void
@@ -361,11 +368,13 @@ final class Handler extends BaseHandlerWithFlagCache {
 	protected function assignTable(Struct $struct, string $cluster, string $shardName): void {
 		$table = $cluster ? "$cluster:$shardName" : $shardName;
 		if ($this->payload->type === 'bulk') {
-			/** @var Struct<"index",array{_id:string|int,_index:string}> $struct */
+			/** @var Struct<string,array{_index:string,_id:int|string}> $struct */
+			$key = static::detectKeyWithTable($struct);
+
 			/** @var array{_id:string|int,_index:string} $index */
-			$index = $struct['index'];
+			$index = $struct[$key];
 			$index['_index'] = $table;
-			$struct['index'] = $index;
+			$struct[$key] = $index;
 		} elseif ($this->payload->type === 'sql') {
 			/** @var Struct<"insert"|"replace",array{table:string}> $struct */
 			$key = isset($struct['replace']) ? 'replace' : 'insert';
@@ -380,11 +389,45 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
+	 * @param Struct<string,array{
+	 *     _index: string,
+	 *     _id: int|string
+	 * }>|array<string,array{
+	 *     _index: string,
+	 *     _id: int|string
+	 * }> $item
+	 * @return string
+	 */
+	protected static function detectKeyWithTable(Struct|array $item): string {
+		return match (true) {
+			isset($item['index']['_index']) => 'index',
+			isset($item['create']['_index']) => 'create',
+			isset($item['delete']['_index']) => 'delete',
+			isset($item['update']['_index']) => 'update',
+			default => throw QueryParseError::create('Cannot detect key with table'),
+		};
+	}
+
+	/**
+	 * @param Struct<string,string|int>|Struct<string,array{_id:string|int,_index:string}|string|int> $struct
 	 * @return bool
 	 */
 	protected function shouldAssignId(Struct $struct): bool {
-		if ($this->payload->type === 'bulk' && !isset($struct['index'])) {
+		if ($this->payload->type === 'bulk') {
+			// Elasticsearch like _bulk
+			foreach (['index', 'create', 'delete', 'update'] as $key) {
+				if (isset($struct[$key]['_index'])) {
+					return true;
+				}
+			}
+
+			// Our bulk
+			foreach (['insert', 'replace', 'update', 'delete'] as $key) {
+				if (isset($struct[$key]['table'])) {
+					return true;
+				}
+			}
+
 			return false;
 		}
 		return true;

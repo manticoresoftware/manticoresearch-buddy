@@ -60,7 +60,7 @@ final class Payload extends BasePayload {
 			Endpoint::Bulk => 'bulk',
 			Endpoint::Update => 'update',
 			Endpoint::Delete => 'delete',
-			default => throw new \Exception('Unsupported endpoint bundle'),
+			default => throw QueryParseError::create('Unsupported endpoint bundle'),
 		};
 
 		return $self;
@@ -181,9 +181,14 @@ final class Payload extends BasePayload {
 			return [$cluster, $table];
 		}
 
-		if (isset($struct['insert'])) { // bulk
+
+		foreach (['insert', 'update', 'delete'] as $key) {
+			if (!isset($struct[$key])) {
+				continue;
+			}
+			// bulk
 			/** @var string $table */
-			$table = $struct['insert']['table'] ?? $struct['insert']['index'];
+			$table = $struct[$key]['table'] ?? $struct[$key]['_index'];
 			if (!isset($tableMap[$table])) {
 				$tableMap[$table] = static::parseCluster($table);
 			}
@@ -196,7 +201,7 @@ final class Payload extends BasePayload {
 		}
 
 		if (!$table) {
-			throw new QueryParseError('Cannot find table name');
+			QueryParseError::throw('Cannot find table name');
 		}
 
 		$batch["$cluster:$table"][] = $struct;
