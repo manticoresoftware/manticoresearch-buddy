@@ -27,6 +27,7 @@ use RuntimeException;
 final class Payload extends BasePayload {
 	const MAX_BOOST = 50;
 	const DECREASE_FACTOR = 1.44;
+	const ESCAPE_CHARS = '()[]<!|*/-~^$@';
 
 	/** @var string */
 	public string $path;
@@ -225,7 +226,7 @@ final class Payload extends BasePayload {
 						return '(' . implode(
 							'|', array_map(
 								function ($word) use ($i) {
-									return $word . '^' . static::getBoostValue($i);
+									return static::escapeWord($word) . '^' . static::getBoostValue($i);
 								}, $words
 							)
 						) . ')';
@@ -239,7 +240,7 @@ final class Payload extends BasePayload {
 						return '(' . implode(
 							'|', array_map(
 								function ($word) use ($i) {
-									return $word . '^' . static::getBoostValue($i);
+									return static::escapeWord($word) . '^' . static::getBoostValue($i);
 								}, $words
 							)
 						) . ')';
@@ -415,5 +416,20 @@ final class Payload extends BasePayload {
 			$layouts = KeyboardLayout::getSupportedLanguages();
 		}
 		return $layouts;
+	}
+
+	/**
+	 * Properly escape special symbols that are used in operators to protect from it
+	 * @param string $word
+	 * @return string
+	 */
+	protected static function escapeWord(string $word): string {
+		// Prevent already escaped symbols, unescape first
+		$chars = str_split(static::ESCAPE_CHARS);
+		$word = str_replace(array_map(fn($char) => '\\' . $char, $chars), $chars, $word);
+
+		// We need double escape here cuz we replace this match inside
+		// SQL query so every escape symbol is escaped twice
+		return addcslashes(addcslashes($word, static::ESCAPE_CHARS), '\\');
 	}
 }
