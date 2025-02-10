@@ -179,7 +179,7 @@ jobs:
     steps:
       - name: Check if all tests passed
         run: |
-          if ${{ ((contains(needs.clt.result, 'completed')  && github.ref == 'refs/heads/main' ) || contains(needs.clt.result,'success')) && contains(needs.codestyle.result, 'success') && contains(needs.codeanalyze.result, 'success')}}
+          if ${{ ((contains(needs.clt.result, 'completed')  && github.ref == 'refs/heads/main' ) || contains(needs.clt.result,'success')) && contains(needs.codestyle.result, 'success') && contains(needs.codeanalyze.result, 'success')}}; then
             echo "All tests passed successfully"
             exit 0
           else
