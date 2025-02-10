@@ -128,7 +128,7 @@ jobs:
   clt:
     name: Run CLT tests
     needs: [test_kit, ref_detection]
-    uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@fix/continue-on-error
+    uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@master
     with:
       docker_image: ${{ needs.test_kit.outputs.docker_repo }}:${{ needs.test_kit.outputs.docker_tag }}
       repository: manticoresoftware/manticoresearch
