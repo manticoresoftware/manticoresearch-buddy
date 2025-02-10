@@ -27,7 +27,7 @@ use RuntimeException;
 final class Payload extends BasePayload {
 	const MAX_BOOST = 50;
 	const DECREASE_FACTOR = 1.44;
-	const ESCAPE_CHARS = '()[]<>!|*/-~^$@';
+	const ESCAPE_CHARS = '()[]<!|*/-~^$@';
 
 	/** @var string */
 	public string $path;
