@@ -128,11 +128,12 @@ jobs:
   clt:
     name: Run CLT tests
     needs: [test_kit, ref_detection]
-    uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@master
+    uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@fix/continue-on-error
     with:
       docker_image: ${{ needs.test_kit.outputs.docker_repo }}:${{ needs.test_kit.outputs.docker_tag }}
       repository: manticoresoftware/manticoresearch
       ref: ${{ needs.ref_detection.outputs.ref }}
+      continue_on_error: ${{ github.ref == 'refs/heads/main' }}
 
   codestyle:
     name: PHPCS validation
@@ -169,3 +170,19 @@ jobs:
             cd /workdir
             composer install --prefer-dist
             bin/codeanalyze
+
+  tests-passed:
+    runs-on: ubuntu-latest
+    needs: [clt, codestyle, codeanalyze]
+    name: Tests passed
+    if: always()
+    steps:
+      - name: Check if all tests passed
+        run: |
+          if ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}; then
+            echo "Some tests failed or were cancelled"
+            exit 1
+          else
+            echo "All tests passed successfully"
+            exit 0
+          fi
