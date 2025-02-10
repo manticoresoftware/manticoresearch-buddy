@@ -133,6 +133,7 @@ jobs:
       docker_image: ${{ needs.test_kit.outputs.docker_repo }}:${{ needs.test_kit.outputs.docker_tag }}
       repository: manticoresoftware/manticoresearch
       ref: ${{ needs.ref_detection.outputs.ref }}
+      continue_on_error: ${{ github.ref == 'refs/heads/main' }}
 
   codestyle:
     name: PHPCS validation
@@ -169,3 +170,19 @@ jobs:
             cd /workdir
             composer install --prefer-dist
             bin/codeanalyze
+
+  tests-passed:
+    runs-on: ubuntu-latest
+    needs: [clt, codestyle, codeanalyze]
+    name: Tests passed
+    if: always()
+    steps:
+      - name: Check if all tests passed
+        run: |
+          if ${{ ((contains(needs.clt.result, 'completed')  && github.ref == 'refs/heads/main' ) || contains(needs.clt.result,'success')) && contains(needs.codestyle.result, 'success') && contains(needs.codeanalyze.result, 'success')}}; then
+            echo "All tests passed successfully"
+            exit 0
+          else
+            echo "Some tests failed or were cancelled"
+            exit 1
+          fi
