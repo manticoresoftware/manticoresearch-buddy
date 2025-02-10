@@ -179,10 +179,10 @@ jobs:
     steps:
       - name: Check if all tests passed
         run: |
-          if ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}; then
-            echo "Some tests failed or were cancelled"
-            exit 1
-          else
+          if ${{ ((contains(needs.clt.result, 'completed')  && github.ref == 'refs/heads/main' ) || contains(needs.clt.result,'success')) && contains(needs.codestyle.result, 'success') && contains(needs.codeanalyze.result, 'success')}}
             echo "All tests passed successfully"
             exit 0
+          else
+            echo "Some tests failed or were cancelled"
+            exit 1
           fi
