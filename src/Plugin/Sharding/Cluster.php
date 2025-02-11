@@ -254,7 +254,7 @@ final class Cluster {
 			throw new \Exception('Tables must be passed to remove');
 		}
 		$tables = implode(',', $tables);
-		$query = "ALTER CLUSTER {$this->name} DROP `{$tables}";
+		$query = "ALTER CLUSTER {$this->name} DROP {$tables}";
 		$queue->add($this->nodeId, $query);
 		return $this;
 	}
