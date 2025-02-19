@@ -81,7 +81,7 @@ final class Payload extends BasePayload {
 		$self->path = $request->path;
 		$self->type = $request->command;
 		$self->cluster = '';
-		$self->table = $matches['table'];
+		$self->table = strtolower($matches['table']);
 		$self->structure = '';
 		$self->options = [];
 		$self->quiet = false;
@@ -124,7 +124,7 @@ final class Payload extends BasePayload {
 		$self->path = $request->path;
 		$self->type = $request->command === 'create' ? 'create' : 'alter';
 		$self->cluster = $matches['cluster'] ?? '';
-		$self->table = $matches['table'];
+		$self->table = strtolower($matches['table']);
 		$self->structure = $matches['structure'];
 		$self->options = $options;
 		$self->extra = $matches['extra'];
@@ -149,7 +149,7 @@ final class Payload extends BasePayload {
 		$self->type = 'drop';
 		$self->quiet = !!$matches['quiet'];
 		$self->cluster = $matches['cluster'];
-		$self->table = $matches['table'];
+		$self->table = strtolower($matches['table']);
 		$self->structure = '';
 		$self->options = [];
 		$self->extra = '';

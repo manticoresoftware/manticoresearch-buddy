@@ -231,32 +231,30 @@ final class Cluster {
 	 * Enqueue the tables attachments to all nodes of current cluster
 	 * @param Queue  $queue
 	 * @param string ...$tables
-	 * @return static
+	 * @return int
 	 */
-	public function addTables(Queue $queue, string ...$tables): static {
+	public function addTables(Queue $queue, string ...$tables): int {
 		if (!$tables) {
 			throw new \Exception('Tables must be passed to add');
 		}
 		$tables = implode(',', $tables);
 		$query = "ALTER CLUSTER {$this->name} ADD {$tables}";
-		$queue->add($this->nodeId, $query);
-		return $this;
+		return $queue->add($this->nodeId, $query);
 	}
 
 	/**
 	 * Enqueue the tables detachement to all nodes of current cluster
 	 * @param Queue  $queue
 	 * @param string ...$tables
-	 * @return static
+	 * @return int
 	 */
-	public function removeTables(Queue $queue, string ...$tables): static {
+	public function removeTables(Queue $queue, string ...$tables): int {
 		if (!$tables) {
 			throw new \Exception('Tables must be passed to remove');
 		}
 		$tables = implode(',', $tables);
 		$query = "ALTER CLUSTER {$this->name} DROP {$tables}";
-		$queue->add($this->nodeId, $query);
-		return $this;
+		return $queue->add($this->nodeId, $query);
 	}
 
 	/**
