@@ -715,12 +715,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "05e39c441c8015aa6b28eae4366b4e1c418f3399"
+                "reference": "c632d72a90599baba00be85574613d4c4921a679"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/05e39c441c8015aa6b28eae4366b4e1c418f3399",
-                "reference": "05e39c441c8015aa6b28eae4366b4e1c418f3399",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/c632d72a90599baba00be85574613d4c4921a679",
+                "reference": "c632d72a90599baba00be85574613d4c4921a679",
                 "shasum": ""
             },
             "require": {
@@ -759,7 +759,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2025-02-10T03:26:36+00:00"
+            "time": "2025-02-20T04:14:08+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -767,12 +767,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/manticoresearch-backup.git",
-                "reference": "5a3856fa183bcfcd07d8a0e45ad0a49f0306212d"
+                "reference": "22bd3a055ab19a7113dbd9c97cdcd8dc884368ec"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/5a3856fa183bcfcd07d8a0e45ad0a49f0306212d",
-                "reference": "5a3856fa183bcfcd07d8a0e45ad0a49f0306212d",
+                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/22bd3a055ab19a7113dbd9c97cdcd8dc884368ec",
+                "reference": "22bd3a055ab19a7113dbd9c97cdcd8dc884368ec",
                 "shasum": ""
             },
             "require": {
@@ -814,7 +814,7 @@
                 "issues": "https://github.com/manticoresoftware/manticoresearch-backup/issues",
                 "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/1.9.1"
             },
-            "time": "2025-02-03T14:00:36+00:00"
+            "time": "2025-02-17T15:45:49+00:00"
         },
         {
             "name": "manticoresoftware/openmetrics",
@@ -3093,16 +3093,16 @@
         },
         {
             "name": "myclabs/deep-copy",
-            "version": "1.12.1",
+            "version": "1.13.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/myclabs/DeepCopy.git",
-                "reference": "123267b2c49fbf30d78a7b2d333f6be754b94845"
+                "reference": "024473a478be9df5fdaca2c793f2232fe788e414"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/myclabs/DeepCopy/zipball/123267b2c49fbf30d78a7b2d333f6be754b94845",
-                "reference": "123267b2c49fbf30d78a7b2d333f6be754b94845",
+                "url": "https://api.github.com/repos/myclabs/DeepCopy/zipball/024473a478be9df5fdaca2c793f2232fe788e414",
+                "reference": "024473a478be9df5fdaca2c793f2232fe788e414",
                 "shasum": ""
             },
             "require": {
@@ -3141,7 +3141,7 @@
             ],
             "support": {
                 "issues": "https://github.com/myclabs/DeepCopy/issues",
-                "source": "https://github.com/myclabs/DeepCopy/tree/1.12.1"
+                "source": "https://github.com/myclabs/DeepCopy/tree/1.13.0"
             },
             "funding": [
                 {
@@ -3149,7 +3149,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-11-08T17:47:46+00:00"
+            "time": "2025-02-12T12:17:51+00:00"
         },
         {
             "name": "nikic/php-parser",
@@ -3376,16 +3376,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.12.17",
+            "version": "1.12.19",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "7027b3b0270bf392de0cfba12825979768d728bf"
+                "reference": "c42ba9bab7a940ed00092ecb1c77bad98896d789"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/7027b3b0270bf392de0cfba12825979768d728bf",
-                "reference": "7027b3b0270bf392de0cfba12825979768d728bf",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/c42ba9bab7a940ed00092ecb1c77bad98896d789",
+                "reference": "c42ba9bab7a940ed00092ecb1c77bad98896d789",
                 "shasum": ""
             },
             "require": {
@@ -3430,7 +3430,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-02-07T15:01:57+00:00"
+            "time": "2025-02-19T15:42:21+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
