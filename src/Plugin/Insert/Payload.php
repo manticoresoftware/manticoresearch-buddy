@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Insert;
 
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Loader;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
@@ -56,16 +57,54 @@ final class Payload extends BasePayload {
 			$self->path = '_bulk';
 			$request->payload = trim($request->payload) . "\n";
 		}
-		$createTableQuery = $self->buildCreateTableQuery(...$parser->parse($request->payload));
+		['name' => $name, 'cols' => $cols, 'colTypes' => $colTypes] = $parser->parse($request->payload);
+		$createTableQuery = $self->buildCreateTableQuery($name, $cols, $colTypes);
 		if (Loader::isElasticLikeRequest($request->path, $request->endpointBundle)) {
 			$createTableQuery .= ' ' . implode(' ', self::ELASTIC_LIKE_TABLE_OPTIONS);
 		}
+		// Handling uppercased table names in the request
+		$payload = (strtolower($name) !== $name)
+			? $self->preprocessUppercasedTableName($request->payload, $request->format)
+			: $request->payload;
 		$self->queries[] = $createTableQuery;
 		$self->queries[] = (str_contains($self->path, '_doc') || str_contains($self->path, '_create'))
-			? self::preprocessElasticLikeRequest($self->path, $request->payload)
-			: $request->payload;
+			? self::preprocessElasticLikeRequest($self->path, $payload)
+			: $payload;
 
 		return $self;
+	}
+
+	/**
+	 * Replaces uppercased table names with lowercased ones to avoid errors on further insert requests
+	 *
+	 * @param string $payload
+	 * @param RequestFormat $format
+	 * @return string
+	 */
+	protected static function preprocessUppercasedTableName(string $payload, RequestFormat $format): string {
+		return match ($format) {
+			RequestFormat::SQL => (string)preg_replace_callback(
+				'/^INSERT\s+INTO\s+(.+?)([\s\(])/is',
+				function ($matches) {
+					return 'INSERT INTO ' . strtolower($matches[1]) . $matches[2];
+				},
+				$payload,
+				1,
+			),
+			default => (
+				function ($payload) {
+					/** @var array{table?:string,index?:string} */
+					$payload = (array)simdjson_decode($payload, true);
+					// Supporting both table and index options here
+					if (isset($payload['table'])) {
+						$payload['table'] = strtolower($payload['table']);
+					} elseif (isset($payload['index'])) {
+						$payload['index'] = strtolower($payload['index']);
+					}
+					return (string)json_encode($payload);
+				}
+			)($payload),
+		};
 	}
 
 	/**
