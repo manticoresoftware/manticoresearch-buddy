@@ -132,18 +132,15 @@ final class Payload extends BasePayload {
 	 */
 	protected static function parseBulkPayload(Request $request): array {
 		$batch = [];
-		$cluster = '';
 		$table = '';
 		$rows = explode("\n", trim($request->payload));
 		$rowCount = sizeof($rows);
-		$tableMap = [];
-
 		for ($i = 0; $i < $rowCount; $i++) {
 			if (empty($rows[$i])) {
 				continue;
 			}
 
-			[$cluster, $table] = static::processBulkRow($rows[$i], $batch, $tableMap, $cluster, $table);
+			$table = static::processBulkRow($rows[$i], $batch, $table);
 		}
 		/** @var Batch $batch */
 		return $batch;
@@ -152,33 +149,25 @@ final class Payload extends BasePayload {
 	/**
 	 * @param string $row
 	 * @param Batch &$batch
-	 * @param array<string,array{0:string,1:string}> &$tableMap
-	 * @param string $cluster
 	 * @param string $table
-	 * @return array{0:string,1:string}
+	 * @return string
 	 * @throws QueryParseError
 	 */
 	protected static function processBulkRow(
 		string $row,
 		array &$batch,
-		array &$tableMap,
-		string $cluster,
-		string $table
-	): array {
+		string $table,
+	): string {
 		/** @var Struct<int|string,array<string,mixed>> $struct */
 		$struct = Struct::fromJson($row);
 		if (isset($struct['index']['_index'])) { // _bulk
 			/** @var string $table */
 			$table = $struct['index']['_index'];
-			if (!isset($tableMap[$table])) {
-				$tableMap[$table] = static::parseCluster($table);
+			if (!isset($batch[$table])) {
+				$batch[$table] = new Vector();
 			}
-			[$cluster, $table] = $tableMap[$table];
-			if (!isset($batch["$cluster:$table"])) {
-				$batch["$cluster:$table"] = new Vector();
-			}
-			$batch["$cluster:$table"][] = $struct;
-			return [$cluster, $table];
+			$batch[$table][] = $struct;
+			return $table;
 		}
 
 
@@ -189,23 +178,19 @@ final class Payload extends BasePayload {
 			// bulk
 			/** @var string $table */
 			$table = $struct[$key]['table'] ?? $struct[$key]['_index'];
-			if (!isset($tableMap[$table])) {
-				$tableMap[$table] = static::parseCluster($table);
+			if (!isset($batch[$table])) {
+				$batch[$table] = new Vector();
 			}
-			[$cluster, $table] = $tableMap[$table];
-			if (!isset($batch["$cluster:$table"])) {
-				$batch["$cluster:$table"] = new Vector();
-			}
-			$batch["$cluster:$table"][] = $struct;
-			return [$cluster, $table];
+			$batch[$table][] = $struct;
+			return $table;
 		}
 
 		if (!$table) {
 			QueryParseError::throw('Cannot find table name');
 		}
 
-		$batch["$cluster:$table"][] = $struct;
-		return [$cluster, $table];
+		$batch[$table][] = $struct;
+		return $table;
 	}
 
 	/**
@@ -217,15 +202,8 @@ final class Payload extends BasePayload {
 		$struct = Struct::fromJson($request->payload);
 		/** @var string $table */
 		$table = $struct['table'] ?? $struct['index'];
-
-		// We support 2 ways of cluster: as key or in table as prefix:
-		/** @var string $cluster */
-		$cluster = $struct['cluster'] ?? '';
-		if (!$cluster) {
-			[$cluster, $table] = static::parseCluster($table);
-		}
-
-		return ["$cluster:$table" => new Vector([$struct])];
+		/** @var Batch */
+		return [$table => new Vector([$struct])];
 	}
 
 	/**
@@ -259,7 +237,6 @@ final class Payload extends BasePayload {
 		if (!$table) {
 			throw QueryParseError::create('Failed to parse table from the query');
 		}
-		[$cluster, $table] = static::parseCluster($table);
 
 		// It's time to parse values
 		if (!isset($matches[4])) {
@@ -294,20 +271,6 @@ final class Payload extends BasePayload {
 			$doc = [];
 		}
 		/** @var Batch */
-		return ["$cluster:$table" => $batch];
-	}
-
-	/**
-	 * @param string $table
-	 * @return array{0:string,1:string}
-	 */
-	public static function parseCluster(string $table): array {
-		$cluster = '';
-		$pos = strpos($table, ':');
-		if ($pos !== false) {
-			$cluster = substr($table, 0, $pos);
-			$table = substr($table, $pos + 1);
-		}
-		return [$cluster, $table];
+		return [$table => $batch];
 	}
 }
