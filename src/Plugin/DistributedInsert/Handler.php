@@ -10,6 +10,7 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\DistributedInsert;
 
+use Ds\Map;
 use Ds\Vector;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
@@ -43,8 +44,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$requests = [];
 			$positions = [];
 			$n = 0;
+			$clusterMap = $this->getTableClusterMap();
 			foreach ($this->payload->batch as $table => $batch) {
-				$shardRows = $this->processBatch($batch, $n, $positions, $table);
+				$shardRows = $this->processBatch($batch, $n, $positions, $table, $clusterMap);
 				if (!$shardRows) {
 					throw new ManticoreSearchClientError('Failed to prepare docs for insertion');
 				}
@@ -66,6 +68,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 * @param int &$n
 	 * @param array<string,array{n:int,table:string,cluster:string}> &$positions
 	 * @param string $table
+	 * @param Map<string,string> $clusterMap
 	 * @return array{string:array{info:array{name:string,url:string},rows:array<string>}}|array{}
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
@@ -75,8 +78,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 		int &$n,
 		array &$positions,
 		string $table,
+		Map $clusterMap,
 	): array {
-		[$cluster, $table] = $this->payload::parseCluster($table);
 		$shards = $this->getShards($table);
 		$shardCount = sizeof($shards);
 
@@ -87,16 +90,18 @@ final class Handler extends BaseHandlerWithFlagCache {
 			if ($this->shouldAssignId($struct)) {
 				$id = $this->assignId($struct);
 				$idStr = (string)$id;
+
+				$shard = jchash($idStr, $shardCount);
+				$info = $shards[$shard];
+				$shardName = $info['name'];
+				$cluster = $clusterMap[$shardName] ?? '';
+				$this->assignTable($struct, $cluster, $shardName);
+
 				$positions[$idStr] = [
 					'n' => $n++,
 					'table' => $table,
 					'cluster' => $cluster,
 				];
-
-				$shard = jchash($idStr, $shardCount);
-				$info = $shards[$shard];
-				$shardName = $info['name'];
-				$this->assignTable($struct, $cluster, $shardName);
 			}
 
 
@@ -366,25 +371,33 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 * @return void
 	 */
 	protected function assignTable(Struct $struct, string $cluster, string $shardName): void {
-		$table = $cluster ? "$cluster:$shardName" : $shardName;
 		if ($this->payload->type === 'bulk') {
 			/** @var Struct<string,array{_index:string,_id:int|string}> $struct */
 			$key = static::detectKeyWithTable($struct);
 
 			/** @var array{_id:string|int,_index:string} $index */
 			$index = $struct[$key];
-			$index['_index'] = $table;
+			$index['_index'] = $shardName;
+			if ($cluster) {
+				$index['_cluster'] = $cluster;
+			}
 			$struct[$key] = $index;
 		} elseif ($this->payload->type === 'sql') {
 			/** @var Struct<"insert"|"replace",array{table:string}> $struct */
 			$key = isset($struct['replace']) ? 'replace' : 'insert';
 			$row = $struct[$key];
 			/** @var array{table:string} $row */
-			$row['table'] = $table;
+			$row['table'] = $shardName;
+			if ($cluster) {
+				$row['cluster'] = $cluster;
+			}
 			$struct[$key] = $row;
 		} else {
 			/** @var Struct<string,string|int> $struct */
-			$struct['table'] = $table;
+			$struct['table'] = $shardName;
+			if ($cluster) {
+				$struct['cluster'] = $cluster;
+			}
 		}
 	}
 
@@ -431,5 +444,26 @@ final class Handler extends BaseHandlerWithFlagCache {
 			return false;
 		}
 		return true;
+	}
+
+	/**
+	 * Fetch and cache cluster for the table
+	 * @return Map<string,string>
+	 */
+	protected function getTableClusterMap(): Map {
+		$q = "SHOW STATUS LIKE 'cluster_%_indexes'";
+		/** @var array{0:array{data:array<array{Counter:string,Value:string}>}} */
+		$result = $this->manticoreClient->sendRequest($q)->getResult();
+		/** @var Map<string,string> */
+		$map = new Map();
+		foreach ($result[0]['data'] as ['Counter' => $key, 'Value' => $value]) {
+			$cluster = substr($key, 8, -8);
+			$tables = explode(',', $value);
+			foreach ($tables as $table) {
+				$map[$table] = $cluster;
+			}
+		}
+
+		return $map;
 	}
 }
