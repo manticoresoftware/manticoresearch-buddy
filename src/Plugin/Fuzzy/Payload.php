@@ -414,6 +414,9 @@ final class Payload extends BasePayload {
 			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
 		} else {
 			$layouts = KeyboardLayout::getSupportedLanguages();
+			// We filter here because 0-9 maps to symbols that can interfere with word splitting
+			$filterFn = fn(string $layout) => $layout !== 'fr' && $layout !== 'be';
+			$layouts = array_filter($layouts, $filterFn);
 		}
 		return $layouts;
 	}
