@@ -100,7 +100,7 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromSqlRequest(Request $request): static {
 		$query = $request->payload;
-		preg_match('/FROM\s+(\w+)\s+WHERE/ius', $query, $matches);
+		preg_match('/FROM\s+`?(\w+)`?\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
 		// Check that we have match
