@@ -179,7 +179,8 @@ final class Payload extends BasePayload {
 				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
-				'/ option/ius', // TODO: hack
+				'/ option/ius',
+				'/\s*,\s*facet\s+/ius',
 				],
 			[
 				'MATCH(\'%s\')',
@@ -187,6 +188,7 @@ final class Payload extends BasePayload {
 				'',
 				'option ',
 				' option idf=\'plain,tfidf_normalized\',', // TODO: hack
+				' facet ',
 			],
 			$payload
 		);
