@@ -57,6 +57,18 @@ final class Cluster {
 	}
 
 	/**
+	 * Check if there is a such cluster or not
+	 * It does not matter where we check (which node)
+	 * @return bool
+	 */
+	public function exists(): bool {
+		$q = "SHOW STATUS LIKE 'cluster_{$this->name}_indexes'";
+		/** @var array{0:array{data:array<array{Counter:string,Value:string}>}} */
+		$result = $this->client->sendRequest($q)->getResult();
+		return sizeof($result[0]['data']) > 0;
+	}
+
+	/**
 	 * Initialize and create the current cluster
 	 * This method should be executed on main cluster node
 	 * @param ?Queue $queue
