@@ -131,7 +131,7 @@ class InsertQueryTest extends TestCase {
 		$outData = $out[0]['data'][0];
 		$this->assertEquals(2, sizeof($outData['items']));
 		if (!isset(
-			$outData['items'][0]['index']['_index'], $outData['items'][0]['index']['id'],
+			$outData['items'][0]['index']['_index'], $outData['items'][0]['index']['_id'],
 			$outData['items'][0]['index']['result'], $outData['items'][1]['create']['_index'],
 			$outData['items'][1]['create']['id'], $outData['items'][1]['create']['result']
 		)) {
@@ -139,7 +139,7 @@ class InsertQueryTest extends TestCase {
 		}
 		$itemsData = $outData['items'][0]['index'];
 		$result = [$this->testTable, 'created'];
-		$this->assertNotEquals('0', $itemsData['id']);
+		$this->assertNotEquals('0', $itemsData['_id']);
 		$this->assertEquals($result, [$itemsData['_index'], $itemsData['result']]);
 		$itemsData = $outData['items'][1]['create'];
 		$result = [$this->testTable, 'created'];
