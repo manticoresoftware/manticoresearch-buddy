@@ -73,11 +73,11 @@ class InsertQueryTest extends TestCase {
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
 		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
-		if (!isset($outData['_id'], $outData['table'], $outData['result'])) {
+		if (!isset($outData['id'], $outData['table'], $outData['result'])) {
 			$this->fail();
 		}
 		$result = [1, $this->testTable, 'created'];
-		$this->assertEquals($result, [$outData['_id'], $outData['table'], $outData['result']]);
+		$this->assertEquals($result, [$outData['id'], $outData['table'], $outData['result']]);
 
 		$out = static::runHttpQuery($query, true, "{$this->testTable}/_doc");
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
@@ -93,11 +93,11 @@ class InsertQueryTest extends TestCase {
 		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
 		$this->assertArrayHasKey(0, $out);
 		$outData = $out[0]['data'][0];
-		if (!isset($outData['_id'], $outData['table'], $outData['result'])) {
+		if (!isset($outData['id'], $outData['table'], $outData['result'])) {
 			$this->fail();
 		}
 		$result = [2, $this->testTable, 'created'];
-		$this->assertEquals($result, [$outData['_id'], $outData['table'], $outData['result']]);
+		$this->assertEquals($result, [$outData['id'], $outData['table'], $outData['result']]);
 	}
 
 	public function testHTTPElasticInsertQueryFail(): void {
@@ -131,15 +131,15 @@ class InsertQueryTest extends TestCase {
 		$outData = $out[0]['data'][0];
 		$this->assertEquals(2, sizeof($outData['items']));
 		if (!isset(
-			$outData['items'][0]['index']['_index'], $outData['items'][0]['index']['_id'],
+			$outData['items'][0]['index']['_index'], $outData['items'][0]['index']['id'],
 			$outData['items'][0]['index']['result'], $outData['items'][1]['create']['_index'],
-			$outData['items'][1]['create']['_id'], $outData['items'][1]['create']['result']
+			$outData['items'][1]['create']['id'], $outData['items'][1]['create']['result']
 		)) {
 			$this->fail();
 		}
 		$itemsData = $outData['items'][0]['index'];
 		$result = [$this->testTable, 'created'];
-		$this->assertNotEquals('0', $itemsData['_id']);
+		$this->assertNotEquals('0', $itemsData['id']);
 		$this->assertEquals($result, [$itemsData['_index'], $itemsData['result']]);
 		$itemsData = $outData['items'][1]['create'];
 		$result = [$this->testTable, 'created'];
