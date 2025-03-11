@@ -133,7 +133,7 @@ class InsertQueryTest extends TestCase {
 		if (!isset(
 			$outData['items'][0]['index']['_index'], $outData['items'][0]['index']['_id'],
 			$outData['items'][0]['index']['result'], $outData['items'][1]['create']['_index'],
-			$outData['items'][1]['create']['id'], $outData['items'][1]['create']['result']
+			$outData['items'][1]['create']['_id'], $outData['items'][1]['create']['result']
 		)) {
 			$this->fail();
 		}
