@@ -352,8 +352,14 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$index['_id'] = "$id";
 			$struct['index'] = $index;
 		} elseif ($this->payload->type === 'sql') {
-			/** @var Struct<"insert"|"replace",array{id:string|int}> $struct */
-			$key = isset($struct['replace']) ? 'replace' : 'insert';
+			/** @var Struct<"insert"|"replace"|"update"|"delete",array{id:string|int}> $struct */
+			$key = match (true) {
+				isset($struct['replace']) => 'replace',
+				isset($struct['insert']) => 'insert',
+				isset($struct['update']) => 'update',
+				isset($struct['delete']) => 'delete',
+				default => throw new \LogicException('Invalid payload type'),
+			};
 			$row = $struct[$key];
 			$row['id'] = (int)$id;
 			$struct[$key] = $row;
@@ -383,8 +389,14 @@ final class Handler extends BaseHandlerWithFlagCache {
 			}
 			$struct[$key] = $index;
 		} elseif ($this->payload->type === 'sql') {
-			/** @var Struct<"insert"|"replace",array{table:string}> $struct */
-			$key = isset($struct['replace']) ? 'replace' : 'insert';
+			/** @var Struct<"insert"|"replace"|"update"|"delete",array{table:string}> $struct */
+			$key = match (true) {
+				isset($struct['replace']) => 'replace',
+				isset($struct['insert']) => 'insert',
+				isset($struct['update']) => 'update',
+				isset($struct['delete']) => 'delete',
+				default => throw new \LogicException('Invalid payload type'),
+			};
 			$row = $struct[$key];
 			/** @var array{table:string} $row */
 			$row['table'] = $shardName;

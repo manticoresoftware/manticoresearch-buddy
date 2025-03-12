@@ -71,7 +71,8 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		$hasErrorMessage = stripos($request->error, 'not support insert') !== false;
+		$hasErrorMessage = stripos($request->error, 'not support insert') !== false
+			|| stripos($request->error, 'is a part of cluster') !== false;
 
 		// Insert or Replace
 		$hasMatch = ($request->endpointBundle === Endpoint::Insert
@@ -100,7 +101,10 @@ final class Payload extends BasePayload {
 			$isSqlEndpoint = $request->endpointBundle === Endpoint::Sql
 				|| $request->endpointBundle === Endpoint::Cli;
 			$hasMatch = $isSqlEndpoint
-				&& ($request->command === 'insert' || $request->command === 'replace')
+				&& ($request->command === 'insert'
+					|| $request->command === 'replace'
+					|| $request->command === 'update'
+					|| $request->command === 'delete')
 				&& $hasErrorMessage
 			;
 		}
@@ -207,11 +211,25 @@ final class Payload extends BasePayload {
 	}
 
 	/**
-	 * Parse the SQL request
+	 * Simple proxy that route the parses into insert, update or delete
 	 * @param Request $request
 	 * @return Batch
 	 */
 	protected static function parseSqlPayload(Request $request): array {
+		return match ($request->command) {
+			'insert', 'replace' => static::parseInsertSqlPayload($request),
+			'update' => static::parseUpdateSqlPayload($request),
+			'delete' => static::parseDeleteSqlPayload($request),
+			default => throw QueryParseError::create('Unsupported command for SQL endpoint'),
+		};
+	}
+
+	/**
+	 * Parse the SQL request
+	 * @param Request $request
+	 * @return Batch
+	 */
+	protected static function parseInsertSqlPayload(Request $request): array {
 		static $queryPattern = '/^(insert|replace)\s+into\s+'
 			. '`?([a-z][a-z\_\-0-9]*)`?'
 			. '(?:\s*\(([^)]+)\))?\s+'
@@ -270,6 +288,91 @@ final class Payload extends BasePayload {
 			$batch[] = Struct::fromData([$type => $row]);
 			$doc = [];
 		}
+		/** @var Batch */
+		return [$table => $batch];
+	}
+
+	/**
+	 * Parse the SQL UPDATE request
+	 * Expected format: update `table` set field1='value1', field2='value2' where id=123
+	 * @param Request $request
+	 * @return Batch
+	 * @throws QueryParseError
+	 */
+	protected static function parseUpdateSqlPayload(Request $request): array {
+		$queryPattern = '/^update\s+`?([a-z][a-z_\-0-9]*)`?\s+set\s+(.*?)\s+where\s+id\s*=\s*(\d+)/ius';
+		// Define a pattern to match a single assignment: field = value
+		$valuePattern = "(?:'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\})";
+		$assignmentPattern = '/`?([a-z][a-z_\-0-9]*)`?\s*=\s*(' . $valuePattern . ')/ius';
+
+		if (!preg_match($queryPattern, $request->payload, $matches)) {
+			throw QueryParseError::create('Failed to parse UPDATE query');
+		}
+
+		$table = $matches[1];
+		$setClause = $matches[2];
+		$id = (int)$matches[3];
+
+		// Parse all assignments in the SET clause.
+		preg_match_all($assignmentPattern, $setClause, $assignMatches, PREG_SET_ORDER);
+		if (!$assignMatches) {
+			throw QueryParseError::create('No assignments found in UPDATE query');
+		}
+
+		$doc = [];
+		foreach ($assignMatches as $assign) {
+			$field = $assign[1];
+			$value = $assign[2];
+			// remove any wrapping quotes if needed
+			if (strlen($value) > 1 && $value[0] === "'" && substr($value, -1) === "'") {
+				$value = trim($value, "'");
+			}
+			$doc[$field] = $value;
+		}
+
+		// In case an id is also set in doc, remove it so that the 'id' key reflects the WHERE clause.
+		if (isset($doc['id'])) {
+			unset($doc['id']);
+		}
+
+		$row = [
+			'id'  => $id,
+			'doc' => $doc,
+		];
+
+		/** @var Vector<Struct<int|string,mixed>> */
+		$batch = new \Ds\Vector();
+		$batch->push(Struct::fromData(['update' => $row]));
+
+		/** @var Batch */
+		return [$table => $batch];
+	}
+
+	/**
+	 * Parse the SQL DELETE request
+	 * Expected format: delete from `table` where id=123
+	 * @param Request $request
+	 * @return Batch
+	 * @throws QueryParseError
+	 */
+	protected static function parseDeleteSqlPayload(Request $request): array {
+		$queryPattern = '/^delete\s+from\s+`?([a-z][a-z_\-0-9]*)`?\s+where\s+id\s*=\s*(\d+)/ius';
+
+		if (!preg_match($queryPattern, $request->payload, $matches)) {
+			throw QueryParseError::create('Failed to parse DELETE query');
+		}
+
+		$table = $matches[1];
+		$id = (int)$matches[2];
+
+		$row = [
+			'id' => $id,
+		];
+
+		/** @var Vector<Struct<int|string,mixed>> */
+		$batch = new \Ds\Vector();
+		$batch->push(Struct::fromData(['delete' => $row]));
+
 		/** @var Batch */
 		return [$table => $batch];
 	}

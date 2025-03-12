@@ -100,7 +100,7 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromSqlRequest(Request $request): static {
 		$query = $request->payload;
-		preg_match('/FROM\s+(\w+)\s+WHERE/ius', $query, $matches);
+		preg_match('/FROM\s+`?(\w+)`?\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
 		// Check that we have match
@@ -108,21 +108,23 @@ final class Payload extends BasePayload {
 			throw QueryParseError::create("The 'fuzzy' option requires a full-text query");
 		}
 
+		// I did not figure out how to make with regxp case OPTION fuzzy=1 so do this way
+		$optionPos = stripos($query, ' OPTION ');
+		if ($optionPos !== false && substr_count($query, '=', $optionPos) > 1) {
+			$pattern = '/(?:^OPTION\s+|\s*,\s*)(?:[a-zA-Z\_]+)\s*=\s*([\'"][^\'"]*[\'"]|\d+)(?=\s*\;?\s*$|\s*,)/iu';
+			if (!preg_match($pattern, $query)) {
+				throw QueryParseError::create(
+					'Invalid options in query string, ' .
+						'make sure they are separated by commas'
+				);
+			}
+		}
+
 		// Parse fuzzy and use default 0 if missing
 		if (!preg_match('/fuzzy\s*=\s*(\d+)/ius', $query, $matches)) {
 			throw QueryParseError::create('Invalid value for option \'fuzzy\'');
 		}
 		$fuzzy = (bool)$matches[1];
-
-		// Check that we have , between options
-		$pattern = '/OPTION\s+' .
-			'([a-zA-Z0-9_]+\s*=\s*(\'[^\']*\'|[0-9]+)\s*,\s*)*' .
-			'[a-zA-Z0-9_]+\s*=\s*(\'[^\']*\'|[0-9]+)' .
-			'(\s*,\s*[a-zA-Z0-9_]+\s*=\s*(\'[^\']*\'|[0-9]+))*$/ius';
-
-		if (!preg_match($pattern, $query)) {
-			throw QueryParseError::create('Invalid options in query string, make sure they are separated by commas');
-		}
 
 		// Parse distance and use default 2 if missing
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
@@ -133,7 +135,7 @@ final class Payload extends BasePayload {
 		$preserve = (bool)($matches[1] ?? 0);
 
 		// Parse layouts and use default all languages if missed
-		preg_match('/layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
+		preg_match('/(?:OPTION\s+|,\s+)layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
 		$layouts = static::parseLayouts($matches[1] ?? null);
 
 		$self = new static();
