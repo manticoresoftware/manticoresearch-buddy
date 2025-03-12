@@ -64,10 +64,24 @@ class Handler extends BaseHandlerWithClient {
 
 				$resp = $manticoreClient->sendRequest($query, $i === 0 ? null : $payload->path);
 			}
-
 			if (!isset($resp)) {
 				throw new Exception('Empty queries to process');
 			}
+
+			// Postprocessing Elastic-like inserts to keep Elastic-like response format
+			if (!$payload->isElasticLikeInsert) {
+				return TaskResult::fromResponse($resp);
+			}
+			$resp->postprocess(
+				function ($body) {
+					$data = (array)simdjson_decode($body, true);
+					if (isset($data['id'])) {
+						$data['_id'] = $data['id'];
+						unset($data['id']);
+					}
+					return json_encode($data);
+				}
+			);
 
 			return TaskResult::fromResponse($resp);
 		};
