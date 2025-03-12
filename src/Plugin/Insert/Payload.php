@@ -30,6 +30,9 @@ final class Payload extends BasePayload {
 	/** @var string $path */
 	public string $path;
 
+	/** @var bool $isElasticLikeInsert */
+	public bool $isElasticLikeInsert = false;
+
 	/**
 	 * @return void
 	 */
@@ -67,9 +70,16 @@ final class Payload extends BasePayload {
 			? $self->preprocessUppercasedTableName($request->payload, $request->format)
 			: $request->payload;
 		$self->queries[] = $createTableQuery;
-		$self->queries[] = (str_contains($self->path, '_doc') || str_contains($self->path, '_create'))
-			? self::preprocessElasticLikeRequest($self->path, $payload)
-			: $payload;
+
+		// Preprocessing Elastic-like insert requests
+		if (str_contains($self->path, '_doc') || str_contains($self->path, '_create')) {
+			$insertQuery = self::preprocessElasticLikeRequest($self->path, $payload);
+			$self->path = 'insert';
+			$self->isElasticLikeInsert = true;
+		} else {
+			$insertQuery = $payload;
+		}
+		$self->queries[] = $insertQuery;
 
 		return $self;
 	}
@@ -112,10 +122,9 @@ final class Payload extends BasePayload {
 	 * @param string $payload
 	 * @return string
 	 */
-	protected static function preprocessElasticLikeRequest(string &$path, string $payload): string {
+	protected static function preprocessElasticLikeRequest(string $path, string $payload): string {
 		$pathParts = explode('/', $path);
 		$table = $pathParts[0];
-		$path = 'insert';
 		$query = [
 			'table' => $table,
 			'doc' => (array)simdjson_decode($payload, true),
