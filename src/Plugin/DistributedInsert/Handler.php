@@ -383,10 +383,10 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 			/** @var array{_id:string|int,_index:string} $index */
 			$index = $struct[$key];
-			$index['_index'] = $shardName;
 			if ($cluster) {
-				$index['_cluster'] = $cluster;
+				$shardName = "{$cluster}:{$shardName}";
 			}
+			$index['_index'] = $shardName;
 			$struct[$key] = $index;
 		} elseif ($this->payload->type === 'sql') {
 			/** @var Struct<"insert"|"replace"|"update"|"delete",array{table:string}> $struct */
