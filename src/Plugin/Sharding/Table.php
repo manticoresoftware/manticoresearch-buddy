@@ -321,10 +321,13 @@ final class Table {
 				fn ($connectedNode) => $connectedNode !== $node
 			);
 			$clusterMap[$clusterName] = $cluster;
-			$waitForId = $cluster->create($queue);
-			$queue->setWaitForId($waitForId);
-			$cluster->addNodeIds($queue, ...$nodesToJoin);
-			$queue->resetWaitForId();
+			// Create cluster only if it does not exist
+			if (!$cluster->exists()) {
+				$waitForId = $cluster->create($queue);
+				$queue->setWaitForId($waitForId);
+				$cluster->addNodeIds($queue, ...$nodesToJoin);
+				$queue->resetWaitForId();
+			}
 		}
 
 		/** @var Cluster $cluster */
