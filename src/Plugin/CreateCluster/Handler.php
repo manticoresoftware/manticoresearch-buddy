@@ -9,17 +9,14 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\Create;
+namespace Manticoresearch\Buddy\Base\Plugin\CreateCluster;
 
-use Manticoresearch\Buddy\Core\Error\GenericError;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
-final class WithEngineHandler extends BaseHandlerWithClient
-{
+final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * Initialize the executor
@@ -37,21 +34,18 @@ final class WithEngineHandler extends BaseHandlerWithClient
 	 * @throws RuntimeException
 	 */
 	public function run(): Task {
-		$taskFn = static function (Payload $payload, Client $client): TaskResult {
-
-			$sql = "CREATE TABLE {$payload->destinationTableName}";
-			$result = $client->sendRequest($sql);
-			if ($result->hasError()) {
-				throw GenericError::create(
-					"Can't create table {$payload->destinationTableName}. Reason: " . $result->getError()
-				);
+		$taskFn = function (): TaskResult {
+			$resp = $this->manticoreClient->sendRequest($this->payload->query);
+			$error = $resp->getError();
+			// In case quiet mode we have IF EXISTS so do nothing
+			if ($error && $this->payload->quiet) {
+				return TaskResult::none();
 			}
-			return TaskResult::none();
+			return TaskResult::fromResponse($resp);
 		};
 
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
 		)->run();
 	}
-
 }

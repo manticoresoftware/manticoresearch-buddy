@@ -177,9 +177,15 @@ final class Queue {
 	 * @return Struct<int|string, mixed>
 	 */
 	protected function executeQuery(array $query): Struct {
+		// We try to avoid infinite loop in wrong queries with buddy so allow
+		// disable agent only for create cluster cuz we need it
+		$params = ['request' => $query['query']];
+		if (stripos($query['query'], 'CREATE CLUSTER IF NOT EXISTS') === 0) {
+			$params['disableAgentHeader'] = true;
+		}
 		// TODO: this is a temporary hack, remove when job is done on searchd
 		$this->runMkdir($query['query']);
-		return $this->client->sendRequest($query['query'])->getResult();
+		return $this->client->sendRequest(...$params)->getResult();
 	}
 
 	/**
