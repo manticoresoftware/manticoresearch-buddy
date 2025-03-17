@@ -57,33 +57,15 @@ final class Cluster {
 	}
 
 	/**
-	 * Check if there is a such cluster or not
-	 * It does not matter where we check (which node)
-	 * @return bool
-	 */
-	public function exists(): bool {
-		$q = "SHOW STATUS LIKE 'cluster_{$this->name}_indexes'";
-		/** @var array{0:array{data:array<array{Counter:string,Value:string}>}} */
-		$result = $this->client->sendRequest($q)->getResult();
-		return sizeof($result[0]['data']) > 0;
-	}
-
-	/**
 	 * Initialize and create the current cluster
 	 * This method should be executed on main cluster node
 	 * @param ?Queue $queue
 	 * @return int Last insert id into the queue or 0
 	 */
 	public function create(?Queue $queue = null): int {
-		$nodes = $this->getNodes();
-		// Empty nodes mean that there is no such cluster
-		if (!$nodes->isEmpty()) {
-			throw new RuntimeException('Trying to create cluster that already exists');
-		}
-
 		// TODO: the pass is the subject to remove
 		$galeraOptions = static::GALERA_OPTIONS;
-		$query = "CREATE CLUSTER {$this->name} '{$this->name}' as path, '{$galeraOptions}' as options";
+		$query = "CREATE CLUSTER IF NOT EXISTS {$this->name} '{$this->name}' as path, '{$galeraOptions}' as options";
 		return $this->runQuery($queue, $query);
 	}
 
@@ -120,7 +102,7 @@ final class Cluster {
 		if ($queue) {
 			$queueId = $queue->add($this->nodeId, $query);
 		} else {
-			$this->client->sendRequest($query);
+			$this->client->sendRequest($query, disableAgentHeader: true);
 		}
 
 		return $queueId ?? 0;

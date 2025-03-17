@@ -9,7 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\Create;
+namespace Manticoresearch\Buddy\Base\Plugin\CreateTable;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Network\Request;
@@ -33,7 +33,7 @@ final class Payload extends BasePayload
 	 * @return string
 	 */
 	public static function getInfo(): string {
-		return 'Enables tables copying; handles CREATE statements with MySQL options not supported by Manticore';
+		return 'Enables tables copying; handles CREATE TABLE statements with MySQL options not supported by Manticore';
 	}
 
 	/**
