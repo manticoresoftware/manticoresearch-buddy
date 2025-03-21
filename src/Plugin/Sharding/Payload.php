@@ -108,13 +108,21 @@ final class Payload extends BasePayload {
 		$options = [];
 		if ($matches['extra']) {
 			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*(?P<value>\'?\d+\'?)/ius';
+
+			$keys = [];
 			if (preg_match_all($pattern, $matches['extra'], $optionMatches, PREG_SET_ORDER)) {
 				foreach ($optionMatches as $optionMatch) {
 					$key = strtolower($optionMatch['key']);
+					if (isset($keys[$key])) {
+						QueryParseError::throw("Duplicate parameter '{$key}' found");
+					}
+					$keys[$key] = true;
+
 					$value = (int)$optionMatch['value'];
 					$options[$key] = $value;
 				}
 			}
+
 			// Clean up extra from extracted options
 			$matches['extra'] = trim(preg_replace($pattern, '', $matches['extra']) ?? '');
 		}
@@ -164,7 +172,7 @@ final class Payload extends BasePayload {
 	public static function hasMatch(Request $request): bool {
 		// Desc and Show distributed table first
 		if (($request->command === 'desc' || $request->command === 'describe')
-				&& strpos($request->error, 'contains system') !== false
+			&& strpos($request->error, 'contains system') !== false
 		) {
 			return true;
 		}
@@ -173,8 +181,8 @@ final class Payload extends BasePayload {
 		}
 		// Create and Drop
 		return (stripos($request->error, 'syntax error')
-				|| stripos($request->error, 'contains system table')
-			)
+			|| stripos($request->error, 'contains system table')
+		)
 			&& (
 				(stripos($request->payload, 'create table') === 0
 					&& stripos($request->payload, 'shards') !== false
