@@ -311,7 +311,7 @@ final class Table {
 		Map $clusterMap,
 		int $shard
 	): Map {
-		$clusterName = $this->getClusterName($connectedNodes);
+		$clusterName = static::getClusterName($connectedNodes);
 		$hasCluster = isset($clusterMap[$clusterName]);
 		if ($hasCluster) {
 			$cluster = $clusterMap[$clusterName];
@@ -328,7 +328,7 @@ final class Table {
 		}
 
 		/** @var Cluster $cluster */
-		$table = $this->getTableShardName($shard);
+		$table = $this->getShardName($shard);
 		if (!$cluster->hasPendingTable($table, TableOperation::Attach)) {
 			$cluster->addPendingTable($table, TableOperation::Attach);
 			$sql = $this->getCreateTableShardSQL($shard);
@@ -369,7 +369,7 @@ final class Table {
 
 			// Preload current cluster map with configuration
 			foreach ($shardNodesMap as $shard => $connections) {
-				$clusterName = $this->getClusterName($connections);
+				$clusterName = static::getClusterName($connections);
 				$connections->sort();
 				$node = $connections->first();
 				$cluster = new Cluster($this->client, $clusterName, $node);
@@ -475,8 +475,8 @@ final class Table {
 
 		foreach ($shards as $shard) {
 			$connections = $this->getConnectedNodes(new Set([$shard]));
-			$clusterName = $this->getClusterName($connections);
-			$table = $this->getTableShardName($shard);
+			$clusterName = static::getClusterName($connections);
+			$table = $this->getShardName($shard);
 
 			if (sizeof($connections) > 1) {
 				$this->handleClusteredCleanUp(
@@ -602,7 +602,7 @@ final class Table {
 	 * @param Set<string> $connections
 	 * @return string
 	 */
-	protected function getClusterName(Set $connections): string {
+	public static function getClusterName(Set $connections): string {
 		$hash = md5($connections->sorted()->join(','));
 		if (is_numeric($hash[0])) {
 			$hash[0] = chr(97 + ($hash[0] % 6));
@@ -620,7 +620,16 @@ final class Table {
 		// We can call this method on rebalancing, that means
 		// table may exist, so to suppress error we use
 		// if not exists to keep logic simpler
-		return "CREATE TABLE IF NOT EXISTS {$this->getTableShardName($shard)} {$structure} {$this->extra}";
+		return "CREATE TABLE IF NOT EXISTS {$this->getShardName($shard)} {$structure} {$this->extra}";
+	}
+
+	/**
+	 * We use it outside in distributed insert logic
+	 * @param  int    $shard
+	 * @return string
+	 */
+	public static function getTableShardName(string $table, int $shard): string {
+		return "system.{$table}_s{$shard}";
 	}
 
 	/**
@@ -628,8 +637,8 @@ final class Table {
 	 * @param  int    $shard
 	 * @return string
 	 */
-	protected function getTableShardName(int $shard): string {
-		return "system.{$this->name}_s{$shard}";
+	protected function getShardName(int $shard): string {
+		return static::getTableShardName($this->name, $shard);
 	}
 
 	/**
@@ -641,7 +650,7 @@ final class Table {
 		// Calculate local tables
 		$locals = new Set;
 		foreach ($shards as $shard) {
-			$locals->add("local='{$this->getTableShardName($shard)}'");
+			$locals->add("local='{$this->getShardName($shard)}'");
 		}
 
 		// Calculate external tables
@@ -651,7 +660,7 @@ final class Table {
 		foreach ($nodes as $row) {
 			foreach ($row['shards'] as $shard) {
 				$map[$shard] ??= new Set;
-				$shardName = $this->getTableShardName($shard);
+				$shardName = $this->getShardName($shard);
 				// @phpstan-ignore-next-line
 				$map[$shard]->add("{$row['node']}:{$shardName}");
 			}

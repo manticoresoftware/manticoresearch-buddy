@@ -122,7 +122,7 @@ final class Queue {
 		if ($query['wait_for_id']) {
 			$waitFor = $this->getById($query['wait_for_id']);
 			if ($waitFor && $waitFor['status'] !== 'processed') {
-				Buddy::debugv("Sharding queue: wait for {$query['wait_for_id']} [{$waitFor['status']}]");
+				Buddy::debugvv("Sharding queue: wait for {$query['wait_for_id']} [{$waitFor['status']}]");
 				return true;
 			}
 		}
@@ -134,7 +134,7 @@ final class Queue {
 			$timeSinceLastAttempt = (int)(microtime(true) * 1000) - $query['created_at'];
 			$maxAttemptTime = (int)ceil(pow(1.21, $query['tries']) * 1000);
 			if ($timeSinceLastAttempt < $maxAttemptTime) {
-				Buddy::debugv(
+				Buddy::debugvv(
 					"Sharding queue: delay {$query['id']} with {$query['tries']} tries"
 						." due to {$timeSinceLastAttempt}ms < {$maxAttemptTime}ms"
 				);
@@ -153,12 +153,12 @@ final class Queue {
 	 */
 	protected function handleQuery(Node $node, array $query): bool {
 		$mt = microtime(true);
-		Buddy::debugv("[{$node->id}] Queue query: {$query['query']}");
+		Buddy::debugvv("[{$node->id}] Queue query: {$query['query']}");
 
 		$res = $this->executeQuery($query);
 		$status = empty($res['error']) ? 'processed' : 'error';
 
-		Buddy::debugv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
+		Buddy::debugvv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
 
 		$duration = (int)((microtime(true) - $mt) * 1000);
 		$this->attemptToUpdateStatus($query, $status, $duration);
@@ -201,7 +201,7 @@ final class Queue {
 			return true;
 		}
 
-		Buddy::debugv("Failed to update queue status for {$query['id']}");
+		Buddy::debugvv("Failed to update queue status for {$query['id']}");
 		return false;
 	}
 

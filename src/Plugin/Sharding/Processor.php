@@ -23,7 +23,7 @@ final class Processor extends BaseProcessor {
 	 * @return array<array{0:callable,1:int}>
 	 */
 	public function start(): array {
-		Buddy::debugv('Starting sharding processor');
+		Buddy::debugvv('Starting sharding processor');
 		return [[fn() => $this->execute('ping'), 1]];
 	}
 
@@ -32,7 +32,7 @@ final class Processor extends BaseProcessor {
 	 * @return void
 	 */
 	public function stop(): void {
-		Buddy::debugv('Stopping sharding processor');
+		Buddy::debugvv('Stopping sharding processor');
 		parent::stop();
 	}
 
@@ -45,8 +45,8 @@ final class Processor extends BaseProcessor {
 		$nodeId = $operator->node->id;
 		$hasSharding = $operator->hasSharding();
 		$sharded = $hasSharding ? 'yes' : 'no';
-		Buddy::debugv("Node ID: $nodeId");
-		Buddy::debugv("Sharded: $sharded");
+		Buddy::debugvv("Node ID: $nodeId");
+		Buddy::debugvv("Sharded: $sharded");
 
 		// Do nothing when sharding is disabled
 		if (!$operator->hasSharding()) {
@@ -68,7 +68,7 @@ final class Processor extends BaseProcessor {
 		// If this is not master
 		/** @var string */
 		$master = $operator->state->get('master');
-		Buddy::debugv("Master: $master");
+		Buddy::debugvv("Master: $master");
 		if ($master !== $nodeId) {
 			return false;
 		}
@@ -108,7 +108,7 @@ final class Processor extends BaseProcessor {
 		if ($this->getOperator()->hasSharding()) {
 			return $this->getOperator()->checkTableStatus($table);
 		}
-		Buddy::debugv("Sharding: no sharding detected while checking table status of {$table}");
+		Buddy::debugvv("Sharding: no sharding detected while checking table status of {$table}");
 		// In case nothing happened, keep running
 		return false;
 	}

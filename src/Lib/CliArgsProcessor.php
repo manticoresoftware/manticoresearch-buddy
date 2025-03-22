@@ -17,7 +17,7 @@ final class CliArgsProcessor {
 
 	private const LONG_OPTS  = [
 		'threads:', 'telemetry-period:', 'disable-telemetry',
-		'debug', 'debugv', 'version', 'help', 'listen:', 'bind:',
+		'debug', 'debugv', 'debugvv', 'version', 'help', 'listen:', 'bind:',
 		'skip:',
 	];
 	private const DEFAULT_OPTS = [
@@ -51,7 +51,8 @@ final class CliArgsProcessor {
 			. "--disable-telemetry    disables telemetry for Buddy\n"
 			. "--threads=[N]          start N threads on launch, default is 4\n"
 			. "--debug                enable debug mode for testing\n"
-			. "--debugv               enable verbose debug mode with periodic messages\n"
+			. "--debugv               enable verbosity on request and response logging also\n"
+			. "--debugvv              enable verbose debug mode with periodic messages\n"
 			. "Examples:\n"
 			. "$script --debug\n"
 			. "$script --disable-telemetry\n\n";
@@ -164,7 +165,7 @@ final class CliArgsProcessor {
 	}
 
 	/**
-	 * @param array{debug?:bool,debugv?:bool} $opts
+	 * @param array{debug?:bool,debugv?:bool,debugvv?:bool} $opts
 	 * @return void
 	 */
 	protected static function parseDebug(array $opts): void {
@@ -177,6 +178,12 @@ final class CliArgsProcessor {
 		}
 
 		putenv('DEBUG=2');
+
+		if (!isset($opts['debugvv'])) {
+			return;
+		}
+
+		putenv('DEBUG=3');
 	}
 
 	/**

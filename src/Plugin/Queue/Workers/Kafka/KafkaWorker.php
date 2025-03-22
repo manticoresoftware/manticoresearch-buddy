@@ -147,7 +147,7 @@ class KafkaWorker implements WorkerRunnerInterface
 	 */
 	public function run(): void {
 		$lastFullMessage = null;
-		Buddy::debugv('Worker: Start consuming');
+		Buddy::debugvv('Worker: Start consuming');
 		while ($this->consuming) {
 			$message = $this->consumer->consume(1000);
 			switch ($message->err) {
@@ -170,7 +170,7 @@ class KafkaWorker implements WorkerRunnerInterface
 					throw new \Exception($message->errstr(), $message->err);
 			}
 		}
-		Buddy::debugv('Worker: End consuming');
+		Buddy::debugvv('Worker: End consuming');
 	}
 
 	public function stop(): void {

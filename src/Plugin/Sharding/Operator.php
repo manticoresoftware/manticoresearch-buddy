@@ -266,7 +266,7 @@ final class Operator {
 		$stateKey = "table:{$table}";
 		/** @var array{}|array{queue_ids:array<int>,status:string,type:string} */
 		$result = $this->state->get($stateKey);
-		Buddy::debugv("Sharding: table status of {$table}: " . json_encode($result));
+		Buddy::debugvv("Sharding: table status of {$table}: " . json_encode($result));
 		if (!$result) {
 			return false;
 		}
@@ -281,7 +281,7 @@ final class Operator {
 
 			++$processed;
 		}
-		Buddy::debugv("Sharding: table status of {$table}: queue size: {$queueSize}, processed: {$processed}");
+		Buddy::debugvv("Sharding: table status of {$table}: queue size: {$queueSize}, processed: {$processed}");
 
 		$isProcessed = $processed === $queueSize;
 		// Update the state

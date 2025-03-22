@@ -11,7 +11,9 @@
 namespace Manticoresearch\Buddy\Base\Plugin\DistributedInsert;
 
 use Ds\Map;
+use Ds\Set;
 use Ds\Vector;
+use Manticoresearch\Buddy\Base\Plugin\Sharding\Table;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
@@ -44,7 +46,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$requests = [];
 			$positions = [];
 			$n = 0;
-			$clusterMap = $this->getTableClusterMap();
+			$clusterMap = $this->getTableClusterMap(array_keys($this->payload->batch));
 			foreach ($this->payload->batch as $table => $batch) {
 				$shardRows = $this->processBatch($batch, $n, $positions, $table, $clusterMap);
 				if (!$shardRows) {
@@ -460,20 +462,41 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 	/**
 	 * Fetch and cache cluster for the table
+	 * @param array<string> $tables
 	 * @return Map<string,string>
 	 */
-	protected function getTableClusterMap(): Map {
-		$q = "SHOW STATUS LIKE 'cluster_%_indexes'";
-		/** @var array{0:array{data:array<array{Counter:string,Value:string}>}} */
-		$result = $this->manticoreClient->sendRequest($q)->getResult();
-		/** @var Map<string,string> */
-		$map = new Map();
-		foreach ($result[0]['data'] as ['Counter' => $key, 'Value' => $value]) {
-			$cluster = substr($key, 8, -8);
-			$tables = explode(',', $value);
-			foreach ($tables as $table) {
-				$map[$table] = $cluster;
+	protected function getTableClusterMap(array $tables): Map {
+		$tablesStr = "'" . implode("','", $tables) . "'";
+		$query = "
+		SELECT node, table, shards
+		FROM system.sharding_table
+		WHERE table IN ({$tablesStr})
+		";
+
+		/** @var Map<string,Set<string>> */
+		$connections = new Map;
+		/** @var array{0:array{data:array<array{node:string, table:string, shards:string}>}} */
+		$res = $this->manticoreClient->sendRequest($query)->getResult();
+
+		// Process the results to create a map of shards to nodes
+		foreach ($res[0]['data'] as $row) {
+			$node = $row['node'];
+			$table = $row['table'];
+			$shardsList = explode(',', $row['shards']);
+
+			foreach ($shardsList as $shard) {
+				$shard = (int)trim($shard);
+				$shardName = Table::getTableShardName($table, $shard);
+				if (!isset($connections[$shardName])) {
+					$connections[$shardName] = new Set();
+				}
+				$connections[$shardName]?->add($node);
 			}
+		}
+		/** @var Map<string,string> */
+		$map = new Map;
+		foreach ($connections as $shard => $nodes) {
+			$map[$shard] = Table::getClusterName($nodes);
 		}
 
 		return $map;
