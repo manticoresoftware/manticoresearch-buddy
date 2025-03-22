@@ -77,7 +77,7 @@ final class State {
 		$res = $this->client->sendRequest($query);
 		if ($res->hasError()) {
 			$error = $res->getError();
-			Buddy::debugv("Sharding: Error while setting state key '{$key}': {$error}");
+			Buddy::debugvv("Sharding: Error while setting state key '{$key}': {$error}");
 		}
 
 		return $this;

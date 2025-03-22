@@ -85,7 +85,7 @@ class QueueProcess extends BaseProcessor {
 			}
 
 			if (!empty($resultStruct['data'][0]['suspended'])) {
-				Buddy::debugv("Worker {$instance['full_name']} is suspended. Skip running");
+				Buddy::debugvv("Worker {$instance['full_name']} is suspended. Skip running");
 				continue;
 			}
 
@@ -111,7 +111,7 @@ class QueueProcess extends BaseProcessor {
 	 */
 	public function runWorker(array $instance, bool $shouldStart = true): void {
 
-		Buddy::debugv('Start worker ' . $instance['full_name']);
+		Buddy::debugvv('Start worker ' . $instance['full_name']);
 		$kafkaWorker = new KafkaWorker($this->client, $instance);
 		$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
 		// Add worker to the pool and automatically start it
@@ -131,7 +131,7 @@ class QueueProcess extends BaseProcessor {
 			$worker = $this->process->getWorker($id);
 			$this->process->removeWorker($worker);
 		} catch (Throwable $exception) {
-			Buddy::debugv($exception->getMessage());
+			Buddy::debugvv($exception->getMessage());
 		} finally {
 			return true;
 		}

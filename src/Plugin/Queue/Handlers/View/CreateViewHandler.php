@@ -213,8 +213,8 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 				$query = (new PHPSQLCreator())->create($parsedQuery);
 			} catch (\Exception $exception) {
 				$message = "Can\'t compile SELECT query from ".json_encode($parsedQuery);
-				Buddy::debugv($message);
-				Buddy::debugv($exception->getMessage());
+				Buddy::debugvv($message);
+				Buddy::debugvv($exception->getMessage());
 				GenericError::throw($message);
 			}
 
