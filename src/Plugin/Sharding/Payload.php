@@ -126,6 +126,9 @@ final class Payload extends BasePayload {
 			// Clean up extra from extracted options
 			$matches['extra'] = trim(preg_replace($pattern, '', $matches['extra']) ?? '');
 		}
+		if (isset($options['shards']) && $options['shards'] > 3000) {
+			QueryParseError::throw('Shard count cannot be greater than 3000');
+		}
 
 		$self = new static();
 		// We just need to do something, but actually its' just for PHPstan
