@@ -63,15 +63,9 @@ final class Cluster {
 	 * @return int Last insert id into the queue or 0
 	 */
 	public function create(?Queue $queue = null): int {
-		$nodes = $this->getNodes();
-		// Empty nodes mean that there is no such cluster
-		if (!$nodes->isEmpty()) {
-			throw new RuntimeException('Trying to create cluster that already exists');
-		}
-
 		// TODO: the pass is the subject to remove
 		$galeraOptions = static::GALERA_OPTIONS;
-		$query = "CREATE CLUSTER {$this->name} '{$this->name}' as path, '{$galeraOptions}' as options";
+		$query = "CREATE CLUSTER IF NOT EXISTS {$this->name} '{$this->name}' as path, '{$galeraOptions}' as options";
 		return $this->runQuery($queue, $query);
 	}
 
@@ -108,7 +102,7 @@ final class Cluster {
 		if ($queue) {
 			$queueId = $queue->add($this->nodeId, $query);
 		} else {
-			$this->client->sendRequest($query);
+			$this->client->sendRequest($query, disableAgentHeader: true);
 		}
 
 		return $queueId ?? 0;
