@@ -173,11 +173,9 @@ final class CliArgsProcessor {
 			putenv('DEBUG=1');
 		}
 
-		if (!isset($opts['debugv'])) {
-			return;
+		if (isset($opts['debugv'])) {
+			putenv('DEBUG=2');
 		}
-
-		putenv('DEBUG=2');
 
 		if (!isset($opts['debugvv'])) {
 			return;
