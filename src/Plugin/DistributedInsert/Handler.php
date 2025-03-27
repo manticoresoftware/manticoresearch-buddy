@@ -470,7 +470,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$query = "
 		SELECT node, table, shards
 		FROM system.sharding_table
-		WHERE table IN ({$tablesStr})
+		WHERE cluster != '' AND table IN ({$tablesStr})
 		";
 
 		/** @var Map<string,Set<string>> */
