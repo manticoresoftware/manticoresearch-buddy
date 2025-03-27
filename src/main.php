@@ -143,7 +143,6 @@ $server->beforeStart(
 if (is_telemetry_enabled()) {
 	$server->addTicker(
 		static function () {
-			Buddy::debugv('running metric snapshot');
 			MetricThread::instance()->execute(
 				'checkAndSnapshot',
 				[(int)(getenv('TELEMETRY_PERIOD', true) ?: 300)]

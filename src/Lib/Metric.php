@@ -88,7 +88,7 @@ final class Metric {
 		}
 
 		$enabled = is_telemetry_enabled();
-		Buddy::debugv(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
+		Buddy::debugvv(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
 
 		// Add collector parameter, so it makes easier
 		// to understand where metric came from in case we will collect it
@@ -193,6 +193,7 @@ final class Metric {
 			return;
 		}
 
+		Buddy::debugv('running metric snapshot');
 		$ts = time();
 		try {
 			$this->snapshot();
@@ -271,22 +272,22 @@ final class Metric {
 		);
 
 		// Display labels we will send
-		Buddy::debugv(sprintf('labels: %s', json_encode($this->telemetry->getLabels())));
+		Buddy::debugvv(sprintf('labels: %s', json_encode($this->telemetry->getLabels())));
 
 		// 3. Get snapshot of tables metrics
 		$metrics = array_merge($metrics, $this->getTablesMetrics());
-		Buddy::debugv(sprintf('metrics: %s', json_encode($metrics)));
+		Buddy::debugvv(sprintf('metrics: %s', json_encode($metrics)));
 
 		// 4. Get Rate Metrics
 		$rateMetrics = $this->getRateMetrics($metrics);
 		$metrics = array_merge($metrics, $rateMetrics);
-		Buddy::debugv(sprintf('rates: %s', json_encode($rateMetrics)));
+		Buddy::debugvv(sprintf('rates: %s', json_encode($rateMetrics)));
 
 		// 5. Collect volume metrics if enabled
 		if ($this->collectVolumeMetrics && $this->hasVolumeMetrics()) {
 			$volumeMetrics = $this->getVolumeMetrics();
 			$metrics = array_merge($metrics, $volumeMetrics);
-			Buddy::debugv(sprintf('volume: %s', json_encode($volumeMetrics)));
+			Buddy::debugvv(sprintf('volume: %s', json_encode($volumeMetrics)));
 		}
 
 		// 6. Add all metrics to the batch

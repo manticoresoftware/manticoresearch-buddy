@@ -121,7 +121,7 @@ final class MetricThread {
 	 * @return static
 	 */
 	public function execute(string $method, array $args = []): static {
-		Buddy::debugv("metric: $method " . json_encode($args));
+		Buddy::debugvv("metric: $method " . json_encode($args));
 		$packet = ProcessReader::packMessage([$method, $args]);
 		$this->process->write($packet);
 		return $this;
