@@ -496,6 +496,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		/** @var Map<string,string> */
 		$map = new Map;
 		foreach ($connections as $shard => $nodes) {
+			// Skip single node shards cuz no need cluster for them
+			if (sizeof($nodes) <= 1) {
+				continue;
+			}
+
 			$map[$shard] = Table::getClusterName($nodes);
 		}
 
