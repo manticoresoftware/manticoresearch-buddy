@@ -179,7 +179,7 @@ final class Payload extends BasePayload {
 				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
-				'/ option/ius',
+				'/\soption/ius',
 				'/\s*,\s*facet\s+/ius',
 				],
 			[
