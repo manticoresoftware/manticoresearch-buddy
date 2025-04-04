@@ -107,19 +107,13 @@ final class Payload extends BasePayload {
 		/** @var array{table:string,cluster?:string,structure:string,extra:string} $matches */
 		$options = [];
 		if ($matches['extra']) {
-			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*(?P<value>\'?\d+\'?)/ius';
+			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*\'(?P<value>[^\']*)\'/ius';
 
 			$keys = [];
 			if (preg_match_all($pattern, $matches['extra'], $optionMatches, PREG_SET_ORDER)) {
 				foreach ($optionMatches as $optionMatch) {
 					$key = strtolower($optionMatch['key']);
-					if (isset($keys[$key])) {
-						QueryParseError::throw("Duplicate parameter '{$key}' found");
-					}
-					$keys[$key] = true;
-
-					$value = (int)$optionMatch['value'];
-					$options[$key] = $value;
+					$options[$key] = static::validateOptionValue($key, $optionMatch['value']);
 				}
 			}
 
@@ -141,6 +135,26 @@ final class Payload extends BasePayload {
 		$self->extra = $matches['extra'];
 		$self->validate();
 		return $self;
+	}
+
+	/**
+	 * @param string $key
+	 * @param string $value
+	 * @return int
+	 */
+	protected static function validateOptionValue(string $key, string $value): int {
+		if (isset($keys[$key])) {
+			QueryParseError::throw("Duplicate parameter '{$key}' found");
+		}
+		$keys[$key] = true;
+		if (trim($value, '0123456789') !== '') {
+			QueryParseError::throw("Parameter '{$key}' requires to have a numeric value");
+		}
+		if (empty($value)) {
+			QueryParseError::throw("Parameter '{$key}' requires to have a value");
+		}
+
+		return (int)$value;
 	}
 
 	/**
@@ -185,11 +199,12 @@ final class Payload extends BasePayload {
 		// Create and Drop
 		return (stripos($request->error, 'syntax error')
 			|| stripos($request->error, 'contains system table')
+			|| stripos($request->error, 'require Buddy')
 		)
 			&& (
 				(stripos($request->payload, 'create table') === 0
 					&& stripos($request->payload, 'shards') !== false
-					&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/ius', $request->payload)
+					&& preg_match('/(?P<key>rf|shards)\s*=\s*\'(?P<value>[^\']*)\'/ius', $request->payload)
 				) || stripos($request->payload, 'drop') === 0
 			);
 	}
