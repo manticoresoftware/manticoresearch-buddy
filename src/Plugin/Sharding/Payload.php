@@ -200,7 +200,8 @@ final class Payload extends BasePayload {
 
 		// Create and Drop
 		return (stripos($request->error, 'contains system table')
-			|| stripos($request->error, 'require Buddy')
+			|| stripos($request->error, 'require Buddy') ||
+			(stripos($request->error, 'syntax error') && stripos($request->error, 'near \':'))
 		)
 			&& (
 				(stripos($request->payload, 'create table') === 0
