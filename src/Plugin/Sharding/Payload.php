@@ -145,7 +145,7 @@ final class Payload extends BasePayload {
 					QueryParseError::throw("Duplicate parameter '{$key}' found");
 				}
 				$keys[$key] = true;
-				if (trim($value, '0123456789') !== '') {
+				if (trim($optionMatch['value'], '0123456789') !== '') {
 					QueryParseError::throw("Parameter '{$key}' requires to have a numeric value");
 				}
 				if (empty($value)) {
@@ -197,9 +197,9 @@ final class Payload extends BasePayload {
 		if ($request->command === 'show' && strpos($request->error, 'error in your query') !== false) {
 			return true;
 		}
+
 		// Create and Drop
-		return (stripos($request->error, 'syntax error')
-			|| stripos($request->error, 'contains system table')
+		return (stripos($request->error, 'contains system table')
 			|| stripos($request->error, 'require Buddy')
 		)
 			&& (
