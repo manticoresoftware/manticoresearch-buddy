@@ -108,15 +108,7 @@ final class Payload extends BasePayload {
 		$options = [];
 		if ($matches['extra']) {
 			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*\'(?P<value>[^\']*)\'/ius';
-
-			$keys = [];
-			if (preg_match_all($pattern, $matches['extra'], $optionMatches, PREG_SET_ORDER)) {
-				foreach ($optionMatches as $optionMatch) {
-					$key = strtolower($optionMatch['key']);
-					$options[$key] = static::validateOptionValue($key, $optionMatch['value']);
-				}
-			}
-
+			$options = static::validateOptions($pattern, $matches['extra']);
 			// Clean up extra from extracted options
 			$matches['extra'] = trim(preg_replace($pattern, '', $matches['extra']) ?? '');
 		}
@@ -138,23 +130,32 @@ final class Payload extends BasePayload {
 	}
 
 	/**
-	 * @param string $key
+	 * @param string $pattern
 	 * @param string $value
-	 * @return int
+	 * @return array<string,int|string>
 	 */
-	protected static function validateOptionValue(string $key, string $value): int {
-		if (isset($keys[$key])) {
-			QueryParseError::throw("Duplicate parameter '{$key}' found");
-		}
-		$keys[$key] = true;
-		if (trim($value, '0123456789') !== '') {
-			QueryParseError::throw("Parameter '{$key}' requires to have a numeric value");
-		}
-		if (empty($value)) {
-			QueryParseError::throw("Parameter '{$key}' requires to have a value");
-		}
+	protected static function validateOptions(string $pattern, string $value): array {
+		$keys = [];
+		$options = [];
+		if (preg_match_all($pattern, $value, $optionMatches, PREG_SET_ORDER)) {
+			foreach ($optionMatches as $optionMatch) {
+				$key = strtolower($optionMatch['key']);
 
-		return (int)$value;
+				if (isset($keys[$key])) {
+					QueryParseError::throw("Duplicate parameter '{$key}' found");
+				}
+				$keys[$key] = true;
+				if (trim($value, '0123456789') !== '') {
+					QueryParseError::throw("Parameter '{$key}' requires to have a numeric value");
+				}
+				if (empty($value)) {
+					QueryParseError::throw("Parameter '{$key}' requires to have a value");
+				}
+
+				$options[$key] = (int)$optionMatch['value'];
+			}
+		}
+		return $options;
 	}
 
 	/**
