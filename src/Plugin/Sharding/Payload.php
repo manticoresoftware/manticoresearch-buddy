@@ -107,22 +107,8 @@ final class Payload extends BasePayload {
 		/** @var array{table:string,cluster?:string,structure:string,extra:string} $matches */
 		$options = [];
 		if ($matches['extra']) {
-			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*(?P<value>\'?\d+\'?)/ius';
-
-			$keys = [];
-			if (preg_match_all($pattern, $matches['extra'], $optionMatches, PREG_SET_ORDER)) {
-				foreach ($optionMatches as $optionMatch) {
-					$key = strtolower($optionMatch['key']);
-					if (isset($keys[$key])) {
-						QueryParseError::throw("Duplicate parameter '{$key}' found");
-					}
-					$keys[$key] = true;
-
-					$value = (int)$optionMatch['value'];
-					$options[$key] = $value;
-				}
-			}
-
+			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*\'(?P<value>[^\']*)\'/ius';
+			$options = static::validateOptions($pattern, $matches['extra']);
 			// Clean up extra from extracted options
 			$matches['extra'] = trim(preg_replace($pattern, '', $matches['extra']) ?? '');
 		}
@@ -141,6 +127,35 @@ final class Payload extends BasePayload {
 		$self->extra = $matches['extra'];
 		$self->validate();
 		return $self;
+	}
+
+	/**
+	 * @param string $pattern
+	 * @param string $value
+	 * @return array<string,int|string>
+	 */
+	protected static function validateOptions(string $pattern, string $value): array {
+		$keys = [];
+		$options = [];
+		if (preg_match_all($pattern, $value, $optionMatches, PREG_SET_ORDER)) {
+			foreach ($optionMatches as $optionMatch) {
+				$key = strtolower($optionMatch['key']);
+
+				if (isset($keys[$key])) {
+					QueryParseError::throw("Duplicate parameter '{$key}' found");
+				}
+				$keys[$key] = true;
+				if (trim($optionMatch['value'], '0123456789') !== '') {
+					QueryParseError::throw("Parameter '{$key}' requires to have a numeric value");
+				}
+				if (empty($value)) {
+					QueryParseError::throw("Parameter '{$key}' requires to have a value");
+				}
+
+				$options[$key] = (int)$optionMatch['value'];
+			}
+		}
+		return $options;
 	}
 
 	/**
@@ -182,14 +197,16 @@ final class Payload extends BasePayload {
 		if ($request->command === 'show' && strpos($request->error, 'error in your query') !== false) {
 			return true;
 		}
+
 		// Create and Drop
-		return (stripos($request->error, 'syntax error')
-			|| stripos($request->error, 'contains system table')
+		return (stripos($request->error, 'contains system table')
+			|| stripos($request->error, 'require Buddy') ||
+			(stripos($request->error, 'syntax error') && stripos($request->error, 'near \':'))
 		)
 			&& (
 				(stripos($request->payload, 'create table') === 0
 					&& stripos($request->payload, 'shards') !== false
-					&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/ius', $request->payload)
+					&& preg_match('/(?P<key>rf|shards)\s*=\s*\'(?P<value>[^\']*)\'/ius', $request->payload)
 				) || stripos($request->payload, 'drop') === 0
 			);
 	}
