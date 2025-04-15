@@ -154,7 +154,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 					'broker' => $options->brokerList,
 					'topic' => $options->topicList,
 					'group' => $options->consumerGroup ?? 'manticore',
-					'partitions' => $options->partitionList,
+					'partitions' => $options->partitionList ?? [],
 					'batch' => $options->batch ?? '100',
 				]
 			);
