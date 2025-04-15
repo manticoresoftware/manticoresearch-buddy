@@ -47,7 +47,7 @@ class AddTemplateHandler extends BaseHandlerWithClient {
 				throw new \Exception('Cannot parse request');
 			}
 			$patterns = json_encode($request['index_patterns']);
-			foreach (['index_patterns', 'settings', 'mappings'] as $removeProp) {
+			foreach (['index_patterns'] as $removeProp) {
 				if (!isset($request[$removeProp])) {
 					continue;
 				}

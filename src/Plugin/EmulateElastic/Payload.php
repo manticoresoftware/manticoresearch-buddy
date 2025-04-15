@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Prepares payload for Elastic-like queries and determines the appropriate handler for them
@@ -25,7 +26,7 @@ final class Payload extends BasePayload {
 
 	// Endpoint position in Kibana request path
 	const KIBANA_ENDPOINT_PATH_POS = [
-		0 => ['_aliases', '_alias', '_cat', '_field_caps', '_template'],
+		0 => ['_aliases', '_alias', '_cat', '_field_caps', '_template', '_index_template'],
 		1 => ['_create', '_doc', '_update', '_field_caps'],
 	];
 
@@ -72,6 +73,7 @@ final class Payload extends BasePayload {
 		$pathParts = explode('/', ltrim($request->path, '/'));
 		$self->path = $request->path;
 		self::detectRequestTarget($pathParts, $self);
+		Buddy::debug(static::$requestTarget);
 		switch (static::$requestTarget) {
 			case '_cat':
 			case '_count':
@@ -107,6 +109,17 @@ final class Payload extends BasePayload {
 				$self->table = static::$requestTarget;
 				$self->body = $request->payload;
 				break;
+			case '_index_template':
+			case '_template':
+				if ($request->httpMethod !== 'PUT') {
+					// Need this to avoid sending the 404 response for Elasticdump's requests which causes its failure
+					$customError = InvalidNetworkRequestError::create('', true);
+					$customError->setResponseErrorCode(200);
+					throw $customError;
+				}
+				$self->table = end($pathParts);
+				$self->body = $request->payload;
+				break;
 			case '_mapping':
 				/**
 				 * @var array{
@@ -125,17 +138,7 @@ final class Payload extends BasePayload {
 				$self->table = $pathParts[0];
 				$self->body = $request->payload;
 				break;
-			case '_template':
-				$self->table = end($pathParts);
-				$self->body = $request->payload;
-				break;
 			default:
-				if ($pathParts[0] === '_index_template') {
-					// Need this to avoid sending the 404 response for Elasticdump's requests which causes its failure
-					$customError = InvalidNetworkRequestError::create('', true);
-					$customError->setResponseErrorCode(200);
-					throw $customError;
-				}
 				throw new Exception("Unsupported request type in {$request->path}: " . static::$requestTarget);
 		}
 

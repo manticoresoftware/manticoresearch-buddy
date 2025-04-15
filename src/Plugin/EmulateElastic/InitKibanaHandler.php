@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
 
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -65,6 +66,11 @@ class InitKibanaHandler extends BaseEntityHandler {
 					],
 					'status' => 404,
 				];
+				$customError = GenericError::create('', false);
+				$customError->setResponseErrorBody($resp);
+				$customError->setResponseErrorCode(404);
+
+				throw $customError;
 			} else {
 				$resp = [];
 				foreach ($queryResult[0]['data'] as $entity) {
