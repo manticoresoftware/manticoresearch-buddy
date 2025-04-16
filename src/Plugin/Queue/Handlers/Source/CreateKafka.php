@@ -131,6 +131,13 @@ final class CreateKafka extends BaseCreateSourceHandler {
 
 		$options = self::parseOptions($payload);
 
+		if (!empty($options->partitionList) && $options->numConsumers > 1) {
+			throw ManticoreSearchClientError::create(
+				"You can't create multiple consumers when specifying a partition. ".
+				'In this case, num_consumers must be set to 1.'
+			);
+		}
+
 		$sql = /** @lang ManticoreSearch */
 			'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
 			" WHERE match('@name \"" . $options->name . "\"')";
@@ -147,6 +154,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 					'broker' => $options->brokerList,
 					'topic' => $options->topicList,
 					'group' => $options->consumerGroup ?? 'manticore',
+					'partitions' => $options->partitionList ?? [],
 					'batch' => $options->batch ?? '100',
 				]
 			);
@@ -341,10 +349,32 @@ final class CreateKafka extends BaseCreateSourceHandler {
 				$result->numConsumers = (int)SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr']),
 				'batch' =>
 				$result->batch = (int)SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr']),
+				'partition_list' =>
+				$result->partitionList = self::parsePartitions($option['sub_tree'][2]['base_expr']),
 				default => ''
 			};
 		}
 		return $result;
+	}
+
+	/**
+	 * @param string $option
+	 *
+	 * @return array<int>
+	 * @throws GenericError
+	 */
+	private static function parsePartitions(string $option): array {
+
+		$partitions = explode(',', SqlQueryParser::removeQuotes($option));
+		$partitions = array_map('intval', $partitions);
+		foreach ($partitions as $partition) {
+			if (is_int($partition) && $partition >= 0) {
+				continue;
+			}
+
+			GenericError::throw("Invalid partition value: $partition");
+		}
+		return $partitions;
 	}
 
 	/**
