@@ -79,6 +79,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-autocomplete',
 	'manticoresoftware/buddy-plugin-cli-table',
 	'manticoresoftware/buddy-plugin-distributed-insert',
+	'manticoresoftware/buddy-plugin-truncate',
 ];
 // Filtering out the plugins that we don't need
 $plugins = array_filter(
