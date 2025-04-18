@@ -16,7 +16,6 @@ use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Prepares payload for Elastic-like queries and determines the appropriate handler for them
@@ -123,12 +122,12 @@ final class Payload extends BasePayload {
 				break;
 			default:
 				if (!in_array(
+					static::$requestTarget,
 					[
 						'_cat', '_count', '_license', '_nodes', '_xpack', '.kibana', '.kibana_task_manager',
 						'_update_by_query', 'metric', 'config', 'space', 'index-pattern', 'settings', 'telemetry',
 						'stats',
-					],
-					static::$requestTarget
+					]
 				)) {
 					throw new Exception("Unsupported request type in {$request->path}: " . static::$requestTarget);
 				}
