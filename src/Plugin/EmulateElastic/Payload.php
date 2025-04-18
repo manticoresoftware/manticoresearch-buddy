@@ -74,22 +74,6 @@ final class Payload extends BasePayload {
 		$self->path = $request->path;
 		self::detectRequestTarget($pathParts, $self);
 		switch (static::$requestTarget) {
-			case '_cat':
-			case '_count':
-			case '_license':
-			case '_nodes':
-			case '_xpack':
-			case '.kibana':
-			case '.kibana_task_manager':
-			case '_update_by_query':
-			case 'metric':
-			case 'config':
-			case 'space':
-			case 'index-pattern':
-			case 'settings':
-			case 'telemetry':
-			case 'stats':
-				break;
 			case '_doc':
 				static::$requestTarget .= '_' . strtolower($request->httpMethod);
 				$self->body = $request->payload;
