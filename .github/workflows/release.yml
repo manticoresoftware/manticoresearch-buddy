@@ -229,6 +229,7 @@ jobs:
           prerelease: false
 
   deploy:
+    name: ${{ matrix.distro }} ${{ matrix.arch }}
     needs:
       - vars
       - build-artifact
