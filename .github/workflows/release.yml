@@ -40,6 +40,9 @@ jobs:
     steps:
       - id: semver-tagger
         uses: manticoresoftware/semver-tagger-action@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          ignore_patterns: '\.md$|^test/|\.github|\.yml|\.gitignore$'
   vars:
     if: needs.update-version.outputs.version != ''
     needs: update-version
