@@ -73,7 +73,6 @@ final class Payload extends BasePayload {
 		$pathParts = explode('/', ltrim($request->path, '/'));
 		$self->path = $request->path;
 		self::detectRequestTarget($pathParts, $self);
-		Buddy::debug(static::$requestTarget);
 		switch (static::$requestTarget) {
 			case '_cat':
 			case '_count':
@@ -139,7 +138,16 @@ final class Payload extends BasePayload {
 				$self->body = $request->payload;
 				break;
 			default:
-				throw new Exception("Unsupported request type in {$request->path}: " . static::$requestTarget);
+				if (!in_array(
+					[
+						'_cat', '_count', '_license', '_nodes', '_xpack', '.kibana', '.kibana_task_manager',
+						'_update_by_query', 'metric', 'config', 'space', 'index-pattern', 'settings', 'telemetry',
+						'stats',
+					],
+					static::$requestTarget
+				)) {
+					throw new Exception("Unsupported request type in {$request->path}: " . static::$requestTarget);
+				}
 		}
 
 		return $self;

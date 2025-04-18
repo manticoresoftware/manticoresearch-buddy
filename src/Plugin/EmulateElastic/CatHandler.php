@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
 
-use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;

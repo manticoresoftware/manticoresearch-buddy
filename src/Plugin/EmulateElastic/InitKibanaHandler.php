@@ -71,15 +71,15 @@ class InitKibanaHandler extends BaseEntityHandler {
 				$customError->setResponseErrorCode(404);
 
 				throw $customError;
-			} else {
-				$resp = [];
-				foreach ($queryResult[0]['data'] as $entity) {
-					$resp[$entity['_index']] = [
-						'aliases' => [
-							$alias => [],
-						],
-					] + simdjson_decode($entity['_source'], true);
-				}
+			}
+
+			$resp = [];
+			foreach ($queryResult[0]['data'] as $entity) {
+				$resp[$entity['_index']] = [
+					'aliases' => [
+						$alias => [],
+					],
+				] + simdjson_decode($entity['_source'], true);
 			}
 
 			return TaskResult::raw($resp);

@@ -47,12 +47,10 @@ class AddTemplateHandler extends BaseHandlerWithClient {
 				throw new \Exception('Cannot parse request');
 			}
 			$patterns = json_encode($request['index_patterns']);
-			foreach (['index_patterns'] as $removeProp) {
-				if (!isset($request[$removeProp])) {
-					continue;
-				}
-				unset($request[$removeProp]);
+			if (!isset($request['index_patterns'])) {
+				continue;
 			}
+			unset($request['index_patterns']);
 			$content = json_encode($request);
 			$templateTable = self::TEMPLATE_TABLE;
 
