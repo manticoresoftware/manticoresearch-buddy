@@ -110,12 +110,15 @@ class QueueProcess extends BaseProcessor {
 	 * @throws \Exception
 	 */
 	public function runWorker(array $instance, bool $shouldStart = true): void {
-
 		Buddy::debugvv('Start worker ' . $instance['full_name']);
-		$kafkaWorker = new KafkaWorker($this->client, $instance);
-		$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
-		// Add worker to the pool and automatically start it
-		$this->process->addWorker($worker, $shouldStart);
+		try {
+			$kafkaWorker = new KafkaWorker($this->client, $instance);
+			$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
+			// Add worker to the pool and automatically start it
+			$this->process->addWorker($worker, $shouldStart);
+		} catch (\Exception $exception) {
+			Buddy::error($exception);
+		}
 
 		// When we need to use this method from the Handler
 		// we simply get processor and execute method with parameters
