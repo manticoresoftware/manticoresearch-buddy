@@ -160,7 +160,7 @@ class QueryProcessor {
 
 	/**
 	 * Get core plugins and exclude local one that does not start with our prefix
-	 * @return array<array{full:string,short:string,version:string}>
+	 * @return array<array{full:string,short:string,version:string,version?:int}>
 	 */
 	public static function getCorePlugins(): array {
 		return static::$pluggable->getCorePlugins();
@@ -168,7 +168,7 @@ class QueryProcessor {
 
 	/**
 	 * Get local plugins by getting diff
-	 * @return array<array{full:string,short:string,version:string}>
+	 * @return array<array{full:string,short:string,version:string,version?:int}>
 	 */
 	public static function getLocalPlugins(): array {
 		return static::$pluggable->getLocalPlugins();
@@ -176,7 +176,7 @@ class QueryProcessor {
 
 	/**
 	 * Get list of external plugins that was installed by using CREATE PLUGIN instruction
-	 * @return array<array{full:string,short:string,version:string}>
+	 * @return array<array{full:string,short:string,version:string,version?:int}>
 	 */
 	public static function getExtraPlugins(): array {
 		return static::$pluggable->getExtraPlugins();
