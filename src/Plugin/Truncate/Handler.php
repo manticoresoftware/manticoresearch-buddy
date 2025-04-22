@@ -48,7 +48,7 @@ final class Handler extends BaseHandlerWithClient
 				$requests[] = [
 					'url' => $shard['url'],
 					'path' => 'sql?mode=raw',
-					'request' => "DELETE FROM {$shard['name']} WHERE id > 0",
+					'request' => "TRUNCATE TABLE {$shard['name']}",
 				];
 			}
 
