@@ -23,8 +23,7 @@ use RdKafka\Exception;
 use RdKafka\KafkaConsumer;
 use RdKafka\TopicPartition;
 
-class KafkaWorker implements WorkerRunnerInterface
-{
+class KafkaWorker implements WorkerRunnerInterface {
 	use StringFunctionsTrait;
 
 	private Client $client;
