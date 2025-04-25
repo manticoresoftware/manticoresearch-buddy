@@ -438,6 +438,10 @@ final class Table {
 
 			/** @var Set<int> */
 			$queueIds = new Set;
+			foreach ($clusterMap as $cluster) {
+				$cluster->processPendingTables($queue);
+			}
+
 			foreach ($newSchema as $row) {
 				$sql = "DROP TABLE {$this->name} OPTION force=1";
 				$queueId = $queue->add($row['node'], $sql);
