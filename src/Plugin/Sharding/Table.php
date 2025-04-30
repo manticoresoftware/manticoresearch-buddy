@@ -448,6 +448,9 @@ final class Table {
 				$cluster->processPendingTables($queue);
 			}
 
+			// At this case we update schema
+			// before creating distributed table
+			$this->updateScheme($newSchema);
 			foreach ($newSchema as $row) {
 				// We should drop distributed table everywhere
 				// even when node has ONLY it but may have no shards on it
@@ -459,8 +462,6 @@ final class Table {
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);
 			}
-
-			$this->updateScheme($newSchema);
 		} catch (\Throwable $t) {
 			var_dump($t->getMessage());
 		}
