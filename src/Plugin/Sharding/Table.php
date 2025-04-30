@@ -361,9 +361,7 @@ final class Table {
 				return;
 			}
 			$activeNodes = $allNodes->diff($inactiveNodes);
-			var_dump('before', json_encode($schema));
 			$newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
-			var_dump('after', json_encode($schema));
 
 			// Detect shard to nodes map with alive schema
 			$shardNodesMap = $this->getShardNodesMap(
