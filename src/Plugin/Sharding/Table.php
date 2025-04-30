@@ -393,7 +393,7 @@ final class Table {
 				// First thing first, remove from inactive node using the queue
 				$this->cleanUpNode($queue, $row['node'], $row['shards'], $processedTables);
 
-				// Do real rebaliance now
+				// Do real rebalancing now
 				foreach ($row['shards'] as $shard) {
 					/** @var Set<string> */
 					$nodesForShard = new Set;
@@ -455,10 +455,6 @@ final class Table {
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);
 
-				// Do nothing when no shards present for this node
-				if (!$row['shards']->count()) {
-					continue;
-				}
 				$sql = $this->getCreateShardedTableSQL($row['shards']);
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);
