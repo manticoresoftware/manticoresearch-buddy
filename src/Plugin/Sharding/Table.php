@@ -113,14 +113,19 @@ final class Table {
 	 * @return Vector<array{node:string,shards:Set<int>}>
 	 */
 	public function getExternalNodeShards(Set $shards): Vector {
+		// There is a case when we have ONLY distributed table with shards
+		// but all shards are remote agents and nothing locally
+		$shardsCond = $shards->count() > 0
+			? "AND ANY(shards) not in ({$shards->join(',')})"
+			: '';
+
 		$query = "
 		SELECT node, shards FROM {$this->table}
 		WHERE
 		cluster = '{$this->cluster->name}'
 		AND
 		table = '{$this->name}'
-		AND
-		ANY(shards) not in ({$shards->join(',')})
+		$shardsCond
 		ORDER BY id ASC
 		";
 
@@ -192,7 +197,7 @@ final class Table {
 		$nodes = new Set;
 
 		$schema = $this->configureNodeShards($shardCount, $replicationFactor);
-		$reduceFn = function (Map $clusterMap, array $row) use ($queue, $replicationFactor, &$nodes, &$nodeShardsMap) {
+		$reduceFn = function (Map $clusterMap, array $row) use ($queue, &$nodes, &$nodeShardsMap) {
 			/** @var Map<string,Cluster> $clusterMap */
 			$nodes->add($row['node']);
 			$nodeShardsMap[$row['node']] = $row['shards'];
@@ -200,19 +205,13 @@ final class Table {
 			foreach ($row['shards'] as $shard) {
 				$connectedNodes = $this->getConnectedNodes(new Set([$shard]));
 
-				if ($replicationFactor > 1) {
-					$clusterMap = $this->handleReplication(
-						$row['node'],
-						$queue,
-						$connectedNodes,
-						$clusterMap,
-						$shard
-					);
-				} else {
-					// If no replication, add create table shard SQL to queue
-					$sql = $this->getCreateTableShardSQL($shard);
-					$queue->add($row['node'], $sql);
-				}
+				$clusterMap = $this->handleReplication(
+					$row['node'],
+					$queue,
+					$connectedNodes,
+					$clusterMap,
+					$shard
+				);
 			}
 
 			return $clusterMap;
@@ -227,10 +226,7 @@ final class Table {
 		/** @var Set<int> */
 		$queueIds = new Set;
 		foreach ($nodeShardsMap as $node => $shards) {
-			// Do nothing when no shards present for this node
-			if (!$shards->count()) {
-				continue;
-			}
+			// Even when no shards, we still create distributed table
 			$sql = $this->getCreateShardedTableSQL($shards);
 			$queueId = $queue->add($node, $sql);
 			$queueIds->add($queueId);
@@ -311,6 +307,13 @@ final class Table {
 		Map $clusterMap,
 		int $shard
 	): Map {
+		// If no replication, add create table shard SQL to queue
+		if ($connectedNodes->count() === 1) {
+			$sql = $this->getCreateTableShardSQL($shard);
+			$queue->add($node, $sql);
+			return $clusterMap;
+		}
+
 		$clusterName = static::getClusterName($connectedNodes);
 		$hasCluster = isset($clusterMap[$clusterName]);
 		if ($hasCluster) {
@@ -376,6 +379,7 @@ final class Table {
 				$clusterMap[$clusterName] = $cluster;
 			}
 
+			// Get affected schema with nodes that are out
 			$affectedSchema = $schema->filter(
 				fn ($row) => $inactiveNodes->contains($row['node'])
 			);
@@ -387,7 +391,7 @@ final class Table {
 				// First thing first, remove from inactive node using the queue
 				$this->cleanUpNode($queue, $row['node'], $row['shards'], $processedTables);
 
-				// Do real rebaliance now
+				// Do real rebalancing now
 				foreach ($row['shards'] as $shard) {
 					/** @var Set<string> */
 					$nodesForShard = new Set;
@@ -438,20 +442,24 @@ final class Table {
 
 			/** @var Set<int> */
 			$queueIds = new Set;
+			foreach ($clusterMap as $cluster) {
+				$cluster->processPendingTables($queue);
+			}
+
+			// At this case we update schema
+			// before creating distributed table
+			$this->updateScheme($newSchema);
 			foreach ($newSchema as $row) {
+				// We should drop distributed table everywhere
+				// even when node has ONLY it but may have no shards on it
 				$sql = "DROP TABLE {$this->name} OPTION force=1";
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);
-				// Do nothing when no shards present for this node
-				if (!$row['shards']->count()) {
-					continue;
-				}
+
 				$sql = $this->getCreateShardedTableSQL($row['shards']);
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);
 			}
-
-			$this->updateScheme($newSchema);
 		} catch (\Throwable $t) {
 			var_dump($t->getMessage());
 		}
@@ -738,6 +746,9 @@ final class Table {
 	 * @return Set<int>
 	 */
 	protected static function parseShards(string $shards): Set {
-		return new Set(array_map('intval', explode(',', $shards)));
+		return trim($shards) !== ''
+			? new Set(array_map('intval', explode(',', $shards)))
+			: new Set
+		;
 	}
 }
