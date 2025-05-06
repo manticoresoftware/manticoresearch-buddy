@@ -183,6 +183,7 @@ final class Payload extends BasePayload {
 			default => false,
 		};
 		$isInsertError = str_contains($request->error, 'no such index')
+			|| str_contains($request->error, 'bulk request must be terminated')
 			|| str_contains($request->error, 'unsupported endpoint')
 			|| (str_contains($request->error, 'table ') && str_contains($request->error, ' absent'))
 			|| (str_contains($request->error, ' body ') && str_ends_with($request->error, ' is required'));
