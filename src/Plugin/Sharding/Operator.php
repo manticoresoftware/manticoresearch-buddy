@@ -100,11 +100,9 @@ final class Operator {
 	public function checkBalance(): static {
 		$cluster = $this->getCluster();
 		$queue = $this->getQueue();
+		// We get inactive nodes to exclude them from the rebalance in case of outages
+		// It may be an empty list if we're adding a new node to the cluster, which is fine
 		$inactiveNodes = $cluster->getInactiveNodes();
-		// Do rebalance in case we have inactive nodes
-		if ($inactiveNodes->isEmpty()) {
-			return $this;
-		}
 
 		// Do exclude repeated rebalancing we take hash of active nodes
 		// and if the same, we do nothing, otherwise, it shows the change
