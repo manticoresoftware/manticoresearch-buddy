@@ -11,14 +11,15 @@
 
 namespace Manticoresearch\Buddy\Base\Lib;
 
+use InvalidArgumentException;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class CliArgsProcessor {
 
 	private const LONG_OPTS  = [
 		'threads:', 'telemetry-period:', 'disable-telemetry',
-		'debug', 'debugv', 'debugvv', 'version', 'help', 'listen:', 'bind:',
-		'skip:',
+		'version', 'help', 'listen:', 'bind:',
+		'skip:', 'log-level:',
 	];
 	private const DEFAULT_OPTS = [
 		'listen' => '127.0.0.1:9308',
@@ -50,11 +51,9 @@ final class CliArgsProcessor {
 			. "--telemetry-period=[N] set period for telemetry when we do snapshots\n"
 			. "--disable-telemetry    disables telemetry for Buddy\n"
 			. "--threads=[N]          start N threads on launch, default is 4\n"
-			. "--debug                enable debug mode for testing\n"
-			. "--debugv               enable verbosity on request and response logging also\n"
-			. "--debugvv              enable verbose debug mode with periodic messages\n"
+			.	'--log-level=[N]        set log level for Buddy, default is info, values: info, debug, debugv, debugvv'
 			. "Examples:\n"
-			. "$script --debug\n"
+			. "$script --log-level=debug\n"
 			. "$script --disable-telemetry\n\n";
 	}
 
@@ -76,18 +75,17 @@ final class CliArgsProcessor {
 	 *  threads?:int,
 	 *  telemetry-period?:int,
 	 *  disable-telemetry?:bool,
-	 *  debug?:bool,
 	 *  help?:bool,
 	 *  version?:bool,
 	 *  listen?:string,
 	 *  bind?:string,
-	 *  skip?:string[]
+	 *  skip?:string[],
+	 *  log-level?:string
 	 * } $opts
 	 * @return array{
 	 *  threads?:int,
 	 *  telemetry-period?:int,
 	 *  disable-telemetry?:bool,
-	 *  debug?:bool,
 	 *  help?:bool,
 	 *  version?:bool,
 	 *  listen:string,
@@ -103,12 +101,12 @@ final class CliArgsProcessor {
 		 *  threads?:int,
 		 *  telemetry-period?:int,
 		 *  disable-telemetry?:bool,
-		 *  debug?:bool,
 		 *  help?:bool,
 		 *  version?:bool,
 		 *  listen:string,
 		 *  bind:string,
-		 *  skip:string[]
+		 *  skip:string[],
+		 *  log-level?:string,
 		 * } $opts
 		 */
 		$opts = array_replace(self::DEFAULT_OPTS, $opts); // @phpstan-ignore-line
@@ -126,11 +124,14 @@ final class CliArgsProcessor {
 
 		static::parseThreads($opts);
 		static::parseDisableTelemetry($opts);
-		static::parseDebug($opts);
 		static::parseTelemetryPeriod($opts);
 		static::parseListen($opts);
 		static::parseBind($opts);
 		$opts['skip'] = static::parseSkip($opts);
+
+		if (isset($opts['log-level'])) {
+			static::parseLogLevel($opts['log-level']);
+		}
 
 		return $opts;
 	}
@@ -165,23 +166,17 @@ final class CliArgsProcessor {
 	}
 
 	/**
-	 * @param array{debug?:bool,debugv?:bool,debugvv?:bool} $opts
+	 * @param string $level
 	 * @return void
 	 */
-	protected static function parseDebug(array $opts): void {
-		if (isset($opts['debug'])) {
-			putenv('DEBUG=1');
-		}
-
-		if (isset($opts['debugv'])) {
-			putenv('DEBUG=2');
-		}
-
-		if (!isset($opts['debugvv'])) {
-			return;
-		}
-
-		putenv('DEBUG=3');
+	protected static function parseLogLevel(string $level): void {
+		match ($level) {
+			'info' => null,
+			'debug' => putenv('DEBUG=1'),
+			'debugv' => putenv('DEBUG=2'),
+			'debugvv' => putenv('DEBUG=3'),
+			default => throw new InvalidArgumentException("Invalid log level {$level}"),
+		};
 	}
 
 	/**
