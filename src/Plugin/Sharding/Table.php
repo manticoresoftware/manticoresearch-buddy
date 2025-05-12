@@ -354,9 +354,6 @@ final class Table {
 			$schema = $this->getShardSchema();
 			$allNodes = $this->cluster->getNodes();
 			$inactiveNodes = $this->cluster->getInactiveNodes();
-			if (!$inactiveNodes->count()) {
-				return;
-			}
 			$activeNodes = $allNodes->diff($inactiveNodes);
 			$newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
 
@@ -439,7 +436,7 @@ final class Table {
 			/** @var Set<int> */
 			$queueIds = new Set;
 			foreach ($newSchema as $row) {
-				$sql = "DROP TABLE {$this->name} OPTION force=1";
+				$sql = "DROP TABLE IF EXISTS {$this->name} OPTION force=1";
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);
 				// Do nothing when no shards present for this node
