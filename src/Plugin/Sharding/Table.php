@@ -357,9 +357,6 @@ final class Table {
 			$schema = $this->getShardSchema();
 			$allNodes = $this->cluster->getNodes();
 			$inactiveNodes = $this->cluster->getInactiveNodes();
-			if (!$inactiveNodes->count()) {
-				return;
-			}
 			$activeNodes = $allNodes->diff($inactiveNodes);
 			$newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
 
@@ -452,7 +449,7 @@ final class Table {
 			foreach ($newSchema as $row) {
 				// We should drop distributed table everywhere
 				// even when node has ONLY it but may have no shards on it
-				$sql = "DROP TABLE {$this->name} OPTION force=1";
+				$sql = "DROP TABLE IF EXISTS {$this->name} OPTION force=1";
 				$queueId = $queue->add($row['node'], $sql);
 				$queueIds->add($queueId);
 
