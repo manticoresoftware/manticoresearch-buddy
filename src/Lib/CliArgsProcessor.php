@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License version 3 or any later
@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Lib;
 
-use InvalidArgumentException;
+use Manticoresearch\Buddy\Base\Config\LogLevel;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class CliArgsProcessor {
@@ -39,7 +39,7 @@ final class CliArgsProcessor {
 			$script = 'manticore-executor src/main.php';
 		}
 
-		return "Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)\n\n"
+		return "Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)\n\n"
 			. "Usage: $script [ARGUMENTS]\n\n"
 			. "Arguments are:\n"
 			. "--bind                 Which IP to bind. Default is 127.0.0.1\n"
@@ -64,7 +64,7 @@ final class CliArgsProcessor {
 	 */
 	private static function version(): string {
 		return 'Manticore Buddy v' . Buddy::getVersion() . "\n"
-			. "Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)\n"
+			. "Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)\n"
 		;
 	}
 
@@ -170,13 +170,8 @@ final class CliArgsProcessor {
 	 * @return void
 	 */
 	protected static function parseLogLevel(string $level): void {
-		match ($level) {
-			'info' => null,
-			'debug' => putenv('DEBUG=1'),
-			'debugv' => putenv('DEBUG=2'),
-			'debugvv' => putenv('DEBUG=3'),
-			default => throw new InvalidArgumentException("Invalid log level {$level}"),
-		};
+		$level = LogLevel::fromString($level);
+		putenv('DEBUG=' . $level->value);
 	}
 
 	/**
