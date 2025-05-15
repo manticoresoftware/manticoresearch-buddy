@@ -49,6 +49,9 @@ final class Payload extends BasePayload {
 	/** @var string|array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>} */
 	public array|string $payload;
 
+	/** @var array<string> */
+	public array $queries = [];
+
 	public function __construct() {
 	}
 
@@ -99,6 +102,30 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromSqlRequest(Request $request): static {
 		$query = $request->payload;
+		$additionalQueries = [];
+
+		// Extract any additional queries that follow the main one (separated by semicolons)
+		if (preg_match('/;(.*)/s', $query, $matches)) {
+			// The main query is everything before the first semicolon
+			$query = trim(substr($query, 0, strpos($query, ';', stripos($query, ' option '))));
+
+			// Get the rest of the string after the first semicolon
+			$remainingText = trim($matches[1]);
+
+			// If there's content after the semicolon, split it into additional queries
+			if (!empty($remainingText)) {
+				// Split the remaining text by semicolons
+				$extraQueries = preg_split('/;/', $remainingText, -1, PREG_SPLIT_NO_EMPTY);
+
+				foreach ($extraQueries as $extraQuery) {
+					$trimmedQuery = trim($extraQuery);
+					if (!empty($trimmedQuery)) {
+						$additionalQueries[] = $trimmedQuery;
+					}
+				}
+			}
+		}
+
 		preg_match('/FROM\s+`?(\w+)`?\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
@@ -145,6 +172,7 @@ final class Payload extends BasePayload {
 		$self->layouts = $layouts;
 		$self->preserve = $preserve;
 		$self->payload = $query;
+		$self->queries = $additionalQueries;
 		return $self;
 	}
 
@@ -207,7 +235,8 @@ final class Payload extends BasePayload {
 			$match = $searchValue;
 		}
 		Buddy::debug("Fuzzy: match: $match");
-		return sprintf($template, $match);
+		$queries = [sprintf($template, $match), ...$this->queries];
+		return implode(';', $queries);
 	}
 
 	/**
