@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License version 3 or any later
@@ -11,14 +11,15 @@
 
 namespace Manticoresearch\Buddy\Base\Lib;
 
+use Manticoresearch\Buddy\Base\Config\LogLevel;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class CliArgsProcessor {
 
 	private const LONG_OPTS  = [
 		'threads:', 'telemetry-period:', 'disable-telemetry',
-		'debug', 'debugv', 'debugvv', 'version', 'help', 'listen:', 'bind:',
-		'skip:',
+		'version', 'help', 'listen:', 'bind:',
+		'skip:', 'log-level:',
 	];
 	private const DEFAULT_OPTS = [
 		'listen' => '127.0.0.1:9308',
@@ -38,7 +39,7 @@ final class CliArgsProcessor {
 			$script = 'manticore-executor src/main.php';
 		}
 
-		return "Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)\n\n"
+		return "Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)\n\n"
 			. "Usage: $script [ARGUMENTS]\n\n"
 			. "Arguments are:\n"
 			. "--bind                 Which IP to bind. Default is 127.0.0.1\n"
@@ -50,11 +51,9 @@ final class CliArgsProcessor {
 			. "--telemetry-period=[N] set period for telemetry when we do snapshots\n"
 			. "--disable-telemetry    disables telemetry for Buddy\n"
 			. "--threads=[N]          start N threads on launch, default is 4\n"
-			. "--debug                enable debug mode for testing\n"
-			. "--debugv               enable verbosity on request and response logging also\n"
-			. "--debugvv              enable verbose debug mode with periodic messages\n"
+			.	'--log-level=[N]        set log level for Buddy, default is info, values: info, debug, debugv, debugvv'
 			. "Examples:\n"
-			. "$script --debug\n"
+			. "$script --log-level=debug\n"
 			. "$script --disable-telemetry\n\n";
 	}
 
@@ -65,7 +64,7 @@ final class CliArgsProcessor {
 	 */
 	private static function version(): string {
 		return 'Manticore Buddy v' . Buddy::getVersion() . "\n"
-			. "Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)\n"
+			. "Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)\n"
 		;
 	}
 
@@ -76,18 +75,17 @@ final class CliArgsProcessor {
 	 *  threads?:int,
 	 *  telemetry-period?:int,
 	 *  disable-telemetry?:bool,
-	 *  debug?:bool,
 	 *  help?:bool,
 	 *  version?:bool,
 	 *  listen?:string,
 	 *  bind?:string,
-	 *  skip?:string[]
+	 *  skip?:string[],
+	 *  log-level?:string
 	 * } $opts
 	 * @return array{
 	 *  threads?:int,
 	 *  telemetry-period?:int,
 	 *  disable-telemetry?:bool,
-	 *  debug?:bool,
 	 *  help?:bool,
 	 *  version?:bool,
 	 *  listen:string,
@@ -103,12 +101,12 @@ final class CliArgsProcessor {
 		 *  threads?:int,
 		 *  telemetry-period?:int,
 		 *  disable-telemetry?:bool,
-		 *  debug?:bool,
 		 *  help?:bool,
 		 *  version?:bool,
 		 *  listen:string,
 		 *  bind:string,
-		 *  skip:string[]
+		 *  skip:string[],
+		 *  log-level?:string,
 		 * } $opts
 		 */
 		$opts = array_replace(self::DEFAULT_OPTS, $opts); // @phpstan-ignore-line
@@ -126,11 +124,14 @@ final class CliArgsProcessor {
 
 		static::parseThreads($opts);
 		static::parseDisableTelemetry($opts);
-		static::parseDebug($opts);
 		static::parseTelemetryPeriod($opts);
 		static::parseListen($opts);
 		static::parseBind($opts);
 		$opts['skip'] = static::parseSkip($opts);
+
+		if (isset($opts['log-level'])) {
+			static::parseLogLevel($opts['log-level']);
+		}
 
 		return $opts;
 	}
@@ -165,23 +166,12 @@ final class CliArgsProcessor {
 	}
 
 	/**
-	 * @param array{debug?:bool,debugv?:bool,debugvv?:bool} $opts
+	 * @param string $level
 	 * @return void
 	 */
-	protected static function parseDebug(array $opts): void {
-		if (isset($opts['debug'])) {
-			putenv('DEBUG=1');
-		}
-
-		if (isset($opts['debugv'])) {
-			putenv('DEBUG=2');
-		}
-
-		if (!isset($opts['debugvv'])) {
-			return;
-		}
-
-		putenv('DEBUG=3');
+	protected static function parseLogLevel(string $level): void {
+		$level = LogLevel::fromString($level);
+		putenv('DEBUG=' . $level->value);
 	}
 
 	/**
