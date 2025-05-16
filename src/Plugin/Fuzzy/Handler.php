@@ -93,7 +93,6 @@ final class Handler extends BaseHandlerWithFlagCache {
 			Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
 			// Extend varitions for each iteration we have
 			foreach ($variations as $pos => $variation) {
-				$words[$pos] ??= [];
 				$keywords = $variation['keywords'];
 				if (!$keywords) {
 					if (!$this->payload->preserve) {
@@ -102,7 +101,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 					$keywords = [$variation['original']];
 				}
-				$blend = Arrays::blend($words[$pos], $variation['keywords']);
+
+				$words[$pos] ??= [];
+				$blend = Arrays::blend($words[$pos], $keywords);
 				$words[$pos] = array_values(array_unique($blend));
 				$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
 			}

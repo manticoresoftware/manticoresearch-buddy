@@ -218,7 +218,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 		// If no words found, we just add the original phrase
 		if (!$words) {
-			$words = [['original' => $phrase, 'keywords' => [$phrase]]];
+			$words = [['original' => $phrase, 'keywords' => $this->payload->preserve ? [$phrase] : []]];
 		}
 
 		Buddy::debug("Autocomplete: variations for '$phrase': " . json_encode($words));
@@ -226,7 +226,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 		// Expand last word with wildcard
 		$lastIndex = array_key_last($words);
 		$lastWords = $words[$lastIndex]['keywords'];
-		if (!$lastWords && $this->payload->preserve) {
+		if (!$lastWords) {
 			$lastWords = [$words[$lastIndex]['original']];
 		}
 
