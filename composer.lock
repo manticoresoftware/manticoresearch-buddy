@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f8b8f7446a01b57af60c5fcd61adb8c7",
+    "content-hash": "4b35895154d5c7b0c00bf4eea72fffc6",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -721,16 +721,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-fix/multi-query-show-meta",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "7de5e5f723236b732fd2c434bc0aa27ae98534ff"
+                "reference": "eca18629801e773282e84e0955a50fba62319d2e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/7de5e5f723236b732fd2c434bc0aa27ae98534ff",
-                "reference": "7de5e5f723236b732fd2c434bc0aa27ae98534ff",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/eca18629801e773282e84e0955a50fba62319d2e",
+                "reference": "eca18629801e773282e84e0955a50fba62319d2e",
                 "shasum": ""
             },
             "require": {
@@ -746,7 +746,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -767,9 +766,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/multi-query-show-meta"
             },
-            "time": "2025-04-22T08:52:49+00:00"
+            "time": "2025-05-20T15:53:03+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -5139,8 +5138,8 @@
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.1.0"
     },
