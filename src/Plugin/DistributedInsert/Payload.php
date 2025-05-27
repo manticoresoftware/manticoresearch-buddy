@@ -264,9 +264,13 @@ final class Payload extends BasePayload {
 		$values = &$matches[4];
 		preg_match_all($valuePattern, $values, $matches);
 		$values = &$matches[0];
-		/* $values = array_map(trim(...), $matches[0]); */
 
-		$fieldCount = sizeof($fields);
+		// We filter values here because when there's no match in the regex
+		// we'll still have an empty value in the array
+		$fieldCount = sizeof(array_filter($fields));
+		if ($fieldCount === 0) {
+			throw QueryParseError::create('No fields specified. Please specify all fields in your query.');
+		}
 		$valueCount = sizeof($values);
 		/** @var Vector<Struct<int|string,mixed>> */
 		$batch = new Vector();
