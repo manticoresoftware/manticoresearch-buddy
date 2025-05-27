@@ -174,8 +174,7 @@ final class Payload extends BasePayload {
 			return $table;
 		}
 
-
-		foreach (['insert', 'update', 'delete'] as $key) {
+		foreach (['insert', 'replace', 'update', 'delete'] as $key) {
 			if (!isset($struct[$key])) {
 				continue;
 			}
