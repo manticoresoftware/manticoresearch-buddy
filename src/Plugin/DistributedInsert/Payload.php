@@ -272,13 +272,20 @@ final class Payload extends BasePayload {
 		$batch = new Vector();
 		$doc = [];
 		for ($i = 0; $i < $valueCount; $i++) {
-			$index = ($i + 1) % $fieldCount;
-			$doc[$fields[$index]] = trim($values[$i], "'");
-			// We have edge case when single field and last is first also
-			$isLast = $index === 0;
+			$index = $i % $fieldCount;
+			$field = $fields[$index];
+			$value = trim($values[$i], "'");
+
+			// Store the value for the field
+			$doc[$field] = $value;
+
+			// Check if we've processed a complete document
+			$isLast = ($i + 1) % $fieldCount === 0;
 			if (!$isLast) {
 				continue;
 			}
+
+			// Process the completed document
 			$row = [];
 			if (isset($doc['id'])) {
 				$row['id'] = (int)$doc['id'];
