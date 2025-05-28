@@ -137,37 +137,37 @@ final class Metric {
 	 *
 	 * @return array<string,string>
 	 */
-	public function getVersions(): array {
-		$buddyVersion = Buddy::getVersion();
-		$statusMap = $this->getStatusMap();
-		if (!isset($statusMap['version'])) {
-			Buddy::debug('metric: failed to get version from SHOW STATUS query');
-			return [];
-		}
-
-		$verPattern = 'v?((?:x\.x\.x|\d+\.\d+\.\d+)[^\(\)]*)';
-		$matchExpr = "/^{$verPattern}(\s+\(columnar\s{$verPattern}\))?"
-			. "(\s+\(secondary\s{$verPattern}\))?"
-			. "(\s+\(knn\s{$verPattern}\))?"
-			. "(\s+\(buddy\s{$verPattern}\))?$/ius"
-		;
-		/** @var string $version */
-		$version = $statusMap['version'];
-		preg_match($matchExpr, $version, $m);
-		if (!isset($m[1])) {
-			Buddy::debug('metric: failed to parse manticore version');
-			return [];
-		}
-
-		return array_filter(
-			[
-				'buddy_version' => $buddyVersion,
-				'manticore_version' => trim($m[1]),
-				'columnar_version' => $m[3] ?? null,
-				'secondary_version' => $m[5] ?? null,
-				'knn_version' => $m[7] ?? null,
-			]
-		);
+	public function getVersions(): array
+	{
+			$statusMap = $this->getStatusMap();
+			if (!isset($statusMap['version'])) {
+					Buddy::debug('Failed to get version');
+					return [];
+			}
+	
+			$version = $statusMap['version'];
+			$result = [];
+			
+			// Split into main part and components
+			$parts = preg_split('/\s+(?=\()/', $version, 2);
+			
+			// Main version is everything before first component
+			$result['manticore_version'] = trim($parts[0]);
+			
+			// Process components if they exist
+			if (isset($parts[1])) {
+					preg_match_all('/\(([^\s]+)\s+([^)]*)\)/', $parts[1], $matches, PREG_SET_ORDER);
+					
+					foreach ($matches as $match) {
+							$name = $match[1];
+							$version = trim($match[2]);
+							if (!empty($name) && !empty($version)) {
+									$result[$name.'_version'] = $version;
+							}
+					}
+			}
+			
+			return $result;
 	}
 
 	/**
