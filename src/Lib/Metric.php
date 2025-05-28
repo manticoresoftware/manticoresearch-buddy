@@ -141,7 +141,7 @@ final class Metric {
 	{
 			$statusMap = $this->getStatusMap();
 			if (!isset($statusMap['version'])) {
-					Buddy::debug('Failed to get version');
+					Buddy::debug('metric: failed to get version from SHOW STATUS query');
 					return [];
 			}
 	
