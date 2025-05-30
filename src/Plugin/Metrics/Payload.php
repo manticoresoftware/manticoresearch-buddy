@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Metrics;
 
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * This is simple do nothing request that handle empty queries
@@ -50,6 +49,6 @@ final class Payload extends BasePayload
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-			return $request->endpointBundle->value === "metrics";
+			return $request->endpointBundle->value === 'metrics';
 	}
 }
