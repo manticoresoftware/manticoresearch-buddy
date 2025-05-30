@@ -17,7 +17,6 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
 /**
@@ -421,8 +420,7 @@ final class Payload extends BasePayload {
 	 */
 	protected static function parseLayouts(null|string|array $layouts): array {
 		// If we have array already, just return it
-		Buddy::debug("--------------->".json_encode($layouts));
-		if (empty($layouts)){
+		if (empty($layouts)) {
 			return [];
 		}
 		if (is_array($layouts)) {
