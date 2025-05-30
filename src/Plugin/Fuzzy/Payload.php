@@ -426,10 +426,8 @@ final class Payload extends BasePayload {
 		if (is_array($layouts)) {
 			return $layouts;
 		}
-		if (isset($layouts)) {
-			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
-		}
-		return $layouts;
+
+		return array_map('trim', explode(',', $layouts));
 	}
 
 	/**
