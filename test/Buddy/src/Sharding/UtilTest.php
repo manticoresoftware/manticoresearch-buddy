@@ -51,4 +51,72 @@ class UtilTest extends TestCase {
 			$this->assertEquals(3, sizeof($node['connections']));
 		}
 	}
+
+	public function testRebalanceShardingSchema(): void {
+		//
+		// CASE 1
+		// 3 nodes, 2 shards, rf=1:
+		// – originally one shard on “1”, one on “2”, “3” is unused
+		// – simulate killing node “2”
+		// – expect that shard 1 moves onto the previously unused node “3”
+		//
+		$nodes       = new Set(['1', '2', '3']);
+		$shardCount  = 2;
+		$replicaFactor = 1;
+
+		// build the original schema
+		$originalSchema = Util::createShardingSchema($nodes, $shardCount, $replicaFactor);
+		// original should be:
+		//   node "1" → [0]
+		//   node "2" → []
+		//   node "3" → [1]
+		$this->assertEquals(
+			['1','2','3'], $originalSchema
+			->map(fn($r)=>$r['node'])
+			->toArray()
+		);
+		$this->assertEquals([0], $originalSchema->get(0)['shards']->toArray());
+		$this->assertEquals([], $originalSchema->get(1)['shards']->toArray());
+		$this->assertEquals([1], $originalSchema->get(2)['shards']->toArray());
+
+		// now kill node "2"
+		$active = new Set(['1','2']);
+		$rebalanced = Util::rebalanceShardingScheme($originalSchema, $active);
+
+		// after rebalance we should have exactly 2 rows (only active nodes)
+		$this->assertCount(2, $rebalanced);
+
+		// in the filtered vector the order is the same as in the original schema,
+		// so get(0) is node "1" and get(1) is node "2"
+		$this->assertSame('1', $rebalanced->get(0)['node']);
+		$this->assertEquals([0], $rebalanced->get(0)['shards']->toArray());
+
+		$this->assertSame('2', $rebalanced->get(1)['node']);
+
+		// node "2" was unused before, now it must pick up shard 1
+		$this->assertEquals([1], $rebalanced->get(1)['shards']->toArray());
+
+		//
+		// CASE 2
+		// no nodes down → rebalance should leave the schema untouched
+		//
+		$fullRebalanced = Util::rebalanceShardingScheme($originalSchema, $nodes);
+
+		// should still have 3 entries
+		$this->assertCount(3, $fullRebalanced);
+
+		// and all shards should be exactly the same as original
+		foreach ($fullRebalanced as $idx => $row) {
+			$this->assertSame(
+				$originalSchema->get($idx)['node'],
+				$row['node'],
+				"node at index $idx must remain the same"
+			);
+			$this->assertEquals(
+				$originalSchema->get($idx)['shards']->toArray(),
+				$row['shards']->toArray(),
+				"shards on node {$row['node']} must remain the same"
+			);
+		}
+	}
 }
