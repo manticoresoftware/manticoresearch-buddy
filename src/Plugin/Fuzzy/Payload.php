@@ -28,6 +28,7 @@ final class Payload extends BasePayload {
 	const MAX_BOOST = 50;
 	const DECREASE_FACTOR = 1.44;
 	const ESCAPE_CHARS = '()[]<!|*/-~^$@';
+	const MATCH_REG_PATTERN = '/MATCH\s*\(\'(.*?)\'(\s*,\s*\w*?)?\s*\)/ius';
 
 	/** @var string */
 	public string $path;
@@ -104,8 +105,19 @@ final class Payload extends BasePayload {
 		$tableName = $matches[1] ?? '';
 
 		// Check that we have match
-		if (!preg_match('/match\s*\(\'(.*?)\'\)/ius', $query, $matches)) {
-			throw QueryParseError::create("The 'fuzzy' option requires a full-text query");
+		if (!preg_match(static::MATCH_REG_PATTERN, $query, $matches)) {
+			throw QueryParseError::create(
+				"The 'fuzzy' option requires a full-text query. " .
+					"Use: MATCH('search query') or MATCH('search query', table_name)"
+			);
+		}
+
+		$searchTableName = $matches[2] ?? null;
+		if (isset($searchTableName) && trim($searchTableName) === ',') {
+			throw QueryParseError::create(
+				"MATCH() clause has a trailing comma but table name is not defined. " .
+					"Did you mean to specify a table? Eample: MATCH('search query', table_name)"
+				);
 		}
 
 		// I did not figure out how to make with regxp case OPTION fuzzy=1 so do this way
@@ -171,11 +183,12 @@ final class Payload extends BasePayload {
 	public function getQueriesSQLRequest(callable $fn): string {
 		/** @var string */
 		$payload = $this->payload;
-		preg_match('/MATCH\s*\(\'(.*?)\'\)/ius', $payload, $matches);
+		preg_match(static::MATCH_REG_PATTERN, $payload, $matches);
 		$searchValue = $matches[1] ?? '';
+		$searchTableName = $matches[2] ?? '';
 		$template = (string)preg_replace(
 			[
-				'/MATCH\s*\(\'(.*?)\'\)/ius',
+				static::MATCH_REG_PATTERN,
 				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
@@ -183,7 +196,7 @@ final class Payload extends BasePayload {
 				'/\s*,\s*facet\s+/ius',
 				],
 			[
-				'MATCH(\'%s\')',
+				'MATCH(\'%s\'%s)',
 				'',
 				'',
 				'option ',
@@ -208,7 +221,7 @@ final class Payload extends BasePayload {
 			$match = $searchValue;
 		}
 		Buddy::debug("Fuzzy: match: $match");
-		return sprintf($template, $match);
+		return sprintf($template, $match, $searchTableName);
 	}
 
 	/**
