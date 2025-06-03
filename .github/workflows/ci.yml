@@ -9,90 +9,12 @@ on:
 env:
   GHCR_REPO: ghcr.io/manticoresoftware/manticoresearch
 jobs:
-  test:
-    name: Run unit tests
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Run tests inside docker container
-        uses: manticoresoftware/addnab-docker-run-action@v3
-        with:
-          image: ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
-          options: -v ${{ github.workspace }}:/workdir --cap-add SYS_ADMIN --security-opt apparmor=unconfined
-          run: |
-            # the entrypoint is rewritten so we need to launch searchd manually
-            searchd
-            cd /workdir
-            composer install --prefer-dist
-            git clone https://github.com/manticoresoftware/phar_builder.git
-            bin/test
-
-  test_kit:
-    name: Build test kit Docker image
-    runs-on: ubuntu-22.04
-    outputs:
-      docker_repo: ${{ steps.vars.outputs.docker_repo }}
-      docker_tag: ${{ steps.vars.outputs.docker_tag }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.head_ref || github.ref }}
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Set variables
-        id: vars
-        run: |
-          set -e
-          BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-          DOCKER_TAG=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-' | tr '.' '-' | tr '@' '-' | tr ':' '-' | tr ' ' '-' | tr '[A-Z]' '[a-z]')
-          DOCKER_TAG="test-kit-${DOCKER_TAG,,}"
-          COMMIT=${GITHUB_SHA::8}
-          IMAGE="${GHCR_REPO}:${DOCKER_TAG}"
-          IMAGE_COMMIT="${GHCR_REPO}:test-kit-${COMMIT,,}"
-          echo "docker_repo=${GHCR_REPO}" >> $GITHUB_OUTPUT
-          echo "docker_tag=${DOCKER_TAG}" >> $GITHUB_OUTPUT
-          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
-          echo "image_commit=${IMAGE_COMMIT}" >> $GITHUB_OUTPUT
-          echo "Docker Image: ${IMAGE}" >> $GITHUB_STEP_SUMMARY
-          echo "Docker Image commit: ${IMAGE_COMMIT}" >> $GITHUB_STEP_SUMMARY
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ vars.GHCR_USER }}
-          password: ${{ secrets.GHCR_PASSWORD }}
-
-      - name: Pull base image
-        run: docker pull ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
-
-      - name: Create and push test kit image
-        run: |
-          docker create --name temp ghcr.io/manticoresoftware/manticoresearch:test-kit-latest tail -f /dev/null
-          docker start temp
-          docker exec temp sh -c 'rm -rf /usr/share/manticore/modules/manticore-buddy && mkdir -p /usr/share/manticore/modules/manticore-buddy'
-          docker cp . temp:/usr/share/manticore/modules/manticore-buddy/
-          docker exec temp sh -c 'cd /usr/share/manticore/modules/manticore-buddy/ && composer install --prefer-dist'
-          docker exec temp sh -c 'git config --system --add safe.directory /usr/share/manticore/modules/manticore-buddy'
-          docker commit temp ${{ steps.vars.outputs.image }}
-          docker commit temp ${{ steps.vars.outputs.image_commit }}
-          docker push ${{ steps.vars.outputs.image }}
-          docker push ${{ steps.vars.outputs.image_commit }}
-          docker rm -f temp
-
   ref_detection:
     name: Detect CLT tests ref
     runs-on: ubuntu-22.04
     outputs:
       ref: ${{ steps.ref.outputs.ref }}
+      test_kit_image: ${{ steps.test_kit_image.outputs.image }}
     steps:
       - name: Get current branch name
         id: current_branch
@@ -125,6 +47,107 @@ jobs:
           fi
           echo "ref=${REF}" >> $GITHUB_OUTPUT
           echo "Ref: ${REF}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Determine test-kit image
+        id: test_kit_image
+        run: |
+          set -e
+          if [[ "${{ steps.check_branch.outputs.exists }}" == "true" ]]; then
+            BRANCH="${{ steps.current_branch.outputs.branch }}"
+            DOCKER_TAG=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-' | tr '.' '-' | tr '@' '-' | tr ':' '-' | tr ' ' '-' | tr '[A-Z]' '[a-z]')
+            IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-${DOCKER_TAG,,}"
+          else
+            IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-latest"
+          fi
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "Test-kit Image: ${IMAGE}" >> $GITHUB_STEP_SUMMARY
+
+  test:
+    name: Run unit tests
+    runs-on: ubuntu-22.04
+    needs: [ref_detection]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Run tests inside docker container
+        uses: manticoresoftware/addnab-docker-run-action@v3
+        with:
+          image: ${{ needs.ref_detection.outputs.test_kit_image }}
+          options: -v ${{ github.workspace }}:/workdir --cap-add SYS_ADMIN --security-opt apparmor=unconfined
+          run: |
+            # the entrypoint is rewritten so we need to launch searchd manually
+            searchd
+            cd /workdir
+            composer install --prefer-dist
+            git clone https://github.com/manticoresoftware/phar_builder.git
+            bin/test
+
+  test_kit:
+    name: Build test kit Docker image
+    runs-on: ubuntu-22.04
+    needs: [ref_detection]
+    outputs:
+      docker_repo: ${{ steps.vars.outputs.docker_repo }}
+      docker_tag: ${{ steps.vars.outputs.docker_tag }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.head_ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set variables
+        id: vars
+        run: |
+          set -e
+          BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          DOCKER_TAG=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-' | tr '.' '-' | tr '@' '-' | tr ':' '-' | tr ' ' '-' | tr '[A-Z]' '[a-z]')
+          DOCKER_TAG="test-kit-${DOCKER_TAG,,}-buddy"
+          COMMIT=${GITHUB_SHA::8}
+          IMAGE="${GHCR_REPO}:${DOCKER_TAG}"
+          IMAGE_COMMIT="${GHCR_REPO}:test-kit-${COMMIT,,}-buddy"
+          # Base image to pull from (same logic as ref_detection)
+          BASE_IMAGE="${{ needs.ref_detection.outputs.test_kit_image }}"
+          echo "docker_repo=${GHCR_REPO}" >> $GITHUB_OUTPUT
+          echo "docker_tag=${DOCKER_TAG}" >> $GITHUB_OUTPUT
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "image_commit=${IMAGE_COMMIT}" >> $GITHUB_OUTPUT
+          echo "base_image=${BASE_IMAGE}" >> $GITHUB_OUTPUT
+          echo "Docker Image: ${IMAGE}" >> $GITHUB_STEP_SUMMARY
+          echo "Docker Image commit: ${IMAGE_COMMIT}" >> $GITHUB_STEP_SUMMARY
+          echo "Base Image: ${BASE_IMAGE}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ vars.GHCR_USER }}
+          password: ${{ secrets.GHCR_PASSWORD }}
+
+      - name: Pull base image
+        run: docker pull ${{ steps.vars.outputs.base_image }}
+
+      - name: Create and push test kit image
+        run: |
+          docker create --name temp ${{ steps.vars.outputs.base_image }} tail -f /dev/null
+          docker start temp
+          docker exec temp sh -c 'rm -rf /usr/share/manticore/modules/manticore-buddy && mkdir -p /usr/share/manticore/modules/manticore-buddy'
+          docker cp . temp:/usr/share/manticore/modules/manticore-buddy/
+          docker exec temp sh -c 'cd /usr/share/manticore/modules/manticore-buddy/ && composer install --prefer-dist'
+          docker exec temp sh -c 'git config --system --add safe.directory /usr/share/manticore/modules/manticore-buddy'
+          docker commit temp ${{ steps.vars.outputs.image }}
+          docker commit temp ${{ steps.vars.outputs.image_commit }}
+          docker push ${{ steps.vars.outputs.image }}
+          docker push ${{ steps.vars.outputs.image_commit }}
+          docker rm -f temp
+
+
   clt:
     name: Run CLT tests
     needs: [test_kit, ref_detection]
@@ -138,6 +161,7 @@ jobs:
   codestyle:
     name: PHPCS validation
     runs-on: ubuntu-22.04
+    needs: [ref_detection]
 
     steps:
       - name: Checkout
@@ -146,7 +170,7 @@ jobs:
       - name: Run PHPCS to check following the standard
         uses: manticoresoftware/addnab-docker-run-action@v3
         with:
-          image: ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
+          image: ${{ needs.ref_detection.outputs.test_kit_image }}
           options: -v ${{ github.workspace }}:/workdir
           run: |
             cd /workdir
@@ -156,6 +180,7 @@ jobs:
   codeanalyze:
     name: PHPStan static analysis
     runs-on: ubuntu-22.04
+    needs: [ref_detection]
 
     steps:
       - name: Checkout
@@ -164,7 +189,7 @@ jobs:
       - name: Run PHPStan to analyze the codebase
         uses: manticoresoftware/addnab-docker-run-action@v3
         with:
-          image: ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
+          image: ${{ needs.ref_detection.outputs.test_kit_image }}
           options: -v ${{ github.workspace }}:/workdir
           run: |
             cd /workdir
