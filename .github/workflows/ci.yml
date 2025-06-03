@@ -54,7 +54,9 @@ jobs:
           set -e
           if [[ "${{ steps.check_branch.outputs.exists }}" == "true" ]]; then
             BRANCH="${{ steps.current_branch.outputs.branch }}"
-            DOCKER_TAG=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-' | tr '.' '-' | tr '@' '-' | tr ':' '-' | tr ' ' '-' | tr '[A-Z]' '[a-z]')
+
+            fix=$(echo "$BRANCH" | tr '/' '_')
+            DOCKER_TAG=$(echo "$fix" | sed 's/[^a-zA-Z0-9_.-]//g')
             IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-${DOCKER_TAG,,}"
           else
             IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-latest"
@@ -104,7 +106,8 @@ jobs:
         run: |
           set -e
           BRANCH=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-          DOCKER_TAG=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-' | tr '.' '-' | tr '@' '-' | tr ':' '-' | tr ' ' '-' | tr '[A-Z]' '[a-z]')
+          fix=$(echo "$BRANCH" | tr '/' '_')
+          DOCKER_TAG=$(echo "$fix" | sed 's/[^a-zA-Z0-9_.-]//g')
           DOCKER_TAG="test-kit-${DOCKER_TAG,,}-buddy"
           COMMIT=${GITHUB_SHA::8}
           IMAGE="${GHCR_REPO}:${DOCKER_TAG}"
