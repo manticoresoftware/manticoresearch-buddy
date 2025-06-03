@@ -131,21 +131,63 @@ jobs:
           password: ${{ secrets.GHCR_PASSWORD }}
 
       - name: Pull base image
-        run: docker pull ${{ steps.vars.outputs.base_image }}
+        run: |
+          echo "📥 PULLING Base Image: ${{ steps.vars.outputs.base_image }}"
+          docker pull ${{ steps.vars.outputs.base_image }}
 
       - name: Create and push test kit image
         run: |
+          # Create temporary container from the base image
           docker create --name temp ${{ steps.vars.outputs.base_image }} tail -f /dev/null
           docker start temp
+
+          # Install buddy code into the container
           docker exec temp sh -c 'rm -rf /usr/share/manticore/modules/manticore-buddy && mkdir -p /usr/share/manticore/modules/manticore-buddy'
           docker cp . temp:/usr/share/manticore/modules/manticore-buddy/
           docker exec temp sh -c 'cd /usr/share/manticore/modules/manticore-buddy/ && composer install --prefer-dist'
           docker exec temp sh -c 'git config --system --add safe.directory /usr/share/manticore/modules/manticore-buddy'
+
+          # Commit and push the buddy test-kit images
           docker commit temp ${{ steps.vars.outputs.image }}
           docker commit temp ${{ steps.vars.outputs.image_commit }}
+
+          # PUSHING: Always push with current branch + buddy suffix
+          # Example: test-kit-feature-xyz-buddy (branch-based)
+          # Example: test-kit-abc12345-buddy (commit-based)
+          echo "🚀 PUSHING Docker Images:"
+          echo "  Branch image: ${{ steps.vars.outputs.image }}"
+          echo "  Commit image: ${{ steps.vars.outputs.image_commit }}"
+
           docker push ${{ steps.vars.outputs.image }}
           docker push ${{ steps.vars.outputs.image_commit }}
+
+          # Cleanup
           docker rm -f temp
+
+      - name: Comment on PR with Docker images
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const branchImage = '${{ steps.vars.outputs.image }}';
+            const commitImage = '${{ steps.vars.outputs.image_commit }}';
+
+            const comment = `## 🐳 Docker Images Pushed
+
+            **Buddy Test-Kit Images:**
+            - **Branch image:** \`${branchImage}\`
+            - **Commit image:** \`${commitImage}\`
+
+            **Base image used:** \`${{ steps.vars.outputs.base_image }}\`
+
+            These images contain the buddy code from this PR and can be used for testing.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
 
 
   clt:
