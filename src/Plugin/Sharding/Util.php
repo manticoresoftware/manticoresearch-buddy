@@ -7,6 +7,7 @@ use Ds\Set;
 use Ds\Vector;
 use RuntimeException;
 
+/** @package Manticoresearch\Buddy\Base\Plugin\Sharding */
 final class Util {
   /**
    * Generate sharding schema by using input nodes, shards and replication
@@ -137,6 +138,25 @@ final class Util {
 		$newSchema = self::addNodesToSchema($newSchema, $nodes);
 		$inactiveShards = self::findInactiveShards($schema, $nodes);
 
+		// Check if we have new nodes (nodes with no shards assigned)
+		$hasNewNodes = $newSchema->filter(fn($row) => $row['shards']->isEmpty())->count() > 0;
+
+		if ($hasNewNodes) {
+			// For new nodes, use the same balanced logic as createShardingSchema
+			$totalShards = 0;
+			foreach ($schema as $row) {
+				$totalShards += $row['shards']->count();
+			}
+
+			if ($totalShards > 0) {
+				// Reuse the balanced assignment logic from createShardingSchema
+				$balancedSchema = self::initializeSchema($nodes);
+				$nodeMap = self::initializeNodeMap($nodes->count());
+				return self::assignNodesToSchema($balancedSchema, $nodeMap, $nodes, $totalShards, 2);
+			}
+		}
+
+		// For node failures only (no new nodes), use the original logic
 		return self::assignShardsToNodes($newSchema, $inactiveShards);
 	}
 
