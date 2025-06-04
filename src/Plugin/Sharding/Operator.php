@@ -113,7 +113,12 @@ final class Operator {
 		if ($clusterHash === $currentHash) {
 			return $this;
 		}
-		Buddy::info("Rebalancing due to inactive nodes: {$inactiveNodes->join(', ')}");
+
+		if ($inactiveNodes->count() > 0) {
+			Buddy::info("Rebalancing due to inactive nodes: {$inactiveNodes->join(', ')}");
+		} else {
+			Buddy::info('Rebalancing due to new nodes joined');
+		}
 
 		// Get all tables from the state we have
 		$list = $this->state->listRegex('table:.+');

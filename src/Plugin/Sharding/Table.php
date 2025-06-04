@@ -443,6 +443,16 @@ final class Table {
 				$cluster->processPendingTables($queue);
 			}
 
+			// Handle new nodes that need shard creation
+			$originalNodes = new Set($schema->map(fn($row) => $row['node']));
+			$newNodes = $activeNodes->diff($originalNodes);
+
+
+
+			if ($newNodes->count() > 0) {
+				$this->handleShardCreationForRebalancing($queue, $schema, $newSchema, $clusterMap);
+			}
+
 			// At this case we update schema
 			// before creating distributed table
 			$this->updateScheme($newSchema);
@@ -664,10 +674,12 @@ final class Table {
 		$map = new Map;
 		foreach ($nodes as $row) {
 			foreach ($row['shards'] as $shard) {
-				$map[$shard] ??= new Set;
+				if (!$map->hasKey($shard)) {
+					$map[$shard] = new Set();
+				}
 				$shardName = $this->getShardName($shard);
-				// @phpstan-ignore-next-line
-				$map[$shard]->add("{$row['node']}:{$shardName}");
+
+				$map[$shard]?->add("{$row['node']}:{$shardName}");
 			}
 		}
 
@@ -747,5 +759,62 @@ final class Table {
 			? new Set(array_map('intval', explode(',', $shards)))
 			: new Set
 		;
+	}
+
+	/**
+	 * Handle shard creation for rebalancing (all nodes that need new shards)
+	 * @param Queue $queue
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $oldSchema
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
+	 * @param Map<string,Cluster> $clusterMap
+	 * @return void
+	 */
+	protected function handleShardCreationForRebalancing(Queue $queue, Vector $oldSchema, Vector $newSchema, Map $clusterMap): void {
+		// Create map of old schema for comparison
+		/** @var Map<string,Set<int>> */
+		$oldShardMap = new Map();
+		foreach ($oldSchema as $row) {
+			$oldShardMap[$row['node']] = $row['shards'];
+		}
+
+		foreach ($newSchema as $row) {
+			$oldShards = $oldShardMap->get($row['node'], new Set());
+			$newShards = $row['shards'];
+			$shardsToCreate = $newShards->diff($oldShards);
+
+			if ($shardsToCreate->isEmpty()) {
+				continue;
+			}
+
+			// Create missing shard tables on this node
+			foreach ($shardsToCreate as $shard) {
+				$sql = $this->getCreateTableShardSQL($shard);
+				$queue->add($row['node'], $sql);
+
+				// Find nodes that already have this shard in old schema for replication
+				$existingNodesWithShard = $oldSchema->filter(
+					fn($existingRow) => $existingRow['shards']->contains($shard)
+				);
+
+				// If there are existing nodes with this shard, set up replication
+				if ($existingNodesWithShard->count() <= 0) {
+					continue;
+				}
+
+				$sourceNode = $existingNodesWithShard->first()['node'];
+				$connectedNodes = new Set([$row['node'], $sourceNode]);
+
+
+
+				// Set up cluster replication for this shard
+				$this->handleReplication(
+					$sourceNode,
+					$queue,
+					$connectedNodes,
+					$clusterMap,
+					$shard
+				);
+			}
+		}
 	}
 }
