@@ -429,7 +429,7 @@ final class Payload extends BasePayload {
 		}
 
 		$layouts = array_map('trim', explode(',', $layouts));
-		if (sizeof($layouts) < 2) {
+		if ($layouts && sizeof($layouts) < 2) {
 			throw QueryParseError::create(
 				'At least two languages are required in layouts'
 			);
