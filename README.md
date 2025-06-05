@@ -84,7 +84,7 @@ To run a Buddy instance from the command line interface (CLI), use the following
   --help                 display this help message
   --telemetry-period=[N] set period for telemetry when we do snapshots
   --disable-telemetry    disables telemetry for Buddy
-  --threads=[N]          start N threads on launch, default is CPU count
+  --threads=[N]          start N threads on launch, default is CPU core count
   --debug                enable debug mode for testing
   --debugv               enable verbose debug mode with periodic messages
   Examples:
