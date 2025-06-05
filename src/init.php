@@ -80,6 +80,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-cli-table',
 	'manticoresoftware/buddy-plugin-distributed-insert',
 	'manticoresoftware/buddy-plugin-truncate',
+	'manticoresoftware/buddy-plugin-metrics',
 ];
 // Filtering out the plugins that we don't need
 $plugins = array_filter(
