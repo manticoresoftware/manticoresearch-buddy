@@ -52,6 +52,131 @@ class UtilTest extends TestCase {
 		}
 	}
 
+	/**
+	 * Test rebalancing with RF=1 when adding new nodes - should NOT move shards
+	 */
+	public function testRebalanceWithRf1AddingNodes(): void {
+		// Create original schema with RF=1: 6 shards on 2 nodes
+		$originalNodes = new Set(['node1', 'node2']);
+		$shardCount = 6;
+		$replicationFactor = 1;
+
+		$originalSchema = Util::createShardingSchema($originalNodes, $shardCount, $replicationFactor);
+
+		// Verify original schema has RF=1 (each shard appears only once)
+		$shardCounts = [];
+		foreach ($originalSchema as $row) {
+			foreach ($row['shards'] as $shard) {
+				$shardCounts[$shard] = ($shardCounts[$shard] ?? 0) + 1;
+			}
+		}
+		foreach ($shardCounts as $count) {
+			$this->assertEquals(1, $count, 'Each shard should appear exactly once in RF=1');
+		}
+
+		// Store original shard distribution
+		$originalDistribution = [];
+		foreach ($originalSchema as $row) {
+			$originalDistribution[$row['node']] = $row['shards']->toArray();
+		}
+
+		// Add a new node
+		$newNodes = new Set(['node1', 'node2', 'node3']);
+		$rebalanced = Util::rebalanceShardingScheme($originalSchema, $newNodes);
+
+		// Should have 3 nodes now (including the new one)
+		$this->assertCount(3, $rebalanced);
+
+		// Find the new node
+		$newNodeRow = null;
+		foreach ($rebalanced as $row) {
+			if ($row['node'] === 'node3') {
+				$newNodeRow = $row;
+				break;
+			}
+		}
+		$this->assertNotNull($newNodeRow, 'New node should be present in rebalanced schema');
+
+		// CRITICAL: New node should have NO shards (RF=1 prevents data movement)
+		$this->assertTrue($newNodeRow['shards']->isEmpty(), 'New node should have no shards with RF=1 to prevent data loss');
+
+		// CRITICAL: Existing nodes should keep their EXACT original shards (no movement)
+		foreach ($originalSchema as $originalRow) {
+			$rebalancedRow = null;
+			foreach ($rebalanced as $row) {
+				if ($row['node'] === $originalRow['node']) {
+					$rebalancedRow = $row;
+					break;
+				}
+			}
+			$this->assertNotNull($rebalancedRow);
+			$this->assertEquals(
+				$originalRow['shards']->toArray(),
+				$rebalancedRow['shards']->toArray(),
+				"Node {$originalRow['node']} should keep its EXACT original shards with RF=1 - moving shards would cause data loss!"
+			);
+		}
+
+		// Verify all original shards are still present
+		$allRebalancedShards = new Set();
+		foreach ($rebalanced as $row) {
+			$allRebalancedShards->add(...$row['shards']);
+		}
+		$this->assertEquals($shardCount, $allRebalancedShards->count(), 'All original shards must be preserved');
+	}
+
+	/**
+	 * Test rebalancing with RF=2 when adding new nodes - should safely rebalance
+	 */
+	public function testRebalanceWithRf2AddingNodes(): void {
+		// Create original schema with RF=2: 2 shards replicated on 2 nodes
+		$originalNodes = new Set(['node1', 'node2']);
+		$shardCount = 2;
+		$replicationFactor = 2;
+
+		$originalSchema = Util::createShardingSchema($originalNodes, $shardCount, $replicationFactor);
+
+		// Verify original schema has RF=2 (each shard appears twice)
+		$shardCounts = [];
+		foreach ($originalSchema as $row) {
+			foreach ($row['shards'] as $shard) {
+				$shardCounts[$shard] = ($shardCounts[$shard] ?? 0) + 1;
+			}
+		}
+		foreach ($shardCounts as $count) {
+			$this->assertEquals(2, $count, 'Each shard should appear exactly twice in RF=2');
+		}
+
+		// Add a new node
+		$newNodes = new Set(['node1', 'node2', 'node3']);
+		$rebalanced = Util::rebalanceShardingScheme($originalSchema, $newNodes);
+
+		// Should have 3 nodes now
+		$this->assertCount(3, $rebalanced);
+
+		// Verify RF=2 is maintained in rebalanced schema
+		$newShardCounts = [];
+		foreach ($rebalanced as $row) {
+			foreach ($row['shards'] as $shard) {
+				$newShardCounts[$shard] = ($newShardCounts[$shard] ?? 0) + 1;
+			}
+		}
+		foreach ($newShardCounts as $count) {
+			$this->assertEquals(2, $count, 'RF=2 should be maintained after rebalancing');
+		}
+
+		// New node should have some shards (rebalancing occurred)
+		$newNodeRow = null;
+		foreach ($rebalanced as $row) {
+			if ($row['node'] === 'node3') {
+				$newNodeRow = $row;
+				break;
+			}
+		}
+		$this->assertNotNull($newNodeRow);
+		$this->assertFalse($newNodeRow['shards']->isEmpty(), 'New node should have shards with RF=2 rebalancing');
+	}
+
 	public function testRebalanceShardingSchema(): void {
 		//
 		// CASE 1

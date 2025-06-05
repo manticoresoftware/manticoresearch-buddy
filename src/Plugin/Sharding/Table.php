@@ -763,6 +763,10 @@ final class Table {
 
 	/**
 	 * Handle shard creation for rebalancing (all nodes that need new shards)
+	 * 
+	 * SAFETY: Respects original replication factor - with RF=1, only creates shard tables
+	 * but does NOT set up replication to prevent data movement and potential data loss.
+	 * 
 	 * @param Queue $queue
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $oldSchema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
@@ -770,6 +774,9 @@ final class Table {
 	 * @return void
 	 */
 	protected function handleShardCreationForRebalancing(Queue $queue, Vector $oldSchema, Vector $newSchema, Map $clusterMap): void {
+		// Calculate original replication factor to ensure safe operations
+		$originalRf = $this->calculateReplicationFactor($oldSchema);
+		
 		// Create map of old schema for comparison
 		/** @var Map<string,Set<int>> */
 		$oldShardMap = new Map();
@@ -797,14 +804,13 @@ final class Table {
 				);
 
 				// If there are existing nodes with this shard, set up replication
-				if ($existingNodesWithShard->count() <= 0) {
+				// BUT only if original RF > 1 (safe to replicate)
+				if ($existingNodesWithShard->count() <= 0 || $originalRf === 1) {
 					continue;
 				}
 
 				$sourceNode = $existingNodesWithShard->first()['node'];
 				$connectedNodes = new Set([$row['node'], $sourceNode]);
-
-
 
 				// Set up cluster replication for this shard
 				$this->handleReplication(
@@ -816,5 +822,33 @@ final class Table {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Calculate the original replication factor from the schema
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @return int
+	 */
+	private function calculateReplicationFactor(Vector $schema): int {
+		if ($schema->isEmpty()) {
+			return 1;
+		}
+
+		// Count how many nodes have each shard
+		$shardCounts = new Map();
+		
+		foreach ($schema as $row) {
+			foreach ($row['shards'] as $shard) {
+				$currentCount = $shardCounts->get($shard, 0);
+				$shardCounts->put($shard, $currentCount + 1);
+			}
+		}
+
+		if ($shardCounts->isEmpty()) {
+			return 1;
+		}
+
+		// The replication factor is the maximum count of any shard
+		return max($shardCounts->values()->toArray());
 	}
 }
