@@ -174,8 +174,7 @@ final class Payload extends BasePayload {
 			return $table;
 		}
 
-
-		foreach (['insert', 'update', 'delete'] as $key) {
+		foreach (['insert', 'replace', 'update', 'delete'] as $key) {
 			if (!isset($struct[$key])) {
 				continue;
 			}
@@ -264,21 +263,32 @@ final class Payload extends BasePayload {
 		$values = &$matches[4];
 		preg_match_all($valuePattern, $values, $matches);
 		$values = &$matches[0];
-		/* $values = array_map(trim(...), $matches[0]); */
 
-		$fieldCount = sizeof($fields);
+		// We filter values here because when there's no match in the regex
+		// we'll still have an empty value in the array
+		$fieldCount = sizeof(array_filter($fields));
+		if ($fieldCount === 0) {
+			throw QueryParseError::create('No fields specified. Please specify all fields in your query.');
+		}
 		$valueCount = sizeof($values);
 		/** @var Vector<Struct<int|string,mixed>> */
 		$batch = new Vector();
 		$doc = [];
 		for ($i = 0; $i < $valueCount; $i++) {
-			$index = ($i + 1) % $fieldCount;
-			$doc[$fields[$index]] = trim($values[$i], "'");
-			// We have edge case when single field and last is first also
-			$isLast = $index === 0;
+			$index = $i % $fieldCount;
+			$field = $fields[$index];
+			$value = trim($values[$i], "'");
+
+			// Store the value for the field
+			$doc[$field] = $value;
+
+			// Check if we've processed a complete document
+			$isLast = ($i + 1) % $fieldCount === 0;
 			if (!$isLast) {
 				continue;
 			}
+
+			// Process the completed document
 			$row = [];
 			if (isset($doc['id'])) {
 				$row['id'] = (int)$doc['id'];
