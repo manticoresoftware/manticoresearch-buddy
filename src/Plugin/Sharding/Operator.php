@@ -2,6 +2,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
+use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -290,7 +291,7 @@ final class Operator {
 		// Update the state
 		if ($isProcessed) {
 			$result['status'] = 'done';
-			$result['result'] = getenv('DEBUG') && $result['type'] === 'create'
+			$result['result'] = ConfigManager::getInt('DEBUG') && $result['type'] === 'create'
 			? $this->client->sendRequest("SHOW CREATE TABLE {$table} OPTION force=1")->getBody()
 			: TaskResult::none()->toString();
 			$this->state->set($stateKey, $result);

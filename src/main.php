@@ -9,6 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Base\Lib\CrashDetector;
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
@@ -30,6 +31,8 @@ try {
 	$settings = QueryProcessor::getSettings();
 	$initBuffer = ob_get_clean();
 	putenv("PLUGIN_DIR={$settings->commonPluginDir}");
+	// Update shared config with plugin directory
+	ConfigManager::set('PLUGIN_DIR', $settings->commonPluginDir);
 } catch (Throwable $t) {
 	Buddy::error($t);
 	ob_flush();
@@ -38,7 +41,7 @@ try {
 
 
 /** @var int $threads */
-$threads = (int)(getenv('THREADS', true) ?: swoole_cpu_num());
+$threads = ConfigManager::getInt('THREADS', swoole_cpu_num());
 $server = Server::create(
 	[
 	'daemonize' => 0,
@@ -145,7 +148,7 @@ if (is_telemetry_enabled()) {
 		static function () {
 			MetricThread::instance()->execute(
 				'checkAndSnapshot',
-				[(int)(getenv('TELEMETRY_PERIOD', true) ?: 300)]
+				[ConfigManager::getInt('TELEMETRY_PERIOD', 300)]
 			);
 		}, 10
 	);

@@ -10,6 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Base\Lib\CliArgsProcessor;
+use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
@@ -30,8 +31,8 @@ class CliArgsProcessorTest extends TestCase {
 		CliArgsProcessor::run();
 
 		echo "\nTesting the processing of the arguments with default values\n";
-		$this->assertEquals(1, getenv('TELEMETRY'));
-		$this->assertEquals(false, getenv('DEBUG'));
+		$this->assertEquals(1, ConfigManager::getInt('TELEMETRY'));
+		$this->assertEquals(false, ConfigManager::getBool('DEBUG'));
 	}
 
 	public function testListenArgProcessOk(): void {
@@ -64,7 +65,7 @@ class CliArgsProcessorTest extends TestCase {
 		echo "\nTesting the processing of the `threads` argument\n";
 		for ($threads = 1; $threads < 12; $threads++) {
 			CliArgsProcessor::run(['threads' => $threads]);
-			$this->assertEquals($threads, (int)getenv('THREADS', true));
+			$this->assertEquals($threads, ConfigManager::getInt('THREADS'));
 		}
 	}
 
@@ -72,7 +73,7 @@ class CliArgsProcessorTest extends TestCase {
 		CliArgsProcessor::run(['disable-telemetry' => false]);
 
 		echo "\nTesting the processing of the `disable-telemetry` argument\n";
-		$this->assertEquals('0', getenv('TELEMETRY', true));
+		$this->assertEquals('0', ConfigManager::get('TELEMETRY'));
 	}
 
 	public function testTelemetryPeriodArgProcessOk(): void {
@@ -80,6 +81,6 @@ class CliArgsProcessorTest extends TestCase {
 		CliArgsProcessor::run(['telemetry-period' => $period]);
 
 		echo "\nTesting the processing of the `telemetry-period` argument\n";
-		$this->assertEquals($period, (int)getenv('TELEMETRY_PERIOD', true));
+		$this->assertEquals($period, ConfigManager::getInt("TELEMETRY_PERIOD"));
 	}
 }

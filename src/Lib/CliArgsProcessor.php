@@ -150,7 +150,7 @@ final class CliArgsProcessor {
 			exit(1);
 		}
 
-		putenv('THREADS=' . (int)$opts['threads']);
+		ConfigManager::set('THREADS', (string)(int)$opts['threads']);
 	}
 
 	/**
@@ -158,11 +158,8 @@ final class CliArgsProcessor {
 	 * @return void
 	 */
 	protected static function parseDisableTelemetry(array $opts): void {
-		if (isset($opts['disable-telemetry'])) {
-			putenv('TELEMETRY=0');
-		} else {
-			putenv('TELEMETRY=1');
-		}
+		$telemetryValue = isset($opts['disable-telemetry']) ? '0' : '1';
+		ConfigManager::set('TELEMETRY', $telemetryValue);
 	}
 
 	/**
@@ -171,7 +168,7 @@ final class CliArgsProcessor {
 	 */
 	protected static function parseLogLevel(string $level): void {
 		$level = LogLevel::fromString($level);
-		putenv('DEBUG=' . $level->value);
+		ConfigManager::set('DEBUG', (string)$level->value);
 	}
 
 	/**
@@ -187,7 +184,8 @@ final class CliArgsProcessor {
 			echo "The --telemetry-period must be in range of 5 to 1800 secs.\n";
 			exit(1);
 		}
-		putenv('TELEMETRY_PERIOD=' . (int)$opts['telemetry-period']);
+		$period = (string)(int)$opts['telemetry-period'];
+		ConfigManager::set('TELEMETRY_PERIOD', $period);
 	}
 
 	/**
@@ -198,7 +196,7 @@ final class CliArgsProcessor {
 		if (str_starts_with($opts['listen'], 'http://0.0.0.0')) {
 			$opts['listen'] = 'http://127.0.0.1' . substr($opts['listen'], 14);
 		}
-		putenv("LISTEN={$opts['listen']}");
+		ConfigManager::set('LISTEN', $opts['listen']);
 	}
 
 	/**
@@ -207,11 +205,12 @@ final class CliArgsProcessor {
 	 */
 	protected static function parseBind(array $opts): void {
 		$host = $opts['bind'];
+		$port = '';
 		if (false !== strpos($host, ':')) {
 			[$host, $port] = explode(':', $host);
-			putenv("BIND_PORT={$port}");
+			ConfigManager::set('BIND_PORT', $port);
 		}
-		putenv("BIND_HOST={$host}");
+		ConfigManager::set('BIND_HOST', $host);
 	}
 
 	/**

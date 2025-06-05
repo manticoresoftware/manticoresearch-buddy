@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Network;
 
 use Manticoresearch\Buddy\Base\Config\LogLevel;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
+use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
@@ -153,7 +154,7 @@ final class EventHandler {
 	 */
 	private static function getConfig(): array {
 		return [
-			'log_level' => match ((int)getenv('DEBUG')) {
+			'log_level' => match (ConfigManager::getInt('DEBUG')) {
 				0 => 'info',
 				1 => 'debug',
 				2 => 'debugv',
@@ -171,10 +172,11 @@ final class EventHandler {
 	 */
 	private static function setConfig(array $config): array {
 		$newConfig = static::getConfig();
-		// Process log level if presetns
+		// Process log level if present
 		if (isset($config['log_level'])) {
 			$level = LogLevel::fromString($config['log_level']);
-			putenv('DEBUG=' . $level->value);
+			// Update shared configuration that all workers can access
+			ConfigManager::set('DEBUG', (string)$level->value);
 			$newConfig['log_level'] = $level->toString();
 		}
 
