@@ -18,7 +18,7 @@ fi
 for n in $(seq 1 $nodes); do
 	cat << EOF > $DIR/manticore-${n}.conf
 searchd {
-	buddy_path = manticore-executor /workdir/src/main.php --debugv
+	buddy_path = manticore-executor /workdir/src/main.php --log-level=debugvv
 	listen = 127.0.0.1:${n}9312
 	listen = 127.0.0.1:${n}9306:mysql
 	listen = 127.0.0.1:${n}9308:http
