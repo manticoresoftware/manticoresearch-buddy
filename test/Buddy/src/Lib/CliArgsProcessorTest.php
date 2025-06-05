@@ -81,6 +81,6 @@ class CliArgsProcessorTest extends TestCase {
 		CliArgsProcessor::run(['telemetry-period' => $period]);
 
 		echo "\nTesting the processing of the `telemetry-period` argument\n";
-		$this->assertEquals($period, ConfigManager::getInt("TELEMETRY_PERIOD"));
+		$this->assertEquals($period, ConfigManager::getInt('TELEMETRY_PERIOD'));
 	}
 }

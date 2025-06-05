@@ -32,7 +32,7 @@ try {
 	$initBuffer = ob_get_clean();
 	putenv("PLUGIN_DIR={$settings->commonPluginDir}");
 	// Update shared config with plugin directory
-	ConfigManager::set('PLUGIN_DIR', $settings->commonPluginDir);
+	ConfigManager::set('PLUGIN_DIR', $settings->commonPluginDir ?? '');
 } catch (Throwable $t) {
 	Buddy::error($t);
 	ob_flush();

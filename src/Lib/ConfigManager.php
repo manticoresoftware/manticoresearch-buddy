@@ -59,6 +59,7 @@ final class ConfigManager {
 	 */
 	public static function set(string $key, string $value): void {
 		self::ensureInitialized();
+		assert(self::$table !== null);
 		self::$table->set($key, ['value' => $value]);
 	}
 
@@ -72,8 +73,9 @@ final class ConfigManager {
 	 */
 	public static function get(string $key, string $default = ''): string {
 		self::ensureInitialized();
+		assert(self::$table !== null);
 		$row = self::$table->get($key);
-		return $row ? $row['value'] : $default;
+		return $row !== false && is_array($row) && isset($row['value']) ? (string)$row['value'] : $default;
 	}
 
 	/**
@@ -110,6 +112,7 @@ final class ConfigManager {
 	 */
 	public static function has(string $key): bool {
 		self::ensureInitialized();
+		assert(self::$table !== null);
 		return self::$table->exist($key);
 	}
 
@@ -121,9 +124,12 @@ final class ConfigManager {
 	 */
 	public static function getAll(): array {
 		self::ensureInitialized();
+		assert(self::$table !== null);
 		$config = [];
 		foreach (self::$table as $key => $row) {
-			$config[$key] = $row['value'];
+			if (is_array($row) && isset($row['value'])) {
+				$config[$key] = (string)$row['value'];
+			}
 		}
 		return $config;
 	}
@@ -149,9 +155,12 @@ final class ConfigManager {
 
 		foreach ($defaultVars as $key => $value) {
 			// Only set if not already set (allows CliArgsProcessor to override)
-			if (!self::$table->exist($key)) {
-				self::$table->set($key, ['value' => $value]);
+			assert(self::$table !== null);
+			if (self::$table->exist($key)) {
+				continue;
 			}
+
+			self::$table->set($key, ['value' => $value]);
 		}
 	}
 
