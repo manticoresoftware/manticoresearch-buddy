@@ -223,6 +223,7 @@ final class Payload extends BasePayload {
 	 * Helper to parse the lang string into array
 	 * @param null|string|array<string> $layouts
 	 * @return array<string>
+	 * @throws QueryParseError
 	 */
 	protected static function parseLayouts(null|string|array $layouts): array {
 		// If we have array already, just return it
@@ -233,6 +234,12 @@ final class Payload extends BasePayload {
 			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
 		} else {
 			$layouts = KeyboardLayout::getSupportedLanguages();
+		}
+
+		if ($layouts && sizeof($layouts) < 2) {
+			throw QueryParseError::create(
+				'At least two languages are required in layouts'
+			);
 		}
 		return $layouts;
 	}
