@@ -36,7 +36,7 @@ function buddy_metric(string $name, int|float $value) {
  * @return bool
  */
 function is_telemetry_enabled(): bool {
-	return getenv('TELEMETRY', true) === '1';
+	return \Manticoresearch\Buddy\Base\Lib\ConfigManager::get('TELEMETRY', '1') === '1';
 }
 
 /**
