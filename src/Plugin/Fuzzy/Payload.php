@@ -115,9 +115,9 @@ final class Payload extends BasePayload {
 		$searchTableName = $matches[2] ?? null;
 		if (isset($searchTableName) && trim($searchTableName) === ',') {
 			throw QueryParseError::create(
-				"MATCH() clause has a trailing comma but table name is not defined. " .
+				'MATCH() clause has a trailing comma but table name is not defined. ' .
 					"Did you mean to specify a table? Eample: MATCH('search query', table_name)"
-				);
+			);
 		}
 
 		// I did not figure out how to make with regxp case OPTION fuzzy=1 so do this way
