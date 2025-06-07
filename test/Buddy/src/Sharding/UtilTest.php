@@ -55,6 +55,7 @@ class UtilTest extends TestCase {
 	/**
 	 * Test rebalancing with RF=1 when adding new nodes - should NOT move shards
 	 */
+	// phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
 	public function testRebalanceWithRf1AddingNodes(): void {
 		// Create original schema with RF=1: 6 shards on 2 nodes
 		$originalNodes = new Set(['node1', 'node2']);
@@ -98,7 +99,10 @@ class UtilTest extends TestCase {
 		$this->assertNotNull($newNodeRow, 'New node should be present in rebalanced schema');
 
 		// CRITICAL: New node should have NO shards (RF=1 prevents data movement)
-		$this->assertTrue($newNodeRow['shards']->isEmpty(), 'New node should have no shards with RF=1 to prevent data loss');
+		$this->assertTrue(
+			$newNodeRow['shards']->isEmpty(),
+			'New node should have no shards with RF=1 to prevent data loss'
+		);
 
 		// CRITICAL: Existing nodes should keep their EXACT original shards (no movement)
 		foreach ($originalSchema as $originalRow) {
@@ -113,7 +117,8 @@ class UtilTest extends TestCase {
 			$this->assertEquals(
 				$originalRow['shards']->toArray(),
 				$rebalancedRow['shards']->toArray(),
-				"Node {$originalRow['node']} should keep its EXACT original shards with RF=1 - moving shards would cause data loss!"
+				"Node {$originalRow['node']} should keep its EXACT original"
+					. 'shards with RF=1 - moving shards would cause data loss!'
 			);
 		}
 
