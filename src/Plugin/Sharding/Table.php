@@ -763,10 +763,10 @@ final class Table {
 
 	/**
 	 * Handle shard creation for rebalancing (all nodes that need new shards)
-	 * 
+	 *
 	 * SAFETY: Respects original replication factor - with RF=1, only creates shard tables
 	 * but does NOT set up replication to prevent data movement and potential data loss.
-	 * 
+	 *
 	 * @param Queue $queue
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $oldSchema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
@@ -776,7 +776,7 @@ final class Table {
 	protected function handleShardCreationForRebalancing(Queue $queue, Vector $oldSchema, Vector $newSchema, Map $clusterMap): void {
 		// Calculate original replication factor to ensure safe operations
 		$originalRf = $this->calculateReplicationFactor($oldSchema);
-		
+
 		// Create map of old schema for comparison
 		/** @var Map<string,Set<int>> */
 		$oldShardMap = new Map();
@@ -836,7 +836,7 @@ final class Table {
 
 		// Count how many nodes have each shard
 		$shardCounts = new Map();
-		
+
 		foreach ($schema as $row) {
 			foreach ($row['shards'] as $shard) {
 				$currentCount = $shardCounts->get($shard, 0);

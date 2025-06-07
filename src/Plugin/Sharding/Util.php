@@ -124,11 +124,11 @@ final class Util {
 
   /**
    * Make rebalance of the sharding schema and return new one
-   * 
+   *
    * IMPORTANT: This method respects the original replication factor (RF) to ensure data safety:
    * - RF=1: NO data movement - new nodes are added but existing shards stay put to prevent data loss
    * - RF>1: Safe rebalancing - shards can be redistributed because data is replicated
-   * 
+   *
    * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
    * @param  Set<string> $nodes
    * @return Vector<array{
@@ -149,7 +149,7 @@ final class Util {
 		if ($hasNewNodes) {
 			// Calculate original replication factor from existing schema
 			$originalRf = self::calculateReplicationFactor($schema);
-			
+
 			// For rf=1, we should NOT move existing data - only link new nodes
 			// Data movement with rf=1 would cause data loss
 			if ($originalRf === 1) {
@@ -294,7 +294,7 @@ final class Util {
 
 		// Count how many nodes have each shard
 		$shardCounts = new Map();
-		
+
 		foreach ($schema as $row) {
 			foreach ($row['shards'] as $shard) {
 				$currentCount = $shardCounts->get($shard, 0);
@@ -318,7 +318,7 @@ final class Util {
    */
 	private static function getTotalUniqueShards(Vector $schema): int {
 		$allShards = new Set();
-		
+
 		foreach ($schema as $row) {
 			$allShards->add(...$row['shards']);
 		}
