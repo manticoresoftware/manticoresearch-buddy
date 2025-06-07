@@ -16,39 +16,31 @@ To control different SQL commands, we use the following architecture. Each comma
 
 ### Execution flow
 
-Each request is handled by ReactPHP, parsed in the main loop, and forwarded to the `QueryProcessor`, which is the main entry point for command detection.
+Each request is handled by Swoole HTTP server, parsed in the main loop, and forwarded to the `QueryProcessor`, which is the main entry point for command detection.
 
-Each command that Buddy can process consists of implementing two interfaces: `CommandRequestInterface` and `CommandExecutorInterface`.
+Each command that Buddy can process consists of implementing a plugin with two main classes: `Payload` and `Handler`.
 
-The `CommandRequestInterface` represents the parsing of raw network data from JSON and its preparation for future request processing by the command. Its primary purpose is to parse the data into a `CommandRequest` object and throw exceptions in case of any errors.
+The `Payload` class represents the parsing of raw network data from JSON and its preparation for future request processing. It must implement static methods `fromRequest()` for parsing, `hasMatch()` for request detection, and `getInfo()` for plugin description.
 
-There is a base class – `CommandRequestBase`, that implements the required interface and adds some base logic to all requests we support. You should extend this class when you create a new command request.
-
-The `CommandExecutorInterface` contains the logic for the command that must be executed. It uses the `Task` class, which is run in parallel in a separate thread to make the process non-blocking.
+The `Handler` class contains the logic for the command that must be executed. It takes a `Payload` instance in its constructor and implements a `run()` method that returns a `Task` instance, which is executed asynchronously using Swoole coroutines.
 
 Exceptions can be thrown when implementing a new command because they are all caught in a loop and processed.
 
 There is a `GenericError` class that implements the `setResponseError` and `getResponseError` methods. If you want to provide a user-friendly error message, you can use the `setResponseError` method or create an exception with `GenericError::create('User-friendly error message goes here')`. It's important to note that the default exception message will not be included in the user response but in the Manticore log file.
 
-### Helper tool to start new command development
+### Helper tool to start new plugin development
 
-We offer a tool that simplifies the process of adding a new command. Using the tool, you can create a new command with a single command-line instruction like this:
+We offer a tool that simplifies the process of adding a new plugin. However, this tool is not currently available in the repository. You can manually create a new plugin by following the structure described in the next section.
 
-```bash
-bin/create-command NameOfTheCommand
-```
+### Steps for creating a new plugin
 
-Once you execute this command, all the necessary structures for the `NameOfTheCommand` command will be created automatically. All that's left for you to do is to review the files and add your code where necessary. For further information on how this tool works, please refer to the next section.
+Let's take a closer look at an example of how to create a plugin for a RESTORE command:
 
-### Steps for creating a new command
-
-Let's take a closer look at an example of how to create an abstract RESTORE command:
-
-1. Start by creating a directory with our command namespace `src/Restore` and implementing the Request and Executor classes.
-2. Then, write code that implements the `fromRequest` method in the `Request` class. This method should parse the input network request and return a new Request instance with all the necessary data loaded and ready to be used in the `Executor`.
-3. In the `Executor`, write code that implements the run method and contains all the logic for the command. This method should return an instance of the `Task` class.
-4. With the `Task` instance, you can check the status, get the result, and have full control over the asynchronous execution of the command.
-5.Finally, add a case for our new command to the `extractCommandFromRequest` method of the `QueryProcessor` class. This ensures that the `QueryProcessor` can recognize and handle requests for the `RESTORE` command.
+1. Start by creating a directory with your plugin namespace `src/Plugin/Restore` and implementing the `Payload` and `Handler` classes.
+2. In the `Payload` class, implement the `fromRequest()` static method that parses the input network request and returns a new Payload instance with all necessary data loaded.
+3. Implement the `hasMatch()` static method that determines if this plugin should handle the given request.
+4. In the `Handler` class, implement the `run()` method that contains all the logic for the command and returns a `Task` instance.
+5. The plugin will be automatically discovered by the plugin system through namespace scanning - no manual registration is required.
 
 ### Debug
 
@@ -92,7 +84,7 @@ To run a Buddy instance from the command line interface (CLI), use the following
   --help                 display this help message
   --telemetry-period=[N] set period for telemetry when we do snapshots
   --disable-telemetry    disables telemetry for Buddy
-  --threads=[N]          start N threads on launch, default is 4
+  --threads=[N]          start N threads on launch, default is CPU core count
   --debug                enable debug mode for testing
   --debugv               enable verbose debug mode with periodic messages
   Examples:
@@ -110,8 +102,7 @@ If you want to contribute to the project and develop extra features, we have pre
 Just go to your "buddy" folder on a host machine and run the following instructions.
 
 ```bash
-docker run --privileged --entrypoint bash -v $(pwd):/workdir --name manticore-buddy  -it ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
-ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
+docker run --privileged --entrypoint bash -v $(pwd):/workdir --name manticore-buddy -it ghcr.io/manticoresoftware/manticoresearch:test-kit-latest
 ```
 
 After that, you can go into the container and work as normal. It has pre-installed Manticoresearchd with the columnar library, production, and development version of executor.
