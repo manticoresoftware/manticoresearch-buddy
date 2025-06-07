@@ -218,8 +218,9 @@ class UtilTest extends TestCase {
 
 		$this->assertSame('2', $rebalanced->get(1)['node']);
 
-		// node "2" was unused before, now it must pick up shard 1
-		$this->assertEquals([1], $rebalanced->get(1)['shards']->toArray());
+		// node "2" was unused before
+		// it cannot pick up shard 1 because it on dead node while its rf=1
+		$this->assertEquals([], $rebalanced->get(1)['shards']->toArray());
 
 		//
 		// CASE 2
