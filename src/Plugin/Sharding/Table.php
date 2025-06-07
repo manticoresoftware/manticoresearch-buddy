@@ -773,7 +773,12 @@ final class Table {
 	 * @param Map<string,Cluster> $clusterMap
 	 * @return void
 	 */
-	protected function handleShardCreationForRebalancing(Queue $queue, Vector $oldSchema, Vector $newSchema, Map $clusterMap): void {
+	protected function handleShardCreationForRebalancing(
+		Queue $queue,
+		Vector $oldSchema,
+		Vector $newSchema,
+		Map $clusterMap
+	): void {
 		// Calculate original replication factor to ensure safe operations
 		$originalRf = $this->calculateReplicationFactor($oldSchema);
 
