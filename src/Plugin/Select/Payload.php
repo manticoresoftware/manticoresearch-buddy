@@ -213,7 +213,7 @@ final class Payload extends BasePayload {
 				}
 			}
 
-			if (preg_match('/(`?Manticore`?|^select\s+version\(\))/ius', $request->payload)) {
+			if (preg_match('/(^select\s+version\(\))/ius', $request->payload)) {
 				return true;
 			}
 
