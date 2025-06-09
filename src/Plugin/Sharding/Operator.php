@@ -3,7 +3,6 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
@@ -267,7 +266,7 @@ final class Operator {
 		$stateKey = "table:{$table}";
 		/** @var array{}|array{queue_ids:array<int>,status:string,type:string} */
 		$result = $this->state->get($stateKey);
-		Buddy::debugv("Sharding: table status of {$table}: " . json_encode($result));
+		Buddy::debugvv("Sharding: table status of {$table}: " . json_encode($result));
 		if (!$result) {
 			return false;
 		}
@@ -282,15 +281,15 @@ final class Operator {
 
 			++$processed;
 		}
-		Buddy::debugv("Sharding: table status of {$table}: queue size: {$queueSize}, processed: {$processed}");
+		Buddy::debugvv("Sharding: table status of {$table}: queue size: {$queueSize}, processed: {$processed}");
 
 		$isProcessed = $processed === $queueSize;
 		// Update the state
 		if ($isProcessed) {
 			$result['status'] = 'done';
 			$result['result'] = getenv('DEBUG') && $result['type'] === 'create'
-			? Struct::fromJson($this->client->sendRequest("SHOW CREATE TABLE {$table}")->getBody())
-			: TaskResult::none()->getStruct();
+			? $this->client->sendRequest("SHOW CREATE TABLE {$table} OPTION force=1")->getBody()
+			: TaskResult::none()->toString();
 			$this->state->set($stateKey, $result);
 		}
 

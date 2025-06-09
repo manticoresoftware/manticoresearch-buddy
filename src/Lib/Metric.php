@@ -88,7 +88,7 @@ final class Metric {
 		}
 
 		$enabled = is_telemetry_enabled();
-		Buddy::debugv(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
+		Buddy::debugvv(sprintf('telemetry: %s', $enabled ? 'yes' : 'no'));
 
 		// Add collector parameter, so it makes easier
 		// to understand where metric came from in case we will collect it
@@ -138,43 +138,44 @@ final class Metric {
 	 * @return array<string,string>
 	 */
 	public function getVersions(): array {
-		$buddyVersion = trim(
-			(string)file_get_contents(
-				__DIR__ . DIRECTORY_SEPARATOR . '..'
-				. DIRECTORY_SEPARATOR. '..'
-				. DIRECTORY_SEPARATOR . 'APP_VERSION'
-			)
-		);
-
+		$buddyVersion = Buddy::getVersion();
+		/** @var array{version?:string} $statusMap */
 		$statusMap = $this->getStatusMap();
 		if (!isset($statusMap['version'])) {
 			Buddy::debug('metric: failed to get version from SHOW STATUS query');
 			return [];
 		}
 
-		$verPattern = 'v?(\d+\.\d+\.\d+[^\(\)]*)';
-		$matchExpr = "/^{$verPattern}(\(columnar\s{$verPattern}\))?"
-			. "([^\(]*\(secondary\s{$verPattern}\))?"
-			. "([^\(]*\(knn\s{$verPattern}\))?"
-			. "([^\(]*\(buddy\s{$verPattern}\))?$/ius"
-		;
-		/** @var string $version */
-		$version = $statusMap['version'];
-		preg_match($matchExpr, $version, $m);
-		if (!isset($m[1])) {
-			Buddy::debug('metric: failed to parse manticore version');
-			return [];
+		$value = $statusMap['version'];
+		$result = [];
+
+		// Add buddy version from our method
+		$result['buddy_version'] = $buddyVersion;
+
+		// Process components and their versions
+		$splitVersions = explode('(', $value);
+		foreach ($splitVersions as $n => $version) {
+			$version = trim($version);
+
+			// Remove closing parenthesis if exists
+			if ($version && $version[mb_strlen($version) - 1] === ')') {
+				$version = substr($version, 0, -1);
+			}
+
+			$exploded = explode(' ', $version);
+
+			if ($n === 0) {
+				// First version is manticore_version (not daemon)
+				$result['manticore_version'] = $version;
+			} elseif (sizeof($exploded) > 1) {
+				// Handle component versions (columnar, secondary, knn)
+				$component = strtolower($exploded[0]);
+				$componentVersion = implode(' ', array_slice($exploded, 1));
+				$result[$component . '_version'] = $componentVersion;
+			}
 		}
 
-		return array_filter(
-			[
-				'buddy_version' => $buddyVersion,
-				'manticore_version' => trim($m[1]),
-				'columnar_version' => $m[3] ?? null,
-				'secondary_version' => $m[5] ?? null,
-				'knn_version' => $m[7] ?? null,
-			]
-		);
+		return array_filter($result);
 	}
 
 	/**
@@ -200,6 +201,7 @@ final class Metric {
 			return;
 		}
 
+		Buddy::debugv('running metric snapshot');
 		$ts = time();
 		try {
 			$this->snapshot();
@@ -278,22 +280,22 @@ final class Metric {
 		);
 
 		// Display labels we will send
-		Buddy::debugv(sprintf('labels: %s', json_encode($this->telemetry->getLabels())));
+		Buddy::debugvv(sprintf('labels: %s', json_encode($this->telemetry->getLabels())));
 
 		// 3. Get snapshot of tables metrics
 		$metrics = array_merge($metrics, $this->getTablesMetrics());
-		Buddy::debugv(sprintf('metrics: %s', json_encode($metrics)));
+		Buddy::debugvv(sprintf('metrics: %s', json_encode($metrics)));
 
 		// 4. Get Rate Metrics
 		$rateMetrics = $this->getRateMetrics($metrics);
 		$metrics = array_merge($metrics, $rateMetrics);
-		Buddy::debugv(sprintf('rates: %s', json_encode($rateMetrics)));
+		Buddy::debugvv(sprintf('rates: %s', json_encode($rateMetrics)));
 
 		// 5. Collect volume metrics if enabled
 		if ($this->collectVolumeMetrics && $this->hasVolumeMetrics()) {
 			$volumeMetrics = $this->getVolumeMetrics();
 			$metrics = array_merge($metrics, $volumeMetrics);
-			Buddy::debugv(sprintf('volume: %s', json_encode($volumeMetrics)));
+			Buddy::debugvv(sprintf('volume: %s', json_encode($volumeMetrics)));
 		}
 
 		// 6. Add all metrics to the batch

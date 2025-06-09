@@ -10,7 +10,10 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\DistributedInsert;
 
+use Ds\Map;
+use Ds\Set;
 use Ds\Vector;
+use Manticoresearch\Buddy\Base\Plugin\Sharding\Table;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
@@ -43,8 +46,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$requests = [];
 			$positions = [];
 			$n = 0;
+			$clusterMap = $this->getTableClusterMap(array_keys($this->payload->batch));
 			foreach ($this->payload->batch as $table => $batch) {
-				$shardRows = $this->processBatch($batch, $n, $positions, $table);
+				$shardRows = $this->processBatch($batch, $n, $positions, $table, $clusterMap);
 				if (!$shardRows) {
 					throw new ManticoreSearchClientError('Failed to prepare docs for insertion');
 				}
@@ -66,6 +70,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 * @param int &$n
 	 * @param array<string,array{n:int,table:string,cluster:string}> &$positions
 	 * @param string $table
+	 * @param Map<string,string> $clusterMap
 	 * @return array{string:array{info:array{name:string,url:string},rows:array<string>}}|array{}
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
@@ -75,29 +80,32 @@ final class Handler extends BaseHandlerWithFlagCache {
 		int &$n,
 		array &$positions,
 		string $table,
+		Map $clusterMap,
 	): array {
-		[$cluster, $table] = $this->payload::parseCluster($table);
-		$shards = $this->getShards($table);
+		$shards = $this->manticoreClient->getTableShards($table);
 		$shardCount = sizeof($shards);
 
 		// Group rows by shard
 		$shardRows = [];
 		foreach ($batch as $struct) {
-			/** @var Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct */
+			/** @var Struct<string,array{_id:string|int,_index:string}|string|int> $struct */
 			if ($this->shouldAssignId($struct)) {
 				$id = $this->assignId($struct);
 				$idStr = (string)$id;
+
+				$shard = jchash($idStr, $shardCount);
+				$info = $shards[$shard];
+				$shardName = $info['name'];
+				$cluster = $clusterMap[$shardName] ?? '';
+				$this->assignTable($struct, $cluster, $shardName);
+
 				$positions[$idStr] = [
 					'n' => $n++,
 					'table' => $table,
 					'cluster' => $cluster,
 				];
-
-				$shard = jchash($idStr, $shardCount);
-				$info = $shards[$shard];
-				$shardName = $info['name'];
-				$this->assignTable($struct, $cluster, $shardName);
 			}
+
 
 			if (!isset($shardName)) {
 				throw QueryParseError::create('Cannot find shard for table');
@@ -148,63 +156,6 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * Get all shards for current distributed table from the schema
-	 * @param string $table
-	 * @return array<array{name:string,url:string}>
-	 * @throws RuntimeException
-	 */
-	protected function getShards(string $table): array {
-		[$locals, $agents] = $this->parseShards($table);
-
-		$shards = [];
-		// Add locals first
-		foreach ($locals as $t) {
-			$shards[] = [
-				'name' => $t,
-				'url' => '',
-			];
-		}
-		// Add agents after
-		foreach ($agents as $agent) {
-			$ex = explode('|', $agent);
-			$host = strtok($ex[0], ':');
-			$port = (int)strtok(':');
-			$t = strtok(':');
-			$shards[] = [
-				'name' => (string)$t,
-				'url' => "$host:$port",
-			];
-		}
-		$map[$table] = $shards;
-		return $shards;
-	}
-
-	/**
-	 * Helper to parse shards and return local and remote agents for current table
-	 * @param string $table
-	 * @return array{0:array<string>,1:array<string>}
-	 */
-	protected function parseShards($table): array {
-		/** @var array{0:array{data:array<array{"Create Table":string}>}} */
-		$res = $this->manticoreClient->sendRequest("SHOW CREATE TABLE $table")->getResult();
-		$tableSchema = $res[0]['data'][0]['Create Table'] ?? '';
-		if (!$tableSchema) {
-			throw new RuntimeException("There is no such table: {$table}");
-		}
-		if (!str_contains($tableSchema, "type='distributed'")) {
-			throw new RuntimeException('The table is not distributed');
-		}
-
-		if (!preg_match_all("/local='(?P<local>[^']+)'|agent='(?P<agent>[^']+)'/ius", $tableSchema, $m)) {
-			throw new RuntimeException('Failed to match tables from the schema');
-		}
-		return [
-			array_filter($m['local']),
-			array_filter($m['agent']),
-		];
-	}
-
-	/**
 	 * @param array<array{url:string,path:string,request:string}> $requests
 	 * @param array<string|int,array{n:int,table:string,cluster:string}> $positions
 	 * @return TaskResult
@@ -223,7 +174,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	/**
 	 * @param array<array{url:string,path:string,request:string}> $requests
 	 * @param array<string|int,array{n:int,table:string,cluster:string}> $positions
-	 * @return array{took:int,errors:bool,items:array<array{index:array{_id:string,_index:string}}>}
+	 * @return array{took:int,errors:bool,items:array<array<string,array{_id:string,_index:string}>>}
 	 * @throws ManticoreSearchClientError
 	 */
 	protected function processBulk(array $requests, array $positions): array {
@@ -237,11 +188,12 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$errors = $errors || $current['errors'];
 			foreach ($current['items'] as &$item) {
 				if ($this->payload->type === 'bulk') {
-					$id = $item['index']['_id'];
+					$key = static::detectKeyWithTable($item);
+					$id = $item[$key]['_id'];
 					$info = $positions[$id];
-					$index = $item['index'];
+					$index = $item[$key];
 					$index['_index'] = $info['cluster'] ? "{$info['cluster']}:{$info['table']}" : $info['table'];
-					$item['index'] = $index;
+					$item[$key] = $index;
 					$n = $info['n'];
 					$items[$n] = $item;
 				} else {
@@ -305,7 +257,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
+	 * @param Struct<string,string|int>|Struct<string,array{_id:string|int,_index:string}|string|int> $struct
 	 * @return int
 	 */
 	protected function assignId(Struct $struct): int {
@@ -314,11 +266,16 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$id = match (true) {
 			// _bulk
 			isset($struct['index']['_id']) => $struct['index']['_id'],
+			isset($struct['create']['_id']) => $struct['create']['_id'],
+			isset($struct['delete']['_id']) => $struct['delete']['_id'],
+			isset($struct['update']['_id']) => $struct['update']['_id'],
 			// insert, delete etc
 			isset($struct['id']) => $struct['id'],
 			// bulk
 			isset($struct['insert']['id']) => $struct['insert']['id'],
 			isset($struct['replace']['id']) => $struct['replace']['id'],
+			isset($struct['update']['id']) => $struct['update']['id'],
+			isset($struct['delete']['id']) => $struct['delete']['id'],
 			default => array_pop($idPool),
 		};
 		// When id = 0 we generate
@@ -340,8 +297,14 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$index['_id'] = "$id";
 			$struct['index'] = $index;
 		} elseif ($this->payload->type === 'sql') {
-			/** @var Struct<"insert"|"replace",array{id:string|int}> $struct */
-			$key = isset($struct['replace']) ? 'replace' : 'insert';
+			/** @var Struct<"insert"|"replace"|"update"|"delete",array{id:string|int}> $struct */
+			$key = match (true) {
+				isset($struct['replace']) => 'replace',
+				isset($struct['insert']) => 'insert',
+				isset($struct['update']) => 'update',
+				isset($struct['delete']) => 'delete',
+				default => throw new \LogicException('Invalid payload type'),
+			};
 			$row = $struct[$key];
 			$row['id'] = (int)$id;
 			$struct[$key] = $row;
@@ -353,40 +316,137 @@ final class Handler extends BaseHandlerWithFlagCache {
 	}
 
 	/**
-	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
+	 * @param Struct<string,string|int>|Struct<string,array{_id:string|int,_index:string}|string|int> $struct
 	 * @param string $cluster
 	 * @param string $shardName
 	 * @return void
 	 */
 	protected function assignTable(Struct $struct, string $cluster, string $shardName): void {
-		$table = $cluster ? "$cluster:$shardName" : $shardName;
 		if ($this->payload->type === 'bulk') {
-			/** @var Struct<"index",array{_id:string|int,_index:string}> $struct */
+			/** @var Struct<string,array{_index:string,_id:int|string}> $struct */
+			$key = static::detectKeyWithTable($struct);
+
 			/** @var array{_id:string|int,_index:string} $index */
-			$index = $struct['index'];
-			$index['_index'] = $table;
-			$struct['index'] = $index;
+			$index = $struct[$key];
+			if ($cluster) {
+				$shardName = "{$cluster}:{$shardName}";
+			}
+			$index['_index'] = $shardName;
+			$struct[$key] = $index;
 		} elseif ($this->payload->type === 'sql') {
-			/** @var Struct<"insert"|"replace",array{table:string}> $struct */
-			$key = isset($struct['replace']) ? 'replace' : 'insert';
+			/** @var Struct<"insert"|"replace"|"update"|"delete",array{table:string}> $struct */
+			$key = match (true) {
+				isset($struct['replace']) => 'replace',
+				isset($struct['insert']) => 'insert',
+				isset($struct['update']) => 'update',
+				isset($struct['delete']) => 'delete',
+				default => throw new \LogicException('Invalid payload type'),
+			};
 			$row = $struct[$key];
 			/** @var array{table:string} $row */
-			$row['table'] = $table;
+			$row['table'] = $shardName;
+			if ($cluster) {
+				$row['cluster'] = $cluster;
+			}
 			$struct[$key] = $row;
 		} else {
 			/** @var Struct<string,string|int> $struct */
-			$struct['table'] = $table;
+			$struct['table'] = $shardName;
+			if ($cluster) {
+				$struct['cluster'] = $cluster;
+			}
 		}
 	}
 
 	/**
-	 * @param Struct<string,string|int>|Struct<"index",array{_id:string|int,_index:string}|string|int> $struct
+	 * @param Struct<string,array{
+	 *     _index: string,
+	 *     _id: int|string
+	 * }>|array<string,array{
+	 *     _index: string,
+	 *     _id: int|string
+	 * }> $item
+	 * @return string
+	 */
+	protected static function detectKeyWithTable(Struct|array $item): string {
+		return match (true) {
+			isset($item['index']['_index']) => 'index',
+			isset($item['create']['_index']) => 'create',
+			isset($item['delete']['_index']) => 'delete',
+			isset($item['update']['_index']) => 'update',
+			default => throw QueryParseError::create('Cannot detect key with table'),
+		};
+	}
+
+	/**
+	 * @param Struct<string,string|int>|Struct<string,array{_id:string|int,_index:string}|string|int> $struct
 	 * @return bool
 	 */
 	protected function shouldAssignId(Struct $struct): bool {
-		if ($this->payload->type === 'bulk' && !isset($struct['index'])) {
+		if ($this->payload->type === 'bulk') {
+			// Elasticsearch like _bulk
+			foreach (['index', 'create', 'delete', 'update'] as $key) {
+				if (isset($struct[$key]['_index'])) {
+					return true;
+				}
+			}
+
+			// Our bulk
+			foreach (['insert', 'replace', 'update', 'delete'] as $key) {
+				if (isset($struct[$key]['table'])) {
+					return true;
+				}
+			}
+
 			return false;
 		}
 		return true;
+	}
+
+	/**
+	 * Fetch and cache cluster for the table
+	 * @param array<string> $tables
+	 * @return Map<string,string>
+	 */
+	protected function getTableClusterMap(array $tables): Map {
+		$tablesStr = "'" . implode("','", $tables) . "'";
+		$query = "
+		SELECT node, table, shards
+		FROM system.sharding_table
+		WHERE cluster != '' AND table IN ({$tablesStr})
+		";
+
+		/** @var Map<string,Set<string>> */
+		$connections = new Map;
+		/** @var array{0:array{data:array<array{node:string, table:string, shards:string}>}} */
+		$res = $this->manticoreClient->sendRequest($query)->getResult();
+
+		// Process the results to create a map of shards to nodes
+		foreach ($res[0]['data'] as $row) {
+			$node = $row['node'];
+			$table = $row['table'];
+			$shardsList = explode(',', $row['shards']);
+
+			foreach ($shardsList as $shard) {
+				$shard = (int)trim($shard);
+				$shardName = Table::getTableShardName($table, $shard);
+				if (!isset($connections[$shardName])) {
+					$connections[$shardName] = new Set();
+				}
+				$connections[$shardName]?->add($node);
+			}
+		}
+		/** @var Map<string,string> */
+		$map = new Map;
+		foreach ($connections as $shard => $nodes) {
+			// Skip single node shards cuz no need cluster for them
+			if (sizeof($nodes) <= 1) {
+				continue;
+			}
+
+			$map[$shard] = Table::getClusterName($nodes);
+		}
+
+		return $map;
 	}
 }

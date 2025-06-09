@@ -85,7 +85,7 @@ class QueueProcess extends BaseProcessor {
 			}
 
 			if (!empty($resultStruct['data'][0]['suspended'])) {
-				Buddy::debugv("Worker {$instance['full_name']} is suspended. Skip running");
+				Buddy::debugvv("Worker {$instance['full_name']} is suspended. Skip running");
 				continue;
 			}
 
@@ -110,12 +110,15 @@ class QueueProcess extends BaseProcessor {
 	 * @throws \Exception
 	 */
 	public function runWorker(array $instance, bool $shouldStart = true): void {
-
-		Buddy::debugv('Start worker ' . $instance['full_name']);
-		$kafkaWorker = new KafkaWorker($this->client, $instance);
-		$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
-		// Add worker to the pool and automatically start it
-		$this->process->addWorker($worker, $shouldStart);
+		Buddy::debugvv('Start worker ' . $instance['full_name']);
+		try {
+			$kafkaWorker = new KafkaWorker($this->client, $instance);
+			$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
+			// Add worker to the pool and automatically start it
+			$this->process->addWorker($worker, $shouldStart);
+		} catch (\Exception $exception) {
+			Buddy::error($exception);
+		}
 
 		// When we need to use this method from the Handler
 		// we simply get processor and execute method with parameters
@@ -131,7 +134,7 @@ class QueueProcess extends BaseProcessor {
 			$worker = $this->process->getWorker($id);
 			$this->process->removeWorker($worker);
 		} catch (Throwable $exception) {
-			Buddy::debugv($exception->getMessage());
+			Buddy::debugvv($exception->getMessage());
 		} finally {
 			return true;
 		}

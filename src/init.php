@@ -33,6 +33,9 @@ set_error_handler(buddy_error_handler(...)); // @phpstan-ignore-line
 Buddy::setVersionFile(__DIR__ . '/../APP_VERSION');
 
 $opts = CliArgsProcessor::run();
+$authToken = getenv('BUDDY_TOKEN') ?: null;
+// Reset token
+putenv('BUDDY_TOKEN=');
 
 // Build container dependencies
 // TODO: probably it's a good idea to get rid out of this container at all
@@ -41,7 +44,8 @@ $container = new ContainerBuilder();
 $container->register('QueryParserLoader', Loader::class);
 $container
 	->register('manticoreClient', HTTPClient::class)
-	->addArgument($opts['listen']);
+	->addArgument($opts['listen'])
+	->addArgument($authToken);
 $container->register('flagCache', FlagCache::class);
 
 $container
@@ -54,7 +58,8 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-backup',
 	'manticoresoftware/buddy-plugin-emulate-elastic',
 	'manticoresoftware/buddy-plugin-fuzzy',
-	'manticoresoftware/buddy-plugin-create',
+	'manticoresoftware/buddy-plugin-create-table',
+	'manticoresoftware/buddy-plugin-create-cluster',
 	'manticoresoftware/buddy-plugin-drop',
 	'manticoresoftware/buddy-plugin-insert',
 	'manticoresoftware/buddy-plugin-alias',
@@ -74,6 +79,8 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-autocomplete',
 	'manticoresoftware/buddy-plugin-cli-table',
 	'manticoresoftware/buddy-plugin-distributed-insert',
+	'manticoresoftware/buddy-plugin-truncate',
+	'manticoresoftware/buddy-plugin-metrics',
 ];
 // Filtering out the plugins that we don't need
 $plugins = array_filter(

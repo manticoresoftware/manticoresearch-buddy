@@ -1,9 +1,11 @@
 name: release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [ tests ]
+    types: [ completed ]
+    branches: [ main ]
+
   pull_request:
     branches: [ main ]
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -18,7 +20,11 @@ env:
 jobs:
   update-version:
     if: >
-      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.ref == 'refs/heads/main'
+      ) ||
       github.event_name == 'pull_request' && contains(
             github.event.pull_request.labels.*.name, 'pack'
           )
@@ -32,11 +38,19 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
       - id: semver-tagger
         uses: manticoresoftware/semver-tagger-action@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          ignore_patterns: '\.md$|^test/|\.github|\.yml|\.gitignore$'
   vars:
-    needs: update-version
     if: needs.update-version.outputs.version != ''
+    needs: update-version
     runs-on: ubuntu-22.04
     outputs:
       target: ${{ steps.vars.outputs.target }}
@@ -196,6 +210,7 @@ jobs:
     if: needs.update-version.outputs.target == 'release'
     runs-on: ubuntu-22.04
     needs:
+      - update-version
       - build-artifact
       - build-linux-packages
     steps:
@@ -219,6 +234,7 @@ jobs:
           prerelease: false
 
   deploy:
+    name: ${{ matrix.distro }} ${{ matrix.arch }}
     needs:
       - vars
       - build-artifact
@@ -289,6 +305,7 @@ jobs:
           artifact: ${{ matrix.artifact }}
           type: ${{ matrix.type }}
           delimiter: ${{ matrix.delimiter }}
+          target: ${{ env.target }}
 
   update-manticoresearch-deps:
     needs:

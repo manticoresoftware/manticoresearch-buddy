@@ -7,11 +7,13 @@ use RuntimeException;
 
 final class Node {
 	const LISTEN_PATTERN = '/^(?:' .
+		'(?:' .
 		'(?:[0-9]{1,3}\.){3}[0-9]{1,3}|' .
 		'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*' .
 		'[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]' .
-		')' .
-		'(?:\:([0-9]+))|([0-9]+)$' .
+		')?:)?' .
+		'([0-9]+)' .
+		'(?:\:http)?$' .
 		'/ius';
 
 	/** @var int */
@@ -45,7 +47,11 @@ final class Node {
 			throw new RuntimeException('Settings searchdListen parameter must be set');
 		}
 		$listen = $settings->searchdListen->copy();
-		$listen->sort();
+		$listen->sort(
+			static function (string $a, string $b): int {
+				return substr_count($a, ':') <=> substr_count($b, ':');
+			}
+		);
 		foreach ($listen as $line) {
 			$nodeId = static::parseNodeId($line);
 			if ($nodeId) {
@@ -72,9 +78,15 @@ final class Node {
 		}
 
 		if (str_contains($line, ':')) {
-			[$host, $port] = explode(':', $line);
+			$parts = explode(':', $line);
+			if (sizeof($parts) === 2 && is_numeric($parts[0])) {
+				$host = '127.0.0.1';
+				[$port] = $parts;
+			} else {
+				[$host, $port] = $parts;
+			}
 		} else {
-			$host = '0.0.0.0';
+			$host = '127.0.0.1';
 			$port = $line;
 		}
 

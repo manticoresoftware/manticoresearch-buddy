@@ -18,6 +18,16 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 class Loader {
 
 	/**
+	 *
+	 * @param string $requestPath
+	 * @param ManticoreEndpoint $requestEndpointBundle
+	 * @return bool
+	 */
+	public static function isElasticLikeRequest(string $requestPath, ManticoreEndpoint $requestEndpointBundle): bool {
+		return ($requestEndpointBundle->value !== $requestPath);
+	}
+
+	/**
 	 * @param string $reqPath
 	 * @param ManticoreEndpoint $reqEndpointBundle
 	 * @return InsertQueryParserInterface
@@ -34,9 +44,9 @@ class Loader {
 		};
 		$parserClass = match ($reqFormat) {
 			RequestFormat::SQL => 'SQLInsertParser',
-			RequestFormat::JSON => ($reqEndpointBundle->value === $reqPath)
-				? 'JSONInsertParser'
-				: 'ElasticJSONInsertParser',
+			RequestFormat::JSON => self::isElasticLikeRequest($reqPath, $reqEndpointBundle)
+				? 'ElasticJSONInsertParser'
+				: 'JSONInsertParser',
 		};
 		$parserClassFull = __NAMESPACE__ . '\\' . $parserClass;
 		$parser = ($parserClassFull === __NAMESPACE__ . '\ElasticJSONInsertParser')

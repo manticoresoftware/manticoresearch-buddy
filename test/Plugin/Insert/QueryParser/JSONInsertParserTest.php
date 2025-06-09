@@ -10,6 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Datatype;
+use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\ElasticJSONInsertParser;
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\JSONInsertParser;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\CoreTest\Trait\TestProtectedTrait;
@@ -37,6 +38,15 @@ class JSONInsertParserTest extends TestCase {
 
 	public function testInsertValTypeDetection(): void {
 		echo "\nTesting the detection of an Insert value datatype\n";
+
+		// Testing the specific treatment of text values in elastic-like requests
+		$parser = new ElasticJSONInsertParser('_bulk');
+		$this->assertEquals(Datatype::Indexedstring, self::invokeMethod($parser, 'detectValType', ['test text']));
+		$this->assertEquals(Datatype::Indexedstring, self::invokeMethod($parser, 'detectValType', ['0.1']));
+		$this->assertEquals(Datatype::Indexedstring, self::invokeMethod($parser, 'detectValType', ['11111111111']));
+		$this->assertEquals(Datatype::Indexedjson, self::invokeMethod($parser, 'detectValType', [['a' => 1]]));
+		$this->assertEquals(Datatype::Indexedjson, self::invokeMethod($parser, 'detectValType', [[2, 0.5]]));
+
 		$parser = new JSONInsertParser();
 		self::$parser = $parser;
 
@@ -153,4 +163,18 @@ class JSONInsertParserTest extends TestCase {
 		$this->assertEquals(QueryParseError::class, $exCls);
 		$this->assertEquals("Operation name 'insert' is missing", $exMsg);
 	}
+
+	public function testElasticParseOk(): void {
+		// Testing the specific treatment of text values in elastic-like requests
+		echo "\nTesting the parsing of JSON insert elastic-like request\n";
+		$parser = new ElasticJSONInsertParser('test_elastic');
+		$query = '{"col1" : 10, "col2": "a", "col3": {"a":1} }';
+		$res = [
+			'name' => 'test_elastic',
+			'cols' => ['col1', 'col2', 'col3'],
+			'colTypes' => ['int', 'string attribute indexed', "json secondary_index='1'"],
+		];
+		$this->assertEquals($res, $parser->parse($query));
+	}
+
 }

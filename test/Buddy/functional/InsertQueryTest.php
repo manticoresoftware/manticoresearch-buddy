@@ -50,6 +50,14 @@ class InsertQueryTest extends TestCase {
 		$this->assertEquals($result, $out);
 	}
 
+	public function testHTTPInsertQueryWithUppercasedTableNameOk(): void {
+		echo "\nTesting the execution of HTTP insert query with an uppercased table name to a non-existing table\n";
+		$query = 'INSERT into ' . strtoupper($this->testTable) . '(col1,col2) VALUES(1,2) ';
+		$out = static::runHttpQuery($query);
+		$result = [['total' => 1,'error' => '','warning' => '']];
+		$this->assertEquals($result, $out);
+	}
+
 	public function testHTTPInsertQueryFail(): void {
 		echo "\nTesting the fail on the execution of HTTP insert query to a non-existing table\n";
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1,2) ";
@@ -181,14 +189,14 @@ class InsertQueryTest extends TestCase {
 		$this->assertEquals(3, sizeof($outData['items']));
 		$out = static::runSqlQuery("describe {$this->testTable}");
 		$res = [
-			'+-----------+--------+----------------+',
-			'| Field     | Type   | Properties     |',
-			'+-----------+--------+----------------+',
-			'| id        | bigint |                |',
-			'| title     | text   | indexed stored |',
-			'| price     | uint   |                |',
-			'| new_price | float  |                |',
-			'+-----------+--------+----------------+',
+			'+-----------+--------+-------------------+',
+			'| Field     | Type   | Properties        |',
+			'+-----------+--------+-------------------+',
+			'| id        | bigint |                   |',
+			'| title     | string | indexed attribute |',
+			'| price     | uint   |                   |',
+			'| new_price | float  |                   |',
+			'+-----------+--------+-------------------+',
 		];
 		$this->assertEquals($res, $out);
 	}

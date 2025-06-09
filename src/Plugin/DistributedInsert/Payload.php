@@ -60,7 +60,7 @@ final class Payload extends BasePayload {
 			Endpoint::Bulk => 'bulk',
 			Endpoint::Update => 'update',
 			Endpoint::Delete => 'delete',
-			default => throw new \Exception('Unsupported endpoint bundle'),
+			default => throw QueryParseError::create('Unsupported endpoint bundle'),
 		};
 
 		return $self;
@@ -71,7 +71,8 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		$hasErrorMessage = stripos($request->error, 'not support insert') !== false;
+		$hasErrorMessage = stripos($request->error, 'not support insert') !== false
+			|| stripos($request->error, 'is a part of cluster') !== false;
 
 		// Insert or Replace
 		$hasMatch = ($request->endpointBundle === Endpoint::Insert
@@ -100,7 +101,10 @@ final class Payload extends BasePayload {
 			$isSqlEndpoint = $request->endpointBundle === Endpoint::Sql
 				|| $request->endpointBundle === Endpoint::Cli;
 			$hasMatch = $isSqlEndpoint
-				&& ($request->command === 'insert' || $request->command === 'replace')
+				&& ($request->command === 'insert'
+					|| $request->command === 'replace'
+					|| $request->command === 'update'
+					|| $request->command === 'delete')
 				&& $hasErrorMessage
 			;
 		}
@@ -132,18 +136,15 @@ final class Payload extends BasePayload {
 	 */
 	protected static function parseBulkPayload(Request $request): array {
 		$batch = [];
-		$cluster = '';
 		$table = '';
 		$rows = explode("\n", trim($request->payload));
 		$rowCount = sizeof($rows);
-		$tableMap = [];
-
 		for ($i = 0; $i < $rowCount; $i++) {
 			if (empty($rows[$i])) {
 				continue;
 			}
 
-			[$cluster, $table] = static::processBulkRow($rows[$i], $batch, $tableMap, $cluster, $table);
+			$table = static::processBulkRow($rows[$i], $batch, $table);
 		}
 		/** @var Batch $batch */
 		return $batch;
@@ -152,55 +153,47 @@ final class Payload extends BasePayload {
 	/**
 	 * @param string $row
 	 * @param Batch &$batch
-	 * @param array<string,array{0:string,1:string}> &$tableMap
-	 * @param string $cluster
 	 * @param string $table
-	 * @return array{0:string,1:string}
+	 * @return string
 	 * @throws QueryParseError
 	 */
 	protected static function processBulkRow(
 		string $row,
 		array &$batch,
-		array &$tableMap,
-		string $cluster,
-		string $table
-	): array {
+		string $table,
+	): string {
 		/** @var Struct<int|string,array<string,mixed>> $struct */
 		$struct = Struct::fromJson($row);
 		if (isset($struct['index']['_index'])) { // _bulk
 			/** @var string $table */
 			$table = $struct['index']['_index'];
-			if (!isset($tableMap[$table])) {
-				$tableMap[$table] = static::parseCluster($table);
+			if (!isset($batch[$table])) {
+				$batch[$table] = new Vector();
 			}
-			[$cluster, $table] = $tableMap[$table];
-			if (!isset($batch["$cluster:$table"])) {
-				$batch["$cluster:$table"] = new Vector();
-			}
-			$batch["$cluster:$table"][] = $struct;
-			return [$cluster, $table];
+			$batch[$table][] = $struct;
+			return $table;
 		}
 
-		if (isset($struct['insert'])) { // bulk
+		foreach (['insert', 'replace', 'update', 'delete'] as $key) {
+			if (!isset($struct[$key])) {
+				continue;
+			}
+			// bulk
 			/** @var string $table */
-			$table = $struct['insert']['table'] ?? $struct['insert']['index'];
-			if (!isset($tableMap[$table])) {
-				$tableMap[$table] = static::parseCluster($table);
+			$table = $struct[$key]['table'] ?? $struct[$key]['_index'];
+			if (!isset($batch[$table])) {
+				$batch[$table] = new Vector();
 			}
-			[$cluster, $table] = $tableMap[$table];
-			if (!isset($batch["$cluster:$table"])) {
-				$batch["$cluster:$table"] = new Vector();
-			}
-			$batch["$cluster:$table"][] = $struct;
-			return [$cluster, $table];
+			$batch[$table][] = $struct;
+			return $table;
 		}
 
 		if (!$table) {
-			throw new QueryParseError('Cannot find table name');
+			QueryParseError::throw('Cannot find table name');
 		}
 
-		$batch["$cluster:$table"][] = $struct;
-		return [$cluster, $table];
+		$batch[$table][] = $struct;
+		return $table;
 	}
 
 	/**
@@ -212,15 +205,22 @@ final class Payload extends BasePayload {
 		$struct = Struct::fromJson($request->payload);
 		/** @var string $table */
 		$table = $struct['table'] ?? $struct['index'];
+		/** @var Batch */
+		return [$table => new Vector([$struct])];
+	}
 
-		// We support 2 ways of cluster: as key or in table as prefix:
-		/** @var string $cluster */
-		$cluster = $struct['cluster'] ?? '';
-		if (!$cluster) {
-			[$cluster, $table] = static::parseCluster($table);
-		}
-
-		return ["$cluster:$table" => new Vector([$struct])];
+	/**
+	 * Simple proxy that route the parses into insert, update or delete
+	 * @param Request $request
+	 * @return Batch
+	 */
+	protected static function parseSqlPayload(Request $request): array {
+		return match ($request->command) {
+			'insert', 'replace' => static::parseInsertSqlPayload($request),
+			'update' => static::parseUpdateSqlPayload($request),
+			'delete' => static::parseDeleteSqlPayload($request),
+			default => throw QueryParseError::create('Unsupported command for SQL endpoint'),
+		};
 	}
 
 	/**
@@ -228,7 +228,7 @@ final class Payload extends BasePayload {
 	 * @param Request $request
 	 * @return Batch
 	 */
-	protected static function parseSqlPayload(Request $request): array {
+	protected static function parseInsertSqlPayload(Request $request): array {
 		static $queryPattern = '/^(insert|replace)\s+into\s+'
 			. '`?([a-z][a-z\_\-0-9]*)`?'
 			. '(?:\s*\(([^)]+)\))?\s+'
@@ -254,7 +254,6 @@ final class Payload extends BasePayload {
 		if (!$table) {
 			throw QueryParseError::create('Failed to parse table from the query');
 		}
-		[$cluster, $table] = static::parseCluster($table);
 
 		// It's time to parse values
 		if (!isset($matches[4])) {
@@ -264,21 +263,32 @@ final class Payload extends BasePayload {
 		$values = &$matches[4];
 		preg_match_all($valuePattern, $values, $matches);
 		$values = &$matches[0];
-		/* $values = array_map(trim(...), $matches[0]); */
 
-		$fieldCount = sizeof($fields);
+		// We filter values here because when there's no match in the regex
+		// we'll still have an empty value in the array
+		$fieldCount = sizeof(array_filter($fields));
+		if ($fieldCount === 0) {
+			throw QueryParseError::create('No fields specified. Please specify all fields in your query.');
+		}
 		$valueCount = sizeof($values);
 		/** @var Vector<Struct<int|string,mixed>> */
 		$batch = new Vector();
 		$doc = [];
 		for ($i = 0; $i < $valueCount; $i++) {
-			$index = ($i + 1) % $fieldCount;
-			$doc[$fields[$index]] = trim($values[$i], "'");
-			// We have edge case when single field and last is first also
-			$isLast = $index === 0;
+			$index = $i % $fieldCount;
+			$field = $fields[$index];
+			$value = trim($values[$i], "'");
+
+			// Store the value for the field
+			$doc[$field] = $value;
+
+			// Check if we've processed a complete document
+			$isLast = ($i + 1) % $fieldCount === 0;
 			if (!$isLast) {
 				continue;
 			}
+
+			// Process the completed document
 			$row = [];
 			if (isset($doc['id'])) {
 				$row['id'] = (int)$doc['id'];
@@ -289,20 +299,91 @@ final class Payload extends BasePayload {
 			$doc = [];
 		}
 		/** @var Batch */
-		return ["$cluster:$table" => $batch];
+		return [$table => $batch];
 	}
 
 	/**
-	 * @param string $table
-	 * @return array{0:string,1:string}
+	 * Parse the SQL UPDATE request
+	 * Expected format: update `table` set field1='value1', field2='value2' where id=123
+	 * @param Request $request
+	 * @return Batch
+	 * @throws QueryParseError
 	 */
-	public static function parseCluster(string $table): array {
-		$cluster = '';
-		$pos = strpos($table, ':');
-		if ($pos !== false) {
-			$cluster = substr($table, 0, $pos);
-			$table = substr($table, $pos + 1);
+	protected static function parseUpdateSqlPayload(Request $request): array {
+		$queryPattern = '/^update\s+`?([a-z][a-z_\-0-9]*)`?\s+set\s+(.*?)\s+where\s+id\s*=\s*(\d+)/ius';
+		// Define a pattern to match a single assignment: field = value
+		$valuePattern = "(?:'(?:[^'\\\\]*(?:\\\\.[^'\\\\]*)*)'|\\d+(?:\\.\\d+)?|NULL|\\{(?:[^{}]|\\{[^{}]*\\})*\\})";
+		$assignmentPattern = '/`?([a-z][a-z_\-0-9]*)`?\s*=\s*(' . $valuePattern . ')/ius';
+
+		if (!preg_match($queryPattern, $request->payload, $matches)) {
+			throw QueryParseError::create('Failed to parse UPDATE query');
 		}
-		return [$cluster, $table];
+
+		$table = $matches[1];
+		$setClause = $matches[2];
+		$id = (int)$matches[3];
+
+		// Parse all assignments in the SET clause.
+		preg_match_all($assignmentPattern, $setClause, $assignMatches, PREG_SET_ORDER);
+		if (!$assignMatches) {
+			throw QueryParseError::create('No assignments found in UPDATE query');
+		}
+
+		$doc = [];
+		foreach ($assignMatches as $assign) {
+			$field = $assign[1];
+			$value = $assign[2];
+			// remove any wrapping quotes if needed
+			if (strlen($value) > 1 && $value[0] === "'" && substr($value, -1) === "'") {
+				$value = trim($value, "'");
+			}
+			$doc[$field] = $value;
+		}
+
+		// In case an id is also set in doc, remove it so that the 'id' key reflects the WHERE clause.
+		if (isset($doc['id'])) {
+			unset($doc['id']);
+		}
+
+		$row = [
+			'id'  => $id,
+			'doc' => $doc,
+		];
+
+		/** @var Vector<Struct<int|string,mixed>> */
+		$batch = new \Ds\Vector();
+		$batch->push(Struct::fromData(['update' => $row]));
+
+		/** @var Batch */
+		return [$table => $batch];
+	}
+
+	/**
+	 * Parse the SQL DELETE request
+	 * Expected format: delete from `table` where id=123
+	 * @param Request $request
+	 * @return Batch
+	 * @throws QueryParseError
+	 */
+	protected static function parseDeleteSqlPayload(Request $request): array {
+		$queryPattern = '/^delete\s+from\s+`?([a-z][a-z_\-0-9]*)`?\s+where\s+id\s*=\s*(\d+)/ius';
+
+		if (!preg_match($queryPattern, $request->payload, $matches)) {
+			throw QueryParseError::create('Failed to parse DELETE query');
+		}
+
+		$table = $matches[1];
+		$id = (int)$matches[2];
+
+		$row = [
+			'id' => $id,
+		];
+
+		/** @var Vector<Struct<int|string,mixed>> */
+		$batch = new \Ds\Vector();
+		$batch->push(Struct::fromData(['delete' => $row]));
+
+		/** @var Batch */
+		return [$table => $batch];
 	}
 }

@@ -17,7 +17,6 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
 /**
@@ -27,6 +26,7 @@ use RuntimeException;
 final class Payload extends BasePayload {
 	const MAX_BOOST = 50;
 	const DECREASE_FACTOR = 1.44;
+	const ESCAPE_CHARS = '()[]<!|*/-~^$@';
 
 	/** @var string */
 	public string $path;
@@ -99,7 +99,7 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromSqlRequest(Request $request): static {
 		$query = $request->payload;
-		preg_match('/FROM\s+(\w+)\s+WHERE/ius', $query, $matches);
+		preg_match('/FROM\s+`?(\w+)`?\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
 		// Check that we have match
@@ -107,21 +107,23 @@ final class Payload extends BasePayload {
 			throw QueryParseError::create("The 'fuzzy' option requires a full-text query");
 		}
 
+		// I did not figure out how to make with regxp case OPTION fuzzy=1 so do this way
+		$optionPos = stripos($query, ' OPTION ');
+		if ($optionPos !== false && substr_count($query, '=', $optionPos) > 1) {
+			$pattern = '/(?:^OPTION\s+|\s*,\s*)(?:[a-zA-Z\_]+)\s*=\s*([\'"][^\'"]*[\'"]|\d+)(?=\s*\;?\s*$|\s*,)/iu';
+			if (!preg_match($pattern, $query)) {
+				throw QueryParseError::create(
+					'Invalid options in query string, ' .
+						'make sure they are separated by commas'
+				);
+			}
+		}
+
 		// Parse fuzzy and use default 0 if missing
 		if (!preg_match('/fuzzy\s*=\s*(\d+)/ius', $query, $matches)) {
 			throw QueryParseError::create('Invalid value for option \'fuzzy\'');
 		}
 		$fuzzy = (bool)$matches[1];
-
-		// Check that we have , between options
-		$pattern = '/OPTION\s+' .
-			'([a-zA-Z0-9_]+\s*=\s*(\'[^\']*\'|[0-9]+)\s*,\s*)*' .
-			'[a-zA-Z0-9_]+\s*=\s*(\'[^\']*\'|[0-9]+)' .
-			'(\s*,\s*[a-zA-Z0-9_]+\s*=\s*(\'[^\']*\'|[0-9]+))*$/ius';
-
-		if (!preg_match($pattern, $query)) {
-			throw QueryParseError::create('Invalid options in query string, make sure they are separated by commas');
-		}
 
 		// Parse distance and use default 2 if missing
 		preg_match('/distance\s*=\s*(\d+)/ius', $query, $matches);
@@ -132,7 +134,7 @@ final class Payload extends BasePayload {
 		$preserve = (bool)($matches[1] ?? 0);
 
 		// Parse layouts and use default all languages if missed
-		preg_match('/layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
+		preg_match('/(?:OPTION\s+|,\s+)layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
 		$layouts = static::parseLayouts($matches[1] ?? null);
 
 		$self = new static();
@@ -176,7 +178,8 @@ final class Payload extends BasePayload {
 				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,/ius',
-				'/ option/ius', // TODO: hack
+				'/\soption/ius',
+				'/\s*,\s*facet\s+/ius',
 				],
 			[
 				'MATCH(\'%s\')',
@@ -184,6 +187,7 @@ final class Payload extends BasePayload {
 				'',
 				'option ',
 				' option idf=\'plain,tfidf_normalized\',', // TODO: hack
+				' facet ',
 			],
 			$payload
 		);
@@ -196,7 +200,12 @@ final class Payload extends BasePayload {
 			$template .= ' option idf=\'plain,tfidf_normalized\'';
 		}
 
-		$match = $this->getQueryStringMatch($fn, $searchValue);
+		// If not fuzzy enabled, we do not need to run function and simply assign search value
+		if ($this->fuzzy) {
+			$match = $this->getQueryStringMatch($fn, $searchValue);
+		} else {
+			$match = $searchValue;
+		}
 		Buddy::debug("Fuzzy: match: $match");
 		return sprintf($template, $match);
 	}
@@ -225,7 +234,7 @@ final class Payload extends BasePayload {
 						return '(' . implode(
 							'|', array_map(
 								function ($word) use ($i) {
-									return $word . '^' . static::getBoostValue($i);
+									return static::escapeWord($word) . '^' . static::getBoostValue($i);
 								}, $words
 							)
 						) . ')';
@@ -239,7 +248,7 @@ final class Payload extends BasePayload {
 						return '(' . implode(
 							'|', array_map(
 								function ($word) use ($i) {
-									return $word . '^' . static::getBoostValue($i);
+									return static::escapeWord($word) . '^' . static::getBoostValue($i);
 								}, $words
 							)
 						) . ')';
@@ -263,28 +272,33 @@ final class Payload extends BasePayload {
 	public function getQueriesHTTPRequest(callable $fn): string {
 		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $request */
 		$request = $this->payload;
-		$queries = static::parseQueryMatches($request['query']);
-		Buddy::debug('Fuzzy: parsed queries: ' . implode(', ', $queries));
-		foreach ($queries as $keyPath => $query) {
-			$parts = explode('.', $keyPath);
-			$lastIndex = sizeof($parts) - 1;
-			$isQueryString = $parts[$lastIndex] === 'query_string' && !str_ends_with($keyPath, 'match.query_string');
-			if ($isQueryString) {
-				$match = $this->getQueryStringMatch($fn, $query);
-				Arrays::setValueByDotNotation($request['query'], $keyPath, $match);
-			} else {
-				$options = $fn($query);
-				$field = $parts[$lastIndex];
-				$newQuery = static::buildShouldHttpQuery($field, $options);
-				$replaceKey = implode('.', array_slice($parts, 0, -2));
-				// Here we do some trick and set the value of the pass in do notation to the payload by using refs
-				if ($replaceKey) {
-					Arrays::setValueByDotNotation($request['query'], $replaceKey, $newQuery);
+
+		// If not fuzzy enabled, we do not need to run function and simply assign search value
+		if ($this->fuzzy) {
+			$queries = static::parseQueryMatches($request['query']);
+			Buddy::debug('Fuzzy: parsed queries: ' . implode(', ', $queries));
+			foreach ($queries as $keyPath => $query) {
+				$parts = explode('.', $keyPath);
+				$lastIndex = sizeof($parts) - 1;
+				$isQueryString = $parts[$lastIndex] === 'query_string'
+					&& !str_ends_with($keyPath, 'match.query_string');
+				if ($isQueryString) {
+					$match = $this->getQueryStringMatch($fn, $query);
+					Arrays::setValueByDotNotation($request['query'], $keyPath, $match);
 				} else {
-					$request['query'] = $newQuery;
+					$options = $fn($query);
+					$field = $parts[$lastIndex];
+					$newQuery = static::buildShouldHttpQuery($field, $options);
+					$replaceKey = implode('.', array_slice($parts, 0, -2));
+					// Here we do some trick and set the value of the pass in do notation to the payload by using refs
+					if ($replaceKey) {
+						Arrays::setValueByDotNotation($request['query'], $replaceKey, $newQuery);
+					} else {
+						$request['query'] = $newQuery;
+					}
+					$encodedNewQuery = json_encode($newQuery);
+					Buddy::debug("Fuzzy: transform: $query [$keyPath] -> $encodedNewQuery");
 				}
-				$encodedNewQuery = json_encode($newQuery);
-				Buddy::debug("Fuzzy: transform: $query [$keyPath] -> $encodedNewQuery");
 			}
 		}
 		$encoded = json_encode($request);
@@ -406,14 +420,28 @@ final class Payload extends BasePayload {
 	 */
 	protected static function parseLayouts(null|string|array $layouts): array {
 		// If we have array already, just return it
+		if (empty($layouts)) {
+			return [];
+		}
 		if (is_array($layouts)) {
 			return $layouts;
 		}
-		if (isset($layouts)) {
-			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
-		} else {
-			$layouts = KeyboardLayout::getSupportedLanguages();
-		}
-		return $layouts;
+
+		return array_map('trim', explode(',', $layouts));
+	}
+
+	/**
+	 * Properly escape special symbols that are used in operators to protect from it
+	 * @param string $word
+	 * @return string
+	 */
+	protected static function escapeWord(string $word): string {
+		// Prevent already escaped symbols, unescape first
+		$chars = str_split(static::ESCAPE_CHARS);
+		$word = str_replace(array_map(fn($char) => '\\' . $char, $chars), $chars, $word);
+
+		// We need double escape here cuz we replace this match inside
+		// SQL query so every escape symbol is escaped twice
+		return addcslashes(addcslashes($word, static::ESCAPE_CHARS), '\\');
 	}
 }

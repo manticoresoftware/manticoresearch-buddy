@@ -23,6 +23,18 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	protected ?int $id = null;
 
 	/**
+	 * @var bool $isElasticQuery
+	 */
+	protected bool $isElasticQuery;
+
+	/**
+	 * @return void
+	 */
+	public function __construct() {
+		$this->isElasticQuery = false;
+	}
+
+	/**
 	 * @param string $query
 	 * @return array{name:string,cols:array<string>,colTypes:array<string>}
 	 */
@@ -122,13 +134,13 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	 * @param array<mixed> $val
 	 * @return Datatype
 	 */
-	protected static function detectArrayVal(array $val): Datatype {
+	protected function detectArrayVal(array $val): Datatype {
 		if (!array_is_list($val)) {
 			return Datatype::Json;
 		}
 		$returnType = Datatype::Multi;
 		foreach ($val as $subVal) {
-			$subValType = self::detectValType($subVal);
+			$subValType = $this->detectValType($subVal);
 			if ($returnType === Datatype::Multi && $subValType === Datatype::Bigint) {
 				$returnType = Datatype::Multi64;
 			} elseif ($subValType !== Datatype::Bigint && $subValType !== Datatype::Int) {
@@ -162,14 +174,24 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	 * @param mixed $val
 	 * @return Datatype
 	 */
-	protected static function detectValType(mixed $val): Datatype {
-		return match (true) {
+	protected function detectValType(mixed $val): Datatype {
+		$type = match (true) {
 			($val === null) => Datatype::Null,
 			is_float($val) => Datatype::Float,
 			is_int($val) => self::detectIntVal($val),
-			is_array($val) => self::detectArrayVal($val),
 			is_string($val) => self::detectStringVal($val),
+			is_array($val) => $this->detectArrayVal($val),
 			default => Datatype::Text,
 		};
+		if (!$this->isElasticQuery) {
+			return $type;
+		}
+		if ($type === Datatype::Text || $type === Datatype::String) {
+			$type = Datatype::Indexedstring;
+		} elseif ($type === Datatype::Json) {
+			$type = Datatype::Indexedjson;
+		}
+
+		return $type;
 	}
 }

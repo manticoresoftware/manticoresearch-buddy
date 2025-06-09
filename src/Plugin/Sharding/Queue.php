@@ -122,7 +122,7 @@ final class Queue {
 		if ($query['wait_for_id']) {
 			$waitFor = $this->getById($query['wait_for_id']);
 			if ($waitFor && $waitFor['status'] !== 'processed') {
-				Buddy::debugv("Sharding queue: wait for {$query['wait_for_id']} [{$waitFor['status']}]");
+				Buddy::debugvv("Sharding queue: wait for {$query['wait_for_id']} [{$waitFor['status']}]");
 				return true;
 			}
 		}
@@ -134,7 +134,7 @@ final class Queue {
 			$timeSinceLastAttempt = (int)(microtime(true) * 1000) - $query['created_at'];
 			$maxAttemptTime = (int)ceil(pow(1.21, $query['tries']) * 1000);
 			if ($timeSinceLastAttempt < $maxAttemptTime) {
-				Buddy::debugv(
+				Buddy::debugvv(
 					"Sharding queue: delay {$query['id']} with {$query['tries']} tries"
 						." due to {$timeSinceLastAttempt}ms < {$maxAttemptTime}ms"
 				);
@@ -153,12 +153,12 @@ final class Queue {
 	 */
 	protected function handleQuery(Node $node, array $query): bool {
 		$mt = microtime(true);
-		Buddy::debugv("[{$node->id}] Queue query: {$query['query']}");
+		Buddy::debugvv("[{$node->id}] Queue query: {$query['query']}");
 
 		$res = $this->executeQuery($query);
 		$status = empty($res['error']) ? 'processed' : 'error';
 
-		Buddy::debugv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
+		Buddy::debugvv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
 
 		$duration = (int)((microtime(true) - $mt) * 1000);
 		$this->attemptToUpdateStatus($query, $status, $duration);
@@ -177,9 +177,15 @@ final class Queue {
 	 * @return Struct<int|string, mixed>
 	 */
 	protected function executeQuery(array $query): Struct {
+		// We try to avoid infinite loop in wrong queries with buddy so allow
+		// disable agent only for create cluster cuz we need it
+		$params = ['request' => $query['query']];
+		if (stripos($query['query'], 'CREATE CLUSTER IF NOT EXISTS') === 0) {
+			$params['disableAgentHeader'] = true;
+		}
 		// TODO: this is a temporary hack, remove when job is done on searchd
 		$this->runMkdir($query['query']);
-		return $this->client->sendRequest($query['query'])->getResult();
+		return $this->client->sendRequest(...$params)->getResult();
 	}
 
 	/**
@@ -195,7 +201,7 @@ final class Queue {
 			return true;
 		}
 
-		Buddy::debugv("Failed to update queue status for {$query['id']}");
+		Buddy::debugvv("Failed to update queue status for {$query['id']}");
 		return false;
 	}
 

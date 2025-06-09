@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Insert;
 
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Loader;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
+use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
@@ -20,11 +21,17 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
+
+	const ELASTIC_LIKE_TABLE_OPTIONS = ["min_infix_len='2'"];
+
 	/** @var array<string> */
 	public array $queries = [];
 
 	/** @var string $path */
 	public string $path;
+
+	/** @var bool $isElasticLikeInsert */
+	public bool $isElasticLikeInsert = false;
 
 	/**
 	 * @return void
@@ -53,12 +60,61 @@ final class Payload extends BasePayload {
 			$self->path = '_bulk';
 			$request->payload = trim($request->payload) . "\n";
 		}
-		$self->queries[] = $self->buildCreateTableQuery(...$parser->parse($request->payload));
-		$self->queries[] = (str_contains($self->path, '_doc') || str_contains($self->path, '_create'))
-			? self::preprocessElasticLikeRequest($self->path, $request->payload)
+		['name' => $name, 'cols' => $cols, 'colTypes' => $colTypes] = $parser->parse($request->payload);
+		$createTableQuery = $self->buildCreateTableQuery($name, $cols, $colTypes);
+		if (Loader::isElasticLikeRequest($request->path, $request->endpointBundle)) {
+			$createTableQuery .= ' ' . implode(' ', self::ELASTIC_LIKE_TABLE_OPTIONS);
+		}
+		// Handling uppercased table names in the request
+		$payload = (strtolower($name) !== $name)
+			? $self->preprocessUppercasedTableName($request->payload, $request->format)
 			: $request->payload;
+		$self->queries[] = $createTableQuery;
+
+		// Preprocessing Elastic-like insert requests
+		if (str_contains($self->path, '_doc') || str_contains($self->path, '_create')) {
+			$insertQuery = self::preprocessElasticLikeRequest($self->path, $payload);
+			$self->path = 'insert';
+			$self->isElasticLikeInsert = true;
+		} else {
+			$insertQuery = $payload;
+		}
+		$self->queries[] = $insertQuery;
 
 		return $self;
+	}
+
+	/**
+	 * Replaces uppercased table names with lowercased ones to avoid errors on further insert requests
+	 *
+	 * @param string $payload
+	 * @param RequestFormat $format
+	 * @return string
+	 */
+	protected static function preprocessUppercasedTableName(string $payload, RequestFormat $format): string {
+		return match ($format) {
+			RequestFormat::SQL => (string)preg_replace_callback(
+				'/^INSERT\s+INTO\s+(.+?)([\s\(])/is',
+				function ($matches) {
+					return 'INSERT INTO ' . strtolower($matches[1]) . $matches[2];
+				},
+				$payload,
+				1,
+			),
+			default => (
+				function ($payload) {
+					/** @var array{table?:string,index?:string} */
+					$payload = (array)simdjson_decode($payload, true);
+					// Supporting both table and index options here
+					if (isset($payload['table'])) {
+						$payload['table'] = strtolower($payload['table']);
+					} elseif (isset($payload['index'])) {
+						$payload['index'] = strtolower($payload['index']);
+					}
+					return (string)json_encode($payload);
+				}
+			)($payload),
+		};
 	}
 
 	/**
@@ -66,10 +122,9 @@ final class Payload extends BasePayload {
 	 * @param string $payload
 	 * @return string
 	 */
-	protected static function preprocessElasticLikeRequest(string &$path, string $payload): string {
+	protected static function preprocessElasticLikeRequest(string $path, string $payload): string {
 		$pathParts = explode('/', $path);
 		$table = $pathParts[0];
-		$path = 'insert';
 		$query = [
 			'table' => $table,
 			'doc' => (array)simdjson_decode($payload, true),
@@ -92,14 +147,14 @@ final class Payload extends BasePayload {
 			',',
 			array_map(
 				function ($a, $b) {
-					return "$a $b";
+					return "`$a` $b";
 				},
 				$cols,
 				$colTypes
 			)
 		);
 		$repls = ['%NAME%' => $name, '%COL_EXPR%' => $colExpr];
-		return strtr('CREATE TABLE IF NOT EXISTS %NAME% (%COL_EXPR%)', $repls);
+		return strtr('CREATE TABLE IF NOT EXISTS `%NAME%` (%COL_EXPR%)', $repls);
 	}
 
 	/**
@@ -128,6 +183,7 @@ final class Payload extends BasePayload {
 			default => false,
 		};
 		$isInsertError = str_contains($request->error, 'no such index')
+			|| str_contains($request->error, 'bulk request must be terminated')
 			|| str_contains($request->error, 'unsupported endpoint')
 			|| (str_contains($request->error, 'table ') && str_contains($request->error, ' absent'))
 			|| (str_contains($request->error, ' body ') && str_ends_with($request->error, ' is required'));

@@ -58,12 +58,36 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	public static function fromRequest(Request $request): static {
-		$type = strtolower(strtok(trim($request->payload), ' ') ?: '');
-		return match ($type) {
+		return match ($request->command) {
 			'create', 'alter' => static::fromCreate($request),
 			'drop' => static::fromDrop($request),
+			'desc', 'describe', 'show' => static::fromDesc($request),
 			default => throw new QueryParseError('Failed to parse query'),
 		};
+	}
+
+	/**
+	 * @param Request $request
+	 * @return static
+	 * @throws QueryParseError
+	 */
+	protected static function fromDesc(Request $request): static {
+		$pattern = '/(?:DESC|DESCRIBE|SHOW\s+CREATE\s+TABLE)\s+(?P<table>[^:\s\()]+)/ius';
+		if (!preg_match($pattern, $request->payload, $matches)) {
+			throw QueryParseError::create('Failed to parse query');
+		}
+
+		$self = new static();
+		$self->path = $request->path;
+		$self->type = $request->command;
+		$self->cluster = '';
+		$self->table = strtolower($matches['table']);
+		$self->structure = '';
+		$self->options = [];
+		$self->quiet = false;
+		$self->extra = '';
+		$self->validate();
+		return $self;
 	}
 
 	/**
@@ -83,16 +107,13 @@ final class Payload extends BasePayload {
 		/** @var array{table:string,cluster?:string,structure:string,extra:string} $matches */
 		$options = [];
 		if ($matches['extra']) {
-			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*(?P<value>\'?\d+\'?)/ius';
-			if (preg_match_all($pattern, $matches['extra'], $optionMatches, PREG_SET_ORDER)) {
-				foreach ($optionMatches as $optionMatch) {
-					$key = strtolower($optionMatch['key']);
-					$value = (int)$optionMatch['value'];
-					$options[$key] = $value;
-				}
-			}
+			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*\'(?P<value>[^\']*)\'/ius';
+			$options = static::validateOptions($pattern, $matches['extra']);
 			// Clean up extra from extracted options
 			$matches['extra'] = trim(preg_replace($pattern, '', $matches['extra']) ?? '');
+		}
+		if (isset($options['shards']) && $options['shards'] > 3000) {
+			QueryParseError::throw('Shard count cannot be greater than 3000');
 		}
 
 		$self = new static();
@@ -100,7 +121,7 @@ final class Payload extends BasePayload {
 		$self->path = $request->path;
 		$self->type = $request->command === 'create' ? 'create' : 'alter';
 		$self->cluster = $matches['cluster'] ?? '';
-		$self->table = $matches['table'];
+		$self->table = strtolower($matches['table']);
 		$self->structure = $matches['structure'];
 		$self->options = $options;
 		$self->extra = $matches['extra'];
@@ -109,12 +130,41 @@ final class Payload extends BasePayload {
 	}
 
 	/**
+	 * @param string $pattern
+	 * @param string $value
+	 * @return array<string,int|string>
+	 */
+	protected static function validateOptions(string $pattern, string $value): array {
+		$keys = [];
+		$options = [];
+		if (preg_match_all($pattern, $value, $optionMatches, PREG_SET_ORDER)) {
+			foreach ($optionMatches as $optionMatch) {
+				$key = strtolower($optionMatch['key']);
+
+				if (isset($keys[$key])) {
+					QueryParseError::throw("Duplicate parameter '{$key}' found");
+				}
+				$keys[$key] = true;
+				if (trim($optionMatch['value'], '0123456789') !== '') {
+					QueryParseError::throw("Parameter '{$key}' requires to have a numeric value");
+				}
+				if (empty($value)) {
+					QueryParseError::throw("Parameter '{$key}' requires to have a value");
+				}
+
+				$options[$key] = (int)$optionMatch['value'];
+			}
+		}
+		return $options;
+	}
+
+	/**
 	 * @param Request $request
 	 * @return static
 	 * @throws QueryParseError
 	 */
 	protected static function fromDrop(Request $request): static {
-		$pattern = '/DROP\s+SHARDED\s+TABLE\s+(?P<quiet>IF\s+EXISTS\s+)?'
+		$pattern = '/DROP\s+TABLE\s+(?P<quiet>IF\s+EXISTS\s+)?'
 			. '(?:(?P<cluster>[^:\s]+):)?(?P<table>[^:\s\()]+)/ius';
 		if (!preg_match($pattern, $request->payload, $matches)) {
 			throw QueryParseError::create('Failed to parse query');
@@ -125,7 +175,7 @@ final class Payload extends BasePayload {
 		$self->type = 'drop';
 		$self->quiet = !!$matches['quiet'];
 		$self->cluster = $matches['cluster'];
-		$self->table = $matches['table'];
+		$self->table = strtolower($matches['table']);
 		$self->structure = '';
 		$self->options = [];
 		$self->extra = '';
@@ -138,12 +188,25 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		return stripos($request->error, 'syntax error')
-			&& strpos($request->error, 'P03') === 0
+		// Desc and Show distributed table first
+		if (($request->command === 'desc' || $request->command === 'describe')
+			&& strpos($request->error, 'contains system') !== false
+		) {
+			return true;
+		}
+		if ($request->command === 'show' && strpos($request->error, 'error in your query') !== false) {
+			return true;
+		}
+
+		// Create and Drop
+		return (stripos($request->error, 'contains system table')
+			|| stripos($request->error, 'require Buddy') ||
+			(stripos($request->error, 'syntax error') && stripos($request->error, 'near \':'))
+		)
 			&& (
 				(stripos($request->payload, 'create table') === 0
 					&& stripos($request->payload, 'shards') !== false
-					&& preg_match('/(?P<key>rf|shards)\s*=\s*(?P<value>[\'"]?\d+[\'"]?)/ius', $request->payload)
+					&& preg_match('/(?P<key>rf|shards)\s*=\s*\'(?P<value>[^\']*)\'/ius', $request->payload)
 				) || stripos($request->payload, 'drop') === 0
 			);
 	}
@@ -157,7 +220,7 @@ final class Payload extends BasePayload {
 			throw QueryParseError::create('Sharded table requires `rf=n`');
 		}
 
-		if (!$this->cluster && $this->type !== 'drop' && $this->options['rf'] > 1) {
+		if (!$this->cluster && ($this->type === 'create' || $this->type === 'alter') && $this->options['rf'] > 1) {
 			throw QueryParseError::create('You cannot set rf greater than 1 when creating single node sharded table.');
 		}
 
@@ -213,6 +276,7 @@ final class Payload extends BasePayload {
 		return match ($this->type) {
 			'create' => CreateHandler::class,
 			'drop' => DropHandler::class,
+			'desc', 'describe', 'show' => DescHandler::class,
 			default => throw new \Exception('Unsupported sharding type'),
 		};
 	}

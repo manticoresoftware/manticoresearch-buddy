@@ -21,9 +21,9 @@ use Manticoresearch\BuddyTest\Lib\BuddyRequestError;
 use RdKafka\Conf;
 use RdKafka\Exception;
 use RdKafka\KafkaConsumer;
+use RdKafka\TopicPartition;
 
-class KafkaWorker implements WorkerRunnerInterface
-{
+class KafkaWorker implements WorkerRunnerInterface {
 	use StringFunctionsTrait;
 
 	private Client $client;
@@ -37,9 +37,10 @@ class KafkaWorker implements WorkerRunnerInterface
 	private int $batchSize;
 	private bool $consuming = true;
 	private View $view;
-
 	private Batch $batch;
 	private KafkaConsumer $consumer;
+	/** @var array<int> */
+	private array $partitions = [];
 
 	/**
 	 * @param Client $client
@@ -57,13 +58,13 @@ class KafkaWorker implements WorkerRunnerInterface
 		Client $client,
 		array  $instance
 	) {
-
-		/** @var array{group:string, broker:string, topic:string, batch:string } $attrs */
+		/** @var array{group:string, broker:string, topic:string, batch:string, partitions:array<int> } $attrs */
 		$attrs = simdjson_decode($instance['attrs'], true);
 
 		$this->client = $client;
 		$this->consumerGroup = $attrs['group'];
 		$this->brokerList = $attrs['broker'];
+		$this->partitions = $attrs['partitions'];
 
 		$decodedMapping = simdjson_decode($instance['custom_mapping'], true);
 		if ($decodedMapping === false) {
@@ -88,38 +89,31 @@ class KafkaWorker implements WorkerRunnerInterface
 	/**
 	 * @return Conf
 	 */
-
 	private function initKafkaConfig(): Conf {
 		$conf = new Conf();
 		$conf->set('group.id', $this->consumerGroup);
 		$conf->set('metadata.broker.list', $this->brokerList);
 		$conf->set('enable.auto.commit', 'false');
-
-		// Set where to start consuming messages when there is no initial offset in
-		// offset store or the desired offset is out of range.
-		// 'earliest': start from the beginning
 		$conf->set('auto.offset.reset', 'earliest');
-
-		// Emit EOF event when reaching the end of a partition
 		$conf->set('enable.partition.eof', 'true');
 
-		// Set a rebalance callback to log partition assignments (optional)
-		$conf->setRebalanceCb(
-			function (KafkaConsumer $kafka, $err, ?array $partitions = null) {
-				switch ($err) {
-					case RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS:
-						$kafka->assign($partitions);
-						break;
-
-					case RD_KAFKA_RESP_ERR__REVOKE_PARTITIONS:
-						$kafka->assign(null);
-						break;
-
-					default:
-						throw new \Exception($err);
+		if (empty($this->partitions)) {
+			$conf->setRebalanceCb(
+				function (KafkaConsumer $kafka, $err, ?array $partitions = null) {
+					switch ($err) {
+						case RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS:
+							$kafka->assign($partitions);
+							break;
+						case RD_KAFKA_RESP_ERR__REVOKE_PARTITIONS:
+							$kafka->assign(null);
+							break;
+						default:
+							throw new \Exception($err);
+					}
 				}
-			}
-		);
+			);
+		}
+
 		return $conf;
 	}
 
@@ -136,10 +130,21 @@ class KafkaWorker implements WorkerRunnerInterface
 		);
 
 		$conf = $this->initKafkaConfig();
-
 		$this->consumer = new KafkaConsumer($conf);
-		$this->consumer->subscribe($this->topicList);
+
+		if (!empty($this->partitions)) {
+			$topicPartitions = [];
+			foreach ($this->topicList as $topic) {
+				foreach ($this->partitions as $partition) {
+					$topicPartitions[] = new TopicPartition($topic, $partition);
+				}
+			}
+			$this->consumer->assign($topicPartitions);
+		} else {
+			$this->consumer->subscribe($this->topicList);
+		}
 	}
+
 
 	/**
 	 * @return void
@@ -147,7 +152,7 @@ class KafkaWorker implements WorkerRunnerInterface
 	 */
 	public function run(): void {
 		$lastFullMessage = null;
-		Buddy::debugv('Worker: Start consuming');
+		Buddy::debugvv('Worker: Start consuming');
 		while ($this->consuming) {
 			$message = $this->consumer->consume(1000);
 			switch ($message->err) {
@@ -170,7 +175,7 @@ class KafkaWorker implements WorkerRunnerInterface
 					throw new \Exception($message->errstr(), $message->err);
 			}
 		}
-		Buddy::debugv('Worker: End consuming');
+		Buddy::debugvv('Worker: End consuming');
 	}
 
 	public function stop(): void {
@@ -267,6 +272,4 @@ class KafkaWorker implements WorkerRunnerInterface
 		}
 		return true;
 	}
-
-
 }
