@@ -127,9 +127,11 @@ final class ConfigManager {
 		assert(self::$table !== null);
 		$config = [];
 		foreach (self::$table as $key => $row) {
-			if (is_array($row) && isset($row['value'])) {
-				$config[$key] = (string)$row['value'];
+			if (!is_array($row) || !isset($row['value'])) {
+				continue;
 			}
+
+			$config[$key] = (string)$row['value'];
 		}
 		return $config;
 	}
