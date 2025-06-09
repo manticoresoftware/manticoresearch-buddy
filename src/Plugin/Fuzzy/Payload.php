@@ -175,8 +175,8 @@ final class Payload extends BasePayload {
 
 				// Add non-empty queries to the result
 				$additionalQueries = array_merge(
-					$additionalQueries ?? [],
-					array_filter(array_map('trim', $extraQueries), 'strlen')
+					$additionalQueries,
+					array_filter(array_map('trim', $extraQueries))
 				);
 			}
 		}
