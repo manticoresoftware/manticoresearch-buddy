@@ -159,30 +159,25 @@ final class Payload extends BasePayload {
 	 * @return array<string>
 	 */
 	protected static function extractAdditionalQueries(string $query): array {
-
 		$additionalQueries = [];
 
-		// Extract any additional queries that follow the main one (separated by semicolons)
-		if (preg_match('/;(.*)/s', $query, $matches)) {
-			// The main query is everything before the first semicolon
-			$query = trim(substr($query, 0, strpos($query, ';', stripos($query, ' option ') ?: 0) ?: 0));
+		// Find the position of the first semicolon
+		$firstSemicolonPos = strpos($query, ';', stripos($query, ' option ') ?: 0) ?: 0;
 
-			// Get the rest of the string after the first semicolon
-			$remainingText = trim($matches[1]);
+		// If a semicolon exists
+		if ($firstSemicolonPos > 0) {
+			// Get the text after the first semicolon
+			$remainingText = trim(substr($query, $firstSemicolonPos + 1));
 
-			// If there's content after the semicolon, split it into additional queries
+			// Split remaining text into additional queries
 			if (!empty($remainingText)) {
-				// Split the remaining text by semicolons
 				$extraQueries = preg_split('/;/', $remainingText, -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
-				foreach ($extraQueries as $extraQuery) {
-					$trimmedQuery = trim($extraQuery);
-					if (empty($trimmedQuery)) {
-						continue;
-					}
-
-					$additionalQueries[] = $trimmedQuery;
-				}
+				// Add non-empty queries to the result
+				$additionalQueries = array_merge(
+					$additionalQueries ?? [],
+					array_filter(array_map('trim', $extraQueries), 'strlen')
+				);
 			}
 		}
 
