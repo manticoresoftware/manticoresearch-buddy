@@ -17,7 +17,6 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
 /**
@@ -434,18 +433,14 @@ final class Payload extends BasePayload {
 	 */
 	protected static function parseLayouts(null|string|array $layouts): array {
 		// If we have array already, just return it
+		if (empty($layouts)) {
+			return [];
+		}
 		if (is_array($layouts)) {
 			return $layouts;
 		}
-		if (isset($layouts)) {
-			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
-		} else {
-			$layouts = KeyboardLayout::getSupportedLanguages();
-			// We filter here because 0-9 maps to symbols that can interfere with word splitting
-			$filterFn = fn(string $layout) => $layout !== 'fr' && $layout !== 'be';
-			$layouts = array_filter($layouts, $filterFn);
-		}
-		return $layouts;
+
+		return array_map('trim', explode(',', $layouts));
 	}
 
 	/**

@@ -113,6 +113,7 @@ final class EventHandler {
 			$message = match ($outputFormat) {
 				// TODO: Maybe later we can use meta for time, but not now cuz no time for non select
 				OutputFormat::Table => $result->getTableFormatted($startTime),
+				OutputFormat::Plain => $result->toString(),
 				default => $result->getStruct(),
 			};
 			$response = Response::fromMessageAndMeta(
