@@ -773,7 +773,6 @@ final class Handler extends BaseHandlerWithClient
 			$maxTime = $rowTime;
 		}
 
-
 		self::addMetric('thread_count', $threadCount);
 		self::addMetric('slowest_thread', $maxTime);
 	}
@@ -881,10 +880,10 @@ final class Handler extends BaseHandlerWithClient
 	}
 
 	/**
-* @param string $name
-* @param string|float|int $value
-* @param array<string, string>|null $label $label
-* @return void
+	 * @param string $name
+	 * @param string|float|int $value
+	 * @param array<string, string>|null $label
+	 * @return void
 	 */
 	private static function addMetric(string $name, string|float|int $value, ?array $label = null): void {
 		if (!isset(self::$metricNames[$name]['name'])) {
@@ -895,14 +894,14 @@ final class Handler extends BaseHandlerWithClient
 			$value = 0;
 		}
 
-		if ($name === 'killed_rate' && is_numeric($value)) {
+		if ($name === 'killed_rate') {
 			$value = (float)$value;
 		}
 
 		if (is_string($value)
 			&& (str_contains($name, 'query_time_')
-			|| str_contains($name, 'found_rows_'))) {
-/** @var array<string, string> $row */
+				|| str_contains($name, 'found_rows_'))) {
+			/** @var array<string, string> $row */
 			$row = json_decode($value, true);
 
 			foreach ($row as $k => $v) {
@@ -927,8 +926,8 @@ final class Handler extends BaseHandlerWithClient
 	}
 
 	/**
-   * @param array<string, float|int|string>|null $label
-   * @return string
+	 * @param array<string, float|int|string>|null $label
+	 * @return string
 	 */
 	private static function getLabel(?array $label): string {
 		$result = '';
