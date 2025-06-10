@@ -17,7 +17,6 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use RuntimeException;
 
 /**
@@ -49,6 +48,9 @@ final class Payload extends BasePayload {
 
 	/** @var string|array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>} */
 	public array|string $payload;
+
+	/** @var array<string> */
+	public array $queries = [];
 
 	public function __construct() {
 	}
@@ -100,6 +102,8 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromSqlRequest(Request $request): static {
 		$query = $request->payload;
+		$additionalQueries = static::extractAdditionalQueries($query);
+
 		preg_match('/FROM\s+`?(\w+)`?\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
@@ -146,7 +150,38 @@ final class Payload extends BasePayload {
 		$self->layouts = $layouts;
 		$self->preserve = $preserve;
 		$self->payload = $query;
+		$self->queries = $additionalQueries;
 		return $self;
+	}
+
+	/**
+	 * @param string $query
+	 * @return array<string>
+	 */
+	protected static function extractAdditionalQueries(string $query): array {
+		$additionalQueries = [];
+
+		// Find the position of the first semicolon
+		$firstSemicolonPos = strpos($query, ';', stripos($query, ' option ') ?: 0) ?: 0;
+
+		// If a semicolon exists
+		if ($firstSemicolonPos > 0) {
+			// Get the text after the first semicolon
+			$remainingText = trim(substr($query, $firstSemicolonPos + 1));
+
+			// Split remaining text into additional queries
+			if (!empty($remainingText)) {
+				$extraQueries = preg_split('/;/', $remainingText, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+				// Add non-empty queries to the result
+				$additionalQueries = array_merge(
+					$additionalQueries,
+					array_filter(array_map('trim', $extraQueries))
+				);
+			}
+		}
+
+		return $additionalQueries;
 	}
 
 	/**
@@ -201,9 +236,15 @@ final class Payload extends BasePayload {
 			$template .= ' option idf=\'plain,tfidf_normalized\'';
 		}
 
-		$match = $this->getQueryStringMatch($fn, $searchValue);
+		// If not fuzzy enabled, we do not need to run function and simply assign search value
+		if ($this->fuzzy) {
+			$match = $this->getQueryStringMatch($fn, $searchValue);
+		} else {
+			$match = $searchValue;
+		}
 		Buddy::debug("Fuzzy: match: $match");
-		return sprintf($template, $match);
+		$queries = [sprintf($template, $match), ...$this->queries];
+		return implode(';', $queries);
 	}
 
 	/**
@@ -268,28 +309,33 @@ final class Payload extends BasePayload {
 	public function getQueriesHTTPRequest(callable $fn): string {
 		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $request */
 		$request = $this->payload;
-		$queries = static::parseQueryMatches($request['query']);
-		Buddy::debug('Fuzzy: parsed queries: ' . implode(', ', $queries));
-		foreach ($queries as $keyPath => $query) {
-			$parts = explode('.', $keyPath);
-			$lastIndex = sizeof($parts) - 1;
-			$isQueryString = $parts[$lastIndex] === 'query_string' && !str_ends_with($keyPath, 'match.query_string');
-			if ($isQueryString) {
-				$match = $this->getQueryStringMatch($fn, $query);
-				Arrays::setValueByDotNotation($request['query'], $keyPath, $match);
-			} else {
-				$options = $fn($query);
-				$field = $parts[$lastIndex];
-				$newQuery = static::buildShouldHttpQuery($field, $options);
-				$replaceKey = implode('.', array_slice($parts, 0, -2));
-				// Here we do some trick and set the value of the pass in do notation to the payload by using refs
-				if ($replaceKey) {
-					Arrays::setValueByDotNotation($request['query'], $replaceKey, $newQuery);
+
+		// If not fuzzy enabled, we do not need to run function and simply assign search value
+		if ($this->fuzzy) {
+			$queries = static::parseQueryMatches($request['query']);
+			Buddy::debug('Fuzzy: parsed queries: ' . implode(', ', $queries));
+			foreach ($queries as $keyPath => $query) {
+				$parts = explode('.', $keyPath);
+				$lastIndex = sizeof($parts) - 1;
+				$isQueryString = $parts[$lastIndex] === 'query_string'
+					&& !str_ends_with($keyPath, 'match.query_string');
+				if ($isQueryString) {
+					$match = $this->getQueryStringMatch($fn, $query);
+					Arrays::setValueByDotNotation($request['query'], $keyPath, $match);
 				} else {
-					$request['query'] = $newQuery;
+					$options = $fn($query);
+					$field = $parts[$lastIndex];
+					$newQuery = static::buildShouldHttpQuery($field, $options);
+					$replaceKey = implode('.', array_slice($parts, 0, -2));
+					// Here we do some trick and set the value of the pass in do notation to the payload by using refs
+					if ($replaceKey) {
+						Arrays::setValueByDotNotation($request['query'], $replaceKey, $newQuery);
+					} else {
+						$request['query'] = $newQuery;
+					}
+					$encodedNewQuery = json_encode($newQuery);
+					Buddy::debug("Fuzzy: transform: $query [$keyPath] -> $encodedNewQuery");
 				}
-				$encodedNewQuery = json_encode($newQuery);
-				Buddy::debug("Fuzzy: transform: $query [$keyPath] -> $encodedNewQuery");
 			}
 		}
 		$encoded = json_encode($request);
@@ -408,19 +454,22 @@ final class Payload extends BasePayload {
 	 * Helper to parse the lang string into array
 	 * @param null|string|array<string> $layouts
 	 * @return array<string>
+	 * @throws QueryParseError
 	 */
 	protected static function parseLayouts(null|string|array $layouts): array {
 		// If we have array already, just return it
+		if (empty($layouts)) {
+			return [];
+		}
 		if (is_array($layouts)) {
 			return $layouts;
 		}
-		if (isset($layouts)) {
-			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
-		} else {
-			$layouts = KeyboardLayout::getSupportedLanguages();
-			// We filter here because 0-9 maps to symbols that can interfere with word splitting
-			$filterFn = fn(string $layout) => $layout !== 'fr' && $layout !== 'be';
-			$layouts = array_filter($layouts, $filterFn);
+
+		$layouts = array_map('trim', explode(',', $layouts));
+		if (sizeof($layouts) < 2) {
+			throw QueryParseError::create(
+				'At least two languages are required in layouts'
+			);
 		}
 		return $layouts;
 	}

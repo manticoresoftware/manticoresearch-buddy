@@ -61,7 +61,7 @@ final class VersionHandler extends BaseHandlerWithClient
 
 			$splittedVersions = explode('(', $value);
 
-			foreach ($splittedVersions as $version) {
+			foreach ($splittedVersions as $n => $version) {
 				$version = trim($version);
 
 				if ($version[mb_strlen($version) - 1] === ')') {
@@ -69,13 +69,7 @@ final class VersionHandler extends BaseHandlerWithClient
 				}
 
 				$exploded = explode(' ', $version);
-
-				$component = 'Daemon';
-				if (in_array($exploded[0], ['columnar', 'secondary', 'buddy'])) {
-					$component = ucfirst($exploded[0]);
-				} elseif ($exploded[0] === 'knn') {
-					$component = 'KNN';
-				}
+				$component = $n > 0 ? ucfirst($exploded[0]) : 'Daemon';
 
 				$versions[] = ['Component' => $component, 'Version' => $version];
 			}
