@@ -211,8 +211,10 @@ final class EventHandler {
 			$message = match ($outputFormat) {
 				// TODO: Maybe later we can use meta for time, but not now cuz no time for non select
 				OutputFormat::Table => $result->getTableFormatted($startTime),
-				OutputFormat::Raw => $result->toString(),
-				default => $result->getStruct(),
+				OutputFormat::Plain => $result->toString(),
+				OutputFormat::Raw => $result->getStruct(),
+				// @phpstan-ignore-next-line
+				default => throw new RuntimeException('Unknown output format'),
 			};
 			$response = Response::fromMessageAndMeta(
 				$message,
@@ -238,10 +240,10 @@ final class EventHandler {
 				/** @var GenericError $e */
 				$e->setResponseError($originalError);
 				$e->setResponseErrorBody($originalErrorBody);
-				Buddy::error($e, "[$id] processing error");
 			} elseif (!is_a($e, GenericError::class)) {
 				$e = GenericError::create($originalError);
 			}
+			Buddy::error($e, "[$id] processing error");
 
 			$response = Response::fromError($e, $request->format ?? RequestFormat::JSON);
 		}
