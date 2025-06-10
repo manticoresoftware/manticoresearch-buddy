@@ -777,12 +777,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/manticoresearch-backup.git",
-                "reference": "6bfc96f0076f968bf9a5bcd7524a460369739a3a"
+                "reference": "2eb83c4b460d9330ed5c519b7a1722efc8d507d0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/6bfc96f0076f968bf9a5bcd7524a460369739a3a",
-                "reference": "6bfc96f0076f968bf9a5bcd7524a460369739a3a",
+                "url": "https://api.github.com/repos/manticoresoftware/manticoresearch-backup/zipball/2eb83c4b460d9330ed5c519b7a1722efc8d507d0",
+                "reference": "2eb83c4b460d9330ed5c519b7a1722efc8d507d0",
                 "shasum": ""
             },
             "require": {
@@ -822,9 +822,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/manticoresearch-backup/issues",
-                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/release-1.9.5"
+                "source": "https://github.com/manticoresoftware/manticoresearch-backup/tree/1.9.5"
             },
-            "time": "2025-06-06T07:32:41+00:00"
+            "time": "2025-06-03T05:00:27+00:00"
         },
         {
             "name": "manticoresoftware/openmetrics",
@@ -2370,20 +2370,19 @@
         },
         {
             "name": "symfony/polyfill-mbstring",
-            "version": "v1.32.0",
+            "version": "v1.31.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-mbstring.git",
-                "reference": "6d857f4d76bd4b343eac26d6b539585d2bc56493"
+                "reference": "85181ba99b2345b0ef10ce42ecac37612d9fd341"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/6d857f4d76bd4b343eac26d6b539585d2bc56493",
-                "reference": "6d857f4d76bd4b343eac26d6b539585d2bc56493",
+                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/85181ba99b2345b0ef10ce42ecac37612d9fd341",
+                "reference": "85181ba99b2345b0ef10ce42ecac37612d9fd341",
                 "shasum": ""
             },
             "require": {
-                "ext-iconv": "*",
                 "php": ">=7.2"
             },
             "provide": {
@@ -2431,7 +2430,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.32.0"
+                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.31.0"
             },
             "funding": [
                 {
@@ -2447,7 +2446,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-12-23T08:48:59+00:00"
+            "time": "2024-09-09T11:45:10+00:00"
         },
         {
             "name": "symfony/polyfill-php73",
@@ -4912,16 +4911,16 @@
         },
         {
             "name": "slevomat/coding-standard",
-            "version": "8.19.1",
+            "version": "8.18.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/slevomat/coding-standard.git",
-                "reference": "458d665acd49009efebd7e0cb385d71ae9ac3220"
+                "reference": "06b18b3f64979ab31d27c37021838439f3ed5919"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/slevomat/coding-standard/zipball/458d665acd49009efebd7e0cb385d71ae9ac3220",
-                "reference": "458d665acd49009efebd7e0cb385d71ae9ac3220",
+                "url": "https://api.github.com/repos/slevomat/coding-standard/zipball/06b18b3f64979ab31d27c37021838439f3ed5919",
+                "reference": "06b18b3f64979ab31d27c37021838439f3ed5919",
                 "shasum": ""
             },
             "require": {
@@ -4961,7 +4960,7 @@
             ],
             "support": {
                 "issues": "https://github.com/slevomat/coding-standard/issues",
-                "source": "https://github.com/slevomat/coding-standard/tree/8.19.1"
+                "source": "https://github.com/slevomat/coding-standard/tree/8.18.1"
             },
             "funding": [
                 {
@@ -4973,7 +4972,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-06-09T17:53:57+00:00"
+            "time": "2025-05-22T14:32:30+00:00"
         },
         {
             "name": "squizlabs/php_codesniffer",
