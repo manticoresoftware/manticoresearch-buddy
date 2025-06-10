@@ -139,35 +139,43 @@ final class Metric {
 	 */
 	public function getVersions(): array {
 		$buddyVersion = Buddy::getVersion();
+		/** @var array{version?:string} $statusMap */
 		$statusMap = $this->getStatusMap();
 		if (!isset($statusMap['version'])) {
 			Buddy::debug('metric: failed to get version from SHOW STATUS query');
 			return [];
 		}
 
-		$verPattern = 'v?((?:x\.x\.x|\d+\.\d+\.\d+)[^\(\)]*)';
-		$matchExpr = "/^{$verPattern}(\s+\(columnar\s{$verPattern}\))?"
-			. "(\s+\(secondary\s{$verPattern}\))?"
-			. "(\s+\(knn\s{$verPattern}\))?"
-			. "(\s+\(buddy\s{$verPattern}\))?$/ius"
-		;
-		/** @var string $version */
-		$version = $statusMap['version'];
-		preg_match($matchExpr, $version, $m);
-		if (!isset($m[1])) {
-			Buddy::debug('metric: failed to parse manticore version');
-			return [];
+		$value = $statusMap['version'];
+		$result = [];
+
+		// Add buddy version from our method
+		$result['buddy_version'] = $buddyVersion;
+
+		// Process components and their versions
+		$splitVersions = explode('(', $value);
+		foreach ($splitVersions as $n => $version) {
+			$version = trim($version);
+
+			// Remove closing parenthesis if exists
+			if ($version && $version[mb_strlen($version) - 1] === ')') {
+				$version = substr($version, 0, -1);
+			}
+
+			$exploded = explode(' ', $version);
+
+			if ($n === 0) {
+				// First version is manticore_version (not daemon)
+				$result['manticore_version'] = $version;
+			} elseif (sizeof($exploded) > 1) {
+				// Handle component versions (columnar, secondary, knn)
+				$component = strtolower($exploded[0]);
+				$componentVersion = implode(' ', array_slice($exploded, 1));
+				$result[$component . '_version'] = $componentVersion;
+			}
 		}
 
-		return array_filter(
-			[
-				'buddy_version' => $buddyVersion,
-				'manticore_version' => trim($m[1]),
-				'columnar_version' => $m[3] ?? null,
-				'secondary_version' => $m[5] ?? null,
-				'knn_version' => $m[7] ?? null,
-			]
-		);
+		return array_filter($result);
 	}
 
 	/**

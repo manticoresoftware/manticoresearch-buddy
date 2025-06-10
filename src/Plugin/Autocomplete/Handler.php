@@ -25,6 +25,8 @@ use RuntimeException;
 
 /**
  * This is the parent class to handle erroneous Manticore queries
+ *
+ * @phpstan-import-type Variation from \Manticoresearch\Buddy\Core\ManticoreSearch\Client
  * @phpstan-type keyword array{normalized:string,tokenized:string,docs:int}
  * @phpstan-type suggestion array{suggest:string,docs:int}
  */
@@ -210,22 +212,24 @@ final class Handler extends BaseHandlerWithFlagCache {
 			[$words, $scoreMap] = $this->manticoreClient->fetchFuzzyVariations(
 				$phrase,
 				$this->payload->table,
-				$this->payload->preserve,
 				$distance
 			);
 		}
 
 		// If no words found, we just add the original phrase
 		if (!$words) {
-			$words = [[$phrase]];
+			$words = [['original' => $phrase, 'keywords' => $this->payload->preserve ? [$phrase] : []]];
 		}
 
 		Buddy::debug("Autocomplete: variations for '$phrase': " . json_encode($words));
 
 		// Expand last word with wildcard
 		$lastIndex = array_key_last($words);
-		$lastWords = $words[$lastIndex];
-		$words[$lastIndex] = [];
+		$lastWords = $words[$lastIndex]['keywords'];
+		if (!$lastWords) {
+			$lastWords = [$words[$lastIndex]['original']];
+		}
+
 		foreach ($lastWords as $lastWord) {
 			// 1. Try to end the latest word with a wildcard
 			$keywords = $this->expandKeywords($lastWord);
@@ -234,11 +238,12 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$suggestions = $this->expandSuggestions($lastWord);
 
 			// 3. Merge it all
-			$words[$lastIndex] = array_merge($words[$lastIndex], $keywords, $suggestions);
+			$words[$lastIndex]['keywords'] = array_merge($words[$lastIndex]['keywords'], $keywords, $suggestions);
 
 			// 4. Make sure we have unique fill up
-			$words[$lastIndex] = array_unique($words[$lastIndex]);
+			$words[$lastIndex]['keywords'] = array_unique($words[$lastIndex]['keywords']);
 		}
+
 		// If the original phrase in the list, we add it to the beginning to boost weight
 		$combinations = static::buildRelevantCombinations($words, $scoreMap, $maxCount);
 		$combinations = Arrays::boostListValues($combinations, [$phrase]);
@@ -248,7 +253,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 	/**
 	 * Most effecitve way to find MOST scored relevant combinations by score map and return it with maxCount
-	 * @param array<array<string>> $words
+	 * @param array<Variation> $words
 	 * @param array<string,float> $scoreMap
 	 * @param int $maxCount
 	 * @return array<string>
@@ -262,7 +267,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$positions = array_keys($words);
 
 		foreach ($positions as $position) {
-			$combinations = static::processCombinations($combinations, $words[$position], $scoreMap, $maxCount);
+			/** @var array<string> $keywords */
+			$keywords = $words[$position]['keywords'];
+			$combinations = static::processCombinations($combinations, $keywords, $scoreMap, $maxCount);
 		}
 
 		arsort($combinations);

@@ -11,6 +11,9 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Fuzzy;
 
 use Closure;
+use Exception;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Error\QueryValidationError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\TableValidator;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithFlagCache;
@@ -60,38 +63,59 @@ final class Handler extends BaseHandlerWithFlagCache {
 		}
 		// Otherwise we process the query
 		return function (string $query): array {
-			$this->validate();
-			$phrases = [$query];
-			// If we have layout correction we generate for all languages given phrases
-			if ($this->payload->layouts) {
-				$phrases = KeyboardLayout::combineMany($query, $this->payload->layouts);
-			}
-			$words = [];
-			$scoreMap = [];
-			foreach ($phrases as $phrase) {
-				[$variations, $variationScores] = $this->manticoreClient->fetchFuzzyVariations(
-					$phrase,
-					$this->payload->table,
-					$this->payload->preserve,
-					$this->payload->distance
-				);
-				Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
-				// Extend varitions for each iteration we have
-				foreach ($variations as $pos => $variation) {
-					$words[$pos] ??= [];
-					$blend = Arrays::blend($words[$pos], $variation);
-					$words[$pos] = array_values(array_unique($blend));
-					$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
-				}
-			}
-
-			// If no words found, we just add the original phrase as fallback
-			if (!$words) {
-				$words = [[$query]];
-			}
-
-			return $words;
+			return $this->processFuzzyQuery($query);
 		};
+	}
+
+	/**
+	 * @param string $query
+	 * @return array<array<string>>
+	 * @throws QueryValidationError
+	 * @throws Exception
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	protected function processFuzzyQuery(string $query): array {
+		$this->validate();
+		$phrases = [$query];
+		// If we have layout correction we generate for all languages given phrases
+		if ($this->payload->layouts) {
+			$phrases = KeyboardLayout::combineMany($query, $this->payload->layouts);
+		}
+		$words = [];
+		$scoreMap = [];
+		foreach ($phrases as $phrase) {
+			[$variations, $variationScores] = $this->manticoreClient->fetchFuzzyVariations(
+				$phrase,
+				$this->payload->table,
+				$this->payload->distance
+			);
+			Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
+			// Extend varitions for each iteration we have
+			foreach ($variations as $pos => $variation) {
+				$keywords = $variation['keywords'];
+				if (!$keywords) {
+					if (!$this->payload->preserve) {
+						continue;
+					}
+
+					$keywords = [$variation['original']];
+				}
+
+				$words[$pos] ??= [];
+				$blend = Arrays::blend($words[$pos], $keywords);
+				$words[$pos] = array_values(array_unique($blend));
+				$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
+			}
+		}
+
+		// If no words found, we just add the original phrase as fallback
+		if (!$words) {
+			$words = [[$query]];
+		}
+
+		/** @var array<array<string>> */
+		return $words;
 	}
 
 	/**
