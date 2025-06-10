@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4b35895154d5c7b0c00bf4eea72fffc6",
+    "content-hash": "f8b8f7446a01b57af60c5fcd61adb8c7",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -721,16 +721,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-fix/multi-query-show-meta",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "fc1aefaf303cbf6481202616eb4e3f2a96032277"
+                "reference": "686606055fb0974368009912e4bc2a969a37ff41"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/fc1aefaf303cbf6481202616eb4e3f2a96032277",
-                "reference": "fc1aefaf303cbf6481202616eb4e3f2a96032277",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/686606055fb0974368009912e4bc2a969a37ff41",
+                "reference": "686606055fb0974368009912e4bc2a969a37ff41",
                 "shasum": ""
             },
             "require": {
@@ -746,6 +746,7 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -766,9 +767,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/multi-query-show-meta"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2025-06-09T12:25:40+00:00"
+            "time": "2025-06-10T04:22:17+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
