@@ -10,8 +10,8 @@ if ((nodes < 2)); then
 	echo "Number of nodes must be greater than 1"
 	exit 1
 fi
-if ((nodes > 4)); then
-	echo "Number of nodes must be less than or equal to 555"
+if ((nodes > 5)); then
+	echo "Number of nodes must be less than or equal to 5"
 	exit 1
 fi
 
