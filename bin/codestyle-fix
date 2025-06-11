@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-./vendor/bin/phpcbf -v --no-cache -s --standard="$(pwd)/ruleset.xml" src/ test/
+./vendor/bin/phpcbf -q -v --no-cache -s --standard="$(pwd)/ruleset.xml" src/ test/

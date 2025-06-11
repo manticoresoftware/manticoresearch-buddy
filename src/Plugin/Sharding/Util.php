@@ -174,6 +174,237 @@ final class Util {
 		return self::assignShardsToNodes($newSchema, $inactiveShards);
 	}
 
+	/**
+	 * Enhanced rebalancing for new node scenarios
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @param  Set<string> $newNodes Nodes that are new to the cluster
+	 * @param  int $replicationFactor Current replication factor
+	 * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
+	 */
+	public static function rebalanceWithNewNodes(Vector $schema, Set $newNodes, int $replicationFactor): Vector {
+		if (!$newNodes->count()) {
+			return $schema;
+		}
+
+		// Add new nodes to schema with empty shards
+		$newSchema = self::addNodesToSchema($schema, $newNodes);
+
+		if ($replicationFactor === 1) {
+			// For RF=1, we need to move shards to achieve better distribution
+			return self::redistributeShardsForRF1($newSchema, $newNodes);
+		}
+
+		// For RF>=2, we can add replicas to new nodes
+		return self::addReplicasToNewNodes($newSchema, $newNodes);
+	}
+
+	/**
+	 * Copy existing nodes to new schema, excluding new nodes
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @param  Set<string> $newNodes
+	 * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
+	 */
+	private static function copyExistingNodesForRF1(Vector $schema, Set $newNodes): Vector {
+		/** @var Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema */
+		$newSchema = new Vector();
+
+		foreach ($schema as $row) {
+			if ($newNodes->contains($row['node'])) {
+				continue;
+			}
+
+			$newSchema[] = [
+				'node' => $row['node'],
+				'shards' => clone $row['shards'], // Clone to avoid reference issues
+				'connections' => new Set([$row['node']]),
+			];
+		}
+
+		return $newSchema;
+	}
+
+	/**
+	 * Calculate target shards per node for balanced distribution
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
+	 * @param  Set<string> $newNodes
+	 * @return int
+	 */
+	private static function calculateTargetShardsPerNode(Vector $newSchema, Set $newNodes): int {
+		$totalShards = 0;
+		foreach ($newSchema as $row) {
+			$totalShards += $row['shards']->count();
+		}
+		$totalNodes = $newSchema->count() + $newNodes->count();
+		return $totalNodes > 0 ? (int)floor($totalShards / $totalNodes) : 0;
+	}
+
+	/**
+	 * Find most loaded existing node
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
+	 * @return array{index: int, maxShards: int}
+	 */
+	private static function findMostLoadedNode(Vector $newSchema): array {
+		$maxShards = 0;
+		$sourceNodeIndex = -1;
+
+		foreach ($newSchema as $index => $existingRow) {
+			if ($existingRow['shards']->count() <= $maxShards) {
+				continue;
+			}
+
+			$maxShards = $existingRow['shards']->count();
+			$sourceNodeIndex = $index;
+		}
+
+		return ['index' => $sourceNodeIndex, 'maxShards' => $maxShards];
+	}
+
+	/**
+	 * Move shards from existing nodes to new node
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
+	 * @param  int $shardsToMove
+	 * @return Set<int>
+	 */
+	private static function moveShardsToNewNode(Vector $newSchema, int $shardsToMove): Set {
+		$shardsForNewNode = new Set();
+
+		for ($i = 0; $i < $shardsToMove; $i++) {
+			$loadedNodeInfo = self::findMostLoadedNode($newSchema);
+			$sourceNodeIndex = $loadedNodeInfo['index'];
+			$maxShards = $loadedNodeInfo['maxShards'];
+
+			// If we found a source node with shards, mark one for movement
+			if ($sourceNodeIndex < 0 || $maxShards <= 0) {
+				// No more shards to move
+				break;
+			}
+
+			// Take one shard from the most loaded node
+			$sourceRow = $newSchema[$sourceNodeIndex];
+			if ($sourceRow === null) {
+				break;
+			}
+			$shardToMove = $sourceRow['shards']->first();
+
+			// For RF=1, remove the shard from source node immediately
+			$sourceRow['shards']->remove($shardToMove);
+			$newSchema[$sourceNodeIndex] = $sourceRow;
+			$shardsForNewNode->add($shardToMove);
+		}
+
+		return $shardsForNewNode;
+	}
+
+	/**
+	 * Redistribute shards for RF=1 to include new nodes
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @param  Set<string> $newNodes
+	 * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
+	 */
+	private static function redistributeShardsForRF1(Vector $schema, Set $newNodes): Vector {
+		// For RF=1, we need to move EXISTING shards (not just reassign them)
+		// This requires intermediate cluster operations to preserve data
+
+		// Copy existing nodes as-is initially
+		$newSchema = self::copyExistingNodesForRF1($schema, $newNodes);
+
+		// Calculate how many shards each new node should get for balanced distribution
+		$targetShardsPerNode = self::calculateTargetShardsPerNode($newSchema, $newNodes);
+
+		// Add new nodes and determine which shards to move to them
+		foreach ($newNodes as $newNode) {
+			// For balanced distribution, move multiple shards if needed
+			$shardsToMove = max(1, $targetShardsPerNode); // At least 1 shard per new node
+			$shardsForNewNode = self::moveShardsToNewNode($newSchema, $shardsToMove);
+
+			// Add the new node with its target shards
+			$newSchema[] = [
+				'node' => $newNode,
+				'shards' => $shardsForNewNode,
+				'connections' => new Set([$newNode]),
+			];
+		}
+
+		return $newSchema;
+	}
+
+	/**
+	 * Collect all existing shards from non-new nodes
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @param  Set<string> $newNodes
+	 * @return Set<int>
+	 */
+	private static function collectExistingShards(Vector $schema, Set $newNodes): Set {
+		$allShards = new Set();
+		foreach ($schema as $row) {
+			if ($newNodes->contains($row['node'])) {
+				continue;
+			}
+			$allShards->add(...$row['shards']);
+		}
+		return $allShards;
+	}
+
+	/**
+	 * Add all shards to new nodes for replication
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @param  Set<string> $newNodes
+	 * @param  Set<int> $allShards
+	 * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
+	 */
+	private static function assignShardsToNewNodes(Vector $schema, Set $newNodes, Set $allShards): Vector {
+		foreach ($newNodes as $newNode) {
+			foreach ($schema as $index => $row) {
+				if ($row['node'] === $newNode) {
+					// Add all shards to the new node
+					foreach ($allShards as $shard) {
+						$row['shards']->add($shard);
+					}
+					$schema[$index] = $row;
+					break;
+				}
+			}
+		}
+		return $schema;
+	}
+
+	/**
+	 * Update connections for all nodes to include all nodes that have each shard
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @param  Set<int> $allShards
+	 * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
+	 */
+	private static function updateShardConnections(Vector $schema, Set $allShards): Vector {
+		foreach ($allShards as $shard) {
+			$allNodesWithShard = self::findUsedNodesInCurrentReplication($schema, $shard);
+			foreach ($schema as $index => $row) {
+				if (!$row['shards']->contains($shard)) {
+					continue;
+				}
+				$schema[$index]['connections'] = $allNodesWithShard;
+			}
+		}
+		return $schema;
+	}
+
+	/**
+	 * Add replicas to new nodes for RF>=2
+	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @param  Set<string> $newNodes
+	 * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
+	 */
+	private static function addReplicasToNewNodes(Vector $schema, Set $newNodes): Vector {
+		// Collect all existing shards
+		$allShards = self::collectExistingShards($schema, $newNodes);
+
+		// For RF>=2, add all shards to new nodes for load balancing
+		// This maintains RF while distributing load across all nodes
+		$schema = self::assignShardsToNewNodes($schema, $newNodes, $allShards);
+
+		// Update connections for all nodes to include all nodes that have each shard
+		return self::updateShardConnections($schema, $allShards);
+	}
+
   /**
    * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}>  $schema
    * @param  Set<string> $nodes
