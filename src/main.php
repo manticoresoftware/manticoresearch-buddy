@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Base\Network\EventHandler;
 use Manticoresearch\Buddy\Base\Network\Server;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 
 // Init autoload first
 include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
@@ -30,6 +31,8 @@ try {
 	$settings = QueryProcessor::getSettings();
 	$initBuffer = ob_get_clean();
 	putenv("PLUGIN_DIR={$settings->commonPluginDir}");
+	// Update shared config with plugin directory
+	ConfigManager::set('PLUGIN_DIR', $settings->commonPluginDir ?? '');
 } catch (Throwable $t) {
 	Buddy::error($t);
 	ob_flush();
@@ -38,7 +41,7 @@ try {
 
 
 /** @var int $threads */
-$threads = (int)(getenv('THREADS', true) ?: swoole_cpu_num());
+$threads = ConfigManager::getInt('THREADS', swoole_cpu_num());
 $server = Server::create(
 	[
 	'daemonize' => 0,
@@ -137,7 +140,7 @@ $server->beforeStart(
 			$memory = memory_get_usage() / 1024;
 			$formatted = number_format($memory, 3).'K';
 			Buddy::debugv("memory usage: {$formatted}");
-		}, 60
+		}, 5
 	);
 
 if (is_telemetry_enabled()) {
@@ -145,7 +148,7 @@ if (is_telemetry_enabled()) {
 		static function () {
 			MetricThread::instance()->execute(
 				'checkAndSnapshot',
-				[(int)(getenv('TELEMETRY_PERIOD', true) ?: 300)]
+				[ConfigManager::getInt('TELEMETRY_PERIOD', 300)]
 			);
 		}, 10
 	);

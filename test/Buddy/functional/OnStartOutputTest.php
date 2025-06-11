@@ -67,13 +67,13 @@ class OnStartOutputTest extends TestCase {
 	public function testTickersOutput(): void {
 		echo "\nTesting if the output from ticker functions is passed from Buddy to daemon correctly\n";
 		// Setting debug mode in Manticore config
-		$conf = preg_replace('/buddy_path(.*?)(\r|\n)/', 'buddy_path$1 --debugv$2', self::$manticoreConf);
+		$conf = preg_replace('/buddy_path(.*?)(\r|\n)/', 'buddy_path$1 --log-level=debugv$2', self::$manticoreConf);
 		self::updateManticoreConf((string)$conf);
 		self::tearDownAfterClass();
 		self::setUpBeforeClass();
 		// Unsetting debug mode in manticore config
-		$conf = str_replace(' --debug', '', self::$manticoreConf);
-		self::updateManticoreConf($conf);
+		$conf = str_replace(' --log-level=debug', '', self::$manticoreConf);
+		self::updateManticoreConf((string)$conf);
 
 		ob_flush();
 		sleep(70);

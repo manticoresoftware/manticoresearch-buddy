@@ -85,10 +85,9 @@ To run a Buddy instance from the command line interface (CLI), use the following
   --telemetry-period=[N] set period for telemetry when we do snapshots
   --disable-telemetry    disables telemetry for Buddy
   --threads=[N]          start N threads on launch, default is CPU core count
-  --debug                enable debug mode for testing
-  --debugv               enable verbose debug mode with periodic messages
+  --log-level=[N]        set log level, default is info, one of debug, debugv, debugvv or info
   Examples:
-  manticore-executor src/main.php --debug
+  manticore-executor src/main.php --log-level=debug
   manticore-executor src/main.php --disable-telemetry
 ```
 

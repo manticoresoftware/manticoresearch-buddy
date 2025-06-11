@@ -20,7 +20,7 @@ class MetricThreadTest extends TestCase {
 		setUpBeforeClass as traitSetUpBeforeClass;
 	}
 	public static function setUpBeforeClass(): void {
-		static::$configFileName = 'manticore-debug.conf';
+		static::setSearchdArgs(['--log-level=debugvv']);
 
 		static::traitSetUpBeforeClass();
 	}

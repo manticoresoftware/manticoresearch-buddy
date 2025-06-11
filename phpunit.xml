@@ -8,7 +8,7 @@
       <directory suffix=".php">test/</directory>
     </exclude>
   </coverage>
-  <testsuite name="Manticore Backup Script">
+  <testsuite name="Manticore Buddy">
     <directory>test/</directory>
   </testsuite>
 </phpunit>
