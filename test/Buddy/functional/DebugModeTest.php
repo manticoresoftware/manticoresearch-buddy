@@ -48,7 +48,7 @@ class DebugModeTest extends TestCase {
 		// Checking the log part corresponding to the latest searchd start
 		$logUpdate = str_replace($this->searchdLog, '', (string)file_get_contents($this->searchdLogFilepath));
 		$this->assertStringNotContainsString('[BUDDY] memory usage:', $logUpdate);
-		self::setManticoreConfigFile('manticore-debug.conf');
+		static::setSearchdArgs(['--log-level=debugvv']);
 	}
 
 	/**
@@ -62,7 +62,7 @@ class DebugModeTest extends TestCase {
 		// Checking the log part corresponding to the latest searchd start
 		$logUpdate = str_replace($this->searchdLog, '', (string)file_get_contents($this->searchdLogFilepath));
 		$this->assertStringContainsString('[BUDDY] memory usage:', $logUpdate);
-		self::setManticoreConfigFile('manticore.conf');
+		static::setSearchdArgs([]);
 	}
 
 }

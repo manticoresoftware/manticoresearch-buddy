@@ -73,7 +73,7 @@ class OnStartOutputTest extends TestCase {
 		self::setUpBeforeClass();
 		// Unsetting debug mode in manticore config
 		$conf = str_replace(' --log-level=debug', '', self::$manticoreConf);
-		self::updateManticoreConf($conf);
+		self::updateManticoreConf((string)$conf);
 
 		ob_flush();
 		sleep(70);
