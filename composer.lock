@@ -725,12 +725,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "2093e96b869a9a3590ddea5b449fa3a8ffaeee68"
+                "reference": "b060d4d4022d5905ef5bdc9dd0a5838f83265c98"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/2093e96b869a9a3590ddea5b449fa3a8ffaeee68",
-                "reference": "2093e96b869a9a3590ddea5b449fa3a8ffaeee68",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/b060d4d4022d5905ef5bdc9dd0a5838f83265c98",
+                "reference": "b060d4d4022d5905ef5bdc9dd0a5838f83265c98",
                 "shasum": ""
             },
             "require": {
@@ -768,7 +768,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/log-level-opt"
             },
-            "time": "2025-06-11T03:27:34+00:00"
+            "time": "2025-06-11T03:45:23+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -5147,8 +5147,8 @@
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.1.0"
     },
