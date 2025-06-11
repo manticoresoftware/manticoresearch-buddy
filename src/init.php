@@ -10,13 +10,13 @@
 */
 
 use Manticoresearch\Buddy\Base\Lib\CliArgsProcessor;
-use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Base\Plugin\Insert\QueryParser\Loader;
 use Manticoresearch\Buddy\Core\Cache\Flag as FlagCache;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\ExpressionLanguage\Expression;
 
@@ -38,6 +38,7 @@ Buddy::setVersionFile(__DIR__ . '/../APP_VERSION');
 try {
 	ConfigManager::init();
 } catch (Throwable $t) {
+	var_dump($t);
 	Buddy::error($t, 'Failed to initialize ConfigManager');
 	exit(1);
 }

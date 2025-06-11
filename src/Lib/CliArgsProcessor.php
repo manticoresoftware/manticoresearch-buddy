@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Lib;
 
 use Manticoresearch\Buddy\Base\Config\LogLevel;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 
 final class CliArgsProcessor {
 

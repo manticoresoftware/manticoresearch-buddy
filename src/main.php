@@ -9,7 +9,6 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Base\Lib\CrashDetector;
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
@@ -17,6 +16,7 @@ use Manticoresearch\Buddy\Base\Network\EventHandler;
 use Manticoresearch\Buddy\Base\Network\Server;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 
 // Init autoload first
 include_once __DIR__ . DIRECTORY_SEPARATOR . 'init.php';
@@ -137,10 +137,11 @@ $server->beforeStart(
 	->addHandler('request', EventHandler::request(...))
 	->addTicker(
 		static function () {
+			var_dump('memory');
 			$memory = memory_get_usage() / 1024;
 			$formatted = number_format($memory, 3).'K';
 			Buddy::debugv("memory usage: {$formatted}");
-		}, 60
+		}, 5
 	);
 
 if (is_telemetry_enabled()) {

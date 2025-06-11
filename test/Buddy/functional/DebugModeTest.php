@@ -48,7 +48,7 @@ class DebugModeTest extends TestCase {
 		// Checking the log part corresponding to the latest searchd start
 		$logUpdate = str_replace($this->searchdLog, '', (string)file_get_contents($this->searchdLogFilepath));
 		$this->assertStringNotContainsString('[BUDDY] memory usage:', $logUpdate);
-		static::setSearchdArgs(['--log-level=debugvv']);
+		static::setSearchdArgs(['--log-level=debugv']);
 	}
 
 	/**

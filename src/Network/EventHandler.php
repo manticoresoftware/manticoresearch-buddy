@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Network;
 
 use Manticoresearch\Buddy\Base\Config\LogLevel;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
-use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
@@ -25,6 +24,7 @@ use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use RuntimeException;
 use Swoole\Coroutine;
 use Swoole\Coroutine\WaitGroup;

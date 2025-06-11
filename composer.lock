@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f8b8f7446a01b57af60c5fcd61adb8c7",
+    "content-hash": "a7f640b4160aa41fe40bef6de0c889c0",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -721,16 +721,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-feature/log-level-opt",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "686606055fb0974368009912e4bc2a969a37ff41"
+                "reference": "2093e96b869a9a3590ddea5b449fa3a8ffaeee68"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/686606055fb0974368009912e4bc2a969a37ff41",
-                "reference": "686606055fb0974368009912e4bc2a969a37ff41",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/2093e96b869a9a3590ddea5b449fa3a8ffaeee68",
+                "reference": "2093e96b869a9a3590ddea5b449fa3a8ffaeee68",
                 "shasum": ""
             },
             "require": {
@@ -746,7 +746,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -767,9 +766,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/feature/log-level-opt"
             },
-            "time": "2025-06-10T04:22:17+00:00"
+            "time": "2025-06-11T03:27:34+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",

@@ -14,9 +14,9 @@ namespace Manticoresearch\Buddy\Base\Network;
 
 use Ds\Set;
 use Exception;
-use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use Swoole\Http\Server as SwooleServer;
 use Swoole\Process;
 use Swoole\Timer;

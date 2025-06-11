@@ -15,10 +15,10 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 	. 'src' . DIRECTORY_SEPARATOR
 	. 'init.php';
 
-use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use Psr\Container\ContainerInterface;
 
 // Not the best way, but it's ok for now

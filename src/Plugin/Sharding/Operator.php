@@ -2,10 +2,10 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
-use Manticoresearch\Buddy\Base\Lib\ConfigManager;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use RuntimeException;
 
 final class Operator {
