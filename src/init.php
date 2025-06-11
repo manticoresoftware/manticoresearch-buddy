@@ -38,7 +38,6 @@ Buddy::setVersionFile(__DIR__ . '/../APP_VERSION');
 try {
 	ConfigManager::init();
 } catch (Throwable $t) {
-	var_dump($t);
 	Buddy::error($t, 'Failed to initialize ConfigManager');
 	exit(1);
 }
