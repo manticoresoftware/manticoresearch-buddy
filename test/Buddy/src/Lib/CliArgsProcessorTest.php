@@ -57,7 +57,7 @@ class CliArgsProcessorTest extends TestCase {
 		echo "\nTesting the processing of the `version` argument\n";
 		$version = Buddy::getVersion();
 		$res = "Manticore Buddy v$version\n"
-			. "Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)\n";
+			. "Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)\n";
 		$this->assertEquals($res, self::invokeMethod(CliArgsProcessor::class, 'version'));
 	}
 
