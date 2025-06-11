@@ -42,13 +42,13 @@ class CliArgsProcessorTest extends TestCase {
 		$refCls = new \ReflectionClass(CliArgsProcessor::class);
 		$consts = $refCls->getConstant('DEFAULT_OPTS');
 		if (is_array($consts)) {
-			$this->assertEquals($consts['listen'], getenv('LISTEN', true));
+			$this->assertEquals($consts['listen'], ConfigManager::get('LISTEN'));
 		}
-		$this->assertEquals('127.0.0.1:9308', getenv('LISTEN', true));
+		$this->assertEquals('127.0.0.1:9308', ConfigManager::get('LISTEN'));
 
 		$listen = '10.0.0.1:34445';
 		CliArgsProcessor::run(['listen' => $listen]);
-		$this->assertEquals($listen, getenv('LISTEN', true));
+		$this->assertEquals($listen, ConfigManager::get('LISTEN'));
 	}
 
 	public function testVersionArgProcessOk(): void {
