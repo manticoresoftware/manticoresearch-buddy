@@ -140,7 +140,7 @@ $server->beforeStart(
 			$memory = memory_get_usage() / 1024;
 			$formatted = number_format($memory, 3).'K';
 			Buddy::debugv("memory usage: {$formatted}");
-		}, 5
+		}, 60
 	);
 
 if (is_telemetry_enabled()) {
