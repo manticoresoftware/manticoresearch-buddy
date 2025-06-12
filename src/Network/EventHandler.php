@@ -240,10 +240,15 @@ final class EventHandler {
 				/** @var GenericError $e */
 				$e->setResponseError($originalError);
 				$e->setResponseErrorBody($originalErrorBody);
+				Buddy::debug("[$id] processing error: {$e->getMessage()}");
 			} elseif (!is_a($e, GenericError::class)) {
 				$e = GenericError::create($originalError);
 			}
-			Buddy::error($e, "[$id] processing error");
+
+			if (!static::shouldProxyError($e)) {
+				Buddy::error($e, "[$id] processing error");
+			}
+
 
 			$response = Response::fromError($e, $request->format ?? RequestFormat::JSON);
 		}
