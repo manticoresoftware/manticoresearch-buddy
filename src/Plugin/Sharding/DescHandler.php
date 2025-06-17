@@ -89,8 +89,9 @@ final class DescHandler extends BaseHandlerWithClient {
 	 * @return string|null
 	 */
 	private function findShardFromAgent(array $data): ?string {
+		$currentNode = Node::findId($this->manticoreClient);
 		foreach ($data as $row) {
-			if ($row['Type'] !== 'agent') {
+			if ($row['Type'] === 'local') {
 				continue;
 			}
 
@@ -98,8 +99,10 @@ final class DescHandler extends BaseHandlerWithClient {
 			$agentParts = explode('|', $row['Agent']);
 			$firstAgent = $agentParts[0]; // "127.0.0.1:1312:system.test2_s0"
 			$shardParts = explode(':', $firstAgent);
-			if (sizeof($shardParts) >= 3) {
-				return $shardParts[2]; // "system.test2_s0"
+			$shardName = array_pop($shardParts);
+			$shardNode = implode(':', $shardParts);
+			if ($currentNode === $shardNode) {
+				return $shardName;
 			}
 		}
 		return null;
