@@ -1144,10 +1144,19 @@ final class Table {
 	/**
 	 * Build local table definitions from shards
 	 * @param Set<int> $shards
+	 * @param int $replicationFactor
 	 * @return Set<string>
 	 */
-	private function buildLocalTableDefinitions(Set $shards): Set {
+	private function buildLocalTableDefinitions(Set $shards, int $replicationFactor): Set {
 		$locals = new Set;
+
+		// For RF > 1, we should NOT use local entries at all
+		// All shards should be accessed via agents with replicas
+		if ($replicationFactor > 1) {
+			return $locals; // Return empty set
+		}
+
+		// For RF = 1, use local entries for current node's shards
 		foreach ($shards as $shard) {
 			$locals->add("local='{$this->getShardName($shard)}'");
 		}
@@ -1190,23 +1199,26 @@ final class Table {
 				if ($shards->contains($shard)) {
 					continue;
 				}
-			} else {
-				// RF>=2: Create agents for shards that DO exist locally (replicated shards)
-				if (!$shards->contains($shard)) {
+
+				// For RF=1, filter out current node from agents (don't point to yourself)
+				$remoteConnections = $nodeConnections->filter(
+					fn($connection) => !str_starts_with($connection, $currentNodeId . ':')
+				);
+
+				if ($remoteConnections->count() <= 0) {
 					continue;
 				}
+
+				$agents->add("agent='{$remoteConnections->join('|')}'");
+			} else {
+				// RF>=2: Create agents for ALL shards with ALL replicas (including current node)
+				// This is the key fix: include ALL replicas in each agent entry
+				if ($nodeConnections->count() <= 0) {
+					continue;
+				}
+
+				$agents->add("agent='{$nodeConnections->join('|')}'");
 			}
-
-			// Filter out the current node from agents (don't point to yourself)
-			$remoteConnections = $nodeConnections->filter(
-				fn($connection) => !str_starts_with($connection, $currentNodeId . ':')
-			);
-
-			if ($remoteConnections->count() <= 0) {
-				continue;
-			}
-
-			$agents->add("agent='{$remoteConnections->join('|')}'");
 		}
 
 		return $agents;
@@ -1219,11 +1231,11 @@ final class Table {
 	 * @return string
 	 */
 	protected function getCreateShardedTableSQLWithSchema(Set $shards, Vector $schema): string {
-		// Calculate local tables
-		$locals = $this->buildLocalTableDefinitions($shards);
-
 		// Use the provided schema instead of querying database
 		$replicationFactor = $this->getReplicationFactor($schema);
+
+		// Calculate local tables
+		$locals = $this->buildLocalTableDefinitions($shards, $replicationFactor);
 
 		// Build map of all shards and their nodes from the provided schema
 		$map = $this->buildShardNodesMapping($schema);
@@ -1258,13 +1270,13 @@ final class Table {
 	 * @return string
 	 */
 	protected function getCreateShardedTableSQL(Set $shards): string {
-		// Calculate local tables
-		$locals = $this->buildLocalTableDefinitions($shards);
-
 		// For RF=1, we need ALL nodes and ALL their shards for the distributed table
 		// Not just the "external" ones based on current node's shards
 		$currentSchema = $this->getShardSchema();
 		$replicationFactor = $this->getReplicationFactor($currentSchema);
+
+		// Calculate local tables
+		$locals = $this->buildLocalTableDefinitions($shards, $replicationFactor);
 
 		$nodes = $this->getNodeShardsByReplicationFactor($shards, $replicationFactor);
 
