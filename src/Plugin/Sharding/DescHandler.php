@@ -33,33 +33,89 @@ final class DescHandler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = function (): TaskResult {
-
 			$table = $this->payload->table;
 			// TODO: think about the way to refactor it and remove duplication
 			$q = "DESC {$table} OPTION force=1";
 			$resp = $this->manticoreClient->sendRequest($q);
 			/** @var array{0:array{data:array<array{Type:string,Agent:string}>}} $result */
 			$result = $resp->getResult();
-			$shard = null;
-			foreach ($result[0]['data'] as $row) {
-				if ($row['Type'] === 'local') {
-					$shard = $row['Agent'];
-					break;
-				}
-			}
+
+			$shard = $this->findShardFromResult($result[0]['data']);
 			if (!isset($shard)) {
-				return TaskResult::withError('Failed to find structure from local shards');
+				return TaskResult::withError('Failed to find structure from local shards or agents');
 			}
 
-			$q = match ($this->payload->type) {
-				'show' => "SHOW CREATE TABLE {$shard}",
-				'desc', 'describe' => "DESC {$shard}",
-				default => throw new RuntimeException("Unknown type: {$this->payload->type}"),
-			};
+			$q = $this->buildShardQuery($shard);
 			$resp = $this->manticoreClient->sendRequest($q);
 			return TaskResult::fromResponse($resp);
 		};
 		$task = Task::create($taskFn, []);
 		return $task->run();
+	}
+
+	/**
+	 * Find a shard from the DESC result data
+	 * @param array<array{Type:string,Agent:string}> $data
+	 * @return string|null
+	 */
+	private function findShardFromResult(array $data): ?string {
+		// First try to find local shards (RF=1 case)
+		$shard = $this->findLocalShard($data);
+		if (isset($shard)) {
+			return $shard;
+		}
+
+		// If no local found, try agent entries (RF>1 case)
+		return $this->findShardFromAgent($data);
+	}
+
+	/**
+	 * Find shard from local entries
+	 * @param array<array{Type:string,Agent:string}> $data
+	 * @return string|null
+	 */
+	private function findLocalShard(array $data): ?string {
+		foreach ($data as $row) {
+			if ($row['Type'] === 'local') {
+				return $row['Agent'];
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Find shard from agent entries
+	 * @param array<array{Type:string,Agent:string}> $data
+	 * @return string|null
+	 */
+	private function findShardFromAgent(array $data): ?string {
+		foreach ($data as $row) {
+			if ($row['Type'] !== 'agent') {
+				continue;
+			}
+
+			// Extract shard name from agent string like "127.0.0.1:1312:system.test2_s0|..."
+			$agentParts = explode('|', $row['Agent']);
+			$firstAgent = $agentParts[0]; // "127.0.0.1:1312:system.test2_s0"
+			$shardParts = explode(':', $firstAgent);
+			if (sizeof($shardParts) >= 3) {
+				return $shardParts[2]; // "system.test2_s0"
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Build the query for the shard
+	 * @param string $shard
+	 * @return string
+	 * @throws RuntimeException
+	 */
+	private function buildShardQuery(string $shard): string {
+		return match ($this->payload->type) {
+			'show' => "SHOW CREATE TABLE {$shard}",
+			'desc', 'describe' => "DESC {$shard}",
+			default => throw new RuntimeException("Unknown type: {$this->payload->type}"),
+		};
 	}
 }
