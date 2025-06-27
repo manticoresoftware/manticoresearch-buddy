@@ -13,6 +13,7 @@
  * This file contains various global functions that are useful in some cases
  */
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 
 /**
  * Emit metric into the separate thread
@@ -36,7 +37,7 @@ function buddy_metric(string $name, int|float $value) {
  * @return bool
  */
 function is_telemetry_enabled(): bool {
-	return getenv('TELEMETRY', true) === '1';
+	return ConfigManager::get('TELEMETRY', '1') === '1';
 }
 
 /**

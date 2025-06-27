@@ -54,6 +54,9 @@ trait TestFunctionalTrait {
 	/** @var string $configFileName */
 	protected static string $configFileName = 'manticore.conf';
 
+	/** @var array<string> $searchdArgs Additional arguments to pass to searchd via buddy_path */
+	protected static array $searchdArgs = [];
+
 	/**
 	 * Launch daemon as as setup stage
 	 * @return void
@@ -65,6 +68,7 @@ trait TestFunctionalTrait {
 		}
 
 		self::setConfWithBuddyPath();
+		self::applySearchdArgs();
 		self::checkManticorePathes();
 		system('rm -f /var/log/manticore-test/searchd.pid');
 		system('rm -f /var/log/manticore-test/searchd.log');
@@ -140,6 +144,15 @@ trait TestFunctionalTrait {
 		$replRegex = '/(listen = [^:]+:?)(\d+)(\r|\n)/';
 		$conf = preg_replace_callback($replRegex, fn($m) => $m[1] . (string)$port . $m[3], static::$manticoreConf);
 		self::updateManticoreConf((string)$conf);
+	}
+	/**
+	 * Sets additional arguments to pass to searchd via buddy_path
+	 *
+	 * @param array<string> $args
+	 * @return void
+	 */
+	public static function setSearchdArgs(array $args): void {
+		static::$searchdArgs = $args;
 	}
 
 	/**
@@ -402,7 +415,30 @@ trait TestFunctionalTrait {
 			throw new Exception("Invalid Manticore config found at $configFile");
 		}
 		$conf = str_replace('%BUDDY%', $buddyPath, $conf);
-		self::updateManticoreConf($conf);
+		self::updateManticoreConf((string)$conf);
+	}
+
+	/**
+	 * Helper that applies additional searchd arguments to the buddy_path config option
+	 *
+	 * @return void
+	 */
+	protected static function applySearchdArgs(): void {
+		if (empty(static::$searchdArgs)) {
+			return;
+		}
+
+		$additionalArgs = implode(' ', static::$searchdArgs);
+		$conf = static::$manticoreConf;
+
+		// Find the buddy_path line and append additional arguments
+		$conf = preg_replace(
+			'/(buddy_path = manticore-executor [^\r\n]+)(\r|\n)/',
+			'$1 ' . $additionalArgs . '$2',
+			$conf
+		);
+
+		self::updateManticoreConf((string)$conf);
 	}
 
 	/**

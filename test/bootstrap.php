@@ -18,6 +18,7 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use Psr\Container\ContainerInterface;
 
 // Not the best way, but it's ok for now
@@ -29,8 +30,10 @@ if (!is_dir('/etc/manticore')) {
 touch('/etc/manticore/manticore.conf');
 putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 // Disable telemetry because we do not need it in tests
-putenv('TELEMETRY=0');
 putenv('PLUGIN_DIR=/usr/local/lib/manticore');
+
+ConfigManager::init();
+ConfigManager::set('TELEMETRY', '0');
 
 /** @var ContainerInterface $manticoreClient */
 $container = Pluggable::getContainer();

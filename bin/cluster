@@ -10,15 +10,15 @@ if ((nodes < 2)); then
 	echo "Number of nodes must be greater than 1"
 	exit 1
 fi
-if ((nodes > 4)); then
-	echo "Number of nodes must be less than or equal to 555"
+if ((nodes > 5)); then
+	echo "Number of nodes must be less than or equal to 5"
 	exit 1
 fi
 
 for n in $(seq 1 $nodes); do
 	cat << EOF > $DIR/manticore-${n}.conf
 searchd {
-	buddy_path = manticore-executor /workdir/src/main.php --debugv
+	buddy_path = manticore-executor /workdir/src/main.php --log-level=debugvv
 	listen = 127.0.0.1:${n}9312
 	listen = 127.0.0.1:${n}9306:mysql
 	listen = 127.0.0.1:${n}9308:http

@@ -7,6 +7,7 @@ use Ds\Set;
 use Ds\Vector;
 use RuntimeException;
 
+/** @package Manticoresearch\Buddy\Base\Plugin\Sharding */
 final class Util {
   /**
    * Generate sharding schema by using input nodes, shards and replication
@@ -123,6 +124,11 @@ final class Util {
 
   /**
    * Make rebalance of the sharding schema and return new one
+   *
+   * IMPORTANT: This method respects the original replication factor (RF) to ensure data safety:
+   * - RF=1: NO data movement - new nodes are added but existing shards stay put to prevent data loss
+   * - RF>1: Safe rebalancing - shards can be redistributed because data is replicated
+   *
    * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
    * @param  Set<string> $nodes
    * @return Vector<array{
@@ -137,6 +143,34 @@ final class Util {
 		$newSchema = self::addNodesToSchema($newSchema, $nodes);
 		$inactiveShards = self::findInactiveShards($schema, $nodes);
 
+		// Check if we have new nodes (nodes with no shards assigned)
+		$hasNewNodes = $newSchema->filter(fn($row) => $row['shards']->isEmpty())->count() > 0;
+
+		if ($hasNewNodes) {
+			// Calculate original replication factor from existing schema
+			$originalRf = self::calculateReplicationFactor($schema);
+
+			// For rf=1, we should NOT move existing data - only link new nodes
+			// Data movement with rf=1 would cause data loss
+			if ($originalRf === 1) {
+				// With rf=1, we can only add new nodes for new shards, not redistribute existing ones
+				// Return the schema as-is with new nodes added (they'll get shards via normal shard creation)
+				return $newSchema;
+			}
+
+			// For rf > 1, we can safely rebalance because data is replicated
+			$totalShards = self::getTotalUniqueShards($schema);
+
+			if ($totalShards > 0) {
+				// Reuse the balanced assignment logic from createShardingSchema
+				// but maintain the original replication factor
+				$balancedSchema = self::initializeSchema($nodes);
+				$nodeMap = self::initializeNodeMap($nodes->count());
+				return self::assignNodesToSchema($balancedSchema, $nodeMap, $nodes, $totalShards, $originalRf);
+			}
+		}
+
+		// For node failures only (no new nodes), use the original logic
 		return self::assignShardsToNodes($newSchema, $inactiveShards);
 	}
 
@@ -245,5 +279,50 @@ final class Util {
 		}
 
 		return $set;
+	}
+
+  /**
+   * Calculate the original replication factor from the schema
+   * by finding how many nodes have the same shard
+   * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+   * @return int
+   */
+	private static function calculateReplicationFactor(Vector $schema): int {
+		if ($schema->isEmpty()) {
+			return 1;
+		}
+
+		// Count how many nodes have each shard
+		$shardCounts = new Map();
+
+		foreach ($schema as $row) {
+			foreach ($row['shards'] as $shard) {
+				$currentCount = $shardCounts->get($shard, 0);
+				$shardCounts->put($shard, $currentCount + 1);
+			}
+		}
+
+		if ($shardCounts->isEmpty()) {
+			return 1;
+		}
+
+		// The replication factor is the maximum count of any shard
+		// (in a properly configured system, all shards should have the same RF)
+		return max($shardCounts->values()->toArray());
+	}
+
+  /**
+   * Get the total number of unique shards from the schema
+   * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+   * @return int
+   */
+	private static function getTotalUniqueShards(Vector $schema): int {
+		$allShards = new Set();
+
+		foreach ($schema as $row) {
+			$allShards->add(...$row['shards']);
+		}
+
+		return $allShards->count();
 	}
 }

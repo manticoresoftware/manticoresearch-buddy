@@ -50,6 +50,9 @@ final class Payload extends BasePayload {
 	/** @var string|array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>} */
 	public array|string $payload;
 
+	/** @var array<string> */
+	public array $queries = [];
+
 	public function __construct() {
 	}
 
@@ -100,6 +103,8 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromSqlRequest(Request $request): static {
 		$query = $request->payload;
+		$additionalQueries = static::extractAdditionalQueries($query);
+
 		preg_match('/FROM\s+`?(\w+)`?\s+WHERE/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
@@ -157,7 +162,38 @@ final class Payload extends BasePayload {
 		$self->layouts = $layouts;
 		$self->preserve = $preserve;
 		$self->payload = $query;
+		$self->queries = $additionalQueries;
 		return $self;
+	}
+
+	/**
+	 * @param string $query
+	 * @return array<string>
+	 */
+	protected static function extractAdditionalQueries(string $query): array {
+		$additionalQueries = [];
+
+		// Find the position of the first semicolon
+		$firstSemicolonPos = strpos($query, ';', stripos($query, ' option ') ?: 0) ?: 0;
+
+		// If a semicolon exists
+		if ($firstSemicolonPos > 0) {
+			// Get the text after the first semicolon
+			$remainingText = trim(substr($query, $firstSemicolonPos + 1));
+
+			// Split remaining text into additional queries
+			if (!empty($remainingText)) {
+				$extraQueries = preg_split('/;/', $remainingText, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+				// Add non-empty queries to the result
+				$additionalQueries = array_merge(
+					$additionalQueries,
+					array_filter(array_map('trim', $extraQueries))
+				);
+			}
+		}
+
+		return $additionalQueries;
 	}
 
 	/**
@@ -220,7 +256,8 @@ final class Payload extends BasePayload {
 			$match = $searchValue;
 		}
 		Buddy::debug("Fuzzy: match: $match");
-		return sprintf($template, $match, $searchTableName);
+		$queries = [sprintf($template, $match, $searchTableName), ...$this->queries];
+		return implode(';', $queries);
 	}
 
 	/**
@@ -430,6 +467,7 @@ final class Payload extends BasePayload {
 	 * Helper to parse the lang string into array
 	 * @param null|string|array<string> $layouts
 	 * @return array<string>
+	 * @throws QueryParseError
 	 */
 	protected static function parseLayouts(null|string|array $layouts): array {
 		// If we have array already, just return it
@@ -440,7 +478,13 @@ final class Payload extends BasePayload {
 			return $layouts;
 		}
 
-		return array_map('trim', explode(',', $layouts));
+		$layouts = array_map('trim', explode(',', $layouts));
+		if (sizeof($layouts) < 2) {
+			throw QueryParseError::create(
+				'At least two languages are required in layouts'
+			);
+		}
+		return $layouts;
 	}
 
 	/**

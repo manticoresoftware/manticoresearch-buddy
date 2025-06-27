@@ -16,6 +16,7 @@ use Ds\Set;
 use Exception;
 use Manticoresearch\Buddy\Core\Network\Response;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use Swoole\Http\Server as SwooleServer;
 use Swoole\Process;
 use Swoole\Timer;
@@ -59,8 +60,8 @@ final class Server {
 	 * @return void
 	 */
 	public function __construct(array $config = []) {
-		$this->bind = getenv('BIND_HOST') ?: '127.0.0.1';
-		$this->socket = new SwooleServer($this->bind, (int)(getenv('BIND_PORT') ?: 0));
+		$this->bind = ConfigManager::get('BIND_HOST', '127.0.0.1');
+		$this->socket = new SwooleServer($this->bind, ConfigManager::getInt('BIND_PORT', 0));
 		$this->socket->set($config);
 		$this->ppid = posix_getppid();
 

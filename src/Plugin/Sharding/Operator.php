@@ -5,6 +5,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use RuntimeException;
 
 final class Operator {
@@ -100,11 +101,9 @@ final class Operator {
 	public function checkBalance(): static {
 		$cluster = $this->getCluster();
 		$queue = $this->getQueue();
+		// We get inactive nodes to exclude them from the rebalance in case of outages
+		// It may be an empty list if we're adding a new node to the cluster, which is fine
 		$inactiveNodes = $cluster->getInactiveNodes();
-		// Do rebalance in case we have inactive nodes
-		if ($inactiveNodes->isEmpty()) {
-			return $this;
-		}
 
 		// Do exclude repeated rebalancing we take hash of active nodes
 		// and if the same, we do nothing, otherwise, it shows the change
@@ -115,7 +114,12 @@ final class Operator {
 		if ($clusterHash === $currentHash) {
 			return $this;
 		}
-		Buddy::info("Rebalancing due to inactive nodes: {$inactiveNodes->join(', ')}");
+
+		if ($inactiveNodes->count() > 0) {
+			Buddy::info("Rebalancing due to inactive nodes: {$inactiveNodes->join(', ')}");
+		} else {
+			Buddy::info('Rebalancing due to new nodes joined');
+		}
 
 		// Get all tables from the state we have
 		$list = $this->state->listRegex('table:.+');
@@ -287,7 +291,7 @@ final class Operator {
 		// Update the state
 		if ($isProcessed) {
 			$result['status'] = 'done';
-			$result['result'] = getenv('DEBUG') && $result['type'] === 'create'
+			$result['result'] = ConfigManager::getInt('DEBUG') && $result['type'] === 'create'
 			? $this->client->sendRequest("SHOW CREATE TABLE {$table} OPTION force=1")->getBody()
 			: TaskResult::none()->toString();
 			$this->state->set($stateKey, $result);

@@ -52,7 +52,7 @@ class InsertQueryHandlerTest extends TestCase {
 			['key' => 'searchd.pid_file', 'value' => '/var/run/manticore/searchd.pid'],
 			['key' => 'searchd.data_dir', 'value' => '/var/lib/manticore'],
 			['key' => 'searchd.query_log_format', 'value' => 'sphinxql'],
-			['key' => 'searchd.buddy_path', 'value' => 'manticore-executor /workdir/src/ main.php --debug'],
+			['key' => 'searchd.buddy_path', 'value' => 'manticore-executor /workdir/src/main.php --log-level=debug'],
 			['key' => 'common.plugin_dir', 'value' => '/usr/local/lib/manticore'],
 			['key' => 'common.lemmatizer_base', 'value' => '/usr/share/manticore/morph/'],
 			]

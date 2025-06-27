@@ -201,7 +201,7 @@ class QueryProcessorTest extends TestCase {
 			new Map(
 				[
 				'key' => 'searchd.buddy_path',
-				'value' => 'manticore-executor /workdir/src/main.php --debug',
+				'value' => 'manticore-executor /workdir/src/main.php --log-level=debug',
 				]
 			)
 		);

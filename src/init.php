@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\Cache\Flag as FlagCache;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\ExpressionLanguage\Expression;
 
@@ -31,6 +32,15 @@ error_reporting(E_ALL & ~E_WARNING);
 
 set_error_handler(buddy_error_handler(...)); // @phpstan-ignore-line
 Buddy::setVersionFile(__DIR__ . '/../APP_VERSION');
+
+// Initialize shared configuration manager before processing CLI arguments
+// This allows CliArgsProcessor to set values directly in ConfigManager
+try {
+	ConfigManager::init();
+} catch (Throwable $t) {
+	Buddy::error($t, 'Failed to initialize ConfigManager');
+	exit(1);
+}
 
 $opts = CliArgsProcessor::run();
 $authToken = getenv('BUDDY_TOKEN') ?: null;
@@ -52,7 +62,7 @@ $container
 	->register('pluggable', Pluggable::class)
 	->setArguments([new Expression('service("manticoreClient").getSettings()')]);
 
-putenv("LISTEN={$opts['listen']}");
+ConfigManager::set('LISTEN', $opts['listen']);
 $plugins = [
 	'manticoresoftware/buddy-plugin-empty-string',
 	'manticoresoftware/buddy-plugin-backup',

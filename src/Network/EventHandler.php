@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Network;
 
+use Manticoresearch\Buddy\Base\Config\LogLevel;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Core\Error\GenericError;
@@ -23,6 +24,8 @@ use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
+use RuntimeException;
 use Swoole\Coroutine;
 use Swoole\Coroutine\WaitGroup;
 use Swoole\Http\Request as SwooleRequest;
@@ -32,6 +35,10 @@ use Throwable;
 /**
  * This is the main class that contains all handlers
  * for work with connection initiated by React framework
+ */
+
+/**
+ * @phpstan-type ConfigStruct array{log_level?:string}
  */
 final class EventHandler {
 	/**
@@ -54,18 +61,28 @@ final class EventHandler {
 	 * @return void
 	 */
 	public static function request(SwooleRequest $request, SwooleResponse $response): void {
-		// Allow only post and otherwise send bad request
+		$requestUri = $request->server['request_uri'] ?? '/';
+
+		// Handle /config endpoint
+		if ($requestUri === '/config') {
+			self::handleConfigRequest($request, $response);
+			return;
+		}
+
+		// Original logic for / endpoint
 		if ($request->server['request_method'] !== 'POST') {
 			$response->status(400);
 			$response->end(Response::none());
 			return;
 		}
+
 		$startTime = hrtime(true);
 		$requestId = $request->header['Request-ID'] ?? uniqid(more_entropy: true);
 		$body = $request->rawContent() ?: '';
 		$waitGroup = new WaitGroup();
 		$waitGroup->add(1);
 		$result = '';
+
 		Coroutine::create(
 			static function () use ($requestId, $body, $startTime, $waitGroup, &$result) {
 				try {
@@ -83,6 +100,87 @@ final class EventHandler {
 		$response->header('Content-Type', 'application/json');
 		$response->status(200);
 		$response->end($result);
+	}
+
+	/**
+	 * Handle requests to the /config endpoint
+	 *
+	 * @param SwooleRequest $request
+	 * @param SwooleResponse $response
+	 * @return void
+	 */
+	private static function handleConfigRequest(SwooleRequest $request, SwooleResponse $response): void {
+		$method = $request->server['request_method'];
+
+		if ($method === 'GET') {
+			$response->header('Content-Type', 'application/json');
+			$response->status(200);
+			$response->end(json_encode(static::getConfig()));
+			return;
+		}
+
+		if ($method === 'POST') {
+			// Handle POST request to /config
+			$body = $request->rawContent() ?: '';
+			$httpCode = 200;
+			try {
+				/** @var ConfigStruct $config */
+				$config = (array)simdjson_decode($body, true);
+				$result = self::setConfig($config);
+			} catch (Throwable $e) {
+				$httpCode = 500;
+				$result = [
+					'error' => $e->getMessage(),
+					'code' => $e->getCode(),
+				];
+			}
+
+
+			$response->header('Content-Type', 'application/json');
+			$response->status($httpCode);
+			$response->end(json_encode($result));
+			return;
+		}
+
+		// Method not allowed
+		$response->status(405);
+		$response->header('Allow', 'GET, POST');
+		$response->end();
+	}
+
+	/**
+	 * Get current configuration
+	 * @return ConfigStruct
+	 */
+	private static function getConfig(): array {
+		return [
+			'log_level' => match (ConfigManager::getInt('DEBUG')) {
+				0 => 'info',
+				1 => 'debug',
+				2 => 'debugv',
+				3 => 'debugvv',
+				default => throw new RuntimeException('Failed to get log level'),
+			},
+		];
+	}
+
+	/**
+	 * Update configuration based on provided data
+	 *
+	 * @param ConfigStruct $config
+	 * @return ConfigStruct
+	 */
+	private static function setConfig(array $config): array {
+		$newConfig = static::getConfig();
+		// Process log level if present
+		if (isset($config['log_level'])) {
+			$level = LogLevel::fromString($config['log_level']);
+			// Update shared configuration that all workers can access
+			ConfigManager::set('DEBUG', (string)$level->value);
+			$newConfig['log_level'] = $level->toString();
+		}
+
+		return $newConfig;
 	}
 
 	/**
@@ -114,7 +212,9 @@ final class EventHandler {
 				// TODO: Maybe later we can use meta for time, but not now cuz no time for non select
 				OutputFormat::Table => $result->getTableFormatted($startTime),
 				OutputFormat::Plain => $result->toString(),
-				default => $result->getStruct(),
+				OutputFormat::Raw => $result->getStruct(),
+				// @phpstan-ignore-next-line
+				default => throw new RuntimeException('Unknown output format'),
 			};
 			$response = Response::fromMessageAndMeta(
 				$message,
@@ -140,10 +240,15 @@ final class EventHandler {
 				/** @var GenericError $e */
 				$e->setResponseError($originalError);
 				$e->setResponseErrorBody($originalErrorBody);
-				Buddy::error($e, "[$id] processing error");
+				Buddy::debug("[$id] processing error: {$e->getMessage()}");
 			} elseif (!is_a($e, GenericError::class)) {
 				$e = GenericError::create($originalError);
 			}
+
+			if (!static::shouldProxyError($e)) {
+				Buddy::error($e, "[$id] processing error");
+			}
+
 
 			$response = Response::fromError($e, $request->format ?? RequestFormat::JSON);
 		}
