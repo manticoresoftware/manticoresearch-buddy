@@ -418,8 +418,14 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 		/** @var Map<string,Set<string>> */
 		$connections = new Map;
+		$resp = $this->manticoreClient->sendRequest($query);
+		// Any error here means we have not table or trying to right to not sharded one
+		if ($resp->hasError()) {
+			throw ManticoreSearchResponseError::create((string)$resp->getError())->setProxyOriginalError(true);
+		}
+
 		/** @var array{0:array{data:array<array{node:string, table:string, shards:string}>}} */
-		$res = $this->manticoreClient->sendRequest($query)->getResult();
+		$res = $resp->getResult();
 
 		// Process the results to create a map of shards to nodes
 		foreach ($res[0]['data'] as $row) {

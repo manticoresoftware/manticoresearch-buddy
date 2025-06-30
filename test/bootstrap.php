@@ -21,6 +21,32 @@ use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use Psr\Container\ContainerInterface;
 
+// Autoloader for test doubles
+spl_autoload_register(
+	function (string $className): void {
+	// Handle test double classes with namespace
+		if (str_contains($className, 'TestDoubles\\Testable')) {
+			// Extract class name from namespace
+			$classNameParts = explode('\\', $className);
+			$shortClassName = end($classNameParts);
+			$testDoubleFile = __DIR__ . '/Plugin/Sharding/TestDoubles/' . $shortClassName . '.php';
+			if (file_exists($testDoubleFile)) {
+				require_once $testDoubleFile;
+				return;
+			}
+		}
+
+	// Handle other test classes in the test directory
+		$testFile = __DIR__ . '/' . str_replace('\\', '/', $className) . '.php';
+		if (file_exists($testFile)) {
+			require_once $testFile;
+			return;
+		}
+
+		return;
+	}
+);
+
 // Not the best way, but it's ok for now
 // phpcs:disable
 // we mock config file just to make tests pass because we do not test backup here
