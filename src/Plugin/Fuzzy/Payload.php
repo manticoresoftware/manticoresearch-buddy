@@ -353,11 +353,13 @@ final class Payload extends BasePayload {
 	private static function buildShouldHttpQuery(string $field, array $words): array {
 		$should = [];
 		foreach ($words as $options) {
-			$should[] = [
-				'match' => [
-					$field => '(' . implode('|', $options) . ')',
-				],
-			];
+			foreach ($options as $option) {
+				$should[] = [
+					'match' => [
+						$field => $option,
+					],
+				];
+			}
 		}
 		return ['bool' => ['should' => $should]];
 	}
