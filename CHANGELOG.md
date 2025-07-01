@@ -5,6 +5,7 @@
 ### Bugfixes
 
 * [7920](https://github.com/manticoresoftware/manticoresearch-buddy/commit/7920d9ac9ebaf956b372b40381352bb1b7bb9538) Fix issue with getting project root directory when we run as Phar archive
+* [08e49a4](https://github.com/manticoresoftware/manticoresearch-buddy/commit/08e49a4c499055eab0fc6a0852fcc3bad47a8019) Fix APP_VERSION missing from macOS package
 
 ### Major new features
 

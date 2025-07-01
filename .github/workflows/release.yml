@@ -98,9 +98,9 @@ jobs:
           echo "${{ needs.vars.outputs.version_full }}" > build/APP_VERSION
           mkdir build/bin
           cp build/${{ env.APP_NAME }} build/bin/${{ env.APP_NAME }}
-          tar czf "$name.tar.gz" -C build bin/${{ env.APP_NAME }} share
+          tar czf "$name.tar.gz" -C build bin/${{ env.APP_NAME }} share APP_VERSION
           cd build
-          zip -r "$name.zip" share/modules
+          zip -r "$name.zip" share/modules APP_VERSION
           mv "$name.zip" ..
           cd ..
         shell: bash
