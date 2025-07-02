@@ -165,10 +165,10 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected function handleNoTableMatches(array $matches): static {
-	if (isset($matches[6])) {
-		$this->fields[] = '@@collation_database';
-		$this->values = ['utf8mb4_0900_ai_ci'];
-	} elseif (isset($matches[5])) {
+		if (isset($matches[6])) {
+			$this->fields[] = '@@collation_database';
+			$this->values = ['utf8mb4_0900_ai_ci'];
+		} elseif (isset($matches[5])) {
 			$this->values = [trim($matches[5], "'")];
 		} elseif (isset($matches[4])) {
 			$this->fields[] = $matches[4];
