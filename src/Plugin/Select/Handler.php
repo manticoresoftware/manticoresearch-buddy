@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 /** @package Manticoresearch\Buddy\Base\Plugin\Select */
@@ -128,7 +129,7 @@ final class Handler extends BaseHandler {
 	 * Instantiating the http client to execute requests to Manticore server
 	 *
 	 * @param Client $client
-	 * $return Client
+	 * @return Client
 	 */
 	public function setManticoreClient(Client $client): Client {
 		$this->manticoreClient = $client;
@@ -739,8 +740,9 @@ final class Handler extends BaseHandler {
 	 * @return TaskResult
 	 */
 	protected static function handleSelectValues(Payload $payload): TaskResult {
-		return TaskResult::withRow(['Value' => $payload->values[0]])
-			->column('Value', Column::String);
+		$field = $payload->fields[0] ?? 'Value';
+		return TaskResult::withRow([$field => $payload->values[0]])
+			->column($field, Column::String);
 	}
 
 	/**
@@ -765,12 +767,17 @@ final class Handler extends BaseHandler {
 	 * @return TaskResult
 	 */
 	protected static function handleNoTableSelect(Client $manticoreClient, Payload $payload): TaskResult {
-		// 0. Handle datagrip query
+		// 0. Handle @@collation_database query
+		if (in_array('@@collation_database', $payload->fields)) {
+			return static::handleSelectValues($payload);
+		}
+
+		// 1. Handle datagrip query
 		if ($payload->fields === ['database', 'schema', 'user']) {
 			return static::handleSelectDatagrip($payload);
 		}
 
-		// 1. Handle empty table case first
+		// 2. Handle empty table case
 		return static::handleMethods($manticoreClient, $payload);
 	}
 
