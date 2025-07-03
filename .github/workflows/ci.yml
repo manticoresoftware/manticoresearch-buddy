@@ -181,7 +181,7 @@ jobs:
           docker push ${{ steps.vars.outputs.image_commit }}
 
       - name: Comment on PR with Docker images
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.vars.outputs.is_fork_pr == 'false'
         uses: actions/github-script@v6
         with:
           script: |
