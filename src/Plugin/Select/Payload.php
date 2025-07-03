@@ -91,7 +91,7 @@ final class Payload extends BasePayload {
 		// Match fields
 		preg_match(
 			'/^SELECT\s+(?:(.*?)\s+FROM\s+(`?[a-z][a-z\_\-0-9]*`?(\.`?[a-z][a-z\_\-0-9]*`?)?)'
-			. '|(version\(\))|(\'[^\']*?\'))/is',
+			. '|(version\(\))|(\'[^\']*?\')|(@@collation_database\s*$))/is',
 			$self->originalQuery,
 			$matches
 		);
@@ -165,7 +165,10 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected function handleNoTableMatches(array $matches): static {
-		if (isset($matches[5])) {
+		if (isset($matches[6])) {
+			$this->fields[] = '@@collation_database';
+			$this->values = ['utf8mb4_0900_ai_ci'];
+		} elseif (isset($matches[5])) {
 			$this->values = [trim($matches[5], "'")];
 		} elseif (isset($matches[4])) {
 			$this->fields[] = $matches[4];
@@ -217,6 +220,10 @@ final class Payload extends BasePayload {
 				return true;
 			}
 
+			if (preg_match('/(^select\s+@@collation_database\s*$)/ius', $request->payload)) {
+				return true;
+			}
+
 			if (static::matchError($request)) {
 				return true;
 			}
@@ -265,6 +272,10 @@ final class Payload extends BasePayload {
 		}
 
 		if (str_contains($request->error, 'unexpected $undefined near \'.*')) {
+			return true;
+		}
+
+		if (str_contains($request->error, 'unknown sysvar @@collation_database')) {
 			return true;
 		}
 		return false;
