@@ -114,19 +114,29 @@ jobs:
           IMAGE_COMMIT="${GHCR_REPO}:test-kit-${COMMIT,,}-buddy"
           # Base image to pull from (same logic as ref_detection)
           BASE_IMAGE="${{ needs.ref_detection.outputs.test_kit_image }}"
+          # Check if this is a fork PR
+          IS_FORK_PR="false"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
+              IS_FORK_PR="true"
+            fi
+          fi
           echo "docker_repo=${GHCR_REPO}" >> $GITHUB_OUTPUT
           echo "docker_tag=${DOCKER_TAG}" >> $GITHUB_OUTPUT
           echo "image=${IMAGE}" >> $GITHUB_OUTPUT
           echo "image_commit=${IMAGE_COMMIT}" >> $GITHUB_OUTPUT
           echo "base_image=${BASE_IMAGE}" >> $GITHUB_OUTPUT
+          echo "is_fork_pr=${IS_FORK_PR}" >> $GITHUB_OUTPUT
           echo "Docker Image: ${IMAGE}" >> $GITHUB_STEP_SUMMARY
           echo "Docker Image commit: ${IMAGE_COMMIT}" >> $GITHUB_STEP_SUMMARY
           echo "Base Image: ${BASE_IMAGE}" >> $GITHUB_STEP_SUMMARY
+          echo "Is Fork PR: ${IS_FORK_PR}" >> $GITHUB_STEP_SUMMARY
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
+        if: steps.vars.outputs.is_fork_pr == 'false'
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
@@ -138,7 +148,7 @@ jobs:
           echo "📥 PULLING Base Image: ${{ steps.vars.outputs.base_image }}"
           docker pull ${{ steps.vars.outputs.base_image }}
 
-      - name: Create and push test kit image
+      - name: Create test kit image
         run: |
           # Create temporary container from the base image
           docker create --name temp ${{ steps.vars.outputs.base_image }} tail -f /dev/null
@@ -150,10 +160,16 @@ jobs:
           docker exec temp sh -c 'cd /usr/share/manticore/modules/manticore-buddy/ && composer install --prefer-dist'
           docker exec temp sh -c 'git config --system --add safe.directory /usr/share/manticore/modules/manticore-buddy'
 
-          # Commit and push the buddy test-kit images
+          # Commit the buddy test-kit images
           docker commit temp ${{ steps.vars.outputs.image }}
           docker commit temp ${{ steps.vars.outputs.image_commit }}
 
+          # Cleanup
+          docker rm -f temp
+
+      - name: Push test kit images
+        if: steps.vars.outputs.is_fork_pr == 'false'
+        run: |
           # PUSHING: Always push with current branch + buddy suffix
           # Example: test-kit-feature-xyz-buddy (branch-based)
           # Example: test-kit-abc12345-buddy (commit-based)
@@ -164,9 +180,6 @@ jobs:
           docker push ${{ steps.vars.outputs.image }}
           docker push ${{ steps.vars.outputs.image_commit }}
 
-          # Cleanup
-          docker rm -f temp
-
       - name: Comment on PR with Docker images
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v6
@@ -174,16 +187,30 @@ jobs:
           script: |
             const branchImage = '${{ steps.vars.outputs.image }}';
             const commitImage = '${{ steps.vars.outputs.image_commit }}';
+            const isForkPR = '${{ steps.vars.outputs.is_fork_pr }}' === 'true';
 
-            const comment = `## 🐳 Docker Images Pushed
+            let comment;
+            if (isForkPR) {
+              comment = `## 🐳 Docker Images Built (Fork PR)
 
-            **Buddy Test-Kit Images:**
-            - **Branch image:** \`${branchImage}\`
-            - **Commit image:** \`${commitImage}\`
+              **Buddy Test-Kit Images Built Locally:**
+              - **Branch image:** \`${branchImage}\`
+              - **Commit image:** \`${commitImage}\`
 
-            **Base image used:** \`${{ steps.vars.outputs.base_image }}\`
+              **Base image used:** \`${{ steps.vars.outputs.base_image }}\`
 
-            These images contain the buddy code from this PR and can be used for testing.`;
+              ⚠️ **Note:** Images were built successfully but not pushed to the registry because this PR comes from a fork. The images are available locally for testing during the CI run.`;
+            } else {
+              comment = `## 🐳 Docker Images Pushed
+
+              **Buddy Test-Kit Images:**
+              - **Branch image:** \`${branchImage}\`
+              - **Commit image:** \`${commitImage}\`
+
+              **Base image used:** \`${{ steps.vars.outputs.base_image }}\`
+
+              These images contain the buddy code from this PR and can be used for testing.`;
+            }
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
