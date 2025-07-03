@@ -113,7 +113,7 @@ final class Payload extends BasePayload {
 		}
 
 		// I did not figure out how to make with regxp case OPTION fuzzy=1 so do this way
-		$optionPos = stripos($query, ' OPTION ');
+		$optionPos = strripos($query, ' OPTION ');
 		if ($optionPos !== false && substr_count($query, '=', $optionPos) > 1) {
 			$pattern = '/(?:^OPTION\s+|\s*,\s*)(?:[a-zA-Z\_]+)\s*=\s*([\'"][^\'"]*[\'"]|\d+)(?=\s*\;?\s*$|\s*,)/iu';
 			if (!preg_match($pattern, $query)) {
@@ -162,7 +162,7 @@ final class Payload extends BasePayload {
 		$additionalQueries = [];
 
 		// Find the position of the first semicolon
-		$firstSemicolonPos = strpos($query, ';', stripos($query, ' option ') ?: 0) ?: 0;
+		$firstSemicolonPos = strpos($query, ';', strripos($query, ' option ') ?: 0) ?: 0;
 
 		// If a semicolon exists
 		if ($firstSemicolonPos > 0) {
@@ -213,8 +213,8 @@ final class Payload extends BasePayload {
 				'/MATCH\s*\(\'(.*?)\'\)/ius',
 				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
-				'/option,/ius',
-				'/\soption/ius',
+				'/option,(?!.*option|.*from)/ius',
+				'/\soption(?!.*option|.*from)/ius',
 				'/\s*,\s*facet\s+/ius',
 				],
 			[
@@ -353,11 +353,13 @@ final class Payload extends BasePayload {
 	private static function buildShouldHttpQuery(string $field, array $words): array {
 		$should = [];
 		foreach ($words as $options) {
-			$should[] = [
-				'match' => [
-					$field => '(' . implode('|', $options) . ')',
-				],
-			];
+			foreach ($options as $option) {
+				$should[] = [
+					'match' => [
+						$field => $option,
+					],
+				];
+			}
 		}
 		return ['bool' => ['should' => $should]];
 	}
@@ -388,6 +390,8 @@ final class Payload extends BasePayload {
 			} elseif ($isArray) {
 				$queries = array_merge($queries, static::parseQueryMatches($value, $currentKey));
 			} elseif (is_string($value) && str_ends_with($parent, 'match')) {
+				$queries[$currentKey] = $value;
+			} elseif (is_string($value) && str_ends_with($parent, 'match_phrase')) {
 				$queries[$currentKey] = $value;
 			} elseif (is_string($value) && $key === 'query_string') {
 				$queries[$currentKey] = $value;
