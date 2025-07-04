@@ -24,15 +24,10 @@ env:
 
 jobs:
   update-version:
-    if: >
-      (
-        github.event_name == 'workflow_run' &&
-        github.event.workflow_run.conclusion == 'success' &&
-        github.ref == 'refs/heads/main'
-      ) ||
-      github.event_name == 'pull_request' && contains(
-            github.event.pull_request.labels.*.name, 'pack'
-          )
+    if: |
+      (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'pack') || contains(github.event.pull_request.labels.*.name, 'publish')))
+      || ( github.event_name == 'push' && ( startsWith( github.ref, 'refs/heads/release-' ) || contains( github.ref, 'refs/tags/pack_publish' ) ) )
+      || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.ref == 'refs/heads/main' && github.event.workflow_run.event != 'schedule')
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.semver-tagger.outputs.version }}
