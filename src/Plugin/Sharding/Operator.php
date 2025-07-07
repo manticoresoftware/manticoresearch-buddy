@@ -101,27 +101,30 @@ final class Operator {
 	public function checkBalance(): static {
 		$cluster = $this->getCluster();
 		$queue = $this->getQueue();
+		$allNodes = $cluster->getNodes();
+
 		// We get inactive nodes to exclude them from the rebalance in case of outages
 		// It may be an empty list if we're adding a new node to the cluster, which is fine
 		$inactiveNodes = $cluster->getInactiveNodes();
+		$activeNodes = $allNodes->diff($inactiveNodes);
 
-		// Do exclude repeated rebalancing we take hash of active nodes
-		// and if the same, we do nothing, otherwise, it shows the change
-		// and we try to process the rebalance
-		$activeNodes = $cluster->getNodes()->diff($inactiveNodes);
+		// Check if cluster topology changed (failed nodes OR new nodes)
 		$clusterHash = Cluster::getNodesHash($activeNodes);
 		$currentHash = $this->state->get('cluster_hash');
+
+		// If no topology change, nothing to do
 		if ($clusterHash === $currentHash) {
 			return $this;
 		}
 
+		// Topology changed - determine what kind of change
 		if ($inactiveNodes->count() > 0) {
 			Buddy::info("Rebalancing due to inactive nodes: {$inactiveNodes->join(', ')}");
 		} else {
-			Buddy::info('Rebalancing due to new nodes joined');
+			Buddy::info('Rebalancing due to cluster topology change (likely new nodes)');
 		}
 
-		// Get all tables from the state we have
+		// Get all tables from the state we have and rebalance them
 		$list = $this->state->listRegex('table:.+');
 		foreach ($list as $row) {
 			/** @var array{key:string,value:array{name:string,structure:string,extra:string}} $row */
