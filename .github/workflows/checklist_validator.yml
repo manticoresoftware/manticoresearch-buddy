@@ -12,4 +12,3 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: manticoresoftware/manticoresearch/actions/checklist-validator@master
-
