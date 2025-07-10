@@ -84,6 +84,9 @@ jobs:
       - name: Prepare release directory
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
+          # We need to write current version HERE before we pack
+          echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
+          # Now build it
           ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
 
       - uses: manticoresoftware/upload_artifact_with_retries@main
@@ -95,8 +98,7 @@ jobs:
         run: |
           name="${{ env.APP_NAME }}_${{ needs.vars.outputs.version_full }}"
           echo "$name"
-          echo "${{ needs.vars.outputs.version_full }}" > build/APP_VERSION
-          mkdir build/bin
+          mkdir -p build/bin
           cp build/${{ env.APP_NAME }} build/bin/${{ env.APP_NAME }}
           tar czf "$name.tar.gz" -C build bin/${{ env.APP_NAME }} share
           cd build
@@ -127,8 +129,6 @@ jobs:
           cp -rp build/share/modules/${{ env.APP_NAME }}/* .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/
           cp -r build/${{ env.APP_NAME }} .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
           cp -r build/${{ env.APP_NAME }} .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
-          echo "${{ needs.vars.outputs.version_full }}" > .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/APP_VERSION
-          echo "${{ needs.vars.outputs.version_full }}" > .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/APP_VERSION
           sudo chown -R root:root .debpkg
           sudo chown -R root:root .rpmpkg
       - uses: manticoresoftware/actions-build-deb-action@master
