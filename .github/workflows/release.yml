@@ -127,8 +127,6 @@ jobs:
           mkdir -p .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin
           cp -rp build/share/modules/${{ env.APP_NAME }}/* .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/
           cp -rp build/share/modules/${{ env.APP_NAME }}/* .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/
-          echo "${{ needs.vars.outputs.version_full }}" > .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/APP_VERSION
-          echo "${{ needs.vars.outputs.version_full }}" > .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/APP_VERSION
           cp -r build/${{ env.APP_NAME }} .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
           cp -r build/${{ env.APP_NAME }} .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
           sudo chown -R root:root .debpkg
