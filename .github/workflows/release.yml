@@ -120,6 +120,8 @@ jobs:
       - name: Build binary
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
+          # We need to write current version HERE before we pack
+          echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
           ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
       - name: Prepare packages structure
         run: |
