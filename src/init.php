@@ -93,10 +93,19 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-metrics',
 ];
 // Filtering out the plugins that we don't need
-$plugins = array_filter(
-	$plugins,
-	fn ($plugin) => !in_array($plugin, $opts['skip'])
-);
+if (!empty($opts['enable-plugin'])) {
+	// If --enable-plugin is used, disable all plugins except the specified ones
+	$plugins = array_filter(
+		$plugins,
+		fn ($plugin) => in_array($plugin, $opts['enable-plugin'])
+	);
+} else {
+	// Default behavior: enable all plugins except those in --skip
+	$plugins = array_filter(
+		$plugins,
+		fn ($plugin) => !in_array($plugin, $opts['skip'])
+	);
+}
 Pluggable::setContainer($container);
 Pluggable::setCorePlugins($plugins);
 MetricThread::setContainer($container);

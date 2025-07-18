@@ -20,12 +20,13 @@ final class CliArgsProcessor {
 	private const LONG_OPTS  = [
 		'threads:', 'telemetry-period:', 'disable-telemetry',
 		'version', 'help', 'listen:', 'bind:',
-		'skip:', 'log-level:',
+		'skip:', 'enable-plugin:', 'log-level:',
 	];
 	private const DEFAULT_OPTS = [
 		'listen' => '127.0.0.1:9308',
 		'bind' => '127.0.0.1',
 		'skip' => [],
+		'enable-plugin' => [],
 	];
 
 	/**
@@ -46,6 +47,8 @@ final class CliArgsProcessor {
 			. "--bind                 Which IP to bind. Default is 127.0.0.1\n"
 			. '--skip                 Skips the specified plugin by its fully qualified name;'
 				. " can be used multiple times\n"
+			. '--enable-plugin        Disables all plugins and enables only the specified ones;'
+				. " can be used multiple times\n"
 			. "--listen               HTTP endpoint to accept Manticore requests\n"
 			. "--version              display the current version of Buddy\n"
 			. "--help                 display this help message\n"
@@ -55,7 +58,10 @@ final class CliArgsProcessor {
 			.	'--log-level=[N]        set log level for Buddy, default is info, values: info, debug, debugv, debugvv'
 			. "Examples:\n"
 			. "$script --log-level=debug\n"
-			. "$script --disable-telemetry\n\n";
+			. "$script --disable-telemetry\n"
+			. "$script --enable-plugin=manticoresoftware/buddy-plugin-backup\n"
+			. "$script --enable-plugin=manticoresoftware/buddy-plugin-backup"
+				. " --enable-plugin=manticoresoftware/buddy-plugin-show\n\n";
 	}
 
 	/**
@@ -81,6 +87,7 @@ final class CliArgsProcessor {
 	 *  listen?:string,
 	 *  bind?:string,
 	 *  skip?:string[],
+	 *  enable-plugin?:string[],
 	 *  log-level?:string
 	 * } $opts
 	 * @return array{
@@ -91,7 +98,8 @@ final class CliArgsProcessor {
 	 *  version?:bool,
 	 *  listen:string,
 	 *  bind:string,
-	 *  skip:string[]
+	 *  skip:string[],
+	 *  enable-plugin:string[]
 	 * }
 	 */
 	public static function run(?array $opts = null): array {
@@ -107,6 +115,7 @@ final class CliArgsProcessor {
 		 *  listen:string,
 		 *  bind:string,
 		 *  skip:string[],
+		 *  enable-plugin:string[],
 		 *  log-level?:string,
 		 * } $opts
 		 */
@@ -129,6 +138,7 @@ final class CliArgsProcessor {
 		static::parseListen($opts);
 		static::parseBind($opts);
 		$opts['skip'] = static::parseSkip($opts);
+		$opts['enable-plugin'] = static::parseEnablePlugin($opts);
 
 		if (isset($opts['log-level'])) {
 			static::parseLogLevel($opts['log-level']);
@@ -220,5 +230,13 @@ final class CliArgsProcessor {
 	 */
 	protected static function parseSkip(array $opts): array {
 		return (array)$opts['skip'];
+	}
+
+	/**
+	 * @param array{enable-plugin:string|string[]} $opts
+	 * @return string[]
+	 */
+	protected static function parseEnablePlugin(array $opts): array {
+		return (array)$opts['enable-plugin'];
 	}
 }
