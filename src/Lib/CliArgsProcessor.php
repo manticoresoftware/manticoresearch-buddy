@@ -73,7 +73,7 @@ final class CliArgsProcessor {
 	 * Process cli arguments passed
 	 *
 	 * @param ?array{
-	 *  threads?:int,
+	 *  threads?:int|array<int>,
 	 *  telemetry-period?:int,
 	 *  disable-telemetry?:bool,
 	 *  help?:bool,
@@ -138,20 +138,27 @@ final class CliArgsProcessor {
 	}
 
 	/**
-	 * @param array{threads?:int} $opts
+	 * @param array{threads?:int|array<int>} $opts
 	 * @return void
 	 */
 	protected static function parseThreads(array $opts): void {
 		if (!isset($opts['threads'])) {
 			return;
 		}
+		// Daemon sets --threads so buddy gets --threads=1 --threads=2
+		// That results into array instead of int
+		// So to avoid changes on daemon side we prefer buddy way from buddy_path
+		// for that case threads comes first cuz daemon appends it
+		$threads = (is_array($opts['threads'])
+			? $opts['threads'][0]
+			: $opts['threads']);
 
-		if ($opts['threads'] < 1 || $opts['threads'] > 256) {
+		if ($threads < 1 || $threads > 256) {
 			echo "The --threads value must be in the range of 1 to 256.\n";
 			exit(1);
 		}
 
-		ConfigManager::set('THREADS', (string)(int)$opts['threads']);
+		ConfigManager::set('THREADS', (string)$threads);
 	}
 
 	/**
