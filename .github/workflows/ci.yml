@@ -13,7 +13,7 @@ jobs:
     name: Detect CLT tests ref
     runs-on: ubuntu-22.04
     outputs:
-      ref: 74376eb
+      ref: 74376ebbcbd69840367a3851ad514cf28232c8d5
       test_kit_image: ${{ steps.test_kit_image.outputs.image }}
     steps:
       - name: Get current branch name
