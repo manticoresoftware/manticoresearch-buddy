@@ -59,7 +59,7 @@ jobs:
             DOCKER_TAG=$(echo "$fix" | sed 's/[^a-zA-Z0-9_.-]//g')
             IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-${DOCKER_TAG,,}"
           else
-            IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-latest"
+            IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-74376eb"
           fi
           echo "image=${IMAGE}" >> $GITHUB_OUTPUT
           echo "Test-kit Image: ${IMAGE}" >> $GITHUB_STEP_SUMMARY
