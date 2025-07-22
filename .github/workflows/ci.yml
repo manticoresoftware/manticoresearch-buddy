@@ -2,7 +2,7 @@ name: tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ 3.33.1_plus_9.2.14 ]
   pull_request:
     branches: [ main ]
 
