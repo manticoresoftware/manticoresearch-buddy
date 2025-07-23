@@ -68,6 +68,22 @@ class CliArgsProcessorTest extends TestCase {
 		}
 	}
 
+	public function testMultipleThreadsArgProcessOk(): void {
+		echo "\nTesting the processing of multiple `threads` arguments (first value should be used)\n";
+
+		// Test case: --threads=1 --threads=2 should use 1
+		CliArgsProcessor::run(['threads' => [1, 2]]);
+		$this->assertEquals(1, (int)getenv('THREADS', true));
+
+		// Test case: --threads=5 --threads=10 --threads=3 should use 5
+		CliArgsProcessor::run(['threads' => [5, 10, 3]]);
+		$this->assertEquals(5, (int)getenv('THREADS', true));
+
+		// Test case: --threads=8 --threads=1 should use 8
+		CliArgsProcessor::run(['threads' => [8, 1]]);
+		$this->assertEquals(8, (int)getenv('THREADS', true));
+	}
+
 	public function testDisableTelemetryArgProcessOk(): void {
 		CliArgsProcessor::run(['disable-telemetry' => false]);
 
