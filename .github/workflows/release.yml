@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Test
         run: |
+          pwd
+          ls -la
           git tag -l "[0-9]*.[0-9]*.[0-9]*" --merged HEAD
   update-version:
     runs-on: ubuntu-24.04
