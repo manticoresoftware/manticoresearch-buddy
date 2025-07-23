@@ -10,6 +10,10 @@ on:
     branches: [ main ]
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
+  push:
+    tags:
+      - 'release*'
+      
 env:
   APP_NAME: 'manticore-buddy'
   MAINTAINER: 'Manticore'
