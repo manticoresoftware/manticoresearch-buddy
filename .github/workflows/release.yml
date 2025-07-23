@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: [ tests ]
     types: [ completed ]
-    branches: [ 3.26.5-extra1 ]
+    branches: [ main ]
 
   pull_request:
     branches: [ main ]
@@ -12,8 +12,9 @@ on:
 
   push:
     tags:
-      - 'release*'
-      
+      - 'release-*'
+      - 'pack_publish'
+
 env:
   APP_NAME: 'manticore-buddy'
   MAINTAINER: 'Manticore'
@@ -22,15 +23,11 @@ env:
   LIBCURL_VERSION: '7.29.0'
 
 jobs:
-  test:
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Test
-        run: |
-          pwd
-          ls -la
-          git tag -l "[0-9]*.[0-9]*.[0-9]*" --merged HEAD
   update-version:
+    if: |
+      (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'pack') || contains(github.event.pull_request.labels.*.name, 'publish')))
+      || ( github.event_name == 'push' && ( startsWith( github.ref, 'refs/tags/release-' ) || contains( github.ref, 'refs/tags/pack_publish' ) ) )
+      || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.ref == 'refs/heads/main' && github.event.workflow_run.event != 'schedule')
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.semver-tagger.outputs.version }}
@@ -41,10 +38,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
       - id: semver-tagger
         uses: manticoresoftware/semver-tagger-action@main
         with:
-          debug: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          ignore_patterns: '\.md$|^test/|\.github|\.yml|\.gitignore$'
   vars:
     if: needs.update-version.outputs.version != ''
     needs: update-version
@@ -81,6 +84,9 @@ jobs:
       - name: Prepare release directory
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
+          # We need to write current version HERE before we pack
+          echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
+          # Now build it
           ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
 
       - uses: manticoresoftware/upload_artifact_with_retries@main
@@ -92,8 +98,7 @@ jobs:
         run: |
           name="${{ env.APP_NAME }}_${{ needs.vars.outputs.version_full }}"
           echo "$name"
-          echo "${{ needs.vars.outputs.version_full }}" > build/APP_VERSION
-          mkdir build/bin
+          mkdir -p build/bin
           cp build/${{ env.APP_NAME }} build/bin/${{ env.APP_NAME }}
           tar czf "$name.tar.gz" -C build bin/${{ env.APP_NAME }} share
           cd build
@@ -115,6 +120,8 @@ jobs:
       - name: Build binary
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
+          # We need to write current version HERE before we pack
+          echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
           ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
       - name: Prepare packages structure
         run: |
@@ -124,8 +131,6 @@ jobs:
           cp -rp build/share/modules/${{ env.APP_NAME }}/* .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/
           cp -r build/${{ env.APP_NAME }} .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
           cp -r build/${{ env.APP_NAME }} .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin/${{ env.APP_NAME }}
-          echo "${{ needs.vars.outputs.version_full }}" > .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/APP_VERSION
-          echo "${{ needs.vars.outputs.version_full }}" > .rpmpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/APP_VERSION
           sudo chown -R root:root .debpkg
           sudo chown -R root:root .rpmpkg
       - uses: manticoresoftware/actions-build-deb-action@master
@@ -180,6 +185,7 @@ jobs:
           cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el7.noarch.rpm"
           cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el8.noarch.rpm"
           cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el9.noarch.rpm"
+          cp $rpm_path "./${{ env.APP_NAME }}-${version}-1.el10.noarch.rpm"
 
           ls -la ./*.deb
 
@@ -202,6 +208,11 @@ jobs:
         with:
           name: artifact-el9-rpm
           path: ./*.el9.noarch.rpm
+
+      - uses: manticoresoftware/upload_artifact_with_retries@main
+        with:
+          name: artifact-el10-rpm
+          path: ./*.el10.noarch.rpm
 
   create-release:
     if: needs.update-version.outputs.target == 'release'
@@ -231,6 +242,7 @@ jobs:
           prerelease: false
 
   deploy:
+    name: ${{ matrix.distro }} ${{ matrix.arch }}
     needs:
       - vars
       - build-artifact
@@ -286,6 +298,11 @@ jobs:
             arch: noarch
             delimiter: "_"
             distro: 9
+          - artifact: artifact-el10-rpm
+            type: rpm
+            arch: noarch
+            delimiter: "_"
+            distro: 10
           - artifact: artifact
             type: arc
             arch: noarch
