@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: [ tests ]
     types: [ completed ]
-    branches: [ main ]
+    branches: [ 3.26.5-extra1 ]
 
   pull_request:
     branches: [ main ]
@@ -23,7 +23,7 @@ jobs:
       (
         github.event_name == 'workflow_run' &&
         github.event.workflow_run.conclusion == 'success' &&
-        github.ref == 'refs/heads/main'
+        github.ref == 'refs/heads/3.26.5-extra1'
       ) ||
       github.event_name == 'pull_request' && contains(
             github.event.pull_request.labels.*.name, 'pack'
