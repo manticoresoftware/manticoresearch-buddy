@@ -798,11 +798,15 @@ final class Handler extends BaseHandler {
 		$unsupportedMySQLVars = self::getUnsupportedMySQLVars();
 		$allVars = [];
 		foreach ($fieldNames as $fieldName) {
-			if (!in_array($fieldName, $errorFields)) {
-				throw new Exception('Unknown sysvar ' . $fieldName . ' - failed to fix query');
+			if (in_array($fieldName, $errorFields)) {
+				$varName = str_replace('@@', '', $fieldName);
+				if (!isset($unsupportedMySQLVars[$varName])) {
+					throw new Exception('Unknown sysvar ' . $fieldName);
+				}
+				$allVars[$fieldName] = $unsupportedMySQLVars[$varName];
+			} else {
+				$allVars[$fieldName] = null;
 			}
-			$varName = str_replace('@@', '', $fieldName);
-			$allVars[$fieldName] = $unsupportedMySQLVars[$varName] ?? null;
 		}
 		// If an original query contained supported vars as well, we need to get their values
 		if ($requeryFields) {
