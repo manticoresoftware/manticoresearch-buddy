@@ -801,7 +801,7 @@ final class Handler extends BaseHandler {
 			if (in_array($fieldName, $errorFields)) {
 				$varName = str_replace('@@', '', $fieldName);
 				if (!isset($unsupportedMySQLVars[$varName])) {
-					throw new Exception('Unknown sysvar ' . $fieldName);
+					throw new Exception('unknown sysvar ' . $fieldName);
 				}
 				$allVars[$fieldName] = $unsupportedMySQLVars[$varName];
 			} else {
