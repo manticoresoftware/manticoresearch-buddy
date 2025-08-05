@@ -859,7 +859,17 @@ final class Handler extends BaseHandler {
 		if (isset(static::$unsupportedMySQLVars)) {
 			return static::$unsupportedMySQLVars;
 		}
-		static::$unsupportedMySQLVars = include __DIR__ . '/MySQLVars.php';
+		$mySqlVarsFilePath = __DIR__ . '/../../Config/mysql_vars.json';
+		$mySqlVarsContent = file_get_contents($mySqlVarsFilePath);
+		if ($mySqlVarsContent === false) {
+			throw new Exception("Unable to read MySQLVars config file at '$mySqlVarsFilePath'");
+		}
+		/** @var array<string,string> $mySqlVars */
+		$mySqlVars = json_decode($mySqlVarsContent, true);
+		if (!is_array($mySqlVars)) {
+			throw new Exception("Invalid MySQLVars config file at '$mySqlVarsFilePath'");
+		}
+		static::$unsupportedMySQLVars = $mySqlVars;
 		return static::$unsupportedMySQLVars;
 	}
 
