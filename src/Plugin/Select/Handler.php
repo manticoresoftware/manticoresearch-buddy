@@ -57,6 +57,9 @@ final class Handler extends BaseHandler {
 		'AUTO_INCREMENT' => '',
 	];
 
+	/** @var array<string,string> */
+	protected static array $unsupportedMySQLVars;
+
   /** @var Client $manticoreClient */
 	protected Client $manticoreClient;
 
@@ -766,9 +769,9 @@ final class Handler extends BaseHandler {
 	 * @return TaskResult
 	 */
 	protected static function handleNoTableSelect(Client $manticoreClient, Payload $payload): TaskResult {
-		// 0. Handle @@collation_database query
-		if (in_array('@@collation_database', $payload->fields)) {
-			return static::handleSelectValues($payload);
+		// 0. Handle unsupported mysql vars query
+		if (str_starts_with($payload->fields[0] ?? '', '@@')) {
+			return static::handleSelectSysVars($manticoreClient, $payload);
 		}
 
 		// 1. Handle datagrip query
@@ -778,6 +781,83 @@ final class Handler extends BaseHandler {
 
 		// 2. Handle empty table case
 		return static::handleMethods($manticoreClient, $payload);
+	}
+
+	/**
+	 * @param Client $manticoreClient
+	 * @param Payload $payload
+	 * @return TaskResult
+	 */
+	protected static function handleSelectSysVars(Client $manticoreClient, Payload $payload): TaskResult {
+		// Checking for field aliases first
+		$fieldNames = $aliasFields = [];
+		[$fieldNames, $aliasFields] = self::getFieldNamesAndAliases($payload->fields);
+		// Get unsupported var names from the error message
+		$errorFields = preg_split('/\s*;\s*/', str_replace('unknown sysvar ', '', $payload->error)) ?: [];
+		$requeryFields = array_diff($fieldNames, $errorFields);
+		$unsupportedMySQLVars = self::getUnsupportedMySQLVars();
+		$allVars = [];
+		foreach ($fieldNames as $fieldName) {
+			if (in_array($fieldName, $errorFields)) {
+				$varName = str_replace('@@', '', $fieldName);
+				$allVars[$fieldName] = $unsupportedMySQLVars[$varName] ?? null;
+			} else {
+				$allVars[$fieldName] = null;
+			}
+		}
+		// If an original query contained supported vars as well, we need to get their values
+		if ($requeryFields) {
+			$requery = 'SELECT ' . implode(',', $requeryFields);
+			/** @var array<array{data:array<array<string,string>>}> $requeryResult */
+			$requeryResult = $manticoreClient->sendRequest($requery, $payload->path, false, true)->getResult();
+			foreach ($requeryResult[0]['data'][0] as $field => $value) {
+				$allVars[$field] = $value;
+			}
+		}
+
+		foreach ($fieldNames as $i => $fieldName) {
+			$fieldNames[$i] = $aliasFields[$fieldName] ?? $fieldName;
+		}
+		$result = TaskResult::withData(
+			[
+			array_combine($fieldNames, array_values($allVars)),
+			]
+		);
+		foreach ($fieldNames as $column) {
+			$result->column($column, Column::String);
+		}
+		return $result;
+	}
+
+	/**
+	 * @param array<string> $fields
+	 * @return array{0:array<string>,1:array<string,string>}
+	 */
+	protected static function getFieldNamesAndAliases(array $fields): array {
+		$fieldNames = $aliasFields = [];
+		foreach ($fields as $fieldName) {
+			if (str_contains(strtolower($fieldName), ' as ')) {
+				$fieldInfo = preg_split('/\s+as\s+/', strtolower($fieldName));
+				if ($fieldInfo) {
+					[$fieldName, $alias] = $fieldInfo;
+					$aliasFields[$fieldName] = $alias;
+				}
+			}
+			$fieldNames[] = $fieldName;
+		}
+		return [$fieldNames, $aliasFields];
+	}
+
+	/**
+	 * Get unsupported system variable names
+	 * @return array<string,string>
+	 */
+	protected static function getUnsupportedMySQLVars(): array {
+		if (isset(static::$unsupportedMySQLVars)) {
+			return static::$unsupportedMySQLVars;
+		}
+		static::$unsupportedMySQLVars = include __DIR__ . '/MySQLVars.php';
+		return static::$unsupportedMySQLVars;
 	}
 
 	/**

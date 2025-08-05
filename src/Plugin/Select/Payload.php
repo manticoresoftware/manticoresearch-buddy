@@ -52,6 +52,9 @@ final class Payload extends BasePayload {
 	public string $path;
 
 	/** @var string */
+	public string $error;
+
+	/** @var string */
 	public string $table = '';
 
 	/** @var array<string> */
@@ -86,12 +89,13 @@ final class Payload extends BasePayload {
 	public static function fromRequest(Request $request): static {
 		$self = new static();
 		$self->path = $request->path;
+		$self->error = $request->error;
 		$self->originalQuery = str_replace("\n", ' ', $request->payload);
 		$self->mySQLTool = $request->mySQLTool ?? null;
 		// Match fields
 		preg_match(
 			'/^SELECT\s+(?:(.*?)\s+FROM\s+(`?[a-z][a-z\_\-0-9]*`?(\.`?[a-z][a-z\_\-0-9]*`?)?)'
-			. '|(version\(\))|(\'[^\']*?\')|(@@collation_database\s*$))/is',
+			. '|(version\(\))|(\'[^\']*?\')|(?:(@@.+)\s*$))/is',
 			$self->originalQuery,
 			$matches
 		);
@@ -121,6 +125,7 @@ final class Payload extends BasePayload {
 			// Check that we hit tables that we support otherwise return standard error
 			// To proxy original one
 			if (!str_contains($request->error, "unsupported filter type 'string' on attribute")
+				&& !str_contains($request->error, 'unknown sysvar')
 				&& !isset(static::HANDLED_TABLES[$self->table])
 				&& !str_starts_with($self->table, 'manticore')
 			) {
@@ -166,8 +171,8 @@ final class Payload extends BasePayload {
 	 */
 	protected function handleNoTableMatches(array $matches): static {
 		if (isset($matches[6])) {
-			$this->fields[] = '@@collation_database';
-			$this->values = ['utf8mb4_0900_ai_ci'];
+			$fields = preg_split('/\s*,\s*/', $matches[6]);
+			$this->fields = $fields ?: [];
 		} elseif (isset($matches[5])) {
 			$this->values = [trim($matches[5], "'")];
 		} elseif (isset($matches[4])) {
@@ -275,7 +280,7 @@ final class Payload extends BasePayload {
 			return true;
 		}
 
-		if (str_contains($request->error, 'unknown sysvar @@collation_database')) {
+		if (str_contains($request->error, 'unknown sysvar')) {
 			return true;
 		}
 		return false;
