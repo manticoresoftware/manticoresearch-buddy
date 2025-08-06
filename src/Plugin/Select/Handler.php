@@ -794,12 +794,19 @@ final class Handler extends BaseHandler {
 		[$fieldNames, $aliasFields] = self::getFieldNamesAndAliases($payload->fields);
 		// Get unsupported var names from the error message
 		$errorFields = preg_split('/\s*;\s*/', str_replace('unknown sysvar ', '', $payload->error)) ?: [];
-		$requeryFields = array_diff($fieldNames, $errorFields);
+		// Error message has var names in lowercase,
+		// so we need to convert original field names accordingly before further processing
+		$fieldNamesLower = array_map('strtolower', $fieldNames);
+		$requeryFields = array_diff($fieldNamesLower, $errorFields);
 		$unsupportedMySQLVars = self::getUnsupportedMySQLVars();
 		$allVars = [];
-		foreach ($fieldNames as $fieldName) {
+		foreach ($fieldNamesLower as $fieldName) {
 			if (in_array($fieldName, $errorFields)) {
-				$varName = str_replace('@@', '', $fieldName);
+				$varName = str_ireplace(
+					['@@global.', '@@session.', '@@'],
+					'',
+					$fieldName
+				);
 				if (!isset($unsupportedMySQLVars[$varName])) {
 					throw new Exception('unknown sysvar ' . $fieldName);
 				}
@@ -840,7 +847,7 @@ final class Handler extends BaseHandler {
 		$fieldNames = $aliasFields = [];
 		foreach ($fields as $fieldName) {
 			if (str_contains(strtolower($fieldName), ' as ')) {
-				$fieldInfo = preg_split('/\s+as\s+/', strtolower($fieldName));
+				$fieldInfo = preg_split('/\s+as\s+/i', $fieldName);
 				if ($fieldInfo) {
 					[$fieldName, $alias] = $fieldInfo;
 					$aliasFields[$fieldName] = $alias;
