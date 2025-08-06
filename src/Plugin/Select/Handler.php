@@ -17,7 +17,6 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 /** @package Manticoresearch\Buddy\Base\Plugin\Select */
@@ -808,7 +807,6 @@ final class Handler extends BaseHandler {
 					'',
 					$fieldName
 				);
-				Buddy::debug('TEST 2: ' . $varName);
 				if (!isset($unsupportedMySQLVars[$varName])) {
 					throw new Exception('unknown sysvar ' . $fieldName);
 				}
