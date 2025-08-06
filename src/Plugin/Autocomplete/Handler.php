@@ -116,6 +116,12 @@ final class Handler extends BaseHandlerWithFlagCache {
 		// so in the end, we wind up with multiple suggestions for the same phrase
 		/** @var array<string> $suggestions */
 		$suggestions = array_unique(Arrays::blend(...$combinationSets));
+		foreach ($suggestions as &$suggestion) {
+			if (!is_numeric($suggestion)) {
+				continue;
+			}
+			$suggestion = (string)$suggestion;
+		}
 		return $suggestions;
 	}
 
