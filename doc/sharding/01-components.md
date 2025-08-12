@@ -59,32 +59,46 @@ public static function rebalanceWithNewNodes(Vector $schema, Set $newNodes, int 
 
 ### 3. Queue Class (`src/Plugin/Sharding/Queue.php`)
 
-Manages asynchronous command execution across cluster nodes.
+Manages asynchronous command execution across cluster nodes with rollback support.
 
 **Key Features:**
 - Command queuing with dependencies
 - `wait_for_id` synchronization mechanism
 - Node-specific command targeting
 - Parallel execution support
+- **Rollback command storage** (NEW)
+- **Operation group management** (NEW)
+- **Automatic rollback execution** (NEW)
 
 **Core Responsibilities:**
 - Command ordering and dependencies
 - Asynchronous execution management
 - Inter-node communication
 - Operation synchronization
+- **Rollback orchestration** (NEW)
+- **Group-based atomic operations** (NEW)
+
+**Enhanced Methods (NEW):**
+- `addWithRollback()`: Add command with rollback support
+- `rollbackOperationGroup()`: Execute rollback for entire group
+- `getRollbackCommands()`: Retrieve rollback commands
+- `executeRollbackSequence()`: Execute rollback in reverse order
+- `hasRollbackSupport()`: Check for rollback column support
+- `migrateForRollbackSupport()`: Upgrade existing tables
 
 **Synchronization Pattern:**
 ```php
-// Command A
-$idA = $queue->add($node, "COMMAND A");
+// Command A with rollback
+$idA = $queue->addWithRollback($node, "CREATE TABLE t1", "DROP TABLE t1", $group);
 
-// Command B waits for A to complete
+// Command B waits for A and has rollback
 $queue->setWaitForId($idA);
-$idB = $queue->add($node, "COMMAND B");
+$idB = $queue->addWithRollback($node, "ALTER CLUSTER c1 ADD t1", "ALTER CLUSTER c1 DROP t1", $group);
 
-// Command C waits for B to complete
-$queue->setWaitForId($idB);
-$idC = $queue->add($node, "COMMAND C");
+// On failure, rollback entire group
+if ($error) {
+    $queue->rollbackOperationGroup($group);
+}
 ```
 
 ### 4. State Class (`src/Plugin/Sharding/State.php`)
@@ -251,3 +265,147 @@ class TestableQueue {
 - **Integration Testing**: Test with real dependencies where possible
 
 This component architecture provides a robust, scalable foundation for distributed table sharding with comprehensive testing coverage and production-ready reliability.
+
+## New Components (Rollback & Recovery System)
+
+### 7. RollbackCommandGenerator Class (`src/Plugin/Sharding/RollbackCommandGenerator.php`)
+
+Generates reverse SQL commands for rollback operations.
+
+**Key Features:**
+- Automatic rollback command generation
+- Pattern matching for SQL commands
+- Safety checks for rollback operations
+- Batch generation support
+
+**Supported Conversions:**
+- `CREATE TABLE` → `DROP TABLE IF EXISTS`
+- `CREATE CLUSTER` → `DELETE CLUSTER`
+- `ALTER CLUSTER ADD` → `ALTER CLUSTER DROP`
+- `ALTER CLUSTER DROP` → `ALTER CLUSTER ADD`
+- `JOIN CLUSTER` → `DELETE CLUSTER`
+
+**Usage Pattern:**
+```php
+// Automatic generation
+$rollback = RollbackCommandGenerator::generate("CREATE TABLE users");
+// Returns: "DROP TABLE IF EXISTS users"
+
+// Specific generators
+$rollback = RollbackCommandGenerator::forCreateTable("users");
+$rollback = RollbackCommandGenerator::forAlterClusterAdd("c1", "users");
+
+// Safety check
+if (RollbackCommandGenerator::isSafeToRollback($command)) {
+    $rollback = RollbackCommandGenerator::generate($command);
+}
+```
+
+### 8. CleanupManager Class (`src/Plugin/Sharding/CleanupManager.php`)
+
+Manages cleanup of orphaned resources and failed operations.
+
+**Key Features:**
+- Orphaned cluster detection and removal
+- Failed operation group cleanup
+- Expired queue item removal
+- Stale state entry cleanup
+
+**Core Methods:**
+- `performFullCleanup()`: Comprehensive cleanup of all resources
+- `cleanupOrphanedTemporaryClusters()`: Remove temp clusters >1 hour old
+- `cleanupFailedOperationGroups()`: Clean failed groups >24 hours old
+- `cleanupExpiredQueueItems()`: Remove queue items >7 days old
+- `cleanupStaleStateEntries()`: Clean state entries >30 days old
+
+**Usage Pattern:**
+```php
+$cleanup = new CleanupManager($client, $cluster);
+$results = $cleanup->performFullCleanup();
+// Returns: ['resources_cleaned' => 42, 'actions_taken' => [...]]
+```
+
+### 9. HealthMonitor Class (`src/Plugin/Sharding/HealthMonitor.php`)
+
+Monitors system health and performs auto-recovery.
+
+**Key Features:**
+- Comprehensive health checking
+- Automatic issue detection
+- Auto-recovery mechanisms
+- Recommendation generation
+
+**Health Checks:**
+- Stuck rebalancing operations (>30 minutes)
+- Failed operations detection
+- Orphaned resource identification
+- Queue depth monitoring
+
+**Core Methods:**
+- `performHealthCheck()`: Complete system health assessment
+- `performAutoRecovery()`: Automatic recovery from issues
+- `checkStuckOperations()`: Detect stuck rebalancing
+- `checkFailedOperations()`: Find failed operations
+- `checkOrphanedResources()`: Identify orphaned resources
+- `checkQueueHealth()`: Monitor queue depth
+
+**Usage Pattern:**
+```php
+$monitor = new HealthMonitor($client, $cluster);
+$health = $monitor->performHealthCheck();
+
+if ($health['overall_status'] !== 'healthy') {
+    // Automatic recovery
+    $recovery = $monitor->performAutoRecovery();
+    
+    // Or manual intervention based on recommendations
+    foreach ($health['recommendations'] as $recommendation) {
+        echo $recommendation;
+    }
+}
+```
+
+## Component Interaction Flows
+
+### Rollback Flow
+
+```
+Table.shard() 
+    ├── Creates operation_group
+    ├── Queue.addWithRollback() [multiple times]
+    ├── On failure:
+    │   └── Queue.rollbackOperationGroup()
+    │       ├── getRollbackCommands()
+    │       └── executeRollbackSequence()
+    └── On success: Complete
+```
+
+### Health Monitoring Flow
+
+```
+HealthMonitor.performHealthCheck()
+    ├── checkStuckOperations()
+    ├── checkFailedOperations()
+    ├── checkOrphanedResources()
+    ├── checkQueueHealth()
+    └── generateRecommendations()
+        └── performAutoRecovery() [if needed]
+            ├── recoverStuckOperation()
+            ├── recoverFailedOperation()
+            └── CleanupManager.performFullCleanup()
+```
+
+### Rebalancing Control Flow
+
+```
+Table.rebalance()
+    ├── Create operation_group
+    ├── Check stop signal
+    ├── Execute operations
+    │   └── Check stop signal between steps
+    ├── On stop signal:
+    │   └── rollbackOperationGroup()
+    └── On completion: Clear operation_group
+```
+
+The enhanced component architecture now provides automatic rollback, health monitoring, and resource cleanup capabilities, making the sharding system more robust and production-ready.

@@ -89,6 +89,7 @@ final class Server {
 		return new static($config);
 	}
 
+
 	/**
 	 * Add handler to process events
 	 *

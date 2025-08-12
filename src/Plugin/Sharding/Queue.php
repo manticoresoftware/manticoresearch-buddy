@@ -80,6 +80,54 @@ final class Queue {
 	}
 
 	/**
+	 * Add command with rollback support
+	 * @param string $nodeId Target node
+	 * @param string $query Forward command
+	 * @param string|null $rollbackQuery Rollback command (auto-generated if null)
+	 * @param string|null $operationGroup Group for bulk operations
+	 * @return int Queue ID
+	 */
+	public function addWithRollback(
+		string $nodeId,
+		string $query,
+		?string $rollbackQuery = null,
+		?string $operationGroup = null
+	): int {
+		// Auto-generate rollback if not provided
+		if ($rollbackQuery === null) {
+			$rollbackQuery = RollbackCommandGenerator::generate($query);
+		}
+
+		$table = $this->cluster->getSystemTableName($this->table);
+		$mt = (int)(microtime(true) * 1000);
+		$query = addcslashes($query, "'");
+		$rollbackQuery = $rollbackQuery ? addcslashes($rollbackQuery, "'") : '';
+		$operationGroup = $operationGroup ?? '';
+		$id = hrtime(true);
+
+		// Check if table has rollback columns (for backward compatibility)
+		if ($this->hasRollbackSupport()) {
+			$this->client->sendRequest(
+				"
+				INSERT INTO {$table}
+					(`id`, `node`, `query`, `rollback_query`, `wait_for_id`,
+					 `rollback_wait_for_id`, `operation_group`, `tries`, `status`,
+					 `created_at`, `updated_at`, `duration`)
+				VALUES
+					($id, '{$nodeId}', '{$query}', '{$rollbackQuery}',
+					 $this->waitForId, 0, '{$operationGroup}', 0, 'created',
+					 {$mt}, {$mt}, 0)
+				"
+			);
+		} else {
+			// Fallback to regular add for backward compatibility
+			return $this->add($nodeId, $query);
+		}
+
+		return $id;
+	}
+
+	/**
 	 * Get the single row by id
 	 * @param  int    $id
 	 * @return QueryItem|array{}
@@ -311,5 +359,155 @@ final class Queue {
 		}
 
 		mkdir($dir, 0755);
+	}
+
+	/**
+	 * Rollback entire operation group
+	 * @param string $operationGroup Group to rollback
+	 * @return bool Success status
+	 */
+	public function rollbackOperationGroup(string $operationGroup): bool {
+		try {
+			if (!$this->hasRollbackSupport()) {
+				Buddy::debugvv("Rollback not supported - queue table missing rollback columns");
+				return false;
+			}
+
+			$rollbackCommands = $this->getRollbackCommands($operationGroup);
+			if (empty($rollbackCommands)) {
+				Buddy::debugvv("No rollback commands found for group {$operationGroup}");
+				return true; // Nothing to rollback is considered success
+			}
+
+			return $this->executeRollbackSequence($rollbackCommands);
+		} catch (\Throwable $e) {
+			Buddy::debugvv("Rollback failed for group {$operationGroup}: " . $e->getMessage());
+			return false;
+		}
+	}
+
+	/**
+	 * Get rollback commands for operation group in reverse order
+	 * @param string $operationGroup
+	 * @return array Rollback commands in reverse execution order
+	 */
+	protected function getRollbackCommands(string $operationGroup): array {
+		$table = $this->cluster->getSystemTableName($this->table);
+
+		// Get completed commands with rollback queries in reverse order
+		$query = "
+			SELECT id, node, rollback_query, rollback_wait_for_id
+			FROM {$table}
+			WHERE operation_group = '{$operationGroup}'
+			AND status = 'processed'
+			AND rollback_query != ''
+			ORDER BY id DESC
+		";
+
+		/** @var array{0?:array{data?:array<array{id:int,node:string,rollback_query:string,rollback_wait_for_id:int}>}} */
+		$result = $this->client->sendRequest($query)->getResult();
+
+		return $result[0]['data'] ?? [];
+	}
+
+	/**
+	 * Execute rollback commands in sequence
+	 * @param array $rollbackCommands
+	 * @return bool Success status
+	 */
+	protected function executeRollbackSequence(array $rollbackCommands): bool {
+		$allSuccess = true;
+
+		foreach ($rollbackCommands as $command) {
+			try {
+				// Execute rollback command on the specific node
+				$nodeId = $command['node'];
+				$rollbackQuery = $command['rollback_query'];
+
+				Buddy::debugvv("Executing rollback on {$nodeId}: {$rollbackQuery}");
+
+				// Execute the rollback query
+				$res = $this->client->sendRequest($rollbackQuery);
+				if ($res->hasError()) {
+					$error = $res->getError();
+					Buddy::debugvv("Rollback command failed: {$rollbackQuery} - Error: {$error}");
+					$allSuccess = false;
+					// Continue with other rollback commands even if one fails
+				} else {
+					Buddy::debugvv("Rollback successful: {$rollbackQuery}");
+				}
+			} catch (\Throwable $e) {
+				Buddy::debugvv("Rollback command exception: {$command['rollback_query']} - " . $e->getMessage());
+				$allSuccess = false;
+				// Continue with other rollback commands
+			}
+		}
+
+		return $allSuccess;
+	}
+
+	/**
+	 * Check if the queue table has rollback support columns
+	 * @return bool
+	 */
+	protected function hasRollbackSupport(): bool {
+		static $hasSupport = null;
+
+		if ($hasSupport !== null) {
+			return $hasSupport;
+		}
+
+		try {
+			$table = $this->cluster->getSystemTableName($this->table);
+			// Try to query rollback columns
+			$query = "SELECT rollback_query, operation_group FROM {$table} LIMIT 1";
+			$res = $this->client->sendRequest($query);
+			$hasSupport = !$res->hasError();
+		} catch (\Throwable $e) {
+			$hasSupport = false;
+		}
+
+		return $hasSupport;
+	}
+
+	/**
+	 * Migrate existing queue table to support rollback
+	 * Call this during system upgrade
+	 * @return bool Success status
+	 */
+	public function migrateForRollbackSupport(): bool {
+		$table = $this->cluster->getSystemTableName($this->table);
+
+		try {
+			// Check if migration is needed
+			if ($this->hasRollbackSupport()) {
+				Buddy::debugvv("Queue table already has rollback support");
+				return true;
+			}
+
+			// Add new columns for rollback support
+			$alterQueries = [
+				"ALTER TABLE {$table} ADD COLUMN rollback_query string",
+				"ALTER TABLE {$table} ADD COLUMN rollback_wait_for_id bigint",
+				"ALTER TABLE {$table} ADD COLUMN operation_group string",
+			];
+
+			foreach ($alterQueries as $query) {
+				try {
+					$this->client->sendRequest($query);
+					Buddy::debugvv("Added rollback column: {$query}");
+				} catch (\Throwable $e) {
+					// Column might already exist - that's OK
+					Buddy::debugvv("Column might already exist: " . $e->getMessage());
+				}
+			}
+
+			// Clear the cache
+			$hasSupport = null;
+			return true;
+		} catch (\Throwable $e) {
+			Buddy::debugvv("Queue migration failed: " . $e->getMessage());
+			return false;
+		}
 	}
 }
