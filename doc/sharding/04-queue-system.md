@@ -13,6 +13,28 @@ The Queue class manages distributed command execution with the following key fea
 - **Node Targeting**: Routes commands to specific cluster nodes
 - **Parallel Execution**: Supports concurrent operations where safe
 - **Synchronization Points**: Ensures critical operations complete before proceeding
+- **Rollback Support**: Stores rollback commands alongside forward commands
+- **Operation Groups**: Groups related commands for atomic execution
+- **Automatic Rollback**: Executes rollback sequence on failure
+
+### Enhanced Queue Table Structure
+
+```sql
+CREATE TABLE system.sharding_queue (
+    `id` bigint,                    -- Primary key
+    `node` string,                   -- Target node
+    `query` string,                  -- Forward command
+    `rollback_query` string,         -- Rollback command (NEW)
+    `wait_for_id` bigint,           -- Forward dependency
+    `rollback_wait_for_id` bigint,  -- Rollback dependency (NEW)
+    `operation_group` string,        -- Operation group ID (NEW)
+    `tries` int,                     -- Retry count
+    `status` string,                 -- Command status
+    `created_at` bigint,            -- Creation timestamp
+    `updated_at` bigint,            -- Last update timestamp
+    `duration` int                  -- Execution duration
+)
+```
 
 ### Queue Command Structure
 
@@ -23,6 +45,17 @@ $command = [
     'node' => $nodeId,
     'query' => $sqlCommand,
     'wait_for_id' => $dependencyId, // Optional dependency
+];
+
+// Enhanced command with rollback support
+$command = [
+    'id' => $queueId,
+    'node' => $nodeId,
+    'query' => $sqlCommand,
+    'rollback_query' => $rollbackCommand,     // Reverse operation
+    'wait_for_id' => $dependencyId,
+    'rollback_wait_for_id' => 0,              // Rollback dependency
+    'operation_group' => $groupId,             // Group identifier
 ];
 ```
 
@@ -46,6 +79,77 @@ $idC = $queue->add($node, "COMMAND C");
 
 // Reset dependencies for independent commands
 $queue->resetWaitForId();
+```
+
+## Rollback Operations
+
+### Adding Commands with Rollback
+
+The queue system now supports adding commands with automatic rollback:
+
+```php
+// Add command with automatic rollback generation
+$queue->addWithRollback(
+    $nodeId,
+    "CREATE TABLE users_s0 (id bigint)",
+    null,  // Auto-generate rollback
+    $operationGroup
+);
+
+// Add command with explicit rollback
+$queue->addWithRollback(
+    $nodeId,
+    "ALTER CLUSTER c1 ADD users_s0",
+    "ALTER CLUSTER c1 DROP users_s0",  // Explicit rollback
+    $operationGroup
+);
+```
+
+### Operation Groups
+
+Related commands are grouped for atomic execution:
+
+```php
+$operationGroup = "shard_create_users_" . uniqid();
+
+// All commands in the same group
+$queue->addWithRollback($node1, $cmd1, $rollback1, $operationGroup);
+$queue->addWithRollback($node2, $cmd2, $rollback2, $operationGroup);
+$queue->addWithRollback($node3, $cmd3, $rollback3, $operationGroup);
+
+// On failure, rollback entire group
+if ($error) {
+    $queue->rollbackOperationGroup($operationGroup);
+}
+```
+
+### Rollback Execution Flow
+
+When a rollback is triggered:
+
+1. **Get Rollback Commands**: Retrieve all completed commands in the group
+2. **Reverse Order**: Sort commands by ID descending (reverse order)
+3. **Execute Rollbacks**: Run each rollback command
+4. **Continue on Error**: If a rollback fails, continue with others
+5. **Report Status**: Return overall rollback success/failure
+
+```php
+protected function executeRollbackSequence(array $rollbackCommands): bool {
+    $allSuccess = true;
+    
+    foreach ($rollbackCommands as $command) {
+        try {
+            $this->client->sendRequest($command['rollback_query']);
+            Buddy::debugvv("Rollback successful: {$command['rollback_query']}");
+        } catch (\Throwable $e) {
+            Buddy::debugvv("Rollback failed: " . $e->getMessage());
+            $allSuccess = false;
+            // Continue with other rollback commands
+        }
+    }
+    
+    return $allSuccess;
+}
 ```
 
 ### Critical Synchronization Points

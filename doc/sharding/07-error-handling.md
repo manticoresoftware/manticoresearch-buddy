@@ -1,6 +1,170 @@
 # Error Handling and Recovery
 
-The sharding system implements comprehensive error handling and recovery mechanisms to ensure system reliability and data safety during failures. This section covers error scenarios, recovery strategies, and troubleshooting procedures.
+The sharding system implements comprehensive error handling and recovery mechanisms to ensure system reliability and data safety during failures. This section covers error scenarios, recovery strategies, rollback mechanisms, and troubleshooting procedures.
+
+## Rollback System
+
+### Overview
+
+The sharding system now includes a comprehensive rollback mechanism that automatically reverses failed operations to maintain system consistency.
+
+### Operation Groups
+
+All related operations are grouped together for atomic execution:
+
+```php
+public function shard(Queue $queue, int $shardCount, int $replicationFactor = 2): Map {
+    // Create unique operation group
+    $operationGroup = "shard_create_{$this->name}_" . uniqid();
+    
+    try {
+        // All operations in this group
+        $queue->addWithRollback($node, $createSql, $rollbackSql, $operationGroup);
+        // ... more operations
+        
+        return $result;
+    } catch (\Throwable $t) {
+        // Automatic rollback of entire group
+        $queue->rollbackOperationGroup($operationGroup);
+        throw $t;
+    }
+}
+```
+
+### Rollback Command Generation
+
+The system automatically generates reverse commands for common operations:
+
+```php
+// RollbackCommandGenerator examples
+"CREATE TABLE users" → "DROP TABLE IF EXISTS users"
+"CREATE CLUSTER c1" → "DELETE CLUSTER c1"
+"ALTER CLUSTER c1 ADD t1" → "ALTER CLUSTER c1 DROP t1"
+"JOIN CLUSTER c1" → "DELETE CLUSTER c1"
+```
+
+### Rollback Execution Flow
+
+1. **Failure Detection**: Operation fails and throws exception
+2. **Group Identification**: Find all commands in operation group
+3. **Rollback Sequence**: Execute rollback commands in reverse order
+4. **State Cleanup**: Reset state and mark as failed
+5. **Error Reporting**: Log details for debugging
+
+```php
+protected function executeRollbackSequence(array $rollbackCommands): bool {
+    foreach ($rollbackCommands as $command) {
+        try {
+            $this->client->sendRequest($command['rollback_query']);
+            Buddy::debugvv("Rollback successful: {$command['rollback_query']}");
+        } catch (\Throwable $e) {
+            Buddy::debugvv("Rollback failed: " . $e->getMessage());
+            // Continue with other rollback commands
+        }
+    }
+    return true;
+}
+```
+
+## Rebalancing Control
+
+### Stop/Pause/Resume Operations
+
+The system now provides full control over rebalancing operations:
+
+```php
+// Graceful stop - completes current operation
+$result = $table->stopRebalancing(true);
+
+// Immediate stop with rollback
+$result = $table->stopRebalancing(false);
+
+// Pause operation
+$table->pauseRebalancing();
+
+// Resume paused operation
+$table->resumeRebalancing();
+
+// Get progress
+$progress = $table->getRebalancingProgress();
+```
+
+### Stop Signal Mechanism
+
+Operations check for stop signals between steps:
+
+```php
+if ($this->checkStopSignal()) {
+    $queue->rollbackOperationGroup($operationGroup);
+    $state->set($rebalanceKey, 'stopped');
+    $this->clearStopSignal();
+    return;
+}
+```
+
+## Health Monitoring
+
+### Automatic Health Checks
+
+The HealthMonitor performs comprehensive system checks:
+
+```php
+$monitor = new HealthMonitor($client, $cluster);
+$health = $monitor->performHealthCheck();
+
+// Health check results
+[
+    'overall_status' => 'healthy|unhealthy',
+    'checks' => [
+        'stuck_operations' => [...],
+        'failed_operations' => [...],
+        'orphaned_resources' => [...],
+        'queue_health' => [...]
+    ],
+    'issues' => [...],
+    'warnings' => [...],
+    'recommendations' => [...]
+]
+```
+
+### Auto-Recovery
+
+The system can automatically recover from common issues:
+
+```php
+if ($health['overall_status'] !== 'healthy') {
+    $recovery = $monitor->performAutoRecovery();
+    // Automatic recovery actions:
+    // - Reset stuck operations
+    // - Clean failed operation groups
+    // - Remove orphaned resources
+}
+```
+
+## Resource Cleanup
+
+### Cleanup Manager
+
+Automatic cleanup of orphaned resources:
+
+```php
+$cleanup = new CleanupManager($client, $cluster);
+$results = $cleanup->performFullCleanup();
+
+// Cleanup actions:
+// - Remove orphaned temporary clusters (>1 hour old)
+// - Delete failed operation groups (>24 hours old)
+// - Clean expired queue items (>7 days old)
+// - Remove stale state entries (>30 days old)
+```
+
+### Cleanup Schedule
+
+Recommended cleanup schedule:
+- **Hourly**: Check for orphaned temporary clusters
+- **Daily**: Clean failed operation groups
+- **Weekly**: Remove expired queue items
+- **Monthly**: Clean stale state entries
 
 ## Error Handling Strategy
 

@@ -354,4 +354,99 @@ final class Cluster {
 	public function getSystemTableName(string $table): string {
 		return $this->getTableName($table);
 	}
+
+	/**
+	 * Process pending tables with rollback support
+	 * @param Queue $queue
+	 * @param string $operationGroup
+	 * @return static
+	 */
+	public function processPendingTablesWithRollback(Queue $queue, string $operationGroup): static {
+		if ($this->tablesToDetach->count()) {
+			$this->removeTablesWithRollback($queue, $operationGroup, ...$this->tablesToDetach);
+			$this->tablesToDetach = new Set;
+		}
+
+		if ($this->tablesToAttach->count()) {
+			$this->addTablesWithRollback($queue, $operationGroup, ...$this->tablesToAttach);
+			$this->tablesToAttach = new Set;
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Add pending table with rollback support
+	 * @param string $node
+	 * @param string $table
+	 * @param string $operationGroup
+	 * @return static
+	 */
+	public function addPendingTableWithRollback(string $node, string $table, string $operationGroup): static {
+		$this->nodeId = $node;
+		$this->tablesToAttach->add($table);
+		return $this;
+	}
+
+	/**
+	 * Create cluster with rollback support
+	 * @param Queue $queue
+	 * @param string $operationGroup
+	 * @return int
+	 */
+	public function createWithRollback(Queue $queue, string $operationGroup): int {
+		$query = "CREATE CLUSTER IF NOT EXISTS {$this->name} '{$this->name}' as path";
+		$rollback = RollbackCommandGenerator::forCreateCluster($this->name);
+		return $queue->addWithRollback($this->nodeId, $query, $rollback, $operationGroup);
+	}
+
+	/**
+	 * Add node IDs with rollback support
+	 * @param Queue $queue
+	 * @param string $operationGroup
+	 * @param string ...$nodeIds
+	 * @return static
+	 */
+	public function addNodeIdsWithRollback(Queue $queue, string $operationGroup, string ...$nodeIds): static {
+		$galeraOptions = static::GALERA_OPTIONS;
+		foreach ($nodeIds as $nodeId) {
+			$query = "JOIN CLUSTER {$this->name} AT '{$this->nodeId}' '{$galeraOptions}'";
+			$rollback = RollbackCommandGenerator::forJoinCluster($this->name);
+			$queue->addWithRollback($nodeId, $query, $rollback, $operationGroup);
+			$this->nodes->add($nodeId);
+		}
+		return $this;
+	}
+
+	/**
+	 * Add tables with rollback support
+	 * @param Queue $queue
+	 * @param string $operationGroup
+	 * @param string ...$tables
+	 * @return int
+	 */
+	public function addTablesWithRollback(Queue $queue, string $operationGroup, string ...$tables): int {
+		if (!$tables) {
+			return 0;
+		}
+		$query = 'ALTER CLUSTER ' . $this->name . ' ADD ' . implode(', ', $tables);
+		$rollback = 'ALTER CLUSTER ' . $this->name . ' DROP ' . implode(', ', $tables);
+		return $queue->addWithRollback($this->nodeId, $query, $rollback, $operationGroup);
+	}
+
+	/**
+	 * Remove tables with rollback support
+	 * @param Queue $queue
+	 * @param string $operationGroup
+	 * @param string ...$tables
+	 * @return int
+	 */
+	public function removeTablesWithRollback(Queue $queue, string $operationGroup, string ...$tables): int {
+		if (!$tables) {
+			return 0;
+		}
+		$query = 'ALTER CLUSTER ' . $this->name . ' DROP ' . implode(', ', $tables);
+		$rollback = 'ALTER CLUSTER ' . $this->name . ' ADD ' . implode(', ', $tables);
+		return $queue->addWithRollback($this->nodeId, $query, $rollback, $operationGroup);
+	}
 }
