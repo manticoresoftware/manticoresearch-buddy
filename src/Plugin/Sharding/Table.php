@@ -237,51 +237,75 @@ final class Table {
 			]
 		);
 
-		/** @var Map<string,Set<int>> */
-		$nodeShardsMap = new Map;
+		// Create unique operation group for this table creation
+		$operationGroup = "shard_create_{$this->name}_" . uniqid();
+		$result['operation_group'] = $operationGroup;
 
-		/** @var Set<string> */
-		$nodes = new Set;
+		try {
+			/** @var Map<string,Set<int>> */
+			$nodeShardsMap = new Map;
 
-		$schema = $this->configureNodeShards($shardCount, $replicationFactor);
-		$reduceFn = function (Map $clusterMap, array $row) use ($queue, &$nodes, &$nodeShardsMap) {
-			/** @var Map<string,Cluster> $clusterMap */
-			$nodes->add($row['node']);
-			$nodeShardsMap[$row['node']] = $row['shards'];
+			/** @var Set<string> */
+			$nodes = new Set;
 
-			foreach ($row['shards'] as $shard) {
-				$connectedNodes = $this->getConnectedNodes(new Set([$shard]));
+			$schema = $this->configureNodeShards($shardCount, $replicationFactor);
+			$reduceFn = function (Map $clusterMap, array $row) use ($queue, &$nodes, &$nodeShardsMap, $operationGroup) {
+				/** @var Map<string,Cluster> $clusterMap */
+				$nodes->add($row['node']);
+				$nodeShardsMap[$row['node']] = $row['shards'];
 
-				$clusterMap = $this->handleReplication(
-					$row['node'],
-					$queue,
-					$connectedNodes,
-					$clusterMap,
-					$shard
-				);
+				foreach ($row['shards'] as $shard) {
+					$connectedNodes = $this->getConnectedNodes(new Set([$shard]));
+
+					$clusterMap = $this->handleReplicationWithRollback(
+						$row['node'],
+						$queue,
+						$connectedNodes,
+						$clusterMap,
+						$shard,
+						$operationGroup
+					);
+				}
+
+				return $clusterMap;
+			};
+			$clusterMap = $schema->reduce($reduceFn, new Map);
+
+			// Now process all postponed pending tables to attach to each cluster
+			foreach ($clusterMap as $cluster) {
+				$cluster->processPendingTablesWithRollback($queue, $operationGroup);
 			}
 
-			return $clusterMap;
-		};
-		$clusterMap = $schema->reduce($reduceFn, new Map);
+			/** @var Set<int> */
+			$queueIds = new Set;
+			foreach ($nodeShardsMap as $node => $shards) {
+				// Even when no shards, we still create distributed table
+				$sql = $this->getCreateShardedTableSQL($shards);
+				$rollbackSql = RollbackCommandGenerator::forCreateDistributedTable($this->name);
 
-		// Now process all postponed pending tables to attach to each cluster
-		foreach ($clusterMap as $cluster) {
-			$cluster->processPendingTables($queue);
+				// Use addWithRollback for atomic operations
+				$queueId = $queue->addWithRollback($node, $sql, $rollbackSql, $operationGroup);
+				$queueIds->add($queueId);
+			}
+
+			$result['nodes'] = $nodes;
+			$result['queue_ids'] = $queueIds;
+			$result['status'] = 'success';
+
+			return $result;
+
+		} catch (\Throwable $t) {
+			// Rollback entire table creation on any failure
+			Buddy::debugvv("Table creation failed for {$this->name}, initiating rollback for group {$operationGroup}");
+			$rollbackSuccess = $queue->rollbackOperationGroup($operationGroup);
+
+			$result['status'] = 'failed';
+			$result['error'] = $t->getMessage();
+			$result['rollback_executed'] = true;
+			$result['rollback_success'] = $rollbackSuccess;
+
+			throw $t;
 		}
-
-		/** @var Set<int> */
-		$queueIds = new Set;
-		foreach ($nodeShardsMap as $node => $shards) {
-			// Even when no shards, we still create distributed table
-			$sql = $this->getCreateShardedTableSQL($shards);
-			$queueId = $queue->add($node, $sql);
-			$queueIds->add($queueId);
-		}
-
-		$result['nodes'] = $nodes;
-		$result['queue_ids'] = $queueIds;
-		return $result;
 	}
 
 	/**
@@ -388,15 +412,80 @@ final class Table {
 	}
 
 	/**
+	 * Enhanced replication handling with rollback support
+	 * @param  string $node
+	 * @param  Queue  $queue
+	 * @param  Set<string>    $connectedNodes
+	 * @param  Map<string,Cluster>   $clusterMap
+	 * @param  int    $shard
+	 * @param  string $operationGroup
+	 * @return Map<string,Cluster>
+	 */
+	protected function handleReplicationWithRollback(
+		string $node,
+		Queue $queue,
+		Set $connectedNodes,
+		Map $clusterMap,
+		int $shard,
+		string $operationGroup
+	): Map {
+		// If no replication, add create table shard SQL to queue with rollback
+		if ($connectedNodes->count() === 1) {
+			$sql = $this->getCreateTableShardSQL($shard);
+			$shardName = $this->getShardName($shard);
+			$rollbackSql = RollbackCommandGenerator::forCreateTable($shardName);
+			$queue->addWithRollback($node, $sql, $rollbackSql, $operationGroup);
+			return $clusterMap;
+		}
+
+		$clusterName = static::getClusterName($connectedNodes);
+		$hasCluster = isset($clusterMap[$clusterName]);
+		if ($hasCluster) {
+			$cluster = $clusterMap[$clusterName];
+		} else {
+			$cluster = new Cluster($this->client, $clusterName, $node);
+			$nodesToJoin = $connectedNodes->filter(
+				fn ($connectedNode) => $connectedNode !== $node
+			);
+			$clusterMap[$clusterName] = $cluster;
+			$waitForId = $cluster->createWithRollback($queue, $operationGroup);
+			$queue->setWaitForId($waitForId);
+			$cluster->addNodeIdsWithRollback($queue, $operationGroup, ...$nodesToJoin);
+			$queue->resetWaitForId();
+		}
+
+		/** @var Cluster $cluster */
+		$table = $this->getShardName($shard);
+		if (!$cluster->hasPendingTable($table, TableOperation::Attach)) {
+			$cluster->addPendingTable($table, TableOperation::Attach);
+			$sql = $this->getCreateTableShardSQL($shard);
+			$rollbackSql = RollbackCommandGenerator::forCreateTable($table);
+			$queue->addWithRollback($node, $sql, $rollbackSql, $operationGroup);
+		}
+		return $clusterMap;
+	}
+
+	/**
+	 * Rollback failed table creation
+	 * @param string $operationGroup
+	 * @return bool Success status
+	 */
+	public function rollbackFailedSharding(string $operationGroup): bool {
+		$queue = new Queue($this->cluster, $this->client);
+		return $queue->rollbackOperationGroup($operationGroup);
+	}
+
+	/**
 	 * Rebalances the shards,
-	 * identifying affected shards from inactive nodes
-	 * and moving only them.
-	 *
+	 * it checks if there are any inactive nodes and rebalances the shards
 	 * @param Queue $queue
 	 * @return void
+	 * @phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
 	 */
 	// @phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
 	public function rebalance(Queue $queue): void {
+		$operationGroup = "rebalance_{$this->name}_" . time();
+		$state = null;
 		try {
 			// Create state instance for tracking rebalancing operations
 			$state = new State($this->client);
@@ -410,8 +499,9 @@ final class Table {
 				return;
 			}
 
-			// Mark rebalancing as running
+			// Mark rebalancing as running with operation group info
 			$state->set($rebalanceKey, 'running');
+			$state->set("rebalance_group:{$this->name}", $operationGroup);
 
 			$schema = $this->getShardSchema();
 			$allNodes = $this->cluster->getNodes();
@@ -421,6 +511,14 @@ final class Table {
 			// Detect new nodes (not in current schema)
 			$schemaNodes = new Set($schema->map(fn($row) => $row['node']));
 			$newNodes = $activeNodes->diff($schemaNodes);
+
+			// Check for stop signal before proceeding
+			if ($this->checkStopSignal()) {
+				$queue->rollbackOperationGroup($operationGroup);
+				$state->set($rebalanceKey, 'stopped');
+				$this->clearStopSignal();
+				return;
+			}
 
 			// Handle different rebalancing scenarios
 			if ($inactiveNodes->count() > 0) {
@@ -445,13 +543,249 @@ final class Table {
 
 			// Mark rebalancing as completed
 			$state->set($rebalanceKey, 'completed');
+			$state->set("rebalance_group:{$this->name}", null); // Clear operation group
 		} catch (\Throwable $t) {
-			// Mark rebalancing as failed and reset state
-			$state = new State($this->client);
-			$rebalanceKey = "rebalance:{$this->name}";
-			$state->set($rebalanceKey, 'failed');
-			var_dump($t->getMessage());
+			// Enhanced error handling with rollback
+			$this->handleRebalancingFailure($t, $operationGroup ?? '', $queue, $state ?? null);
 		}
+	}
+
+	/**
+	 * Stop rebalancing operation
+	 * @param bool $graceful If true, complete current operation before stopping
+	 * @return array Status information
+	 */
+	public function stopRebalancing(bool $graceful = true): array {
+		$state = new State($this->client);
+		$rebalanceKey = "rebalance:{$this->name}";
+		$currentStatus = $state->get($rebalanceKey);
+
+		if ($currentStatus !== 'running') {
+			return [
+				'status' => 'not_running',
+				'message' => 'Rebalancing is not currently running',
+				'current_status' => $currentStatus,
+			];
+		}
+
+		if ($graceful) {
+			// Set stop signal - will be checked during next operation
+			$this->setStopSignal();
+			return [
+				'status' => 'stop_requested',
+				'message' => 'Graceful stop requested - will complete current operation',
+				'graceful' => true,
+			];
+		} else {
+			// Immediate stop with rollback
+			$operationGroup = $state->get("rebalance_group:{$this->name}");
+			if ($operationGroup) {
+				$queue = new Queue($this->cluster, $this->client);
+				$queue->rollbackOperationGroup($operationGroup);
+			}
+
+			$state->set($rebalanceKey, 'stopped');
+			$this->clearStopSignal();
+
+			return [
+				'status' => 'stopped',
+				'message' => 'Rebalancing stopped immediately with rollback',
+				'graceful' => false,
+				'rollback_executed' => true,
+			];
+		}
+	}
+
+	/**
+	 * Pause rebalancing (can be resumed later)
+	 * @return bool Success status
+	 */
+	public function pauseRebalancing(): bool {
+		$state = new State($this->client);
+		$rebalanceKey = "rebalance:{$this->name}";
+		$currentStatus = $state->get($rebalanceKey);
+
+		if ($currentStatus !== 'running') {
+			return false;
+		}
+
+		$state->set($rebalanceKey, 'paused');
+		return true;
+	}
+
+	/**
+	 * Resume paused rebalancing
+	 * @return bool Success status
+	 */
+	public function resumeRebalancing(): bool {
+		$state = new State($this->client);
+		$rebalanceKey = "rebalance:{$this->name}";
+		$currentStatus = $state->get($rebalanceKey);
+
+		if ($currentStatus !== 'paused') {
+			return false;
+		}
+
+		$state->set($rebalanceKey, 'running');
+		return true;
+	}
+
+	/**
+	 * Get detailed rebalancing progress
+	 * @return array Progress information
+	 */
+	public function getRebalancingProgress(): array {
+		$state = new State($this->client);
+		$rebalanceKey = "rebalance:{$this->name}";
+		$status = $state->get($rebalanceKey) ?? 'idle';
+		$operationGroup = $state->get("rebalance_group:{$this->name}");
+
+		$progress = [
+			'status' => $status,
+			'table' => $this->name,
+			'operation_group' => $operationGroup,
+			'can_stop' => in_array($status, ['running', 'paused']),
+			'can_pause' => $status === 'running',
+			'can_resume' => $status === 'paused',
+		];
+
+		if ($operationGroup) {
+			// Get queue progress for this operation group
+			$queue = new Queue($this->cluster, $this->client);
+			$queueProgress = $this->getQueueProgress($operationGroup);
+			$progress = array_merge($progress, $queueProgress);
+		}
+
+		return $progress;
+	}
+
+	/**
+	 * Reset rebalancing state
+	 * @return bool Success status
+	 */
+	public function resetRebalancingState(): bool {
+		$state = new State($this->client);
+		$rebalanceKey = "rebalance:{$this->name}";
+		$state->set($rebalanceKey, 'idle');
+		$state->set("rebalance_group:{$this->name}", null);
+		$this->clearStopSignal();
+		return true;
+	}
+
+	/**
+	 * Check if stop signal is set
+	 * @return bool
+	 */
+	protected function checkStopSignal(): bool {
+		$state = new State($this->client);
+		return $state->get("stop_signal:{$this->name}") !== null;
+	}
+
+	/**
+	 * Set stop signal for graceful stopping
+	 * @return void
+	 */
+	protected function setStopSignal(): void {
+		$state = new State($this->client);
+		$state->set("stop_signal:{$this->name}", time());
+	}
+
+	/**
+	 * Clear stop signal
+	 * @return void
+	 */
+	protected function clearStopSignal(): void {
+		$state = new State($this->client);
+		$state->set("stop_signal:{$this->name}", null);
+	}
+
+	/**
+	 * Handle rebalancing failure with comprehensive rollback
+	 * @param \Throwable $error
+	 * @param string $operationGroup
+	 * @param Queue $queue
+	 * @param ?State $state
+	 * @return void
+	 */
+	protected function handleRebalancingFailure(\Throwable $error, string $operationGroup, Queue $queue, ?State $state = null): void {
+		if (!$state) {
+			$state = new State($this->client);
+		}
+		$rebalanceKey = "rebalance:{$this->name}";
+
+		try {
+			// Execute rollback for the entire operation group if provided
+			$rollbackSuccess = false;
+			if ($operationGroup) {
+				$rollbackSuccess = $queue->rollbackOperationGroup($operationGroup);
+			}
+
+			// Mark as failed with rollback info
+			$state->set($rebalanceKey, 'failed');
+			$state->set("rebalance_group:{$this->name}", null);
+
+			// Store error information for debugging
+			$errorInfo = [
+				'error_message' => $error->getMessage(),
+				'error_type' => get_class($error),
+				'failed_at' => time(),
+				'operation_group' => $operationGroup,
+				'rollback_executed' => $operationGroup ? true : false,
+				'rollback_success' => $rollbackSuccess,
+			];
+
+			$state->set("rebalance_error:{$this->name}", json_encode($errorInfo));
+
+			// Clear stop signal if set
+			$this->clearStopSignal();
+
+			Buddy::debugvv("Rebalancing failed for table {$this->name}: " . $error->getMessage() .
+						  " (Rollback " . ($rollbackSuccess ? "successful" : "failed") . ")");
+
+		} catch (\Throwable $rollbackError) {
+			// Rollback itself failed - critical situation
+			$state->set($rebalanceKey, 'critical_failure');
+
+			Buddy::debugvv("CRITICAL: Rebalancing AND rollback failed for table {$this->name}. " .
+						  "Original error: " . $error->getMessage() .
+						  " Rollback error: " . $rollbackError->getMessage());
+		}
+
+		// Re-throw original error for upstream handling
+		throw $error;
+	}
+
+	/**
+	 * Get queue progress for operation group
+	 * @param string $operationGroup
+	 * @return array
+	 */
+	protected function getQueueProgress(string $operationGroup): array {
+		$table = $this->cluster->getSystemTableName('system.sharding_queue');
+
+		$query = "
+			SELECT 
+				COUNT(*) as total,
+				SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) as completed,
+				SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as failed,
+				SUM(CASE WHEN status IN ('created', 'processing') THEN 1 ELSE 0 END) as pending
+			FROM {$table}
+			WHERE operation_group = '{$operationGroup}'
+		";
+
+		/** @var array{0?:array{data?:array{0?:array{total:int,completed:int,failed:int,pending:int}}}} */
+		$result = $this->client->sendRequest($query)->getResult();
+		$data = $result[0]['data'][0] ?? [];
+
+		return [
+			'queue_total' => $data['total'] ?? 0,
+			'queue_completed' => $data['completed'] ?? 0,
+			'queue_failed' => $data['failed'] ?? 0,
+			'queue_pending' => $data['pending'] ?? 0,
+			'progress_percentage' => $data['total'] > 0
+				? round(($data['completed'] / $data['total']) * 100, 2)
+				: 0,
+		];
 	}
 
 	/**
@@ -936,15 +1270,6 @@ final class Table {
 		return $currentRebalance !== 'running';
 	}
 
-	/**
-	 * Reset rebalancing state (useful for recovery)
-	 * @return void
-	 */
-	public function resetRebalancingState(): void {
-		$state = new State($this->client);
-		$rebalanceKey = "rebalance:{$this->name}";
-		$state->set($rebalanceKey, 'idle');
-	}
 
 	/**
 	 * Get current rebalancing status
