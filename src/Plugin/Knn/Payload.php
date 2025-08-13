@@ -157,9 +157,15 @@ final class Payload extends BasePayload
 	private static function getParsedPayload(Request $request): ?array {
 		return static::$sqlQueryParser::parse(
 			$request->payload,
-			fn($request) => (str_contains($request->error, "P01: syntax error, unexpected integer, expecting '(' near")
+			fn($request) => (
+				(str_contains($request->error, "P01: syntax error, unexpected integer, expecting '(' near")
+				|| str_contains(
+					$request->error,
+					"P01: syntax error, unexpected integer, expecting string or '(' near"
+				))
 				&& stripos($request->payload, 'knn') !== false
-				&& preg_match('/\(?\s?knn\s?\(/usi', $request->payload)),
+				&& preg_match('/\(?\s?knn\s?\(/usi', $request->payload)
+			),
 			$request
 		);
 	}
