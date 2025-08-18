@@ -67,8 +67,11 @@ final class Server {
 
 		$this->addTicker(
 			function () {
-				if (Process::kill($this->ppid, 0)) {
-					return;
+				try {
+					if (Process::kill($this->ppid, 0)) {
+						return;
+					}
+				} catch (Throwable) {
 				}
 				$this->stop();
 			}, 1
