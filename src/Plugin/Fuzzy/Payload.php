@@ -221,7 +221,7 @@ final class Payload extends BasePayload {
 				'MATCH(\'%s\')',
 				'',
 				'',
-				'option ',
+				' ',
 				' option ',
 				' facet ',
 			],
