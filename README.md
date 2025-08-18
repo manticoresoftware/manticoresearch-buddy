@@ -47,21 +47,21 @@ Let's take a closer look at an example of how to create a plugin for a RESTORE c
 To debug the command flow, you can use the `bin/query` script. To run it, pass the query as an argument. For example:
 
 ```bash
-  $ bin/query "BACKUP"
-  Running query: BACKUP
+$ bin/query "BACKUP"
+Running query: BACKUP
 
 
-  Manticore config
-    endpoint =  127.0.0.1:9308
+Manticore config
+endpoint =  127.0.0.1:9308
 
-  Manticore versions:
-    manticore: 5.0.3 129438c1c@221013 dev
-    columnar: 0.0.0
-    secondary: 0.0.0
-  2022-10-20 14:26:51 [Info] Starting the backup...
-  Status code: Finished
-  Result: Backup directory is not writable
-  done
+Manticore versions:
+manticore: 5.0.3 129438c1c@221013 dev
+columnar: 0.0.0
+secondary: 0.0.0
+2022-10-20 14:26:51 [Info] Starting the backup...
+Status code: Finished
+Result: Backup directory is not writable
+done
 ```
 
 
@@ -72,23 +72,23 @@ This will execute the `BACKUP` command and display the results. The output will 
 To run a Buddy instance from the command line interface (CLI), use the following command:
 
 ```bash
-  $ manticore-executor src/main.php [ARGUMENTS]
-  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+$ manticore-executor src/main.php [ARGUMENTS]
+Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
 
-  Usage: manticore-executor src/main.php [ARGUMENTS]
+Usage: manticore-executor src/main.php [ARGUMENTS]
 
-  Arguments are:
-  --bind                 Which IP to bind, default is 127.0.0.1
-  --listen               HTTP endpoint to accept Manticore requests
-  --version              display the current version of Buddy
-  --help                 display this help message
-  --telemetry-period=[N] set period for telemetry when we do snapshots
-  --disable-telemetry    disables telemetry for Buddy
-  --threads=[N]          start N threads on launch, default is CPU core count
-  --log-level=[N]        set log level, default is info, one of debug, debugv, debugvv or info
-  Examples:
-  manticore-executor src/main.php --log-level=debug
-  manticore-executor src/main.php --disable-telemetry
+Arguments are:
+--bind                 Which IP to bind, default is 127.0.0.1
+--listen               HTTP endpoint to accept Manticore requests
+--version              display the current version of Buddy
+--help                 display this help message
+--telemetry-period=[N] set period for telemetry when we do snapshots
+--disable-telemetry    disables telemetry for Buddy
+--threads=[N]          start N threads on launch, default is CPU core count
+--log-level=[N]        set log level, default is info, one of debug, debugv, debugvv or info
+Examples:
+manticore-executor src/main.php --log-level=debug
+manticore-executor src/main.php --disable-telemetry
 ```
 
 You can find more detailed information on the Manticore executor [here](https://github.com/manticoresoftware/executor).
@@ -96,7 +96,7 @@ You can find more detailed information on the Manticore executor [here](https://
 
 ### Development
 
-If you want to contribute to the project and develop extra features, we have prepared a particular docker image.
+If you want to contribute to the project and develop extra features, we have prepared a special docker image.
 
 Just go to your "buddy" folder on a host machine and run the following instructions.
 
@@ -108,7 +108,7 @@ After that, you can go into the container and work as normal. It has pre-install
 
 The image is built from Alpine Linux. Please note that you should also run `composer install` before running Buddy from the source code with `manticore-executor`.
 
-If you want to test Buddy somewhere else (not just Alpine), the easiest way to build it as a PHAR archive.
+If you want to test Buddy somewhere else (not just Alpine), the easiest way is to build it as a PHAR archive.
 
 Ensure you are in the directory where the Buddy repository is cloned. And follow the instructions:
 
@@ -122,9 +122,9 @@ Check the build directory and get the built version of Buddy from there and repl
 
 #### Run custom process inside the Plugin
 
-To run the process that can maintain some logic and communicate you need to create the `Processor` class and add `getProcessors` method to the `Payload`
+To run a process that can maintain some logic and communicate, you need to create the `Processor` class and add the `getProcessors` method to the `Payload`
 
-Here is the example that explain how to do So
+Here is an example that explains how to do so:
 
 Create `Processor` plugin and implement required logic
 
@@ -133,25 +133,25 @@ Create `Processor` plugin and implement required logic
 
 … your NS and other copyright here …
 
-use Manticoresearch\Buddy\Core\Process\BaseProcessor;
+    use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Process\Process;
 
 final class Processor extends BaseProcessor {
-  public function start(): void {
-    var_dump('starting');
-    parent::start();
+    public function start(): void {
+        var_dump('starting');
+        parent::start();
 
-    $this->execute('test', ['simple message']);
-  }
+        $this->execute('test', ['simple message']);
+    }
 
-  public function stop(): void {
-    var_dump('stopping');
-    parent::stop();
-  }
+    public function stop(): void {
+        var_dump('stopping');
+        parent::stop();
+    }
 
-  public static function test(string $text): void {
-    var_dump($text);
-  }
+    public static function test(string $text): void {
+        var_dump($text);
+    }
 }
 ```
 
@@ -159,13 +159,13 @@ Add to the `Payload` info that your plugin has processors
 
 ```php
 public static function getProcessors(): array {
-  static $processors;
-  // To ensure the object reference remains unchanged,
-  // create it as static and keep track of it.
-  if (!$processors) {
-    $processors = [new Processor()];
-  }
-  return $processors;
+static $processors;
+// To ensure the object reference remains unchanged,
+// create it as static and keep track of it.
+if (!$processors) {
+$processors = [new Processor()];
+}
+return $processors;
 }
 ````
 
@@ -183,7 +183,7 @@ The request from Manticore Search to Buddy is made in JSON format no matter how 
 | Key | Description |
 |-|-|
 | `type` | Either `unknown json request` when the original request is made via JSON over HTTP or `unknown sql request` for SQL over HTTP/mysql. |
-| `error` | An object containg information about error(error message, etc.) to be returned to the user, if any. |
+| `error` | An object containing information about error(error message, etc.) to be returned to the user, if any. |
 | `message` | An object containing details such as `path_query` (specific to JSON over HTTP requests), `http_method`  (`HEAD`, `GET`, etc) and `body` which holds the main content of the request. For JSON over HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for SQL over HTTP/mysql, it remains empty (`""`). `http_method` is set to `""` for SQL over HTTP/mysql |
 | `version` | The maximum protocol version supported by the sender. |
 
@@ -191,17 +191,17 @@ Example of the request:
 
 ```json
 {
-  "type":"unknown json request",
-  "error": {
-    "message":"unknown option 'fuzzy'",
-    "body":{"error":"unknown option 'fuzzy'"}
-  },
-  "message":{
-    "path_query":"/search",
-    "body":"{\"index\":\"name\",\"query\":{\"bool\":{\"must\":[{\"match\":{\"*\":\"RICH\"}}]}},\"options\":{\"fuzzy\":true}}",
-    "http_method":"POST"
-  },
-  "version":3
+    "type":"unknown json request",
+    "error": {
+        "message":"unknown option 'fuzzy'",
+        "body":{"error":"unknown option 'fuzzy'"}
+    },
+    "message":{
+        "path_query":"/search",
+        "body":"{\"index\":\"name\",\"query\":{\"bool\":{\"must\":[{\"match\":{\"*\":\"RICH\"}}]}},\"options\":{\"fuzzy\":true}}",
+        "http_method":"POST"
+    },
+    "version":3
 }
 ```
 
@@ -221,27 +221,13 @@ Example of HTTP Response:
 
 ```json
 {
-  "type": "json response",
-  "message": {
-    "a": 123,
-    "b": "abc"
-  },
-  "error_code": 0,
-  "version": 3
-}
-```
-
-Example of HTTP Response:
-
-```json
-{
-  "type": "json response",
-  "message": {
-    "a": 123,
-    "b": "abc"
-  },
-  "error_code": 0,
-  "version": 3
+    "type": "json response",
+    "message": {
+        "a": 123,
+        "b": "abc"
+    },
+    "error_code": 0,
+    "version": 3
 }
 ```
 
@@ -249,65 +235,65 @@ Example of MySQL Response:
 
 ```json
 {
-  "type": "sql response",
-  "message": [
-    {
-      "columns": [
+    "type": "sql response",
+    "message": [
         {
-          "Field": {
-            "type": "string"
-          }
-        },
-        {
-          "Type": {
-            "type": "string"
-          }
-        },
-        {
-          "Properties": {
-            "type": "string"
-          }
+            "columns": [
+                {
+                    "Field": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "Type": {
+                        "type": "string"
+                    }
+                },
+                {
+                    "Properties": {
+                        "type": "string"
+                    }
+                }
+            ],
+            "data": [
+                {
+                    "Field": "id",
+                    "Type": "bigint",
+                    "Properties": ""
+                },
+                {
+                    "Field": "title",
+                    "Type": "text",
+                    "Properties": "indexed"
+                },
+                {
+                    "Field": "gid",
+                    "Type": "uint",
+                    "Properties": ""
+                },
+                {
+                    "Field": "title",
+                    "Type": "string",
+                    "Properties": ""
+                },
+                {
+                    "Field": "j",
+                    "Type": "json",
+                    "Properties": ""
+                },
+                {
+                    "Field": "new1",
+                    "Type": "uint",
+                    "Properties": ""
+                }
+            ],
+            "total": 6,
+            "error": "",
+            "warning": ""
         }
-      ],
-      "data": [
-        {
-          "Field": "id",
-          "Type": "bigint",
-          "Properties": ""
-        },
-        {
-          "Field": "title",
-          "Type": "text",
-          "Properties": "indexed"
-        },
-        {
-          "Field": "gid",
-          "Type": "uint",
-          "Properties": ""
-        },
-        {
-          "Field": "title",
-          "Type": "string",
-          "Properties": ""
-        },
-        {
-          "Field": "j",
-          "Type": "json",
-          "Properties": ""
-        },
-        {
-          "Field": "new1",
-          "Type": "uint",
-          "Properties": ""
-        }
-      ],
-      "total": 6,
-      "error": "",
-      "warning": ""
-    }
-  ],
-  "error_code": 0,
-  "version": 3
+    ],
+    "error_code": 0,
+    "version": 3
 }
 ```
 
