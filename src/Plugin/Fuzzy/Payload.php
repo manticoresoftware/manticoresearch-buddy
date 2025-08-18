@@ -222,7 +222,7 @@ final class Payload extends BasePayload {
 				'',
 				'',
 				'option ',
-				' option idf=\'plain,tfidf_normalized\',', // TODO: hack
+				' option ',
 				' facet ',
 			],
 			$payload
@@ -230,10 +230,6 @@ final class Payload extends BasePayload {
 		$template = trim($template, ' ,');
 		if (str_ends_with($template, 'option')) {
 			$template = substr($template, 0, -6);
-		}
-		// TODO: hack
-		if (false === strpos($template, 'option idf=\'plain,tfidf_normalized\'')) {
-			$template .= ' option idf=\'plain,tfidf_normalized\'';
 		}
 
 		// If not fuzzy enabled, we do not need to run function and simply assign search value
@@ -423,13 +419,9 @@ final class Payload extends BasePayload {
 	public static function cleanUpPayloadOptions(array $payload): array {
 		$excludedOptions = ['distance', 'fuzzy', 'layouts', 'preserve'];
 		$payload['options'] = array_diff_key($payload['options'], array_flip($excludedOptions));
-		// TODO: hack
-		if (!isset($payload['options']['idf'])) { // @phpstan-ignore-line
-			$payload['options']['idf'] = 'plain,tfidf_normalized';
+		if (empty($payload['options'])) {
+			unset($payload['options']);
 		}
-		/* if (empty($payload['options'])) { */
-		/* 	unset($payload['options']); */
-		/* } */
 
 		return $payload;
 	}
