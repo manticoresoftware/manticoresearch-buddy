@@ -161,14 +161,8 @@ final class Payload extends BasePayload {
 	protected static function extractAdditionalQueries(string $query): array {
 		$additionalQueries = [];
 
-		// Find the position of the first semicolon after the main query
-		// Look for the last occurrence of either 'option' or 'WHERE MATCH' to determine where main query ends
-		$optionPos = strripos($query, ' option ');
-		$wherePos = strripos($query, ' where ');
-
-		// Use the later position as the starting point for semicolon search
-		$searchStartPos = max($optionPos ?: 0, $wherePos ?: 0);
-		$firstSemicolonPos = strpos($query, ';', $searchStartPos) ?: 0;
+		// Find the position of the first semicolon
+		$firstSemicolonPos = strpos($query, ';', strripos($query, ' option ') ?: 0) ?: 0;
 
 		// If a semicolon exists
 		if ($firstSemicolonPos > 0) {
