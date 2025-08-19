@@ -3,7 +3,6 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Monitors sharding system health and performs auto-recovery
@@ -13,7 +12,8 @@ final class HealthMonitor {
 	public function __construct(
 		private Client $client,
 		private Cluster $cluster
-	) {}
+	) {
+	}
 
 	/**
 	 * Perform comprehensive health check
@@ -118,18 +118,20 @@ final class HealthMonitor {
 				}
 			}
 
-			if ($issue['type'] === 'failed_operations') {
-				foreach ($issue['tables'] as $tableName) {
-					$recovery = $this->recoverFailedOperation($tableName);
-					if ($recovery['success']) {
-						$results['recovered_tables'][] = $tableName;
-						$results['actions_taken'][] = "Recovered failed operation for {$tableName}";
-					} else {
-						$results['failed_recoveries'][] = [
-							'table' => $tableName,
-							'error' => $recovery['error'],
-						];
-					}
+			if ($issue['type'] !== 'failed_operations') {
+				continue;
+			}
+
+			foreach ($issue['tables'] as $tableName) {
+				$recovery = $this->recoverFailedOperation($tableName);
+				if ($recovery['success']) {
+					$results['recovered_tables'][] = $tableName;
+					$results['actions_taken'][] = "Recovered failed operation for {$tableName}";
+				} else {
+					$results['failed_recoveries'][] = [
+						'table' => $tableName,
+						'error' => $recovery['error'],
+					];
 				}
 			}
 		}
@@ -159,13 +161,15 @@ final class HealthMonitor {
 			// Find operations running for more than 30 minutes
 			$cutoffTime = time() - 1800; // 30 minutes ago
 
-			$runningOps = $this->client->sendRequest("
+			$runningOps = $this->client->sendRequest(
+				"
 				SELECT key, value, updated_at
 				FROM {$stateTable}
 				WHERE key LIKE 'rebalance:%'
 				AND value[0] = '\"running\"'
 				AND updated_at < {$cutoffTime}
-			");
+			"
+			);
 
 			/** @var array{0?:array{data?:array<array{key:string,value:string,updated_at:int}>}} */
 			$data = $runningOps->getResult();
@@ -173,12 +177,13 @@ final class HealthMonitor {
 
 			foreach ($operations as $op) {
 				// Extract table name from key (format: rebalance:tablename)
-				if (preg_match('/^rebalance:(.+)$/', $op['key'], $matches)) {
-					$tableName = $matches[1];
-					$results['stuck_tables'][] = $tableName;
+				if (!preg_match('/^rebalance:(.+)$/', $op['key'], $matches)) {
+					continue;
 				}
-			}
 
+				$tableName = $matches[1];
+				$results['stuck_tables'][] = $tableName;
+			}
 		} catch (\Throwable $e) {
 			$results['error'] = $e->getMessage();
 		}
@@ -197,12 +202,14 @@ final class HealthMonitor {
 			$state = new State($this->client);
 			$stateTable = $this->cluster->getSystemTableName('system.sharding_state');
 
-			$failedOps = $this->client->sendRequest("
+			$failedOps = $this->client->sendRequest(
+				"
 				SELECT key, value
 				FROM {$stateTable}
 				WHERE key LIKE 'rebalance:%'
 				AND value[0] = '\"failed\"'
-			");
+			"
+			);
 
 			/** @var array{0?:array{data?:array<array{key:string,value:string}>}} */
 			$data = $failedOps->getResult();
@@ -210,12 +217,13 @@ final class HealthMonitor {
 
 			foreach ($operations as $op) {
 				// Extract table name from key
-				if (preg_match('/^rebalance:(.+)$/', $op['key'], $matches)) {
-					$tableName = $matches[1];
-					$results['failed_tables'][] = $tableName;
+				if (!preg_match('/^rebalance:(.+)$/', $op['key'], $matches)) {
+					continue;
 				}
-			}
 
+				$tableName = $matches[1];
+				$results['failed_tables'][] = $tableName;
+			}
 		} catch (\Throwable $e) {
 			$results['error'] = $e->getMessage();
 		}
@@ -232,19 +240,20 @@ final class HealthMonitor {
 
 		try {
 			// Check for orphaned temporary clusters
-			$clusterResult = $this->client->sendRequest("SHOW CLUSTERS");
+			$clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
 			/** @var array{0?:array{data?:array<array{cluster:string}>}} */
 			$data = $clusterResult->getResult();
 			$clusters = $data[0]['data'] ?? [];
 
 			foreach ($clusters as $cluster) {
 				$clusterName = $cluster['cluster'] ?? '';
-				if (strpos($clusterName, 'temp_move_') === 0) {
-					$results['orphaned_count']++;
-					$results['details'][] = "Orphaned cluster: {$clusterName}";
+				if (strpos($clusterName, 'temp_move_') !== 0) {
+					continue;
 				}
-			}
 
+				$results['orphaned_count']++;
+				$results['details'][] = "Orphaned cluster: {$clusterName}";
+			}
 		} catch (\Throwable $e) {
 			$results['error'] = $e->getMessage();
 		}
@@ -262,18 +271,19 @@ final class HealthMonitor {
 		try {
 			$queueTable = $this->cluster->getSystemTableName('system.sharding_queue');
 
-			$depthResult = $this->client->sendRequest("
+			$depthResult = $this->client->sendRequest(
+				"
 				SELECT COUNT(*) as count
 				FROM {$queueTable}
 				WHERE status IN ('created', 'processing')
-			");
+			"
+			);
 
 			/** @var array{0?:array{data?:array{0?:array{count:int}}}} */
 			$data = $depthResult->getResult();
 			$depth = $data[0]['data'][0]['count'] ?? 0;
 			$results['depth'] = $depth;
 			$results['high_depth'] = $depth > $results['threshold'];
-
 		} catch (\Throwable $e) {
 			$results['error'] = $e->getMessage();
 		}
@@ -292,10 +302,10 @@ final class HealthMonitor {
 		foreach ($health['issues'] as $issue) {
 			switch ($issue['type']) {
 				case 'stuck_operations':
-					$recommendations[] = "Reset stuck operations for tables: " . implode(', ', $issue['tables']);
+					$recommendations[] = 'Reset stuck operations for tables: ' . implode(', ', $issue['tables']);
 					break;
 				case 'failed_operations':
-					$recommendations[] = "Investigate and recover failed operations for tables: " . implode(', ', $issue['tables']);
+					$recommendations[] = 'Investigate and recover failed operations for tables: ' . implode(', ', $issue['tables']);
 					break;
 			}
 		}
@@ -312,7 +322,7 @@ final class HealthMonitor {
 		}
 
 		if (empty($recommendations)) {
-			$recommendations[] = "System is healthy - no actions needed";
+			$recommendations[] = 'System is healthy - no actions needed';
 		}
 
 		return $recommendations;

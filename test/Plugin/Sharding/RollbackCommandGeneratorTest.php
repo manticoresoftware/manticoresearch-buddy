@@ -23,23 +23,23 @@ class RollbackCommandGeneratorTest extends TestCase {
 	 */
 	public function testCreateTableRollback(): void {
 		// Test simple CREATE TABLE
-		$forward = "CREATE TABLE test_table (id bigint, name string)";
+		$forward = 'CREATE TABLE test_table (id bigint, name string)';
 		$rollback = RollbackCommandGenerator::generate($forward);
-		$this->assertEquals("DROP TABLE IF EXISTS test_table", $rollback);
+		$this->assertEquals('DROP TABLE IF EXISTS test_table', $rollback);
 
 		// Test CREATE TABLE IF NOT EXISTS
-		$forward = "CREATE TABLE IF NOT EXISTS test_table (id bigint)";
+		$forward = 'CREATE TABLE IF NOT EXISTS test_table (id bigint)';
 		$rollback = RollbackCommandGenerator::generate($forward);
-		$this->assertEquals("DROP TABLE IF EXISTS test_table", $rollback);
+		$this->assertEquals('DROP TABLE IF EXISTS test_table', $rollback);
 
 		// Test with backticks
-		$forward = "CREATE TABLE `test_table` (id bigint)";
+		$forward = 'CREATE TABLE `test_table` (id bigint)';
 		$rollback = RollbackCommandGenerator::generate($forward);
-		$this->assertEquals("DROP TABLE IF EXISTS test_table", $rollback);
+		$this->assertEquals('DROP TABLE IF EXISTS test_table', $rollback);
 
 		// Test specific method
-		$rollback = RollbackCommandGenerator::forCreateTable("test_table");
-		$this->assertEquals("DROP TABLE IF EXISTS test_table", $rollback);
+		$rollback = RollbackCommandGenerator::forCreateTable('test_table');
+		$this->assertEquals('DROP TABLE IF EXISTS test_table', $rollback);
 	}
 
 	/**
@@ -48,18 +48,18 @@ class RollbackCommandGeneratorTest extends TestCase {
 	 */
 	public function testCreateClusterRollback(): void {
 		// Test simple CREATE CLUSTER
-		$forward = "CREATE CLUSTER test_cluster";
+		$forward = 'CREATE CLUSTER test_cluster';
 		$rollback = RollbackCommandGenerator::generate($forward);
-		$this->assertEquals("DELETE CLUSTER test_cluster", $rollback);
+		$this->assertEquals('DELETE CLUSTER test_cluster', $rollback);
 
 		// Test CREATE CLUSTER IF NOT EXISTS
 		$forward = "CREATE CLUSTER IF NOT EXISTS test_cluster 'path'";
 		$rollback = RollbackCommandGenerator::generate($forward);
-		$this->assertEquals("DELETE CLUSTER test_cluster", $rollback);
+		$this->assertEquals('DELETE CLUSTER test_cluster', $rollback);
 
 		// Test specific method
-		$rollback = RollbackCommandGenerator::forCreateCluster("test_cluster");
-		$this->assertEquals("DELETE CLUSTER test_cluster", $rollback);
+		$rollback = RollbackCommandGenerator::forCreateCluster('test_cluster');
+		$this->assertEquals('DELETE CLUSTER test_cluster', $rollback);
 	}
 
 	/**
@@ -68,18 +68,18 @@ class RollbackCommandGeneratorTest extends TestCase {
 	 */
 	public function testAlterClusterAddRollback(): void {
 		// Test ALTER CLUSTER ADD
-		$forward = "ALTER CLUSTER test_cluster ADD test_table";
+		$forward = 'ALTER CLUSTER test_cluster ADD test_table';
 		$rollback = RollbackCommandGenerator::generate($forward);
-		$this->assertEquals("ALTER CLUSTER test_cluster DROP test_table", $rollback);
+		$this->assertEquals('ALTER CLUSTER test_cluster DROP test_table', $rollback);
 
 		// Test with backticks
-		$forward = "ALTER CLUSTER `test_cluster` ADD `test_table`";
+		$forward = 'ALTER CLUSTER `test_cluster` ADD `test_table`';
 		$rollback = RollbackCommandGenerator::generate($forward);
-		$this->assertEquals("ALTER CLUSTER test_cluster DROP test_table", $rollback);
+		$this->assertEquals('ALTER CLUSTER test_cluster DROP test_table', $rollback);
 
 		// Test specific method
-		$rollback = RollbackCommandGenerator::forAlterClusterAdd("test_cluster", "test_table");
-		$this->assertEquals("ALTER CLUSTER test_cluster DROP test_table", $rollback);
+		$rollback = RollbackCommandGenerator::forAlterClusterAdd('test_cluster', 'test_table');
+		$this->assertEquals('ALTER CLUSTER test_cluster DROP test_table', $rollback);
 	}
 
 	/**
@@ -88,13 +88,13 @@ class RollbackCommandGeneratorTest extends TestCase {
 	 */
 	public function testAlterClusterDropRollback(): void {
 		// Test ALTER CLUSTER DROP
-		$forward = "ALTER CLUSTER test_cluster DROP test_table";
+		$forward = 'ALTER CLUSTER test_cluster DROP test_table';
 		$rollback = RollbackCommandGenerator::generate($forward);
-		$this->assertEquals("ALTER CLUSTER test_cluster ADD test_table", $rollback);
+		$this->assertEquals('ALTER CLUSTER test_cluster ADD test_table', $rollback);
 
 		// Test specific method
-		$rollback = RollbackCommandGenerator::forAlterClusterDrop("test_cluster", "test_table");
-		$this->assertEquals("ALTER CLUSTER test_cluster ADD test_table", $rollback);
+		$rollback = RollbackCommandGenerator::forAlterClusterDrop('test_cluster', 'test_table');
+		$this->assertEquals('ALTER CLUSTER test_cluster ADD test_table', $rollback);
 	}
 
 	/**
@@ -105,11 +105,11 @@ class RollbackCommandGeneratorTest extends TestCase {
 		// Test JOIN CLUSTER
 		$forward = "JOIN CLUSTER test_cluster AT 'node1' 'path'";
 		$rollback = RollbackCommandGenerator::generate($forward);
-		$this->assertEquals("DELETE CLUSTER test_cluster", $rollback);
+		$this->assertEquals('DELETE CLUSTER test_cluster', $rollback);
 
 		// Test specific method
-		$rollback = RollbackCommandGenerator::forJoinCluster("test_cluster");
-		$this->assertEquals("DELETE CLUSTER test_cluster", $rollback);
+		$rollback = RollbackCommandGenerator::forJoinCluster('test_cluster');
+		$this->assertEquals('DELETE CLUSTER test_cluster', $rollback);
 	}
 
 	/**
@@ -118,12 +118,12 @@ class RollbackCommandGeneratorTest extends TestCase {
 	 */
 	public function testUnsupportedCommands(): void {
 		// DROP TABLE cannot be rolled back (data loss)
-		$forward = "DROP TABLE test_table";
+		$forward = 'DROP TABLE test_table';
 		$rollback = RollbackCommandGenerator::generate($forward);
 		$this->assertNull($rollback);
 
 		// DELETE CLUSTER cannot be rolled back
-		$forward = "DELETE CLUSTER test_cluster";
+		$forward = 'DELETE CLUSTER test_cluster';
 		$rollback = RollbackCommandGenerator::generate($forward);
 		$this->assertNull($rollback);
 
@@ -136,7 +136,7 @@ class RollbackCommandGeneratorTest extends TestCase {
 		$rollback = RollbackCommandGenerator::generate($forward);
 		$this->assertNull($rollback);
 
-		$forward = "DELETE FROM test_table WHERE id = 1";
+		$forward = 'DELETE FROM test_table WHERE id = 1';
 		$rollback = RollbackCommandGenerator::generate($forward);
 		$this->assertNull($rollback);
 	}
@@ -147,18 +147,18 @@ class RollbackCommandGeneratorTest extends TestCase {
 	 */
 	public function testBatchGeneration(): void {
 		$commands = [
-			"CREATE TABLE test1 (id bigint)",
-			"CREATE CLUSTER cluster1",
-			"ALTER CLUSTER cluster1 ADD test1",
-			"DROP TABLE test2",
+			'CREATE TABLE test1 (id bigint)',
+			'CREATE CLUSTER cluster1',
+			'ALTER CLUSTER cluster1 ADD test1',
+			'DROP TABLE test2',
 		];
 
 		$rollbacks = RollbackCommandGenerator::generateBatch($commands);
 
 		$this->assertCount(4, $rollbacks);
-		$this->assertEquals("DROP TABLE IF EXISTS test1", $rollbacks[0]);
-		$this->assertEquals("DELETE CLUSTER cluster1", $rollbacks[1]);
-		$this->assertEquals("ALTER CLUSTER cluster1 DROP test1", $rollbacks[2]);
+		$this->assertEquals('DROP TABLE IF EXISTS test1', $rollbacks[0]);
+		$this->assertEquals('DELETE CLUSTER cluster1', $rollbacks[1]);
+		$this->assertEquals('ALTER CLUSTER cluster1 DROP test1', $rollbacks[2]);
 		$this->assertNull($rollbacks[3]); // DROP TABLE cannot be rolled back
 	}
 
@@ -168,18 +168,18 @@ class RollbackCommandGeneratorTest extends TestCase {
 	 */
 	public function testSafetyCheck(): void {
 		// DDL operations are safe
-		$this->assertTrue(RollbackCommandGenerator::isSafeToRollback("CREATE TABLE test (id bigint)"));
-		$this->assertTrue(RollbackCommandGenerator::isSafeToRollback("ALTER CLUSTER test ADD table"));
-		$this->assertTrue(RollbackCommandGenerator::isSafeToRollback("JOIN CLUSTER test"));
+		$this->assertTrue(RollbackCommandGenerator::isSafeToRollback('CREATE TABLE test (id bigint)'));
+		$this->assertTrue(RollbackCommandGenerator::isSafeToRollback('ALTER CLUSTER test ADD table'));
+		$this->assertTrue(RollbackCommandGenerator::isSafeToRollback('JOIN CLUSTER test'));
 
 		// DROP operations are not safe
-		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback("DROP TABLE test"));
-		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback("DELETE CLUSTER test"));
+		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback('DROP TABLE test'));
+		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback('DELETE CLUSTER test'));
 
 		// DML operations are not safe
-		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback("INSERT INTO test VALUES (1)"));
-		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback("UPDATE test SET id = 2"));
-		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback("DELETE FROM test"));
+		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback('INSERT INTO test VALUES (1)'));
+		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback('UPDATE test SET id = 2'));
+		$this->assertFalse(RollbackCommandGenerator::isSafeToRollback('DELETE FROM test'));
 	}
 
 	/**
@@ -188,15 +188,15 @@ class RollbackCommandGeneratorTest extends TestCase {
 	 */
 	public function testIdentifierQuoting(): void {
 		// Test with special characters
-		$rollback = RollbackCommandGenerator::forCreateTable("test-table");
-		$this->assertEquals("DROP TABLE IF EXISTS `test-table`", $rollback);
+		$rollback = RollbackCommandGenerator::forCreateTable('test-table');
+		$this->assertEquals('DROP TABLE IF EXISTS `test-table`', $rollback);
 
 		// Test with reserved word
-		$rollback = RollbackCommandGenerator::forCreateTable("select");
-		$this->assertEquals("DROP TABLE IF EXISTS `select`", $rollback);
+		$rollback = RollbackCommandGenerator::forCreateTable('select');
+		$this->assertEquals('DROP TABLE IF EXISTS `select`', $rollback);
 
 		// Test normal identifier
-		$rollback = RollbackCommandGenerator::forCreateTable("test_table");
-		$this->assertEquals("DROP TABLE IF EXISTS test_table", $rollback);
+		$rollback = RollbackCommandGenerator::forCreateTable('test_table');
+		$this->assertEquals('DROP TABLE IF EXISTS test_table', $rollback);
 	}
 }

@@ -257,7 +257,7 @@ final class Table {
 				foreach ($row['shards'] as $shard) {
 					$connectedNodes = $this->getConnectedNodes(new Set([$shard]));
 
-					$clusterMap = $this->handleReplicationWithRollback(
+					$clusterMap = $this->handleReplication(
 						$row['node'],
 						$queue,
 						$connectedNodes,
@@ -273,7 +273,7 @@ final class Table {
 
 			// Now process all postponed pending tables to attach to each cluster
 			foreach ($clusterMap as $cluster) {
-				$cluster->processPendingTablesWithRollback($queue, $operationGroup);
+				$cluster->processPendingTables($queue, $operationGroup);
 			}
 
 			/** @var Set<int> */
@@ -283,8 +283,8 @@ final class Table {
 				$sql = $this->getCreateShardedTableSQL($shards);
 				$rollbackSql = RollbackCommandGenerator::forCreateDistributedTable($this->name);
 
-				// Use addWithRollback for atomic operations
-				$queueId = $queue->addWithRollback($node, $sql, $rollbackSql, $operationGroup);
+				// Use updated add method with rollback support
+				$queueId = $queue->add($node, $sql, $rollbackSql, $operationGroup);
 				$queueIds->add($queueId);
 			}
 
@@ -293,7 +293,6 @@ final class Table {
 			$result['status'] = 'success';
 
 			return $result;
-
 		} catch (\Throwable $t) {
 			// Rollback entire table creation on any failure
 			Buddy::debugvv("Table creation failed for {$this->name}, initiating rollback for group {$operationGroup}");
@@ -367,6 +366,7 @@ final class Table {
 	 * @param  Set<string>    $connectedNodes
 	 * @param  Map<string,Cluster>   $clusterMap
 	 * @param  int    $shard
+	 * @param  string|null $operationGroup Optional operation group for rollback
 	 * @return Map<string,Cluster> The cluster map that we use
 	 *  for session to maintain which nodes are connected
 	 *  and which cluster are processed already and who is the owner
@@ -376,65 +376,15 @@ final class Table {
 		Queue $queue,
 		Set $connectedNodes,
 		Map $clusterMap,
-		int $shard
+		int $shard,
+		?string $operationGroup = null
 	): Map {
 		// If no replication, add create table shard SQL to queue
 		if ($connectedNodes->count() === 1) {
 			$sql = $this->getCreateTableShardSQL($shard);
-			$queue->add($node, $sql);
-			return $clusterMap;
-		}
-
-		$clusterName = static::getClusterName($connectedNodes);
-		$hasCluster = isset($clusterMap[$clusterName]);
-		if ($hasCluster) {
-			$cluster = $clusterMap[$clusterName];
-		} else {
-			$cluster = new Cluster($this->client, $clusterName, $node);
-			$nodesToJoin = $connectedNodes->filter(
-				fn ($connectedNode) => $connectedNode !== $node
-			);
-			$clusterMap[$clusterName] = $cluster;
-			$waitForId = $cluster->create($queue);
-			$queue->setWaitForId($waitForId);
-			$cluster->addNodeIds($queue, ...$nodesToJoin);
-			$queue->resetWaitForId();
-		}
-
-		/** @var Cluster $cluster */
-		$table = $this->getShardName($shard);
-		if (!$cluster->hasPendingTable($table, TableOperation::Attach)) {
-			$cluster->addPendingTable($table, TableOperation::Attach);
-			$sql = $this->getCreateTableShardSQL($shard);
-			$queue->add($node, $sql);
-		}
-		return $clusterMap;
-	}
-
-	/**
-	 * Enhanced replication handling with rollback support
-	 * @param  string $node
-	 * @param  Queue  $queue
-	 * @param  Set<string>    $connectedNodes
-	 * @param  Map<string,Cluster>   $clusterMap
-	 * @param  int    $shard
-	 * @param  string $operationGroup
-	 * @return Map<string,Cluster>
-	 */
-	protected function handleReplicationWithRollback(
-		string $node,
-		Queue $queue,
-		Set $connectedNodes,
-		Map $clusterMap,
-		int $shard,
-		string $operationGroup
-	): Map {
-		// If no replication, add create table shard SQL to queue with rollback
-		if ($connectedNodes->count() === 1) {
-			$sql = $this->getCreateTableShardSQL($shard);
 			$shardName = $this->getShardName($shard);
 			$rollbackSql = RollbackCommandGenerator::forCreateTable($shardName);
-			$queue->addWithRollback($node, $sql, $rollbackSql, $operationGroup);
+			$queue->add($node, $sql, $rollbackSql, $operationGroup);
 			return $clusterMap;
 		}
 
@@ -448,9 +398,9 @@ final class Table {
 				fn ($connectedNode) => $connectedNode !== $node
 			);
 			$clusterMap[$clusterName] = $cluster;
-			$waitForId = $cluster->createWithRollback($queue, $operationGroup);
+			$waitForId = $cluster->create($queue, $operationGroup);
 			$queue->setWaitForId($waitForId);
-			$cluster->addNodeIdsWithRollback($queue, $operationGroup, ...$nodesToJoin);
+			$cluster->addNodeIds($queue, $operationGroup, ...$nodesToJoin);
 			$queue->resetWaitForId();
 		}
 
@@ -460,20 +410,14 @@ final class Table {
 			$cluster->addPendingTable($table, TableOperation::Attach);
 			$sql = $this->getCreateTableShardSQL($shard);
 			$rollbackSql = RollbackCommandGenerator::forCreateTable($table);
-			$queue->addWithRollback($node, $sql, $rollbackSql, $operationGroup);
+			$queue->add($node, $sql, $rollbackSql, $operationGroup);
 		}
 		return $clusterMap;
 	}
 
-	/**
-	 * Rollback failed table creation
-	 * @param string $operationGroup
-	 * @return bool Success status
-	 */
-	public function rollbackFailedSharding(string $operationGroup): bool {
-		$queue = new Queue($this->cluster, $this->client);
-		return $queue->rollbackOperationGroup($operationGroup);
-	}
+
+
+
 
 	/**
 	 * Rebalances the shards,
@@ -576,24 +520,24 @@ final class Table {
 				'message' => 'Graceful stop requested - will complete current operation',
 				'graceful' => true,
 			];
-		} else {
-			// Immediate stop with rollback
-			$operationGroup = $state->get("rebalance_group:{$this->name}");
-			if ($operationGroup) {
-				$queue = new Queue($this->cluster, $this->client);
-				$queue->rollbackOperationGroup($operationGroup);
-			}
-
-			$state->set($rebalanceKey, 'stopped');
-			$this->clearStopSignal();
-
-			return [
-				'status' => 'stopped',
-				'message' => 'Rebalancing stopped immediately with rollback',
-				'graceful' => false,
-				'rollback_executed' => true,
-			];
 		}
+
+		// Immediate stop with rollback
+		$operationGroup = $state->get("rebalance_group:{$this->name}");
+		if ($operationGroup) {
+			$queue = new Queue($this->cluster, $this->client);
+			$queue->rollbackOperationGroup($operationGroup);
+		}
+
+		$state->set($rebalanceKey, 'stopped');
+		$this->clearStopSignal();
+
+		return [
+			'status' => 'stopped',
+			'message' => 'Rebalancing stopped immediately with rollback',
+			'graceful' => false,
+			'rollback_executed' => true,
+		];
 	}
 
 	/**
@@ -727,7 +671,7 @@ final class Table {
 			// Store error information for debugging
 			$errorInfo = [
 				'error_message' => $error->getMessage(),
-				'error_type' => get_class($error),
+				'error_type' => $error::class,
 				'failed_at' => time(),
 				'operation_group' => $operationGroup,
 				'rollback_executed' => $operationGroup ? true : false,
@@ -739,16 +683,19 @@ final class Table {
 			// Clear stop signal if set
 			$this->clearStopSignal();
 
-			Buddy::debugvv("Rebalancing failed for table {$this->name}: " . $error->getMessage() .
-						  " (Rollback " . ($rollbackSuccess ? "successful" : "failed") . ")");
-
+			Buddy::debugvv(
+				"Rebalancing failed for table {$this->name}: " . $error->getMessage() .
+				' (Rollback ' . ($rollbackSuccess ? 'successful' : 'failed') . ')'
+			);
 		} catch (\Throwable $rollbackError) {
 			// Rollback itself failed - critical situation
 			$state->set($rebalanceKey, 'critical_failure');
 
-			Buddy::debugvv("CRITICAL: Rebalancing AND rollback failed for table {$this->name}. " .
-						  "Original error: " . $error->getMessage() .
-						  " Rollback error: " . $rollbackError->getMessage());
+			Buddy::debugvv(
+				"CRITICAL: Rebalancing AND rollback failed for table {$this->name}. " .
+						  'Original error: ' . $error->getMessage() .
+				' Rollback error: ' . $rollbackError->getMessage()
+			);
 		}
 
 		// Re-throw original error for upstream handling
@@ -764,7 +711,7 @@ final class Table {
 		$table = $this->cluster->getSystemTableName('system.sharding_queue');
 
 		$query = "
-			SELECT 
+			SELECT
 				COUNT(*) as total,
 				SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) as completed,
 				SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as failed,
