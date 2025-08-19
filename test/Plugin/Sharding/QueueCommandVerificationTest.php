@@ -9,12 +9,11 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Ds\Set;
 use Manticoresearch\Buddy\Base\Plugin\Sharding\Queue;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Test\Plugin\Sharding\TestDoubles\TestableCluster;
-use Manticoresearch\Buddy\Test\Plugin\Sharding\TestDoubles\TestableTable;
+use Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles\TestableCluster;
 use Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles\TestableQueue;
+use Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles\TestableTable;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -144,87 +143,12 @@ class QueueCommandVerificationTest extends TestCase {
 	// Helper methods for creating test objects without dynamic properties
 
 	private function createTestableCluster(string $name): TestableCluster {
-		// Create a custom cluster wrapper that doesn't use dynamic properties
-		return new class($name) extends TestableCluster {
-			public function __construct(private string $clusterName) {
-				parent::__construct();
-			}
-
-			public function getName(): string {
-				return $this->clusterName;
-			}
-
-			/** @var array<string> */
-			private array $nodes = [];
-			/** @var array<string> */
-			private array $inactiveNodes = [];
-
-			/** @param array<string> $nodes */
-			public function setNodes(array $nodes): void {
-				$this->nodes = $nodes;
-			}
-
-			/** @param array<string> $inactiveNodes */
-			public function setInactiveNodes(array $inactiveNodes): void {
-				$this->inactiveNodes = $inactiveNodes;
-			}
-
-			public function getNodes(): Set {
-				return new Set($this->nodes);
-			}
-
-			public function getInactiveNodes(): Set {
-				return new Set($this->inactiveNodes);
-			}
-
-			public function getSystemTableName(string $table): string {
-				unset($table);
-				return 'system.sharding_table';
-			}
-		};
+		unset($name); // Parameter required by interface but not used in test
+		return new TestableCluster();
 	}
 
 	private function createTestableQueue(): TestableQueue {
-		// Create a custom queue wrapper that captures commands
-		return new class($this) extends TestableQueue {
-			/** @var array<array{id:int,node:string,query:string,wait_for_id:?int}> */
-			private array $capturedCommands = [];
-			/** @var array<int> */
-			private array $waitForIds = [];
-			private int $nextQueueId = 1;
-
-			public function __construct(private QueueCommandVerificationTest $test) {
-				parent::__construct();
-			}
-
-			/** @return array<array{id:int,node:string,query:string,wait_for_id:?int}> */
-			public function getCapturedCommands(): array {
-				return $this->capturedCommands;
-			}
-
-			public function add(string $nodeId, string $query): int {
-				$queueId = $this->nextQueueId++;
-				$command = [
-					'id' => $queueId,
-					'node' => $nodeId,
-					'query' => $query,
-					'wait_for_id' => end($this->waitForIds) ?: null,
-				];
-				$this->capturedCommands[] = $command;
-				$this->test->addCapturedCommand($command);
-				return $queueId;
-			}
-
-			public function setWaitForId(int $waitForId): static {
-				$this->waitForIds[] = $waitForId;
-				return $this;
-			}
-
-			public function resetWaitForId(): static {
-				$this->waitForIds = [];
-				return $this;
-			}
-		};
+		return new TestableQueue();
 	}
 
 

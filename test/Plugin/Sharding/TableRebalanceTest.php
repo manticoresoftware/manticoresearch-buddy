@@ -12,7 +12,7 @@
 use Ds\Set;
 use Ds\Vector;
 use Manticoresearch\Buddy\Base\Plugin\Sharding\Util;
-use Manticoresearch\Buddy\Test\Plugin\Sharding\TestDoubles\TestableCluster;
+use Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles\TestableCluster;
 use Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles\TestableQueue;
 use Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles\TestableTable;
 use PHPUnit\Framework\TestCase;
