@@ -162,7 +162,7 @@ final class Payload extends BasePayload {
 		$additionalQueries = [];
 
 		// Find the position of the first semicolon
-		$firstSemicolonPos = strpos($query, ';', strripos($query, ' option ') ?: 0) ?: 0;
+		$firstSemicolonPos = strpos($query, ';', strripos($query, ' where ') ?: 0) ?: 0;
 
 		// If a semicolon exists
 		if ($firstSemicolonPos > 0) {
@@ -213,9 +213,9 @@ final class Payload extends BasePayload {
 				'/MATCH\s*\(\'(.*?)\'\)/ius',
 				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
-				'/option,(?!.*option|.*from)/ius',
 				'/\soption(?!.*option|.*from)/ius',
 				'/\s*,\s*facet\s+/ius',
+				'/option\s+facet/ius',
 				],
 			[
 				'MATCH(\'%s\')',
@@ -224,6 +224,7 @@ final class Payload extends BasePayload {
 				' ',
 				' option ',
 				' facet ',
+				'facet',
 			],
 			$payload
 		);
@@ -240,6 +241,7 @@ final class Payload extends BasePayload {
 		}
 		Buddy::debug("Fuzzy: match: $match");
 		$queries = [sprintf($template, $match), ...$this->queries];
+		var_dump($queries);
 		return implode(';', $queries);
 	}
 
