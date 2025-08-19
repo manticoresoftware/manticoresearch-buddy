@@ -66,16 +66,16 @@ $command = [
 The queue system uses `wait_for_id` to ensure proper command ordering:
 
 ```php
-// Command A
-$idA = $queue->add($node, "COMMAND A");
+// Command A with mandatory rollback
+$idA = $queue->add($node, "COMMAND A", "ROLLBACK A", $operationGroup);
 
 // Command B waits for A to complete
 $queue->setWaitForId($idA);
-$idB = $queue->add($node, "COMMAND B");
+$idB = $queue->add($node, "COMMAND B", "ROLLBACK B", $operationGroup);
 
 // Command C waits for B to complete
 $queue->setWaitForId($idB);
-$idC = $queue->add($node, "COMMAND C");
+$idC = $queue->add($node, "COMMAND C", "ROLLBACK C", $operationGroup);
 
 // Reset dependencies for independent commands
 $queue->resetWaitForId();
@@ -85,19 +85,19 @@ $queue->resetWaitForId();
 
 ### Adding Commands with Rollback
 
-The queue system now supports adding commands with automatic rollback:
+All queue commands now require explicit rollback commands:
 
 ```php
-// Add command with automatic rollback generation
-$queue->addWithRollback(
+// Add command with explicit rollback (rollback is mandatory)
+$queue->add(
     $nodeId,
     "CREATE TABLE users_s0 (id bigint)",
-    null,  // Auto-generate rollback
+    "DROP TABLE IF EXISTS users_s0",  // Explicit rollback required
     $operationGroup
 );
 
-// Add command with explicit rollback
-$queue->addWithRollback(
+// Add cluster command with rollback
+$queue->add(
     $nodeId,
     "ALTER CLUSTER c1 ADD users_s0",
     "ALTER CLUSTER c1 DROP users_s0",  // Explicit rollback
@@ -112,10 +112,10 @@ Related commands are grouped for atomic execution:
 ```php
 $operationGroup = "shard_create_users_" . uniqid();
 
-// All commands in the same group
-$queue->addWithRollback($node1, $cmd1, $rollback1, $operationGroup);
-$queue->addWithRollback($node2, $cmd2, $rollback2, $operationGroup);
-$queue->addWithRollback($node3, $cmd3, $rollback3, $operationGroup);
+// All commands in the same group (rollback required for each)
+$queue->add($node1, $cmd1, $rollback1, $operationGroup);
+$queue->add($node2, $cmd2, $rollback2, $operationGroup);
+$queue->add($node3, $cmd3, $rollback3, $operationGroup);
 
 // On failure, rollback entire group
 if ($error) {
@@ -177,39 +177,41 @@ protected function moveShardWithIntermediateCluster(
     $tempClusterName = "temp_move_{$shardId}_" . uniqid();
 
     // Step 1: Create shard table on target node
-    $createQueueId = $queue->add($targetNode, $this->getCreateTableShardSQL($shardId));
+    $createQueueId = $queue->add($targetNode, $this->getCreateTableShardSQL($shardId), "DROP TABLE IF EXISTS {$shardName}");
 
     // Step 2: Create temporary cluster on SOURCE node (where the data IS)
     // CRITICAL: Use cluster name as path to ensure uniqueness
     $clusterQueueId = $queue->add(
         $sourceNode,
-        "CREATE CLUSTER {$tempClusterName} '{$tempClusterName}' as path"
+        "CREATE CLUSTER {$tempClusterName} '{$tempClusterName}' as path",
+        "DELETE CLUSTER {$tempClusterName}"
     );
 
     // Step 3: Add shard to cluster on SOURCE node FIRST (before JOIN)
     $queue->setWaitForId($clusterQueueId);
-    $queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} ADD {$shardName}");
+    $queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} ADD {$shardName}", "ALTER CLUSTER {$tempClusterName} DROP {$shardName}");
 
     // Step 4: TARGET node joins the cluster that SOURCE created
     // Wait for table creation on target node to complete first
     $queue->setWaitForId($createQueueId);
     $joinQueueId = $queue->add(
         $targetNode,
-        "JOIN CLUSTER {$tempClusterName} AT '{$sourceNode}' '{$tempClusterName}' as path"
+        "JOIN CLUSTER {$tempClusterName} AT '{$sourceNode}' '{$tempClusterName}' as path",
+        "DELETE CLUSTER {$tempClusterName}"
     );
 
     // Step 5: CRITICAL - Wait for JOIN to complete (data is now synced)
     // JOIN CLUSTER is synchronous, so once it's processed, data is fully copied
     $queue->setWaitForId($joinQueueId);
-    $dropQueueId = $queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} DROP {$shardName}");
+    $dropQueueId = $queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} DROP {$shardName}", "ALTER CLUSTER {$tempClusterName} ADD {$shardName}");
 
     // Step 6: Only after DROP from cluster, remove the table from source
     $queue->setWaitForId($dropQueueId);
-    $deleteQueueId = $queue->add($sourceNode, "DROP TABLE {$shardName}");
+    $deleteQueueId = $queue->add($sourceNode, "DROP TABLE {$shardName}", "");
 
     // Step 7: Clean up temporary cluster ONLY on SOURCE node after all operations complete
     $queue->setWaitForId($deleteQueueId);
-    return $queue->add($sourceNode, "DELETE CLUSTER {$tempClusterName}");
+    return $queue->add($sourceNode, "DELETE CLUSTER {$tempClusterName}", "");
 }
 ```
 
@@ -253,7 +255,7 @@ protected function handleRFNNewNodes(Queue $queue, Vector $schema, Vector $newSc
 
         foreach ($shardsForNewNode as $shard) {
             // Create shard table on new node
-            $queue->add($newNode, $this->getCreateTableShardSQL($shard));
+            $queue->add($newNode, $this->getCreateTableShardSQL($shard), "DROP TABLE IF EXISTS {$shardName}");
 
             // Set up replication (no wait needed - parallel creation)
             $existingNodes = $this->getExistingNodesForShard($schema, $shard);
@@ -261,7 +263,7 @@ protected function handleRFNNewNodes(Queue $queue, Vector $schema, Vector $newSc
             $primaryNode = $existingNodes->first();
 
             // Use existing cluster replication mechanism
-            $this->handleReplication($primaryNode, $queue, $connectedNodes, $clusterMap, $shard);
+            $this->handleReplication($primaryNode, $queue, $connectedNodes, $clusterMap, $shard, $operationGroup);
         }
     }
 }
@@ -279,7 +281,7 @@ protected function createDistributedTablesFromSchema(Queue $queue, Vector $newSc
     // Phase 1: Drop all distributed tables with proper force option
     foreach ($newSchema as $row) {
         $sql = "DROP TABLE IF EXISTS {$this->name} OPTION force=1";
-        $queueId = $queue->add($row['node'], $sql);
+        $queueId = $queue->add($row['node'], $sql, "");
         $dropQueueIds->add($queueId);
     }
 
@@ -297,7 +299,7 @@ protected function createDistributedTablesFromSchema(Queue $queue, Vector $newSc
         }
 
         $sql = $this->getCreateShardedTableSQLWithSchema($row['shards'], $newSchema);
-        $queue->add($row['node'], $sql);
+        $queue->add($row['node'], $sql, "DROP TABLE IF EXISTS {$this->name}");
     }
 
     // Reset wait dependencies
@@ -310,14 +312,16 @@ protected function createDistributedTablesFromSchema(Queue $queue, Vector $newSc
 ### Queue Command Addition
 
 ```php
-public function add(string $nodeId, string $query): int {
+public function add(string $nodeId, string $query, string $rollbackQuery, ?string $operationGroup = null): int {
     $queueId = $this->generateNextId();
 
     $command = [
         'id' => $queueId,
         'node' => $nodeId,
         'query' => $query,
+        'rollback_query' => $rollbackQuery,
         'wait_for_id' => $this->currentWaitForId,
+        'operation_group' => $operationGroup ?? '',
         'created_at' => time(),
         'status' => 'pending',
     ];
@@ -373,14 +377,14 @@ public function process(Node $node): void {
 When operations must be strictly ordered:
 
 ```php
-// Pattern: Each operation waits for the previous to complete
-$step1Id = $queue->add($node, "STEP 1 COMMAND");
+// Pattern: Each operation waits for the previous to complete (rollback required)
+$step1Id = $queue->add($node, "STEP 1 COMMAND", "STEP 1 ROLLBACK");
 
 $queue->setWaitForId($step1Id);
-$step2Id = $queue->add($node, "STEP 2 COMMAND");
+$step2Id = $queue->add($node, "STEP 2 COMMAND", "STEP 2 ROLLBACK");
 
 $queue->setWaitForId($step2Id);
-$step3Id = $queue->add($node, "STEP 3 COMMAND");
+$step3Id = $queue->add($node, "STEP 3 COMMAND", "STEP 3 ROLLBACK");
 
 $queue->resetWaitForId();
 ```
@@ -390,18 +394,18 @@ $queue->resetWaitForId();
 When some operations can run in parallel but must converge:
 
 ```php
-// Phase 1: Parallel operations
+// Phase 1: Parallel operations (rollback required for each)
 $queue->resetWaitForId(); // Ensure no dependencies
-$parallel1Id = $queue->add($node1, "PARALLEL COMMAND 1");
-$parallel2Id = $queue->add($node2, "PARALLEL COMMAND 2");
-$parallel3Id = $queue->add($node3, "PARALLEL COMMAND 3");
+$parallel1Id = $queue->add($node1, "PARALLEL COMMAND 1", "PARALLEL ROLLBACK 1");
+$parallel2Id = $queue->add($node2, "PARALLEL COMMAND 2", "PARALLEL ROLLBACK 2");
+$parallel3Id = $queue->add($node3, "PARALLEL COMMAND 3", "PARALLEL ROLLBACK 3");
 
 // Phase 2: Wait for all parallel operations to complete
 $maxParallelId = max($parallel1Id, $parallel2Id, $parallel3Id);
 $queue->setWaitForId($maxParallelId);
 
 // Phase 3: Sequential operations that depend on all parallel operations
-$finalStepId = $queue->add($node1, "FINAL COMMAND");
+$finalStepId = $queue->add($node1, "FINAL COMMAND", "FINAL ROLLBACK");
 ```
 
 ### Cross-Node Synchronization
@@ -409,16 +413,16 @@ $finalStepId = $queue->add($node1, "FINAL COMMAND");
 When operations on different nodes must be coordinated:
 
 ```php
-// Node A prepares
-$prepareId = $queue->add($nodeA, "PREPARE OPERATION");
+// Node A prepares (rollback required)
+$prepareId = $queue->add($nodeA, "PREPARE OPERATION", "PREPARE ROLLBACK");
 
 // Node B waits for Node A to prepare, then joins
 $queue->setWaitForId($prepareId);
-$joinId = $queue->add($nodeB, "JOIN OPERATION");
+$joinId = $queue->add($nodeB, "JOIN OPERATION", "JOIN ROLLBACK");
 
 // Node A waits for Node B to join, then finalizes
 $queue->setWaitForId($joinId);
-$finalizeId = $queue->add($nodeA, "FINALIZE OPERATION");
+$finalizeId = $queue->add($nodeA, "FINALIZE OPERATION", "FINALIZE ROLLBACK");
 ```
 
 ## Error Handling in Queue Operations
