@@ -35,9 +35,24 @@ final class QueueRollbackIntegrationTest extends TestCase {
 		// This simulates what would happen during table shard creation
 
 		// Add some typical table creation commands with rollback
-		$this->queue->add('node1', 'CREATE TABLE test_s0 (id bigint)', 'DROP TABLE IF EXISTS test_s0', 'shard_create_test');
-		$this->queue->add('node1', 'CREATE TABLE test_s1 (id bigint)', 'DROP TABLE IF EXISTS test_s1', 'shard_create_test');
-		$this->queue->add('node1', 'CREATE TABLE test type=\'distributed\' local=\'test_s0,test_s1\'', 'DROP TABLE IF EXISTS test', 'shard_create_test');
+		$this->queue->add(
+			'node1',
+			'CREATE TABLE test_s0 (id bigint)',
+			'DROP TABLE IF EXISTS test_s0',
+			'shard_create_test'
+		);
+		$this->queue->add(
+			'node1',
+			'CREATE TABLE test_s1 (id bigint)',
+			'DROP TABLE IF EXISTS test_s1',
+			'shard_create_test'
+		);
+		$this->queue->add(
+			'node1',
+			'CREATE TABLE test type=\'distributed\' local=\'test_s0,test_s1\'',
+			'DROP TABLE IF EXISTS test',
+			'shard_create_test'
+		);
 
 		// Verify queue has commands with rollback
 		$commands = $this->queue->getCapturedCommands();
@@ -92,7 +107,12 @@ final class QueueRollbackIntegrationTest extends TestCase {
 		// Add multiple commands with same operation group
 		$this->queue->add('node1', 'CREATE TABLE test_s0 (id bigint)', 'DROP TABLE IF EXISTS test_s0', $operationGroup);
 		$this->queue->add('node1', 'CREATE TABLE test_s1 (id bigint)', 'DROP TABLE IF EXISTS test_s1', $operationGroup);
-		$this->queue->add('node1', 'CREATE TABLE test type=\'distributed\'', 'DROP TABLE IF EXISTS test', $operationGroup);
+		$this->queue->add(
+			'node1',
+			'CREATE TABLE test type=\'distributed\'',
+			'DROP TABLE IF EXISTS test',
+			$operationGroup
+		);
 
 		// Verify all commands have the same operation group
 		$commands = $this->queue->getCapturedCommands();
@@ -133,13 +153,21 @@ final class QueueRollbackIntegrationTest extends TestCase {
 			['node2', 'JOIN CLUSTER temp_move_0_123', 'DELETE CLUSTER temp_move_0_123'],
 
 			// Complete the move
-			['node1', 'ALTER CLUSTER temp_move_0_123 DROP test_s0', 'ALTER CLUSTER temp_move_0_123 ADD test_s0'],
+			[
+				'node1',
+				'ALTER CLUSTER temp_move_0_123 DROP test_s0',
+				'ALTER CLUSTER temp_move_0_123 ADD test_s0',
+			],
 			['node1', 'DROP TABLE test_s0', ''], // Original shard removal (destructive)
 			['node1', 'DELETE CLUSTER temp_move_0_123', ''], // Cleanup (destructive)
 
 			// Update distributed table
 			['node1', 'DROP TABLE test', ''],
-			['node1', 'CREATE TABLE test type=\'distributed\' local=\'test_s1\' agent=\'node2:test_s0\'', 'DROP TABLE IF EXISTS test'],
+			[
+				'node1',
+				'CREATE TABLE test type=\'distributed\' local=\'test_s1\' agent=\'node2:test_s0\'',
+				'DROP TABLE IF EXISTS test',
+			],
 		];
 
 		foreach ($rebalanceCommands as [$node, $query, $rollback]) {
@@ -148,7 +176,7 @@ final class QueueRollbackIntegrationTest extends TestCase {
 
 		// Verify rebalancing commands have proper rollback
 		$commands = $this->queue->getCapturedCommands();
-		$this->assertCount(count($rebalanceCommands), $commands);
+		$this->assertCount(sizeof($rebalanceCommands), $commands);
 
 		// Check for shard movement commands with rollback
 		$shardMovementCommands = array_filter(
@@ -195,9 +223,9 @@ final class QueueRollbackIntegrationTest extends TestCase {
 		}
 
 		$commands = $this->queue->getCapturedCommands();
-		$this->assertCount(count($testOperations), $commands);
+		$this->assertCount(sizeof($testOperations), $commands);
 
-		for ($i = 0; $i < count($testOperations); $i++) {
+		for ($i = 0; $i < sizeof($testOperations); $i++) {
 			$this->assertEquals($testOperations[$i][0], $commands[$i]['query']);
 			$this->assertEquals($testOperations[$i][1], $commands[$i]['rollback_query']);
 		}
@@ -253,7 +281,10 @@ final class QueueRollbackIntegrationTest extends TestCase {
 			['DELETE CLUSTER temp_cluster', ''],
 
 			// Complex operations
-			['CREATE TABLE distributed_users type=\'distributed\' local=\'users\'', 'DROP TABLE IF EXISTS distributed_users'],
+			[
+				'CREATE TABLE distributed_users type=\'distributed\' local=\'users\'',
+				'DROP TABLE IF EXISTS distributed_users',
+			],
 		];
 
 		foreach ($commands as [$query, $rollback]) {
@@ -261,7 +292,7 @@ final class QueueRollbackIntegrationTest extends TestCase {
 		}
 
 		$capturedCommands = $this->queue->getCapturedCommands();
-		$this->assertCount(count($commands), $capturedCommands);
+		$this->assertCount(sizeof($commands), $capturedCommands);
 
 		// Verify rollback patterns
 		foreach ($capturedCommands as $i => $command) {
