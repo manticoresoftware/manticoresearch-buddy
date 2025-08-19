@@ -52,24 +52,24 @@ final class RollbackCommandGenerator {
 
 		// DROP TABLE -> Cannot rollback (data loss)
 		if (preg_match('/^DROP\s+TABLE/i', $upperCommand)) {
-			Buddy::debugvv("Cannot generate rollback for DROP TABLE - would require data restoration");
+			Buddy::debugvv('Cannot generate rollback for DROP TABLE - would require data restoration');
 			return null;
 		}
 
 		// DELETE CLUSTER -> Cannot rollback (would need original cluster definition)
 		if (preg_match('/^DELETE\s+CLUSTER/i', $upperCommand)) {
-			Buddy::debugvv("Cannot generate rollback for DELETE CLUSTER - would require original definition");
+			Buddy::debugvv('Cannot generate rollback for DELETE CLUSTER - would require original definition');
 			return null;
 		}
 
 		// INSERT/UPDATE/DELETE -> Cannot rollback (would need original data)
 		if (preg_match('/^(INSERT|UPDATE|DELETE)\s+/i', $upperCommand)) {
-			Buddy::debugvv("Cannot generate rollback for DML operations - would require data backup");
+			Buddy::debugvv('Cannot generate rollback for DML operations - would require data backup');
 			return null;
 		}
 
 		// Unknown command type
-		Buddy::debugvv("No rollback pattern for command: " . substr($command, 0, 50));
+		Buddy::debugvv('No rollback pattern for command: ' . substr($command, 0, 50));
 		return null;
 	}
 
