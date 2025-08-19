@@ -17,7 +17,7 @@ final class HealthMonitor {
 
 	/**
 	 * Perform comprehensive health check
-	 * @return array Health status
+	 * @return array{overall_status: string, timestamp: int, checks: array<string, mixed>, issues: array<mixed>, warnings: array<mixed>, recommendations: array<string>} Health status
 	 */
 	public function performHealthCheck(): array {
 		$health = [
@@ -83,7 +83,7 @@ final class HealthMonitor {
 
 	/**
 	 * Attempt automatic recovery for detected issues
-	 * @return array Recovery results
+	 * @return array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} Recovery results
 	 */
 	public function performAutoRecovery(): array {
 		$results = [
@@ -109,8 +109,8 @@ final class HealthMonitor {
 
 	/**
 	 * Process health issues and attempt recovery
-	 * @param array $issues
-	 * @param array &$results
+	 * @param array<mixed> $issues
+	 * @param array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} &$results
 	 */
 	private function processHealthIssues(array $issues, array &$results): void {
 		foreach ($issues as $issue) {
@@ -124,8 +124,8 @@ final class HealthMonitor {
 
 	/**
 	 * Recover stuck operations for given tables
-	 * @param array $tables
-	 * @param array &$results
+	 * @param array<string> $tables
+	 * @param array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} &$results
 	 */
 	private function recoverStuckOperations(array $tables, array &$results): void {
 		foreach ($tables as $tableName) {
@@ -144,8 +144,8 @@ final class HealthMonitor {
 
 	/**
 	 * Recover failed operations for given tables
-	 * @param array $tables
-	 * @param array &$results
+	 * @param array<string> $tables
+	 * @param array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} &$results
 	 */
 	private function recoverFailedOperations(array $tables, array &$results): void {
 		foreach ($tables as $tableName) {
@@ -164,8 +164,8 @@ final class HealthMonitor {
 
 	/**
 	 * Perform cleanup if warnings exist
-	 * @param array $warnings
-	 * @param array &$results
+	 * @param array<mixed> $warnings
+	 * @param array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} &$results
 	 */
 	private function performCleanupIfNeeded(array $warnings, array &$results): void {
 		if (empty($warnings)) {
@@ -180,7 +180,7 @@ final class HealthMonitor {
 
 	/**
 	 * Check for stuck rebalancing operations
-	 * @return array Check results
+	 * @return array{stuck_tables: array<string>, check_time: int, error?: string} Check results
 	 */
 	private function checkStuckOperations(): array {
 		$results = ['stuck_tables' => [], 'check_time' => time()];
@@ -223,7 +223,7 @@ final class HealthMonitor {
 
 	/**
 	 * Check for failed operations
-	 * @return array Check results
+	 * @return array{failed_tables: array<string>, check_time: int, error?: string} Check results
 	 */
 	private function checkFailedOperations(): array {
 		$results = ['failed_tables' => [], 'check_time' => time()];
@@ -262,7 +262,7 @@ final class HealthMonitor {
 
 	/**
 	 * Check for orphaned resources
-	 * @return array Check results
+	 * @return array{orphaned_count: int, details: array<string>, check_time: int, error?: string} Check results
 	 */
 	private function checkOrphanedResources(): array {
 		$results = ['orphaned_count' => 0, 'details' => [], 'check_time' => time()];
@@ -275,7 +275,7 @@ final class HealthMonitor {
 			$clusters = $data[0]['data'] ?? [];
 
 			foreach ($clusters as $cluster) {
-				$clusterName = $cluster['cluster'] ?? '';
+			$clusterName = $cluster['cluster'];
 				if (strpos($clusterName, 'temp_move_') !== 0) {
 					continue;
 				}
@@ -292,7 +292,7 @@ final class HealthMonitor {
 
 	/**
 	 * Check queue health
-	 * @return array Check results
+	 * @return array{depth: int, threshold: int, high_depth: bool, check_time: int, error?: string} Check results
 	 */
 	private function checkQueueHealth(): array {
 		$results = ['depth' => 0, 'threshold' => 100, 'high_depth' => false, 'check_time' => time()];
@@ -322,8 +322,8 @@ final class HealthMonitor {
 
 	/**
 	 * Generate recommendations based on health check
-	 * @param array $health
-	 * @return array Recommendations
+	 * @param array{overall_status: string, timestamp: int, checks: array<string, mixed>, issues: array<mixed>, warnings: array<mixed>, recommendations: array<string>} $health
+	 * @return array<string> Recommendations
 	 */
 	private function generateRecommendations(array $health): array {
 		$recommendations = [];
@@ -361,7 +361,7 @@ final class HealthMonitor {
 	/**
 	 * Recover stuck operation
 	 * @param string $tableName
-	 * @return array Recovery result
+	 * @return array{success: bool, message?: string, error?: string} Recovery result
 	 */
 	private function recoverStuckOperation(string $tableName): array {
 		try {
@@ -377,7 +377,7 @@ final class HealthMonitor {
 	/**
 	 * Recover failed operation
 	 * @param string $tableName
-	 * @return array Recovery result
+	 * @return array{success: bool, message?: string, error?: string} Recovery result
 	 */
 	private function recoverFailedOperation(string $tableName): array {
 		try {

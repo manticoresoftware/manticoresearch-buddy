@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 final class QueueRollbackIntegrationTest extends TestCase {
 
 	private TestableQueue $queue;
+
 	private TestableTable $table;
 
 	protected function setUp(): void {
