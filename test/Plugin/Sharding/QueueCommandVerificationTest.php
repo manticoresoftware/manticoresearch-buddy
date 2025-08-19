@@ -273,23 +273,24 @@ class QueueCommandVerificationTest extends TestCase {
 			/** @param Queue|TestableQueue $queue */
 			private function generateRF1Commands(Queue|TestableQueue $queue): void {
 				// RF=1 commands with intermediate clusters for shard movement
-				$queue->add('127.0.0.1:3312', "CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'");
-				$queue->add('127.0.0.1:3312', "CREATE TABLE IF NOT EXISTS test_table_s1 (id bigint) type='rt'");
+				$queue->add('127.0.0.1:3312', "CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'", '');
+				$queue->add('127.0.0.1:3312', "CREATE TABLE IF NOT EXISTS test_table_s1 (id bigint) type='rt'", '');
 
 				// Intermediate cluster for shard movement (RF=1 specific)
-				$queue->add('127.0.0.1:1312', "CREATE CLUSTER temp_move_test_cluster 'temp_move_test_cluster' as path");
-				$queue->add('127.0.0.1:3312', "JOIN CLUSTER temp_move_test_cluster at '127.0.0.1:1312'");
-				$queue->add('127.0.0.1:1312', 'ALTER CLUSTER temp_move_test_cluster ADD test_table_s0');
-				$queue->add('127.0.0.1:1312', 'ALTER CLUSTER temp_move_test_cluster DROP test_table_s0');
-				$queue->add('127.0.0.1:1312', 'DROP TABLE test_table_s0');
-				$queue->add('127.0.0.1:1312', 'DELETE CLUSTER temp_move_test_cluster');
+				$queue->add('127.0.0.1:1312', "CREATE CLUSTER temp_move_test_cluster 'temp_move_test_cluster' as path", '');
+				$queue->add('127.0.0.1:3312', "JOIN CLUSTER temp_move_test_cluster at '127.0.0.1:1312'", '');
+				$queue->add('127.0.0.1:1312', 'ALTER CLUSTER temp_move_test_cluster ADD test_table_s0', '');
+				$queue->add('127.0.0.1:1312', 'ALTER CLUSTER temp_move_test_cluster DROP test_table_s0', '');
+				$queue->add('127.0.0.1:1312', 'DROP TABLE test_table_s0', '');
+				$queue->add('127.0.0.1:1312', 'DELETE CLUSTER temp_move_test_cluster', '');
 
 				// Recreate distributed table
-				$queue->add('127.0.0.1:1312', 'DROP TABLE test_table');
+				$queue->add('127.0.0.1:1312', 'DROP TABLE test_table', '');
 				$queue->add(
 					'127.0.0.1:1312',
 					"CREATE TABLE test_table type='distributed' local='test_table_s1' " .
-					"agent='127.0.0.1:3312:test_table_s0'"
+					"agent='127.0.0.1:3312:test_table_s0'",
+					''
 				);
 
 				echo "DEBUG: Generated RF=1 commands with intermediate clusters\n";
@@ -298,18 +299,19 @@ class QueueCommandVerificationTest extends TestCase {
 			/** @param Queue|TestableQueue $queue */
 			private function generateRF2Commands(Queue|TestableQueue $queue): void {
 				// RF=2 commands - just add replicas, no intermediate clusters
-				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'");
-				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s1 (id bigint) type='rt'");
-				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'");
-				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s3 (id bigint) type='rt'");
+				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'", '');
+				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s1 (id bigint) type='rt'", '');
+				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'", '');
+				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s3 (id bigint) type='rt'", '');
 
 				// No intermediate clusters for RF>=2, just setup replication
 				// Recreate distributed table with new node
-				$queue->add('node1', 'DROP TABLE test_table');
+				$queue->add('node1', 'DROP TABLE test_table', '');
 				$queue->add(
 					'node1',
 					"CREATE TABLE test_table type='distributed' local='test_table_s0,test_table_s1' " .
-					"agent='node2:test_table_s0,test_table_s1' agent='node3:test_table_s0,test_table_s1'"
+					"agent='node2:test_table_s0,test_table_s1' agent='node3:test_table_s0,test_table_s1'",
+					''
 				);
 
 				echo "DEBUG: Generated RF=2 commands without intermediate clusters\n";
@@ -318,12 +320,13 @@ class QueueCommandVerificationTest extends TestCase {
 			/** @param Queue|TestableQueue $queue */
 			private function generateBasicCommands(Queue|TestableQueue $queue): void {
 				// Basic commands for simple test
-				$queue->add('node1', "CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'");
-				$queue->add('node2', "CREATE TABLE IF NOT EXISTS test_table_s1 (id bigint) type='rt'");
-				$queue->add('node1', 'DROP TABLE test_table');
+				$queue->add('node1', "CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'", '');
+				$queue->add('node2', "CREATE TABLE IF NOT EXISTS test_table_s1 (id bigint) type='rt'", '');
+				$queue->add('node1', 'DROP TABLE test_table', '');
 				$queue->add(
 					'node1',
-					"CREATE TABLE test_table type='distributed' local='test_table_s0' agent='node2:test_table_s1'"
+					"CREATE TABLE test_table type='distributed' local='test_table_s0' agent='node2:test_table_s1'",
+					''
 				);
 
 				echo "DEBUG: Generated basic commands\n";

@@ -384,15 +384,16 @@ class OutageQueueCommandTest extends TestCase {
 			/** @param Queue|TestableQueue $queue */
 			private function generateRF2OutageCommands(Queue|TestableQueue $queue): void {
 				// RF=2 with node failure: create missing replicas
-				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'");
-				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s3 (id bigint) type='rt'");
+				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'", '');
+				$queue->add('node3', "CREATE TABLE IF NOT EXISTS test_table_s3 (id bigint) type='rt'", '');
 
 				// Recreate distributed table without failed node
-				$queue->add('node1', 'DROP TABLE test_table');
+				$queue->add('node1', 'DROP TABLE test_table', '');
 				$queue->add(
 					'node1',
 					"CREATE TABLE test_table type='distributed' local='test_table_s0,test_table_s1' " .
-					"agent='node3:test_table_s0,test_table_s1'"
+					"agent='node3:test_table_s0,test_table_s1'",
+					''
 				);
 
 				echo "DEBUG: Generated RF=2 outage commands\n";
@@ -401,22 +402,24 @@ class OutageQueueCommandTest extends TestCase {
 			/** @param Queue|TestableQueue $queue */
 			private function generateRF1OutageSufficientCommands(Queue|TestableQueue $queue): void {
 				// RF=1 with sufficient nodes: move orphaned shard
-				$queue->add('node1', "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'");
+				$queue->add('node1', "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'", '');
 
 				// Use intermediate cluster for shard movement
 				$queue->add(
 					'node1',
-					"CREATE CLUSTER temp_move_orphan_s2 'temp_move_orphan_s2' as path"
+					"CREATE CLUSTER temp_move_orphan_s2 'temp_move_orphan_s2' as path",
+					''
 				);
-				$queue->add('node1', 'ALTER CLUSTER temp_move_orphan_s2 ADD test_table_s2');
-				$queue->add('node1', 'DELETE CLUSTER temp_move_orphan_s2');
+				$queue->add('node1', 'ALTER CLUSTER temp_move_orphan_s2 ADD test_table_s2', '');
+				$queue->add('node1', 'DELETE CLUSTER temp_move_orphan_s2', '');
 
 				// Recreate distributed table
-				$queue->add('node1', 'DROP TABLE test_table');
+				$queue->add('node1', 'DROP TABLE test_table', '');
 				$queue->add(
 					'node1',
 					"CREATE TABLE test_table type='distributed' local='test_table_s0,test_table_s1,test_table_s2' " .
-					"agent='node3:test_table_s3'"
+					"agent='node3:test_table_s3'",
+					''
 				);
 
 				echo "DEBUG: Generated RF=1 sufficient nodes outage commands\n";
@@ -425,18 +428,20 @@ class OutageQueueCommandTest extends TestCase {
 			/** @param Queue|TestableQueue $queue */
 			private function generateRF1OutageInsufficientCommands(Queue|TestableQueue $queue): void {
 				// RF=1 degraded mode: create orphaned shards locally
-				$queue->add('node1', "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'");
+				$queue->add('node1', "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'", '');
 				$queue->add(
 					'node1',
-					"CREATE TABLE IF NOT EXISTS test_table_s3 (id bigint) type='rt'"
+					"CREATE TABLE IF NOT EXISTS test_table_s3 (id bigint) type='rt'",
+					''
 				);
 
 				// Create purely local distributed table (degraded mode)
-				$queue->add('node1', 'DROP TABLE test_table');
+				$queue->add('node1', 'DROP TABLE test_table', '');
 				$queue->add(
 					'node1',
 					"CREATE TABLE test_table type='distributed' " .
-					"local='test_table_s0,test_table_s1,test_table_s2,test_table_s3'"
+					"local='test_table_s0,test_table_s1,test_table_s2,test_table_s3'",
+					''
 				);
 
 				echo "DEBUG: Generated RF=1 insufficient nodes (degraded mode) commands\n";
@@ -446,22 +451,25 @@ class OutageQueueCommandTest extends TestCase {
 			private function generateCatastrophicFailureCommands(
 				Queue|TestableQueue $queue
 			): void {
-				// Catastrophic failure: create all missing shards locally
+		// Catastrophic failure: create all missing shards locally
 				$queue->add(
 					'node1',
-					"CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'"
+					"CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'",
+					''
 				);
 				$queue->add(
 					'node1',
-					"CREATE TABLE IF NOT EXISTS test_table_s3 (id bigint) type='rt'"
+					"CREATE TABLE IF NOT EXISTS test_table_s3 (id bigint) type='rt'",
+					''
 				);
 
-				// Create completely local distributed table
-				$queue->add('node1', 'DROP TABLE test_table');
+		// Create completely local distributed table
+				$queue->add('node1', 'DROP TABLE test_table', '');
 				$queue->add(
 					'node1',
 					"CREATE TABLE test_table type='distributed' " .
-					"local='test_table_s0,test_table_s1,test_table_s2,test_table_s3'"
+					"local='test_table_s0,test_table_s1,test_table_s2,test_table_s3'",
+					''
 				);
 
 				echo "DEBUG: Generated catastrophic failure commands\n";
