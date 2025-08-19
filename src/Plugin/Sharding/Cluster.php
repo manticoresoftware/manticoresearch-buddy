@@ -109,7 +109,7 @@ final class Cluster {
 		?string $operationGroup = null
 	): int {
 		if ($queue) {
-			$queueId = $queue->add($this->nodeId, $query, $rollbackQuery, $operationGroup);
+			$queueId = $queue->add($this->nodeId, $query, $rollbackQuery ?? '', $operationGroup);
 		} else {
 			$this->client->sendRequest($query, disableAgentHeader: true);
 		}
