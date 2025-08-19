@@ -18,7 +18,8 @@ final class CleanupManager {
 
 	/**
 	 * Comprehensive cleanup of all orphaned resources
-	 * @return array{timestamp: int, actions_taken: array<string>, resources_cleaned: int, errors: array<string>} Cleanup results
+	 * @return array{timestamp: int, actions_taken: array<string>, resources_cleaned: int, errors: array<string>}
+	 *         Cleanup results
 	 */
 	public function performFullCleanup(): array {
 		$results = [
