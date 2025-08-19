@@ -19,9 +19,11 @@ use PHPUnit\Framework\TestCase;
 final class RollbackSystemTest extends TestCase {
 
 	public array $capturedCommands = [];
+	public array $rolledBackGroups = [];
 
 	protected function setUp(): void {
 		$this->capturedCommands = [];
+		$this->rolledBackGroups = [];
 	}
 
 	/**
@@ -39,8 +41,13 @@ final class RollbackSystemTest extends TestCase {
 				parent::__construct(null); // No real queue
 			}
 
-			public function add(string $nodeId, string $query, string $rollbackQuery = '', ?string $operationGroup = null): int {
-				$id = count($this->capturedCommands) + 1;
+			public function add(
+				string $nodeId,
+				string $query,
+				string $rollbackQuery = '',
+				?string $operationGroup = null
+			): int {
+				$id = sizeof($this->capturedCommands) + 1;
 				$command = [
 					'id' => $id,
 					'node' => $nodeId,
@@ -57,7 +64,8 @@ final class RollbackSystemTest extends TestCase {
 			}
 
 			public function rollbackOperationGroup(string $operationGroup): bool {
-				// Mock successful rollback
+				// Mock successful rollback - use the parameter to avoid unused warning
+				$this->testCase->rolledBackGroups[] = $operationGroup;
 				return true;
 			}
 
@@ -132,9 +140,9 @@ final class RollbackSystemTest extends TestCase {
 		}
 
 		$commands = $queue->getCapturedCommands();
-		$this->assertCount(count($testCases), $commands);
+		$this->assertCount(sizeof($testCases), $commands);
 
-		for ($i = 0; $i < count($testCases); $i++) {
+		for ($i = 0; $i < sizeof($testCases); $i++) {
 			$this->assertEquals($testCases[$i][0], $commands[$i]['query']);
 			$this->assertEquals($testCases[$i][1], $commands[$i]['rollback_query']);
 		}
@@ -158,7 +166,7 @@ final class RollbackSystemTest extends TestCase {
 		}
 
 		$commands = $queue->getCapturedCommands();
-		$this->assertCount(count($destructiveOperations), $commands);
+		$this->assertCount(sizeof($destructiveOperations), $commands);
 
 		foreach ($commands as $command) {
 			$this->assertEquals('', $command['rollback_query']);
@@ -216,7 +224,11 @@ final class RollbackSystemTest extends TestCase {
 			['node1', 'ALTER CLUSTER temp_move_0_123 DROP test_s0', 'ALTER CLUSTER temp_move_0_123 ADD test_s0'],
 			['node1', 'DROP TABLE test_s0', ''], // Destructive - empty rollback
 			['node1', 'DELETE CLUSTER temp_move_0_123', ''], // Cleanup - empty rollback
-			['node1', 'CREATE TABLE test type=\'distributed\' local=\'test_s1\' agent=\'node2:test_s0\'', 'DROP TABLE IF EXISTS test'],
+			[
+				'node1',
+				'CREATE TABLE test type=\'distributed\' local=\'test_s1\' agent=\'node2:test_s0\'',
+				'DROP TABLE IF EXISTS test',
+			],
 		];
 
 		foreach ($commands as [$node, $query, $rollback]) {
@@ -224,7 +236,7 @@ final class RollbackSystemTest extends TestCase {
 		}
 
 		$capturedCommands = $queue->getCapturedCommands();
-		$this->assertCount(count($commands), $capturedCommands);
+		$this->assertCount(sizeof($commands), $capturedCommands);
 
 		// Verify all have same operation group
 		foreach ($capturedCommands as $command) {

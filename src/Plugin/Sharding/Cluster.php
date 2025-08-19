@@ -102,7 +102,12 @@ final class Cluster {
 	 * @param  string|null $operationGroup Optional operation group
 	 * @return int
 	 */
-	protected function runQuery(?Queue $queue, string $query, ?string $rollbackQuery = null, ?string $operationGroup = null): int {
+	protected function runQuery(
+		?Queue $queue,
+		string $query,
+		?string $rollbackQuery = null,
+		?string $operationGroup = null
+	): int {
 		if ($queue) {
 			$queueId = $queue->add($this->nodeId, $query, $rollbackQuery, $operationGroup);
 		} else {

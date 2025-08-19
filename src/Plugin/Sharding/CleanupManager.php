@@ -106,7 +106,6 @@ final class CleanupManager {
 		$results = ['cleaned_count' => 0, 'errors' => []];
 
 		try {
-			$queue = new Queue($this->cluster, $this->client);
 			$queueTable = $this->cluster->getSystemTableName('system.sharding_queue');
 
 			// Find operation groups that are older than 24 hours and have failed status
@@ -210,7 +209,6 @@ final class CleanupManager {
 		$results = ['cleaned_count' => 0, 'errors' => []];
 
 		try {
-			$state = new State($this->client);
 			$stateTable = $this->cluster->getSystemTableName('system.sharding_state');
 
 			// Clean up old error entries (older than 30 days)
