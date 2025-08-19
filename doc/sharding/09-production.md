@@ -278,17 +278,17 @@ The sharding system now includes automatic rollback capabilities for all operati
 class RollbackMonitoring {
     public function getRollbackMetrics(): array {
         $queueTable = 'system.sharding_queue';
-        
+
         // Count rollback operations
         $result = $this->client->sendRequest("
-            SELECT 
+            SELECT
                 COUNT(*) as total_operations,
                 SUM(CASE WHEN rollback_query != '' THEN 1 ELSE 0 END) as rollback_enabled,
                 COUNT(DISTINCT operation_group) as operation_groups
             FROM {$queueTable}
             WHERE created_at > " . ((time() - 86400) * 1000) // Last 24 hours
         );
-        
+
         return [
             'rollback_coverage' => $rollback_enabled / $total_operations * 100,
             'operation_groups_24h' => $operation_groups,
@@ -307,18 +307,18 @@ Configure automatic health monitoring and recovery:
 class HealthMonitoringCron {
     public function run(): void {
         $monitor = new HealthMonitor($this->client, $this->cluster);
-        
+
         // Perform health check
         $health = $monitor->performHealthCheck();
-        
+
         // Log health status
         $this->logHealthStatus($health);
-        
+
         // Auto-recovery if needed
         if ($health['overall_status'] !== 'healthy') {
             $recovery = $monitor->performAutoRecovery();
             $this->logRecoveryActions($recovery);
-            
+
             // Alert if recovery failed
             if (!empty($recovery['failed_recoveries'])) {
                 $this->sendAlert('Recovery failed', $recovery['failed_recoveries']);
@@ -340,13 +340,13 @@ class CleanupSchedule {
         $cleanup = new CleanupManager($this->client, $this->cluster);
         $cleanup->cleanupOrphanedTemporaryClusters();
     }
-    
+
     // Run daily
     public function dailyCleanup(): void {
         $cleanup = new CleanupManager($this->client, $this->cluster);
         $cleanup->cleanupFailedOperationGroups();
     }
-    
+
     // Run weekly
     public function weeklyCleanup(): void {
         $cleanup = new CleanupManager($this->client, $this->cluster);
@@ -365,32 +365,32 @@ class RebalancingController {
     // Check before maintenance
     public function prepareForMaintenance(): void {
         $tables = $this->getShardedTables();
-        
+
         foreach ($tables as $tableName) {
             $table = new Table($this->client, $this->cluster, $tableName, '', '');
-            
+
             // Stop any running rebalancing
             $result = $table->stopRebalancing(true); // Graceful stop
-            
+
             if ($result['status'] === 'stop_requested') {
                 // Wait for graceful stop
                 $this->waitForStop($tableName);
             }
         }
     }
-    
+
     // Emergency stop
     public function emergencyStop(string $tableName): void {
         $table = new Table($this->client, $this->cluster, $tableName, '', '');
-        
+
         // Immediate stop with rollback
         $result = $table->stopRebalancing(false);
-        
+
         if ($result['rollback_executed']) {
             $this->logEmergencyStop($tableName, $result);
         }
     }
-    
+
     // Monitor progress
     public function monitorProgress(string $tableName): array {
         $table = new Table($this->client, $this->cluster, $tableName, '', '');
