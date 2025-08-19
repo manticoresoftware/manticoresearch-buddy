@@ -63,9 +63,14 @@ class TestableQueue {
 	 * @param string|null $operationGroup
 	 * @return int the queue id
 	 */
-	public function add(string $nodeId, string $query, string $rollbackQuery = '', ?string $operationGroup = null): int {
+	public function add(
+		string $nodeId,
+		string $query,
+		string $rollbackQuery = '',
+		?string $operationGroup = null
+	): int {
 		// Capture command for testing
-		$id = count($this->capturedCommands) + 1;
+		$id = sizeof($this->capturedCommands) + 1;
 		$this->capturedCommands[] = [
 			'id' => $id,
 			'node' => $nodeId,

@@ -595,7 +595,6 @@ final class Table {
 
 		if ($operationGroup) {
 			// Get queue progress for this operation group
-			$queue = new Queue($this->cluster, $this->client);
 			$queueProgress = $this->getQueueProgress($operationGroup);
 			$progress = array_merge($progress, $queueProgress);
 		}
@@ -651,7 +650,12 @@ final class Table {
 	 * @param ?State $state
 	 * @return void
 	 */
-	protected function handleRebalancingFailure(\Throwable $error, string $operationGroup, Queue $queue, ?State $state = null): void {
+	protected function handleRebalancingFailure(
+		\Throwable $error,
+		string $operationGroup,
+		Queue $queue,
+		?State $state = null
+	): void {
 		if (!$state) {
 			$state = new State($this->client);
 		}
@@ -1137,7 +1141,11 @@ final class Table {
 		$tempClusterName = "temp_move_{$shardId}_" . uniqid();
 
 		// Step 1: Create shard table on target node
-		$createQueueId = $queue->add($targetNode, $this->getCreateTableShardSQL($shardId), "DROP TABLE IF EXISTS {$shardName}");
+		$createQueueId = $queue->add(
+			$targetNode,
+			$this->getCreateTableShardSQL($shardId),
+			"DROP TABLE IF EXISTS {$shardName}"
+		);
 
 		// Step 2: Create temporary cluster on SOURCE node (where the data IS)
 		// CRITICAL: Use cluster name as path to ensure uniqueness for intermediate clusters
@@ -1149,7 +1157,11 @@ final class Table {
 
 		// Step 3: Add shard to cluster on SOURCE node FIRST (before JOIN)
 		$queue->setWaitForId($clusterQueueId);
-		$queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} ADD {$shardName}", "ALTER CLUSTER {$tempClusterName} DROP {$shardName}");
+		$queue->add(
+			$sourceNode,
+			"ALTER CLUSTER {$tempClusterName} ADD {$shardName}",
+			"ALTER CLUSTER {$tempClusterName} DROP {$shardName}"
+		);
 
 		// Step 4: NEW node joins the cluster that SOURCE created
 		// Wait for table creation on target node to complete first
@@ -1164,7 +1176,11 @@ final class Table {
 		// Step 5: CRITICAL - Wait for JOIN to complete (data is now synced)
 		// JOIN CLUSTER is synchronous, so once it's processed, data is fully copied
 		$queue->setWaitForId($joinQueueId);
-		$dropQueueId = $queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} DROP {$shardName}", "ALTER CLUSTER {$tempClusterName} ADD {$shardName}");
+		$dropQueueId = $queue->add(
+			$sourceNode,
+			"ALTER CLUSTER {$tempClusterName} DROP {$shardName}",
+			"ALTER CLUSTER {$tempClusterName} ADD {$shardName}"
+		);
 
 		// Step 6: Only after DROP from cluster, remove the table from source
 		$queue->setWaitForId($dropQueueId);

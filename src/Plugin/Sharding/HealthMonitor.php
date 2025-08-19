@@ -36,7 +36,7 @@ final class HealthMonitor {
 			$health['overall_status'] = 'unhealthy';
 			$health['issues'][] = [
 				'type' => 'stuck_operations',
-				'count' => count($stuckCheck['stuck_tables']),
+				'count' => sizeof($stuckCheck['stuck_tables']),
 				'tables' => $stuckCheck['stuck_tables'],
 			];
 		}
@@ -48,7 +48,7 @@ final class HealthMonitor {
 			$health['overall_status'] = 'unhealthy';
 			$health['issues'][] = [
 				'type' => 'failed_operations',
-				'count' => count($failedCheck['failed_tables']),
+				'count' => sizeof($failedCheck['failed_tables']),
 				'tables' => $failedCheck['failed_tables'],
 			];
 		}
@@ -101,50 +101,81 @@ final class HealthMonitor {
 			return $results;
 		}
 
-		// Recover stuck operations
-		foreach ($healthCheck['issues'] as $issue) {
-			if ($issue['type'] === 'stuck_operations') {
-				foreach ($issue['tables'] as $tableName) {
-					$recovery = $this->recoverStuckOperation($tableName);
-					if ($recovery['success']) {
-						$results['recovered_tables'][] = $tableName;
-						$results['actions_taken'][] = "Recovered stuck operation for {$tableName}";
-					} else {
-						$results['failed_recoveries'][] = [
-							'table' => $tableName,
-							'error' => $recovery['error'],
-						];
-					}
-				}
-			}
-
-			if ($issue['type'] !== 'failed_operations') {
-				continue;
-			}
-
-			foreach ($issue['tables'] as $tableName) {
-				$recovery = $this->recoverFailedOperation($tableName);
-				if ($recovery['success']) {
-					$results['recovered_tables'][] = $tableName;
-					$results['actions_taken'][] = "Recovered failed operation for {$tableName}";
-				} else {
-					$results['failed_recoveries'][] = [
-						'table' => $tableName,
-						'error' => $recovery['error'],
-					];
-				}
-			}
-		}
-
-		// Perform cleanup for warnings
-		if (!empty($healthCheck['warnings'])) {
-			$cleanupManager = new CleanupManager($this->client, $this->cluster);
-			$cleanupResults = $cleanupManager->performFullCleanup();
-			$results['cleanup_performed'] = true;
-			$results['actions_taken'][] = "Performed cleanup: {$cleanupResults['resources_cleaned']} resources cleaned";
-		}
+		$this->processHealthIssues($healthCheck['issues'], $results);
+		$this->performCleanupIfNeeded($healthCheck['warnings'], $results);
 
 		return $results;
+	}
+
+	/**
+	 * Process health issues and attempt recovery
+	 * @param array $issues
+	 * @param array &$results
+	 */
+	private function processHealthIssues(array $issues, array &$results): void {
+		foreach ($issues as $issue) {
+			if ($issue['type'] === 'stuck_operations') {
+				$this->recoverStuckOperations($issue['tables'], $results);
+			} elseif ($issue['type'] === 'failed_operations') {
+				$this->recoverFailedOperations($issue['tables'], $results);
+			}
+		}
+	}
+
+	/**
+	 * Recover stuck operations for given tables
+	 * @param array $tables
+	 * @param array &$results
+	 */
+	private function recoverStuckOperations(array $tables, array &$results): void {
+		foreach ($tables as $tableName) {
+			$recovery = $this->recoverStuckOperation($tableName);
+			if ($recovery['success']) {
+				$results['recovered_tables'][] = $tableName;
+				$results['actions_taken'][] = "Recovered stuck operation for {$tableName}";
+			} else {
+				$results['failed_recoveries'][] = [
+					'table' => $tableName,
+					'error' => $recovery['error'],
+				];
+			}
+		}
+	}
+
+	/**
+	 * Recover failed operations for given tables
+	 * @param array $tables
+	 * @param array &$results
+	 */
+	private function recoverFailedOperations(array $tables, array &$results): void {
+		foreach ($tables as $tableName) {
+			$recovery = $this->recoverFailedOperation($tableName);
+			if ($recovery['success']) {
+				$results['recovered_tables'][] = $tableName;
+				$results['actions_taken'][] = "Recovered failed operation for {$tableName}";
+			} else {
+				$results['failed_recoveries'][] = [
+					'table' => $tableName,
+					'error' => $recovery['error'],
+				];
+			}
+		}
+	}
+
+	/**
+	 * Perform cleanup if warnings exist
+	 * @param array $warnings
+	 * @param array &$results
+	 */
+	private function performCleanupIfNeeded(array $warnings, array &$results): void {
+		if (empty($warnings)) {
+			return;
+		}
+
+		$cleanupManager = new CleanupManager($this->client, $this->cluster);
+		$cleanupResults = $cleanupManager->performFullCleanup();
+		$results['cleanup_performed'] = true;
+		$results['actions_taken'][] = "Performed cleanup: {$cleanupResults['resources_cleaned']} resources cleaned";
 	}
 
 	/**
@@ -155,7 +186,6 @@ final class HealthMonitor {
 		$results = ['stuck_tables' => [], 'check_time' => time()];
 
 		try {
-			$state = new State($this->client);
 			$stateTable = $this->cluster->getSystemTableName('system.sharding_state');
 
 			// Find operations running for more than 30 minutes
@@ -199,7 +229,6 @@ final class HealthMonitor {
 		$results = ['failed_tables' => [], 'check_time' => time()];
 
 		try {
-			$state = new State($this->client);
 			$stateTable = $this->cluster->getSystemTableName('system.sharding_state');
 
 			$failedOps = $this->client->sendRequest(
@@ -305,7 +334,8 @@ final class HealthMonitor {
 					$recommendations[] = 'Reset stuck operations for tables: ' . implode(', ', $issue['tables']);
 					break;
 				case 'failed_operations':
-					$recommendations[] = 'Investigate and recover failed operations for tables: ' . implode(', ', $issue['tables']);
+					$recommendations[] = 'Investigate and recover failed operations for tables: '
+						. implode(', ', $issue['tables']);
 					break;
 			}
 		}
