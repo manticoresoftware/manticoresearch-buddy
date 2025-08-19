@@ -156,13 +156,27 @@ final class CreateHandler extends BaseHandlerWithClient {
 				/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
 				$value = simdjson_decode($result[0]['data'][0]['value'] ?? '[]', true);
 
-				/** @var array{result:string,status?:string,type?:string} $value */
+			// FLOW EXPLANATION:
+			// 1. Table->shard() creates initial state with status='processing', result=null
+			// 2. Operator->checkTableStatus() monitors queue completion
+			// 3. When all queue items processed, sets status='done' and result=response_body
+			// 4. We wait for BOTH status completion AND result to be set
+			// 5. Only then we can safely call Response::fromBody() with non-null result
+
+			/** @var array{result:?string,status?:string,type?:string} $value */
 				$type = $value['type'] ?? 'unknown';
 				$status = $value['status'] ?? 'processing';
-				if ($type === 'create' && $status !== 'processing') {
-					return TaskResult::fromResponse(Response::fromBody($value['result']));
+				$result = $value['result'] ?? null;
+
+			// Only proceed when:
+			// - Type is 'create' (table creation)
+			// - Status is not 'processing' (operation completed)
+			// - Result is not null (response body is available)
+				if ($type === 'create' && $status !== 'processing' && $result !== null) {
+					return TaskResult::fromResponse(Response::fromBody($result));
 				}
 				if ((time() - $ts) > $timeout) {
+					Buddy::debugvv("Sharding: CreateHandler timeout exceeded for table {$payload->table}");
 					break;
 				}
 				Coroutine::sleep(1);
