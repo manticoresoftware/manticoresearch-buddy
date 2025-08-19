@@ -496,8 +496,17 @@ final class Table {
 
 	/**
 	 * Stop rebalancing operation
-	 * @param bool $graceful If true, complete current operation before stopping
-	 * @return array{status: string, message: string, current_status?: string, graceful?: bool, rollback_executed?: bool} Status information
+	 *
+	 * @param bool $graceful If true, complete current operation
+	 *                       before stopping
+	 *
+	 * @return array{
+	 *   status: string,
+	 *   message: string,
+	 *   current_status?: string,
+	 *   graceful?: bool,
+	 *   rollback_executed?: bool
+	 * } Status information
 	 */
 	public function stopRebalancing(bool $graceful = true): array {
 		$state = new State($this->client);
@@ -508,7 +517,7 @@ final class Table {
 			return [
 				'status' => 'not_running',
 				'message' => 'Rebalancing is not currently running',
-				'current_status' => $currentStatus,
+				'current_status' => is_string($currentStatus) ? $currentStatus : 'unknown',
 			];
 		}
 
@@ -576,7 +585,20 @@ final class Table {
 
 	/**
 	 * Get detailed rebalancing progress
-	 * @return array{status: string, table: string, operation_group: mixed, can_stop: bool, can_pause: bool, can_resume: bool, queue_total?: int, queue_completed?: int, queue_failed?: int, queue_pending?: int, progress_percentage?: float} Progress information
+	 *
+	 * @return array{
+	 *   status: string,
+	 *   table: string,
+	 *   operation_group: mixed,
+	 *   can_stop: bool,
+	 *   can_pause: bool,
+	 *   can_resume: bool,
+	 *   queue_total?: int,
+	 *   queue_completed?: int,
+	 *   queue_failed?: int,
+	 *   queue_pending?: int,
+	 *   progress_percentage?: float
+	 * } Progress information
 	 */
 	public function getRebalancingProgress(): array {
 		$state = new State($this->client);
@@ -585,7 +607,7 @@ final class Table {
 		$operationGroup = $state->get("rebalance_group:{$this->name}");
 
 		$progress = [
-			'status' => $status,
+			'status' => is_string($status) ? $status : 'idle',
 			'table' => $this->name,
 			'operation_group' => $operationGroup,
 			'can_stop' => in_array($status, ['running', 'paused']),
@@ -709,7 +731,14 @@ final class Table {
 	/**
 	 * Get queue progress for operation group
 	 * @param string $operationGroup
-	 * @return array{queue_total: int, queue_completed: int, queue_failed: int, queue_pending: int, progress_percentage: float}
+	 *
+	 * @return array{
+	 *   queue_total: int,
+	 *   queue_completed: int,
+	 *   queue_failed: int,
+	 *   queue_pending: int,
+	 *   progress_percentage: float
+	 * }
 	 */
 	protected function getQueueProgress(string $operationGroup): array {
 		$table = $this->cluster->getSystemTableName('system.sharding_queue');
@@ -728,6 +757,18 @@ final class Table {
 		$result = $this->client->sendRequest($query)->getResult();
 		$data = $result[0]['data'][0] ?? [];
 
+		// Handle case where query returns no results (empty data)
+		if (empty($data)) {
+			return [
+				'queue_total' => 0,
+				'queue_completed' => 0,
+				'queue_failed' => 0,
+				'queue_pending' => 0,
+				'progress_percentage' => 0.0,
+			];
+		}
+
+		/** @var array{total:int,completed:int,failed:int,pending:int} $data */
 		return [
 			'queue_total' => $data['total'],
 			'queue_completed' => $data['completed'],
@@ -735,7 +776,7 @@ final class Table {
 			'queue_pending' => $data['pending'],
 			'progress_percentage' => $data['total'] > 0
 				? round(($data['completed'] / $data['total']) * 100, 2)
-				: 0,
+				: 0.0,
 		];
 	}
 

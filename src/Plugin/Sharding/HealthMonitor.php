@@ -17,7 +17,14 @@ final class HealthMonitor {
 
 	/**
 	 * Perform comprehensive health check
-	 * @return array{overall_status: string, timestamp: int, checks: array<string, mixed>, issues: array<mixed>, warnings: array<mixed>, recommendations: array<string>} Health status
+	 * @return array{
+	 *     overall_status: string,
+	 *     timestamp: int,
+	 *     checks: array<string, mixed>,
+	 *     issues: array<mixed>,
+	 *     warnings: array<mixed>,
+	 *     recommendations: array<string>
+	 * } Health status
 	 */
 	public function performHealthCheck(): array {
 		$health = [
@@ -83,7 +90,14 @@ final class HealthMonitor {
 
 	/**
 	 * Attempt automatic recovery for detected issues
-	 * @return array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} Recovery results
+	 *
+	 * @return array{
+	 *   timestamp: int,
+	 *   actions_taken: array<string>,
+	 *   recovered_tables: array<string>,
+	 *   failed_recoveries: array<string>,
+	 *   cleanup_performed: bool
+	 * } Recovery results
 	 */
 	public function performAutoRecovery(): array {
 		$results = [
@@ -110,13 +124,23 @@ final class HealthMonitor {
 	/**
 	 * Process health issues and attempt recovery
 	 * @param array<mixed> $issues
-	 * @param array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} &$results
+	 *
+	 * @param array{
+	 *   timestamp: int,
+	 *   actions_taken: array<string>,
+	 *   recovered_tables: array<string>,
+	 *   failed_recoveries: array<string>,
+	 *   cleanup_performed: bool
+	 * } &$results
 	 */
 	private function processHealthIssues(array $issues, array &$results): void {
 		foreach ($issues as $issue) {
-			if ($issue['type'] === 'stuck_operations') {
+			if (!is_array($issue)) {
+				continue;
+			}
+			if (($issue['type'] ?? '') === 'stuck_operations' && is_array($issue['tables'] ?? null)) {
 				$this->recoverStuckOperations($issue['tables'], $results);
-			} elseif ($issue['type'] === 'failed_operations') {
+			} elseif (($issue['type'] ?? '') === 'failed_operations' && is_array($issue['tables'] ?? null)) {
 				$this->recoverFailedOperations($issue['tables'], $results);
 			}
 		}
@@ -125,7 +149,14 @@ final class HealthMonitor {
 	/**
 	 * Recover stuck operations for given tables
 	 * @param array<string> $tables
-	 * @param array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} &$results
+	 *
+	 * @param array{
+	 *   timestamp: int,
+	 *   actions_taken: array<string>,
+	 *   recovered_tables: array<string>,
+	 *   failed_recoveries: array<string>,
+	 *   cleanup_performed: bool
+	 * } &$results
 	 */
 	private function recoverStuckOperations(array $tables, array &$results): void {
 		foreach ($tables as $tableName) {
@@ -136,7 +167,7 @@ final class HealthMonitor {
 			} else {
 				$results['failed_recoveries'][] = [
 					'table' => $tableName,
-					'error' => $recovery['error'],
+					'error' => $recovery['error'] ?? 'Unknown error',
 				];
 			}
 		}
@@ -145,7 +176,14 @@ final class HealthMonitor {
 	/**
 	 * Recover failed operations for given tables
 	 * @param array<string> $tables
-	 * @param array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} &$results
+	 *
+	 * @param array{
+	 *   timestamp: int,
+	 *   actions_taken: array<string>,
+	 *   recovered_tables: array<string>,
+	 *   failed_recoveries: array<string>,
+	 *   cleanup_performed: bool
+	 * } &$results
 	 */
 	private function recoverFailedOperations(array $tables, array &$results): void {
 		foreach ($tables as $tableName) {
@@ -156,7 +194,7 @@ final class HealthMonitor {
 			} else {
 				$results['failed_recoveries'][] = [
 					'table' => $tableName,
-					'error' => $recovery['error'],
+					'error' => $recovery['error'] ?? 'Unknown error',
 				];
 			}
 		}
@@ -165,7 +203,14 @@ final class HealthMonitor {
 	/**
 	 * Perform cleanup if warnings exist
 	 * @param array<mixed> $warnings
-	 * @param array{timestamp: int, actions_taken: array<string>, recovered_tables: array<string>, failed_recoveries: array<string>, cleanup_performed: bool} &$results
+	 *
+	 * @param array{
+	 *   timestamp: int,
+	 *   actions_taken: array<string>,
+	 *   recovered_tables: array<string>,
+	 *   failed_recoveries: array<string>,
+	 *   cleanup_performed: bool
+	 * } &$results
 	 */
 	private function performCleanupIfNeeded(array $warnings, array &$results): void {
 		if (empty($warnings)) {
@@ -275,7 +320,7 @@ final class HealthMonitor {
 			$clusters = $data[0]['data'] ?? [];
 
 			foreach ($clusters as $cluster) {
-			$clusterName = $cluster['cluster'];
+				$clusterName = $cluster['cluster'];
 				if (strpos($clusterName, 'temp_move_') !== 0) {
 					continue;
 				}
@@ -322,40 +367,80 @@ final class HealthMonitor {
 
 	/**
 	 * Generate recommendations based on health check
-	 * @param array{overall_status: string, timestamp: int, checks: array<string, mixed>, issues: array<mixed>, warnings: array<mixed>, recommendations: array<string>} $health
+	 *
+	 * @param array{
+	 *   overall_status: string,
+	 *   timestamp: int,
+	 *   checks: array<string, mixed>,
+	 *   issues: array<mixed>,
+	 *   warnings: array<mixed>,
+	 *   recommendations: array<string>
+	 * } $health
+	 *
 	 * @return array<string> Recommendations
 	 */
 	private function generateRecommendations(array $health): array {
+		/** @var array<string> $recommendations */
 		$recommendations = [];
 
-		foreach ($health['issues'] as $issue) {
-			switch ($issue['type']) {
-				case 'stuck_operations':
-					$recommendations[] = 'Reset stuck operations for tables: ' . implode(', ', $issue['tables']);
-					break;
-				case 'failed_operations':
-					$recommendations[] = 'Investigate and recover failed operations for tables: '
-						. implode(', ', $issue['tables']);
-					break;
-			}
-		}
-
-		foreach ($health['warnings'] as $warning) {
-			switch ($warning['type']) {
-				case 'orphaned_resources':
-					$recommendations[] = "Run cleanup to remove {$warning['count']} orphaned resources";
-					break;
-				case 'high_queue_depth':
-					$recommendations[] = "Queue depth is high ({$warning['depth']}). Check for processing bottlenecks.";
-					break;
-			}
-		}
+		$this->addIssueRecommendations($health['issues'], $recommendations);
+		$this->addWarningRecommendations($health['warnings'], $recommendations);
 
 		if (empty($recommendations)) {
+			/** @var array<string> $recommendations */
 			$recommendations[] = 'System is healthy - no actions needed';
 		}
 
 		return $recommendations;
+	}
+
+	/**
+	 * Add recommendations for health issues
+	 * @param array<mixed> $issues
+	 * @param array<string> &$recommendations
+	 */
+	private function addIssueRecommendations(array $issues, array &$recommendations): void {
+		foreach ($issues as $issue) {
+			if (!is_array($issue)) {
+				continue;
+			}
+			switch ($issue['type'] ?? '') {
+				case 'stuck_operations':
+					if (is_array($issue['tables'] ?? null)) {
+						$recommendations[] = 'Reset stuck operations for tables: ' . implode(', ', $issue['tables']);
+					}
+					break;
+				case 'failed_operations':
+					if (is_array($issue['tables'] ?? null)) {
+						$recommendations[] = 'Investigate and recover failed operations for tables: '
+							. implode(', ', $issue['tables']);
+					}
+					break;
+			}
+		}
+	}
+
+	/**
+	 * Add recommendations for health warnings
+	 * @param array<mixed> $warnings
+	 * @param array<string> &$recommendations
+	 */
+	private function addWarningRecommendations(array $warnings, array &$recommendations): void {
+		foreach ($warnings as $warning) {
+			if (!is_array($warning)) {
+				continue;
+			}
+			switch ($warning['type'] ?? '') {
+				case 'orphaned_resources':
+					$count = $warning['count'] ?? 0;
+					$recommendations[] = "Run cleanup to remove {$count} orphaned resources";
+					break;
+				case 'high_queue_depth':
+					$depth = $warning['depth'] ?? 0;
+					$recommendations[] = "Queue depth is high ({$depth}). Check for processing bottlenecks.";
+					break;
+			}
+		}
 	}
 
 	/**

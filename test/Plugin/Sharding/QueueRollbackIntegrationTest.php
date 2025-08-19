@@ -10,7 +10,6 @@
 */
 
 use Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles\TestableQueue;
-use Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles\TestableTable;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -21,11 +20,8 @@ final class QueueRollbackIntegrationTest extends TestCase {
 
 	private TestableQueue $queue;
 
-	private TestableTable $table;
-
 	protected function setUp(): void {
 		$this->queue = new TestableQueue();
-		$this->table = new TestableTable();
 	}
 
 	/**

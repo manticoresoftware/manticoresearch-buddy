@@ -21,6 +21,7 @@ use Manticoresearch\Buddy\Base\Plugin\Sharding\Queue;
  */
 class TestableQueue {
 
+	/** @var array<array{node: string, query: string, rollback_query: string, operation_group: string|null}> */
 	private array $capturedCommands = [];
 
 	public function __construct(private ?Queue $queue = null) {
@@ -121,7 +122,7 @@ class TestableQueue {
 
 	/**
 	 * Get captured commands for testing
-	 * @return array
+	 * @return array<array{node: string, query: string, rollback_query: string, operation_group: string|null}>
 	 */
 	public function getCapturedCommands(): array {
 		return $this->capturedCommands;
