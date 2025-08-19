@@ -287,17 +287,18 @@ Generates reverse SQL commands for rollback operations.
 
 **Usage Pattern:**
 ```php
-// Automatic generation
-$rollback = RollbackCommandGenerator::generate("CREATE TABLE users");
-// Returns: "DROP TABLE IF EXISTS users"
+// Direct rollback command provision
+$forwardSql = "CREATE TABLE users (id bigint, name string)";
+$rollbackSql = "DROP TABLE IF EXISTS users";
+$queue->add($nodeId, $forwardSql, $rollbackSql, $operationGroup);
 
-// Specific generators
-$rollback = RollbackCommandGenerator::forCreateTable("users");
-$rollback = RollbackCommandGenerator::forAlterClusterAdd("c1", "users");
+// Common rollback patterns:
+"CREATE TABLE users" → "DROP TABLE IF EXISTS users"
+"CREATE CLUSTER c1" → "DELETE CLUSTER c1"
+"ALTER CLUSTER c1 ADD t1" → "ALTER CLUSTER c1 DROP t1"
 
-// Safety check
-if (RollbackCommandGenerator::isSafeToRollback($command)) {
-    $rollback = RollbackCommandGenerator::generate($command);
+// All operations require explicit rollback commands
+$queue->add($node, $sql, $rollbackSql, $operationGroup);
 }
 ```
 
@@ -357,7 +358,7 @@ $health = $monitor->performHealthCheck();
 if ($health['overall_status'] !== 'healthy') {
     // Automatic recovery
     $recovery = $monitor->performAutoRecovery();
-    
+
     // Or manual intervention based on recommendations
     foreach ($health['recommendations'] as $recommendation) {
         echo $recommendation;
@@ -370,7 +371,7 @@ if ($health['overall_status'] !== 'healthy') {
 ### Rollback Flow
 
 ```
-Table.shard() 
+Table.shard()
     ├── Creates operation_group
     ├── Queue.addWithRollback() [multiple times]
     ├── On failure:

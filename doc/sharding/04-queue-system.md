@@ -13,21 +13,21 @@ The Queue class manages distributed command execution with the following key fea
 - **Node Targeting**: Routes commands to specific cluster nodes
 - **Parallel Execution**: Supports concurrent operations where safe
 - **Synchronization Points**: Ensures critical operations complete before proceeding
-- **Rollback Support**: Stores rollback commands alongside forward commands
+- **Rollback Support**: Stores rollback commands alongside forward commands (REQUIRED)
 - **Operation Groups**: Groups related commands for atomic execution
 - **Automatic Rollback**: Executes rollback sequence on failure
 
-### Enhanced Queue Table Structure
+### Queue Table Structure
 
 ```sql
 CREATE TABLE system.sharding_queue (
     `id` bigint,                    -- Primary key
     `node` string,                   -- Target node
     `query` string,                  -- Forward command
-    `rollback_query` string,         -- Rollback command (NEW)
+    `rollback_query` string,         -- Rollback command (REQUIRED)
     `wait_for_id` bigint,           -- Forward dependency
-    `rollback_wait_for_id` bigint,  -- Rollback dependency (NEW)
-    `operation_group` string,        -- Operation group ID (NEW)
+    `rollback_wait_for_id` bigint,  -- Rollback dependency
+    `operation_group` string,        -- Operation group ID
     `tries` int,                     -- Retry count
     `status` string,                 -- Command status
     `created_at` bigint,            -- Creation timestamp
@@ -136,7 +136,7 @@ When a rollback is triggered:
 ```php
 protected function executeRollbackSequence(array $rollbackCommands): bool {
     $allSuccess = true;
-    
+
     foreach ($rollbackCommands as $command) {
         try {
             $this->client->sendRequest($command['rollback_query']);
@@ -147,7 +147,7 @@ protected function executeRollbackSequence(array $rollbackCommands): bool {
             // Continue with other rollback commands
         }
     }
-    
+
     return $allSuccess;
 }
 ```

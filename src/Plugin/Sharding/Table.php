@@ -281,7 +281,7 @@ final class Table {
 			foreach ($nodeShardsMap as $node => $shards) {
 				// Even when no shards, we still create distributed table
 				$sql = $this->getCreateShardedTableSQL($shards);
-				$rollbackSql = RollbackCommandGenerator::forCreateDistributedTable($this->name);
+				$rollbackSql = "DROP TABLE IF EXISTS {$this->name}";
 
 				// Use updated add method with rollback support
 				$queueId = $queue->add($node, $sql, $rollbackSql, $operationGroup);
@@ -383,7 +383,7 @@ final class Table {
 		if ($connectedNodes->count() === 1) {
 			$sql = $this->getCreateTableShardSQL($shard);
 			$shardName = $this->getShardName($shard);
-			$rollbackSql = RollbackCommandGenerator::forCreateTable($shardName);
+			$rollbackSql = "DROP TABLE IF EXISTS {$shardName}";
 			$queue->add($node, $sql, $rollbackSql, $operationGroup);
 			return $clusterMap;
 		}
@@ -409,7 +409,7 @@ final class Table {
 		if (!$cluster->hasPendingTable($table, TableOperation::Attach)) {
 			$cluster->addPendingTable($table, TableOperation::Attach);
 			$sql = $this->getCreateTableShardSQL($shard);
-			$rollbackSql = RollbackCommandGenerator::forCreateTable($table);
+			$rollbackSql = "DROP TABLE IF EXISTS {$table}";
 			$queue->add($node, $sql, $rollbackSql, $operationGroup);
 		}
 		return $clusterMap;
@@ -984,7 +984,8 @@ final class Table {
 
 			foreach ($shardsForNewNode as $shard) {
 				// Create shard table on new node
-				$queue->add($newNode, $this->getCreateTableShardSQL($shard));
+				$shardName = $this->getShardName($shard);
+				$queue->add($newNode, $this->getCreateTableShardSQL($shard), "DROP TABLE IF EXISTS {$shardName}");
 
 				// Set up replication from existing nodes
 				$existingNodes = $this->getExistingNodesForShard($schema, $shard);
@@ -1024,7 +1025,7 @@ final class Table {
 		// First, drop all distributed tables with proper force option
 		foreach ($newSchema as $row) {
 			$sql = "DROP TABLE IF EXISTS {$this->name} OPTION force=1";
-			$queueId = $queue->add($row['node'], $sql);
+			$queueId = $queue->add($row['node'], $sql, '');
 			$dropQueueIds->add($queueId);
 		}
 
@@ -1042,9 +1043,9 @@ final class Table {
 				$queue->setWaitForId($lastDropId);
 			}
 
-			// Pass the calculated schema to avoid database timing issues
+		// Pass the calculated schema to avoid database timing issues
 			$sql = $this->getCreateShardedTableSQLWithSchema($row['shards'], $newSchema);
-			$queue->add($row['node'], $sql);
+			$queue->add($row['node'], $sql, "DROP TABLE IF EXISTS {$this->name}");
 		}
 
 		// Reset wait for id
@@ -1136,18 +1137,19 @@ final class Table {
 		$tempClusterName = "temp_move_{$shardId}_" . uniqid();
 
 		// Step 1: Create shard table on target node
-		$createQueueId = $queue->add($targetNode, $this->getCreateTableShardSQL($shardId));
+		$createQueueId = $queue->add($targetNode, $this->getCreateTableShardSQL($shardId), "DROP TABLE IF EXISTS {$shardName}");
 
 		// Step 2: Create temporary cluster on SOURCE node (where the data IS)
 		// CRITICAL: Use cluster name as path to ensure uniqueness for intermediate clusters
 		$clusterQueueId = $queue->add(
 			$sourceNode,
-			"CREATE CLUSTER {$tempClusterName} '{$tempClusterName}' as path"
+			"CREATE CLUSTER {$tempClusterName} '{$tempClusterName}' as path",
+			"DELETE CLUSTER {$tempClusterName}"
 		);
 
 		// Step 3: Add shard to cluster on SOURCE node FIRST (before JOIN)
 		$queue->setWaitForId($clusterQueueId);
-		$queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} ADD {$shardName}");
+		$queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} ADD {$shardName}", "ALTER CLUSTER {$tempClusterName} DROP {$shardName}");
 
 		// Step 4: NEW node joins the cluster that SOURCE created
 		// Wait for table creation on target node to complete first
@@ -1155,21 +1157,22 @@ final class Table {
 		$queue->setWaitForId($createQueueId);
 		$joinQueueId = $queue->add(
 			$targetNode,
-			"JOIN CLUSTER {$tempClusterName} AT '{$sourceNode}' '{$tempClusterName}' as path "
+			"JOIN CLUSTER {$tempClusterName} AT '{$sourceNode}' '{$tempClusterName}' as path ",
+			"DELETE CLUSTER {$tempClusterName}"
 		);
 
 		// Step 5: CRITICAL - Wait for JOIN to complete (data is now synced)
 		// JOIN CLUSTER is synchronous, so once it's processed, data is fully copied
 		$queue->setWaitForId($joinQueueId);
-		$dropQueueId = $queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} DROP {$shardName}");
+		$dropQueueId = $queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} DROP {$shardName}", "ALTER CLUSTER {$tempClusterName} ADD {$shardName}");
 
 		// Step 6: Only after DROP from cluster, remove the table from source
 		$queue->setWaitForId($dropQueueId);
-		$deleteQueueId = $queue->add($sourceNode, "DROP TABLE {$shardName}");
+		$deleteQueueId = $queue->add($sourceNode, "DROP TABLE {$shardName}", '');
 
 		// Step 7: Clean up temporary cluster ONLY on SOURCE node after all operations complete
 		$queue->setWaitForId($deleteQueueId);
-		return $queue->add($sourceNode, "DELETE CLUSTER {$tempClusterName}");
+		return $queue->add($sourceNode, "DELETE CLUSTER {$tempClusterName}", '');
 	}
 
 	/**
@@ -1243,7 +1246,7 @@ final class Table {
 	public function cleanUpNode(Queue $queue, string $nodeId, Set $shards, Set $processedTables): Set {
 		/** @var Set<int> */
 		$queueIds = new Set;
-		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$this->name} OPTION force=1");
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$this->name} OPTION force=1", '');
 
 		foreach ($shards as $shard) {
 			$connections = $this->getConnectedNodes(new Set([$shard]));
@@ -1307,7 +1310,7 @@ final class Table {
 			}
 		}
 
-		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}");
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}", '');
 	}
 
 	/**
@@ -1320,7 +1323,7 @@ final class Table {
 	 * @throws ManticoreSearchClientError
 	 */
 	private function handleSingleNodeCleanUp(Queue $queue, string $nodeId, string $table, Set &$queueIds): void {
-		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}");
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}", '');
 	}
 	/**
 	 * Convert schema to map where each shard has nodes
@@ -1676,7 +1679,8 @@ final class Table {
 			// Create missing shard tables on this node
 			foreach ($shardsToCreate as $shard) {
 				$sql = $this->getCreateTableShardSQL($shard);
-				$queue->add($row['node'], $sql);
+				$shardName = $this->getShardName($shard);
+				$queue->add($row['node'], $sql, "DROP TABLE IF EXISTS {$shardName}");
 
 				// Find nodes that already have this shard in old schema for replication
 				$existingNodesWithShard = $oldSchema->filter(

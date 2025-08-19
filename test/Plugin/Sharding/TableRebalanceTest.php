@@ -380,23 +380,24 @@ class TableRebalanceTest extends TestCase {
 				if ($inactiveNodes->count() > 0) {
 					// Simulate failed node cleanup commands
 					foreach ($inactiveNodes as $failedNode) {
-						$queue->add($failedNode, 'DROP TABLE test_table_s0');
-						$queue->add($failedNode, 'DROP TABLE test_table_s2');
+						$queue->add($failedNode, 'DROP TABLE test_table_s0', '');
+						$queue->add($failedNode, 'DROP TABLE test_table_s2', '');
 					}
 					// Simulate redistributing orphaned shards to active nodes
 					foreach ($activeNodes as $activeNode) {
-						$queue->add($activeNode, "CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'");
-						$queue->add($activeNode, "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'");
+						$queue->add($activeNode, "CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'", '');
+						$queue->add($activeNode, "CREATE TABLE IF NOT EXISTS test_table_s2 (id bigint) type='rt'", '');
 					}
 					// Simulate updating distributed table
 					$firstActiveNode = $activeNodes->first();
 					if ($firstActiveNode) {
-						$queue->add($firstActiveNode, 'DROP TABLE test_table');
+						$queue->add($firstActiveNode, 'DROP TABLE test_table', '');
 						$queue->add(
 							$firstActiveNode,
 							"CREATE TABLE test_table type='distributed' " .
 							"local='test_table_s0,test_table_s1' " .
-							"agent='node2:test_table_s2,test_table_s3'"
+							"agent='node2:test_table_s2,test_table_s3'",
+							''
 						);
 					}
 				} elseif ($activeNodes->count() > 1) {
@@ -405,14 +406,16 @@ class TableRebalanceTest extends TestCase {
 					// Simulate creating shard table on new node
 					$queue->add(
 						'node2',
-						"CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'"
+						"CREATE TABLE IF NOT EXISTS test_table_s0 (id bigint) type='rt'",
+						''
 					);
 					// Simulate updating distributed table
-					$queue->add('node1', 'DROP TABLE test_table');
+					$queue->add('node1', 'DROP TABLE test_table', '');
 					$queue->add(
 						'node1',
 						"CREATE TABLE test_table type='distributed' local='test_table_s0' " .
-						"agent='node2:test_table_s0'"
+						"agent='node2:test_table_s0'",
+						''
 					);
 				}
 			}

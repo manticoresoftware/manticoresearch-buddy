@@ -1,16 +1,16 @@
-# Sharding Rollback and Recovery System
+# Sharding Rollback System
 
 ## Overview
 
-The ManticoreSearch Buddy sharding system now includes a comprehensive rollback and recovery mechanism that ensures system consistency and reliability by automatically reversing failed operations and providing tools for health monitoring and resource cleanup.
+The ManticoreSearch Buddy sharding system includes a simplified rollback mechanism that ensures system consistency by storing rollback commands directly when operations are queued. Rollback is always enabled and commands are provided upfront.
 
 ## Key Features
 
-### 1. Automatic Rollback
-- **Operation Groups**: Related commands grouped for atomic execution
-- **Rollback Commands**: Automatic generation of reverse SQL commands
-- **Failure Detection**: Automatic rollback trigger on operation failure
-- **Queue-Based Execution**: Leverages existing queue infrastructure
+### 1. Always-On Rollback
+- **Required Rollback Commands**: Every queued operation must provide its rollback command
+- **Direct Storage**: Rollback commands stored immediately when operation is queued
+- **No Auto-Generation**: Rollback commands are explicitly provided by the caller
+- **Operation Groups**: Related commands grouped for atomic rollback
 
 ### 2. Rebalancing Control
 - **Stop/Pause/Resume**: Full control over rebalancing operations
@@ -32,17 +32,17 @@ The ManticoreSearch Buddy sharding system now includes a comprehensive rollback 
 
 ## Architecture
 
-### Enhanced Queue Table Structure
+### Queue Table Structure
 
 ```sql
 CREATE TABLE system.sharding_queue (
     `id` bigint,                    -- Primary key
     `node` string,                   -- Target node
     `query` string,                  -- Forward command
-    `rollback_query` string,         -- Rollback command (NEW)
+    `rollback_query` string,         -- Rollback command (REQUIRED)
     `wait_for_id` bigint,           -- Forward dependency
-    `rollback_wait_for_id` bigint,  -- Rollback dependency (NEW)
-    `operation_group` string,        -- Operation group ID (NEW)
+    `rollback_wait_for_id` bigint,  -- Rollback dependency
+    `operation_group` string,        -- Operation group ID
     `tries` int,                     -- Retry count
     `status` string,                 -- Command status
     `created_at` bigint,            -- Creation timestamp
@@ -58,7 +58,7 @@ Table Operations
     ├── Create operation_group
     ├── Queue.addWithRollback() [multiple commands]
     ├── On Success: Mark complete
-    └── On Failure: 
+    └── On Failure:
         └── Queue.rollbackOperationGroup()
             ├── Get completed commands
             ├── Sort by ID DESC (reverse)
@@ -116,7 +116,7 @@ if ($health['overall_status'] !== 'healthy') {
     foreach ($health['issues'] as $issue) {
         echo "Issue: {$issue['type']} - {$issue['count']} affected";
     }
-    
+
     // Auto-recovery
     $recovery = $monitor->performAutoRecovery();
     echo "Recovered: " . count($recovery['recovered_tables']) . " tables";
@@ -139,9 +139,9 @@ $cleanup->cleanupExpiredQueueItems();
 $cleanup->cleanupStaleStateEntries();
 ```
 
-## Rollback Command Generation
+## Rollback Command Examples
 
-The system automatically generates rollback commands for common operations:
+Common rollback patterns used in the system:
 
 | Forward Command | Rollback Command |
 |----------------|------------------|
@@ -151,13 +151,29 @@ The system automatically generates rollback commands for common operations:
 | `ALTER CLUSTER c1 DROP t1` | `ALTER CLUSTER c1 ADD t1` |
 | `JOIN CLUSTER c1` | `DELETE CLUSTER c1` |
 
-Commands that cannot be safely rolled back (like `DROP TABLE`) return null and require manual intervention.
+All rollback commands must be provided when queuing operations. The system no longer auto-generates rollback commands.
+
+## Usage Examples
+
+### Adding Operations with Rollback
+
+```php
+// Create table with explicit rollback
+$forwardSql = "CREATE TABLE users (id bigint, name string)";
+$rollbackSql = "DROP TABLE IF EXISTS users";
+$queue->add($nodeId, $forwardSql, $rollbackSql, $operationGroup);
+
+// Distributed table creation
+$forwardSql = $this->getCreateShardedTableSQL($shards);
+$rollbackSql = "DROP TABLE IF EXISTS {$this->name}";
+$queue->add($node, $forwardSql, $rollbackSql, $operationGroup);
+```
 
 ## Production Deployment
 
-### Migration
+### Queue Table Setup
 
-For existing systems, run the migration to add rollback support:
+The queue table is automatically created with rollback support:
 
 ```php
 $queue = new Queue($cluster, $client);

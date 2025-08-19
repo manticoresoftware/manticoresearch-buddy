@@ -16,12 +16,12 @@ All related operations are grouped together for atomic execution:
 public function shard(Queue $queue, int $shardCount, int $replicationFactor = 2): Map {
     // Create unique operation group
     $operationGroup = "shard_create_{$this->name}_" . uniqid();
-    
+
     try {
         // All operations in this group
         $queue->addWithRollback($node, $createSql, $rollbackSql, $operationGroup);
         // ... more operations
-        
+
         return $result;
     } catch (\Throwable $t) {
         // Automatic rollback of entire group
@@ -31,12 +31,17 @@ public function shard(Queue $queue, int $shardCount, int $replicationFactor = 2)
 }
 ```
 
-### Rollback Command Generation
+### Rollback Command Handling
 
-The system automatically generates reverse commands for common operations:
+The system requires explicit rollback commands for all operations:
 
 ```php
-// RollbackCommandGenerator examples
+// Rollback commands must be provided when queuing operations
+$forwardSql = "CREATE TABLE users (id bigint, name string)";
+$rollbackSql = "DROP TABLE IF EXISTS users";
+$queue->add($nodeId, $forwardSql, $rollbackSql, $operationGroup);
+
+// Common rollback patterns:
 "CREATE TABLE users" → "DROP TABLE IF EXISTS users"
 "CREATE CLUSTER c1" → "DELETE CLUSTER c1"
 "ALTER CLUSTER c1 ADD t1" → "ALTER CLUSTER c1 DROP t1"
