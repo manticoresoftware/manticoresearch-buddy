@@ -12,7 +12,7 @@ The Manticore Buddy Sharding system provides automatic distribution of data acro
 - **Data Safety**: Ensures no data loss during rebalancing operations
 - **Concurrent Operation Control**: Prevents conflicting rebalancing operations
 - **Queue-Based Processing**: Asynchronous command execution with proper ordering
-- **Automatic Rollback**: Simplified rollback system with required rollback commands
+- **Automatic Rollback**: Simplified rollback system with mandatory rollback commands
 - **Graceful Stop Control**: Ability to stop/pause/resume rebalancing operations
 - **Resource Cleanup**: Automatic cleanup of orphaned resources and failed operations
 - **Health Monitoring**: Built-in health checks and auto-recovery mechanisms
@@ -122,9 +122,9 @@ This documentation is organized into the following sections:
 The system has been significantly enhanced to handle new node addition scenarios and provide robust error recovery:
 
 ### Rollback and Recovery System
-- **Automatic Rollback**: All operations are now atomic with automatic rollback on failure
-- **Operation Groups**: Related commands grouped for atomic execution
-- **Rollback Command Generation**: Automatic generation of reverse SQL commands
+- **Always-On Rollback**: All operations require explicit rollback commands for atomic execution
+- **Operation Groups**: Related commands grouped for atomic rollback
+- **Explicit Rollback Commands**: Callers must provide rollback SQL for each operation
 - **Queue-Based Rollback**: Leverages existing queue infrastructure for rollback execution
 
 ### Rebalancing Control
