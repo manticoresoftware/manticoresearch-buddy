@@ -196,11 +196,11 @@ final class Cluster {
 	 * Create a cluster by using distributed queue with list of nodes
 	 * This method just add join queries to the queue to all requested nodes
 	 * @param  Queue  $queue
+	 * @param  array<string> $nodeIds
 	 * @param  string|null $operationGroup Optional operation group for rollback
-	 * @param  string ...$nodeIds
 	 * @return static
 	 */
-	public function addNodeIds(Queue $queue, ?string $operationGroup = null, string ...$nodeIds): static {
+	public function addNodeIds(Queue $queue, array $nodeIds, ?string $operationGroup = null): static {
 		$galeraOptions = static::GALERA_OPTIONS;
 		foreach ($nodeIds as $node) {
 			$this->nodes->add($node);
@@ -235,12 +235,12 @@ final class Cluster {
 	/**
 	 * Enqueue the tables attachments to all nodes of current cluster
 	 * @param Queue  $queue
+	 * @param array<string> $tables
 	 * @param string|null $operationGroup Optional operation group for rollback
-	 * @param string ...$tables
 	 * @return int
 	 */
-	public function addTables(Queue $queue, ?string $operationGroup = null, string ...$tables): int {
-		if (!$tables) {
+	public function addTables(Queue $queue, array $tables, ?string $operationGroup = null): int {
+		if (empty($tables)) {
 			throw new \Exception('Tables must be passed to add');
 		}
 		$tablesStr = implode(',', $tables);
@@ -252,12 +252,12 @@ final class Cluster {
 	/**
 	 * Enqueue the tables detachement to all nodes of current cluster
 	 * @param Queue  $queue
+	 * @param array<string> $tables
 	 * @param string|null $operationGroup Optional operation group for rollback
-	 * @param string ...$tables
 	 * @return int
 	 */
-	public function removeTables(Queue $queue, ?string $operationGroup = null, string ...$tables): int {
-		if (!$tables) {
+	public function removeTables(Queue $queue, array $tables, ?string $operationGroup = null): int {
+		if (empty($tables)) {
 			throw new \Exception('Tables must be passed to remove');
 		}
 		$tablesStr = implode(',', $tables);
@@ -341,12 +341,12 @@ final class Cluster {
 	 */
 	public function processPendingTables(Queue $queue, ?string $operationGroup = null): static {
 		if ($this->tablesToDetach->count()) {
-			$this->removeTables($queue, $operationGroup, ...$this->tablesToDetach);
+			$this->removeTables($queue, $this->tablesToDetach->toArray(), $operationGroup);
 			$this->tablesToDetach = new Set;
 		}
 
 		if ($this->tablesToAttach->count()) {
-			$this->addTables($queue, $operationGroup, ...$this->tablesToAttach);
+			$this->addTables($queue, $this->tablesToAttach->toArray(), $operationGroup);
 			$this->tablesToAttach = new Set;
 		}
 
