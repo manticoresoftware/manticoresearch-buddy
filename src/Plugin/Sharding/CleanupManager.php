@@ -13,7 +13,8 @@ final class CleanupManager {
 	public function __construct(
 		private Client $client,
 		private Cluster $cluster
-	) {}
+	) {
+	}
 
 	/**
 	 * Comprehensive cleanup of all orphaned resources
@@ -47,10 +48,9 @@ final class CleanupManager {
 			$stateCleanup = $this->cleanupStaleStateEntries();
 			$results['actions_taken'][] = "Cleaned {$stateCleanup['cleaned_count']} stale state entries";
 			$results['resources_cleaned'] += $stateCleanup['cleaned_count'];
-
 		} catch (\Throwable $e) {
 			$results['errors'][] = $e->getMessage();
-			Buddy::debugvv("Cleanup error: " . $e->getMessage());
+			Buddy::debugvv('Cleanup error: ' . $e->getMessage());
 		}
 
 		return $results;
@@ -65,7 +65,7 @@ final class CleanupManager {
 
 		try {
 			// Get all clusters
-			$clusterResult = $this->client->sendRequest("SHOW CLUSTERS");
+			$clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
 			/** @var array{0?:array{data?:array<array{cluster:string}>}} */
 			$clusterData = $clusterResult->getResult();
 			$clusters = $clusterData[0]['data'] ?? [];
@@ -74,22 +74,25 @@ final class CleanupManager {
 				$clusterName = $cluster['cluster'] ?? '';
 
 				// Check if it's a temporary cluster (starts with temp_move_)
-				if (strpos($clusterName, 'temp_move_') === 0) {
-					// Check if it's orphaned (older than 1 hour)
-					if ($this->isClusterOrphaned($clusterName)) {
-						try {
-							$this->client->sendRequest("DELETE CLUSTER {$clusterName}");
-							$results['cleaned_count']++;
-							Buddy::debugvv("Cleaned orphaned cluster: {$clusterName}");
-						} catch (\Throwable $e) {
-							$results['errors'][] = "Failed to clean cluster {$clusterName}: " . $e->getMessage();
-						}
-					}
+				if (strpos($clusterName, 'temp_move_') !== 0) {
+					continue;
+				}
+
+				// Check if it's orphaned (older than 1 hour)
+				if (!$this->isClusterOrphaned($clusterName)) {
+					continue;
+				}
+
+				try {
+					$this->client->sendRequest("DELETE CLUSTER {$clusterName}");
+					$results['cleaned_count']++;
+					Buddy::debugvv("Cleaned orphaned cluster: {$clusterName}");
+				} catch (\Throwable $e) {
+					$results['errors'][] = "Failed to clean cluster {$clusterName}: " . $e->getMessage();
 				}
 			}
-
 		} catch (\Throwable $e) {
-			$results['errors'][] = "Failed to list clusters: " . $e->getMessage();
+			$results['errors'][] = 'Failed to list clusters: ' . $e->getMessage();
 		}
 
 		return $results;
@@ -115,13 +118,15 @@ final class CleanupManager {
 				return $results;
 			}
 
-			$result = $this->client->sendRequest("
+			$result = $this->client->sendRequest(
+				"
 				SELECT DISTINCT operation_group
 				FROM {$queueTable}
 				WHERE operation_group != ''
 				AND created_at < {$cutoffTime}
 				AND status IN ('failed', 'error')
-			");
+			"
+			);
 
 			/** @var array{0?:array{data?:array<array{operation_group:string}>}} */
 			$data = $result->getResult();
@@ -132,21 +137,21 @@ final class CleanupManager {
 
 				try {
 					// Delete all queue items for this operation group
-					$this->client->sendRequest("
+					$this->client->sendRequest(
+						"
 						DELETE FROM {$queueTable}
 						WHERE operation_group = '{$operationGroup}'
-					");
+					"
+					);
 
 					$results['cleaned_count']++;
 					Buddy::debugvv("Cleaned failed operation group: {$operationGroup}");
-
 				} catch (\Throwable $e) {
 					$results['errors'][] = "Failed to clean operation group {$operationGroup}: " . $e->getMessage();
 				}
 			}
-
 		} catch (\Throwable $e) {
-			$results['errors'][] = "Failed to clean operation groups: " . $e->getMessage();
+			$results['errors'][] = 'Failed to clean operation groups: ' . $e->getMessage();
 		}
 
 		return $results;
@@ -164,12 +169,14 @@ final class CleanupManager {
 			$cutoffTime = (time() - 604800) * 1000; // 7 days ago in milliseconds
 
 			// Count items to be deleted
-			$countResult = $this->client->sendRequest("
+			$countResult = $this->client->sendRequest(
+				"
 				SELECT COUNT(*) as count
 				FROM {$queueTable}
 				WHERE created_at < {$cutoffTime}
 				AND status IN ('processed', 'failed', 'error')
-			");
+			"
+			);
 
 			/** @var array{0?:array{data?:array{0?:array{count:int}}}} */
 			$countData = $countResult->getResult();
@@ -177,18 +184,19 @@ final class CleanupManager {
 
 			if ($count > 0) {
 				// Delete expired items
-				$this->client->sendRequest("
+				$this->client->sendRequest(
+					"
 					DELETE FROM {$queueTable}
 					WHERE created_at < {$cutoffTime}
 					AND status IN ('processed', 'failed', 'error')
-				");
+				"
+				);
 
 				$results['cleaned_count'] = $count;
 				Buddy::debugvv("Cleaned {$count} expired queue items");
 			}
-
 		} catch (\Throwable $e) {
-			$results['errors'][] = "Failed to clean expired queue items: " . $e->getMessage();
+			$results['errors'][] = 'Failed to clean expired queue items: ' . $e->getMessage();
 		}
 
 		return $results;
@@ -208,11 +216,13 @@ final class CleanupManager {
 			// Clean up old error entries (older than 30 days)
 			$cutoffTime = time() - 2592000; // 30 days
 
-			$errorEntries = $this->client->sendRequest("
+			$errorEntries = $this->client->sendRequest(
+				"
 				SELECT key FROM {$stateTable}
 				WHERE key LIKE 'rebalance_error:%'
 				AND updated_at < {$cutoffTime}
-			");
+			"
+			);
 
 			/** @var array{0?:array{data?:array<array{key:string}>}} */
 			$data = $errorEntries->getResult();
@@ -221,18 +231,19 @@ final class CleanupManager {
 			foreach ($entries as $entry) {
 				try {
 					// Delete the stale entry
-					$this->client->sendRequest("
+					$this->client->sendRequest(
+						"
 						DELETE FROM {$stateTable}
 						WHERE key = '{$entry['key']}'
-					");
+					"
+					);
 					$results['cleaned_count']++;
 				} catch (\Throwable $e) {
 					$results['errors'][] = "Failed to clean state entry {$entry['key']}: " . $e->getMessage();
 				}
 			}
-
 		} catch (\Throwable $e) {
-			$results['errors'][] = "Failed to clean state entries: " . $e->getMessage();
+			$results['errors'][] = 'Failed to clean state entries: ' . $e->getMessage();
 		}
 
 		return $results;
@@ -265,9 +276,11 @@ final class CleanupManager {
 	 */
 	private function hasOperationGroupColumn(string $queueTable): bool {
 		try {
-			$result = $this->client->sendRequest("
+			$result = $this->client->sendRequest(
+				"
 				SELECT operation_group FROM {$queueTable} LIMIT 1
-			");
+			"
+			);
 			return !$result->hasError();
 		} catch (\Throwable $e) {
 			return false;

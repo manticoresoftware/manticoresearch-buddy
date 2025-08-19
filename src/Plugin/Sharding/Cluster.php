@@ -60,13 +60,15 @@ final class Cluster {
 	 * Initialize and create the current cluster
 	 * This method should be executed on main cluster node
 	 * @param ?Queue $queue
+	 * @param string|null $operationGroup Optional operation group for rollback
 	 * @return int Last insert id into the queue or 0
 	 */
-	public function create(?Queue $queue = null): int {
+	public function create(?Queue $queue = null, ?string $operationGroup = null): int {
 		// TODO: the pass is the subject to remove
 		$galeraOptions = static::GALERA_OPTIONS;
 		$query = "CREATE CLUSTER IF NOT EXISTS {$this->name} '{$this->name}' as path, '{$galeraOptions}' as options";
-		return $this->runQuery($queue, $query);
+		$rollback = "DELETE CLUSTER {$this->name}";
+		return $this->runQuery($queue, $query, $rollback, $operationGroup);
 	}
 
 	/**
@@ -95,12 +97,14 @@ final class Cluster {
 	/**
 	 * Helper function to run query on the node
 	 * @param  ?Queue $queue
-	 * @param  string     $query
+	 * @param  string $query
+	 * @param  string|null $rollbackQuery Optional rollback command
+	 * @param  string|null $operationGroup Optional operation group
 	 * @return int
 	 */
-	protected function runQuery(?Queue $queue, string $query): int {
+	protected function runQuery(?Queue $queue, string $query, ?string $rollbackQuery = null, ?string $operationGroup = null): int {
 		if ($queue) {
-			$queueId = $queue->add($this->nodeId, $query);
+			$queueId = $queue->add($this->nodeId, $query, $rollbackQuery, $operationGroup);
 		} else {
 			$this->client->sendRequest($query, disableAgentHeader: true);
 		}
@@ -187,17 +191,19 @@ final class Cluster {
 	 * Create a cluster by using distributed queue with list of nodes
 	 * This method just add join queries to the queue to all requested nodes
 	 * @param  Queue  $queue
+	 * @param  string|null $operationGroup Optional operation group for rollback
 	 * @param  string ...$nodeIds
 	 * @return static
 	 */
-	public function addNodeIds(Queue $queue, string ...$nodeIds): static {
+	public function addNodeIds(Queue $queue, ?string $operationGroup = null, string ...$nodeIds): static {
 		$galeraOptions = static::GALERA_OPTIONS;
 		foreach ($nodeIds as $node) {
 			$this->nodes->add($node);
 			// TODO: the pass is the subject to remove
 			$query = "JOIN CLUSTER {$this->name} at '{$this->nodeId}' '{$this->name}' as " .
 				"path, '{$galeraOptions}' as options";
-			$queue->add($node, $query);
+			$rollback = "DELETE CLUSTER {$this->name}";
+			$queue->add($node, $query, $rollback, $operationGroup);
 		}
 		return $this;
 	}
@@ -224,31 +230,35 @@ final class Cluster {
 	/**
 	 * Enqueue the tables attachments to all nodes of current cluster
 	 * @param Queue  $queue
+	 * @param string|null $operationGroup Optional operation group for rollback
 	 * @param string ...$tables
 	 * @return int
 	 */
-	public function addTables(Queue $queue, string ...$tables): int {
+	public function addTables(Queue $queue, ?string $operationGroup = null, string ...$tables): int {
 		if (!$tables) {
 			throw new \Exception('Tables must be passed to add');
 		}
-		$tables = implode(',', $tables);
-		$query = "ALTER CLUSTER {$this->name} ADD {$tables}";
-		return $queue->add($this->nodeId, $query);
+		$tablesStr = implode(',', $tables);
+		$query = "ALTER CLUSTER {$this->name} ADD {$tablesStr}";
+		$rollback = "ALTER CLUSTER {$this->name} DROP {$tablesStr}";
+		return $queue->add($this->nodeId, $query, $rollback, $operationGroup);
 	}
 
 	/**
 	 * Enqueue the tables detachement to all nodes of current cluster
 	 * @param Queue  $queue
+	 * @param string|null $operationGroup Optional operation group for rollback
 	 * @param string ...$tables
 	 * @return int
 	 */
-	public function removeTables(Queue $queue, string ...$tables): int {
+	public function removeTables(Queue $queue, ?string $operationGroup = null, string ...$tables): int {
 		if (!$tables) {
 			throw new \Exception('Tables must be passed to remove');
 		}
-		$tables = implode(',', $tables);
-		$query = "ALTER CLUSTER {$this->name} DROP {$tables}";
-		return $queue->add($this->nodeId, $query);
+		$tablesStr = implode(',', $tables);
+		$query = "ALTER CLUSTER {$this->name} DROP {$tablesStr}";
+		$rollback = "ALTER CLUSTER {$this->name} ADD {$tablesStr}";
+		return $queue->add($this->nodeId, $query, $rollback, $operationGroup);
 	}
 
 	/**
@@ -319,18 +329,19 @@ final class Cluster {
 	/**
 	 * Process pending tables to add and drop in current cluster
 	 * @param Queue $queue
+	 * @param string|null $operationGroup Optional operation group for rollback
 	 * @return static
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 */
-	public function processPendingTables(Queue $queue): static {
+	public function processPendingTables(Queue $queue, ?string $operationGroup = null): static {
 		if ($this->tablesToDetach->count()) {
-			$this->removeTables($queue, ...$this->tablesToDetach);
+			$this->removeTables($queue, $operationGroup, ...$this->tablesToDetach);
 			$this->tablesToDetach = new Set;
 		}
 
 		if ($this->tablesToAttach->count()) {
-			$this->addTables($queue, ...$this->tablesToAttach);
+			$this->addTables($queue, $operationGroup, ...$this->tablesToAttach);
 			$this->tablesToAttach = new Set;
 		}
 
@@ -355,98 +366,15 @@ final class Cluster {
 		return $this->getTableName($table);
 	}
 
-	/**
-	 * Process pending tables with rollback support
-	 * @param Queue $queue
-	 * @param string $operationGroup
-	 * @return static
-	 */
-	public function processPendingTablesWithRollback(Queue $queue, string $operationGroup): static {
-		if ($this->tablesToDetach->count()) {
-			$this->removeTablesWithRollback($queue, $operationGroup, ...$this->tablesToDetach);
-			$this->tablesToDetach = new Set;
-		}
 
-		if ($this->tablesToAttach->count()) {
-			$this->addTablesWithRollback($queue, $operationGroup, ...$this->tablesToAttach);
-			$this->tablesToAttach = new Set;
-		}
 
-		return $this;
-	}
 
-	/**
-	 * Add pending table with rollback support
-	 * @param string $node
-	 * @param string $table
-	 * @param string $operationGroup
-	 * @return static
-	 */
-	public function addPendingTableWithRollback(string $node, string $table, string $operationGroup): static {
-		$this->nodeId = $node;
-		$this->tablesToAttach->add($table);
-		return $this;
-	}
 
-	/**
-	 * Create cluster with rollback support
-	 * @param Queue $queue
-	 * @param string $operationGroup
-	 * @return int
-	 */
-	public function createWithRollback(Queue $queue, string $operationGroup): int {
-		$query = "CREATE CLUSTER IF NOT EXISTS {$this->name} '{$this->name}' as path";
-		$rollback = RollbackCommandGenerator::forCreateCluster($this->name);
-		return $queue->addWithRollback($this->nodeId, $query, $rollback, $operationGroup);
-	}
 
-	/**
-	 * Add node IDs with rollback support
-	 * @param Queue $queue
-	 * @param string $operationGroup
-	 * @param string ...$nodeIds
-	 * @return static
-	 */
-	public function addNodeIdsWithRollback(Queue $queue, string $operationGroup, string ...$nodeIds): static {
-		$galeraOptions = static::GALERA_OPTIONS;
-		foreach ($nodeIds as $nodeId) {
-			$query = "JOIN CLUSTER {$this->name} AT '{$this->nodeId}' '{$galeraOptions}'";
-			$rollback = RollbackCommandGenerator::forJoinCluster($this->name);
-			$queue->addWithRollback($nodeId, $query, $rollback, $operationGroup);
-			$this->nodes->add($nodeId);
-		}
-		return $this;
-	}
 
-	/**
-	 * Add tables with rollback support
-	 * @param Queue $queue
-	 * @param string $operationGroup
-	 * @param string ...$tables
-	 * @return int
-	 */
-	public function addTablesWithRollback(Queue $queue, string $operationGroup, string ...$tables): int {
-		if (!$tables) {
-			return 0;
-		}
-		$query = 'ALTER CLUSTER ' . $this->name . ' ADD ' . implode(', ', $tables);
-		$rollback = 'ALTER CLUSTER ' . $this->name . ' DROP ' . implode(', ', $tables);
-		return $queue->addWithRollback($this->nodeId, $query, $rollback, $operationGroup);
-	}
 
-	/**
-	 * Remove tables with rollback support
-	 * @param Queue $queue
-	 * @param string $operationGroup
-	 * @param string ...$tables
-	 * @return int
-	 */
-	public function removeTablesWithRollback(Queue $queue, string $operationGroup, string ...$tables): int {
-		if (!$tables) {
-			return 0;
-		}
-		$query = 'ALTER CLUSTER ' . $this->name . ' DROP ' . implode(', ', $tables);
-		$rollback = 'ALTER CLUSTER ' . $this->name . ' ADD ' . implode(', ', $tables);
-		return $queue->addWithRollback($this->nodeId, $query, $rollback, $operationGroup);
-	}
+
+
+
+
 }

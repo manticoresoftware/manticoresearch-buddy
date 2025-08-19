@@ -61,52 +61,26 @@ final class Queue {
 	 * Add new query for requested node to the queue
 	 * @param string $nodeId
 	 * @param string $query
+	 * @param string|null $rollbackQuery Optional rollback command
+	 * @param string|null $operationGroup Optional operation group
 	 * @return int the queue id
 	 */
-	public function add(string $nodeId, string $query): int {
+	public function add(string $nodeId, string $query, ?string $rollbackQuery = null, ?string $operationGroup = null): int {
 		$table = $this->cluster->getSystemTableName($this->table);
 		$mt = (int)(microtime(true) * 1000);
 		$query = addcslashes($query, "'");
 		$id = hrtime(true);
-		$this->client->sendRequest(
-			"
-			INSERT INTO {$table}
-				(`id`, `node`, `query`, `wait_for_id`, `tries`, `status`, `created_at`, `updated_at`, `duration`)
-			VALUES
-				($id, '{$nodeId}', '{$query}', $this->waitForId, 0,'created', {$mt}, {$mt}, 0)
-			"
-		);
-		return $id;
-	}
 
-	/**
-	 * Add command with rollback support
-	 * @param string $nodeId Target node
-	 * @param string $query Forward command
-	 * @param string|null $rollbackQuery Rollback command (auto-generated if null)
-	 * @param string|null $operationGroup Group for bulk operations
-	 * @return int Queue ID
-	 */
-	public function addWithRollback(
-		string $nodeId,
-		string $query,
-		?string $rollbackQuery = null,
-		?string $operationGroup = null
-	): int {
-		// Auto-generate rollback if not provided
-		if ($rollbackQuery === null) {
+		// Auto-generate rollback if not provided and rollback is supported
+		if ($rollbackQuery === null && $this->hasRollbackSupport()) {
 			$rollbackQuery = RollbackCommandGenerator::generate($query);
 		}
 
-		$table = $this->cluster->getSystemTableName($this->table);
-		$mt = (int)(microtime(true) * 1000);
-		$query = addcslashes($query, "'");
-		$rollbackQuery = $rollbackQuery ? addcslashes($rollbackQuery, "'") : '';
-		$operationGroup = $operationGroup ?? '';
-		$id = hrtime(true);
-
-		// Check if table has rollback columns (for backward compatibility)
+		// Use rollback columns if available
 		if ($this->hasRollbackSupport()) {
+			$rollbackQuery = $rollbackQuery ? addcslashes($rollbackQuery, "'") : '';
+			$operationGroup = $operationGroup ?? '';
+
 			$this->client->sendRequest(
 				"
 				INSERT INTO {$table}
@@ -120,12 +94,21 @@ final class Queue {
 				"
 			);
 		} else {
-			// Fallback to regular add for backward compatibility
-			return $this->add($nodeId, $query);
+			// Fallback to old schema
+			$this->client->sendRequest(
+				"
+				INSERT INTO {$table}
+					(`id`, `node`, `query`, `wait_for_id`, `tries`, `status`, `created_at`, `updated_at`, `duration`)
+				VALUES
+					($id, '{$nodeId}', '{$query}', $this->waitForId, 0,'created', {$mt}, {$mt}, 0)
+				"
+			);
 		}
 
 		return $id;
 	}
+
+
 
 	/**
 	 * Get the single row by id
@@ -369,7 +352,7 @@ final class Queue {
 	public function rollbackOperationGroup(string $operationGroup): bool {
 		try {
 			if (!$this->hasRollbackSupport()) {
-				Buddy::debugvv("Rollback not supported - queue table missing rollback columns");
+				Buddy::debugvv('Rollback not supported - queue table missing rollback columns');
 				return false;
 			}
 
@@ -481,7 +464,7 @@ final class Queue {
 		try {
 			// Check if migration is needed
 			if ($this->hasRollbackSupport()) {
-				Buddy::debugvv("Queue table already has rollback support");
+				Buddy::debugvv('Queue table already has rollback support');
 				return true;
 			}
 
@@ -498,7 +481,7 @@ final class Queue {
 					Buddy::debugvv("Added rollback column: {$query}");
 				} catch (\Throwable $e) {
 					// Column might already exist - that's OK
-					Buddy::debugvv("Column might already exist: " . $e->getMessage());
+					Buddy::debugvv('Column might already exist: ' . $e->getMessage());
 				}
 			}
 
@@ -506,7 +489,7 @@ final class Queue {
 			$hasSupport = null;
 			return true;
 		} catch (\Throwable $e) {
-			Buddy::debugvv("Queue migration failed: " . $e->getMessage());
+			Buddy::debugvv('Queue migration failed: ' . $e->getMessage());
 			return false;
 		}
 	}
