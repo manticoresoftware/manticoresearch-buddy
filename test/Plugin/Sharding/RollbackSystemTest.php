@@ -18,7 +18,18 @@ use PHPUnit\Framework\TestCase;
  */
 final class RollbackSystemTest extends TestCase {
 
+	/**
+	 * @var array<array{
+	 *   id: int,
+	 *   node: string,
+	 *   query: string,
+	 *   rollback_query: string,
+	 *   operation_group: string,
+	 *   status: string
+	 * }>
+	 */
 	public array $capturedCommands = [];
+	/** @var array<string> */
 	public array $rolledBackGroups = [];
 
 	protected function setUp(): void {
@@ -33,6 +44,16 @@ final class RollbackSystemTest extends TestCase {
 	private function createTestableQueue(): TestableQueue {
 		$testCase = $this;
 		return new class($testCase) extends TestableQueue {
+			/**
+			 * @var array<array{
+			 *   id: int,
+			 *   node: string,
+			 *   query: string,
+			 *   rollback_query: string,
+			 *   operation_group: string,
+			 *   status: string
+			 * }>
+			 */
 			private array $capturedCommands = [];
 			private RollbackSystemTest $testCase;
 
@@ -69,6 +90,16 @@ final class RollbackSystemTest extends TestCase {
 				return true;
 			}
 
+			/**
+			 * @return array<array{
+			 *   id: int,
+			 *   node: string,
+			 *   query: string,
+			 *   rollback_query: string,
+			 *   operation_group: string,
+			 *   status: string
+			 * }>
+			 */
 			public function getCapturedCommands(): array {
 				return $this->capturedCommands;
 			}
