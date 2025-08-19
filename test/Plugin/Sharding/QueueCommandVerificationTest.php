@@ -277,7 +277,11 @@ class QueueCommandVerificationTest extends TestCase {
 				$queue->add('127.0.0.1:3312', "CREATE TABLE IF NOT EXISTS test_table_s1 (id bigint) type='rt'", '');
 
 				// Intermediate cluster for shard movement (RF=1 specific)
-				$queue->add('127.0.0.1:1312', "CREATE CLUSTER temp_move_test_cluster 'temp_move_test_cluster' as path", '');
+				$queue->add(
+					'127.0.0.1:1312',
+					"CREATE CLUSTER temp_move_test_cluster 'temp_move_test_cluster' as path",
+					''
+				);
 				$queue->add('127.0.0.1:3312', "JOIN CLUSTER temp_move_test_cluster at '127.0.0.1:1312'", '');
 				$queue->add('127.0.0.1:1312', 'ALTER CLUSTER temp_move_test_cluster ADD test_table_s0', '');
 				$queue->add('127.0.0.1:1312', 'ALTER CLUSTER temp_move_test_cluster DROP test_table_s0', '');
