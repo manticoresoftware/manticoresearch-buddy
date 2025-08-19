@@ -356,7 +356,7 @@ final class Queue {
 	/**
 	 * Get rollback commands for operation group in reverse order
 	 * @param string $operationGroup
-	 * @return array Rollback commands in reverse execution order
+	 * @return array<array{id:int,node:string,rollback_query:string,rollback_wait_for_id:int}> Rollback commands in reverse execution order
 	 */
 	protected function getRollbackCommands(string $operationGroup): array {
 		$table = $this->cluster->getSystemTableName($this->table);
@@ -379,7 +379,7 @@ final class Queue {
 
 	/**
 	 * Execute rollback commands in sequence
-	 * @param array $rollbackCommands
+	 * @param array<array{id:int,node:string,rollback_query:string,rollback_wait_for_id:int}> $rollbackCommands
 	 * @return bool Success status
 	 */
 	protected function executeRollbackSequence(array $rollbackCommands): bool {

@@ -13,8 +13,8 @@ use Ds\Set;
 use Manticoresearch\Buddy\Base\Plugin\Sharding\Queue;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Test\Plugin\Sharding\TestDoubles\TestableCluster;
-use Manticoresearch\Buddy\Test\Plugin\Sharding\TestDoubles\TestableQueue;
 use Manticoresearch\Buddy\Test\Plugin\Sharding\TestDoubles\TestableTable;
+use Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles\TestableQueue;
 use PHPUnit\Framework\TestCase;
 
 /**
