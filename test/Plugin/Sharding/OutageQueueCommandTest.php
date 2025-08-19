@@ -170,13 +170,15 @@ class OutageQueueCommandTest extends TestCase {
 
 	/** @return TestableQueue */
 	private function createTestableQueue() {
-		return new TestableQueue();
+		return new TestableQueue(null, [$this, 'addCapturedCommand']);
 	}
 
 	/** @param mixed $cluster */
 	private function createTestableTableWithMocks(Client $client, $cluster, string $testType): TestableTable {
-		unset($client, $cluster, $testType); // Parameters required by interface but not used in test
-		return new TestableTable();
+		unset($client, $cluster); // Parameters required by interface but not used in test
+		$table = new TestableTable();
+		$table->setTestScenario($testType); // Pass scenario to table
+		return $table;
 	}
 
 	/** @param array{id:int,node:string,query:string,wait_for_id:?int} $command */
