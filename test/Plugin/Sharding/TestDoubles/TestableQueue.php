@@ -24,9 +24,13 @@ class TestableQueue {
 	/** @var array<array{node: string, query: string, rollback_query: string, operation_group: string|null}> */
 	private array $capturedCommands = [];
 
-	public function __construct(private ?Queue $queue = null) {
+	/** @var callable|null */
+	private $commandCallback = null;
+
+	public function __construct(private ?Queue $queue = null, ?callable $commandCallback = null) {
 		// Allow null for pure mocking scenarios
 		$this->capturedCommands = [];
+		$this->commandCallback = $commandCallback;
 	}
 
 	/**
@@ -80,6 +84,18 @@ class TestableQueue {
 			'operation_group' => $operationGroup ?? '',
 			'status' => 'created',
 		];
+
+		// Call external callback if provided
+		if ($this->commandCallback) {
+			($this->commandCallback)(
+				[
+				'id' => $id,
+				'node' => $nodeId,
+				'query' => $query,
+				'wait_for_id' => null,
+				]
+			);
+		}
 
 		// Delegate to real queue if available
 		return $this->queue?->add($nodeId, $query, $rollbackQuery, $operationGroup) ?? $id;
