@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Test\Plugin\Sharding\TestDoubles;
+namespace Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles;
 
 use Manticoresearch\Buddy\Base\Plugin\Sharding\Node;
 use Manticoresearch\Buddy\Base\Plugin\Sharding\Queue;
@@ -21,8 +21,11 @@ use Manticoresearch\Buddy\Base\Plugin\Sharding\Queue;
  */
 class TestableQueue {
 
+	private array $capturedCommands = [];
+
 	public function __construct(private ?Queue $queue = null) {
 		// Allow null for pure mocking scenarios
+		$this->capturedCommands = [];
 	}
 
 	/**
@@ -53,13 +56,27 @@ class TestableQueue {
 	}
 
 	/**
-	 * Add new query for requested node to the queue
+	 * Add new query for requested node to the queue with rollback support
 	 * @param string $nodeId
 	 * @param string $query
+	 * @param string $rollbackQuery
+	 * @param string|null $operationGroup
 	 * @return int the queue id
 	 */
-	public function add(string $nodeId, string $query): int {
-		return $this->queue?->add($nodeId, $query) ?? 0;
+	public function add(string $nodeId, string $query, string $rollbackQuery = '', ?string $operationGroup = null): int {
+		// Capture command for testing
+		$id = count($this->capturedCommands) + 1;
+		$this->capturedCommands[] = [
+			'id' => $id,
+			'node' => $nodeId,
+			'query' => $query,
+			'rollback_query' => $rollbackQuery,
+			'operation_group' => $operationGroup ?? '',
+			'status' => 'created',
+		];
+
+		// Delegate to real queue if available
+		return $this->queue?->add($nodeId, $query, $rollbackQuery, $operationGroup) ?? $id;
 	}
 
 	/**
@@ -86,5 +103,22 @@ class TestableQueue {
 	 */
 	public function setup(): void {
 		$this->queue?->setup();
+	}
+
+	/**
+	 * Rollback entire operation group
+	 * @param string $operationGroup
+	 * @return bool
+	 */
+	public function rollbackOperationGroup(string $operationGroup): bool {
+		return $this->queue?->rollbackOperationGroup($operationGroup) ?? true;
+	}
+
+	/**
+	 * Get captured commands for testing
+	 * @return array
+	 */
+	public function getCapturedCommands(): array {
+		return $this->capturedCommands;
 	}
 }
