@@ -232,8 +232,9 @@ final class Queue {
 	 */
 	protected function dequeue(Node $node): Vector {
 		$maxTries = static::MAX_TRIES;
+		$table = $this->cluster->getSystemTableName($this->table);
 		$query = "
-		SELECT * FROM {$this->table}
+		SELECT * FROM {$table}
 			WHERE
 				`node` = '{$node->id}'
 				 AND
