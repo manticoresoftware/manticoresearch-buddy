@@ -400,7 +400,7 @@ final class Table {
 			$clusterMap[$clusterName] = $cluster;
 			$waitForId = $cluster->create($queue, $operationGroup);
 			$queue->setWaitForId($waitForId);
-			$cluster->addNodeIds($queue, $operationGroup, ...$nodesToJoin);
+			$cluster->addNodeIds($queue, $nodesToJoin->toArray(), $operationGroup);
 			$queue->resetWaitForId();
 		}
 
@@ -1362,7 +1362,7 @@ final class Table {
 					$connectedNode
 				);
 				$queueIds[] = $cluster->makePrimary($queue);
-				$queueIds[] = $cluster->removeTables($queue, $table);
+				$queueIds[] = $cluster->removeTables($queue, [$table]);
 				$processedTables->add($table);
 			}
 		}
