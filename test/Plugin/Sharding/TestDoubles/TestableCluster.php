@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Test\Plugin\Sharding\TestDoubles;
+namespace Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles;
 
 use Ds\Set;
 use Manticoresearch\Buddy\Base\Plugin\Sharding\Cluster;
