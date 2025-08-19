@@ -18,7 +18,7 @@ final class CleanupManager {
 
 	/**
 	 * Comprehensive cleanup of all orphaned resources
-	 * @return array Cleanup results
+	 * @return array{timestamp: int, actions_taken: array<string>, resources_cleaned: int, errors: array<string>} Cleanup results
 	 */
 	public function performFullCleanup(): array {
 		$results = [
@@ -58,7 +58,7 @@ final class CleanupManager {
 
 	/**
 	 * Find and clean up orphaned temporary clusters
-	 * @return array Cleanup results
+	 * @return array{cleaned_count: int, errors: array<string>} Cleanup results
 	 */
 	public function cleanupOrphanedTemporaryClusters(): array {
 		$results = ['cleaned_count' => 0, 'errors' => []];
@@ -71,7 +71,7 @@ final class CleanupManager {
 			$clusters = $clusterData[0]['data'] ?? [];
 
 			foreach ($clusters as $cluster) {
-				$clusterName = $cluster['cluster'] ?? '';
+				$clusterName = $cluster['cluster'];
 
 				// Check if it's a temporary cluster (starts with temp_move_)
 				if (strpos($clusterName, 'temp_move_') !== 0) {
@@ -100,7 +100,7 @@ final class CleanupManager {
 
 	/**
 	 * Clean up failed operation groups from queue
-	 * @return array Cleanup results
+	 * @return array{cleaned_count: int, errors: array<string>} Cleanup results
 	 */
 	public function cleanupFailedOperationGroups(): array {
 		$results = ['cleaned_count' => 0, 'errors' => []];
@@ -158,7 +158,7 @@ final class CleanupManager {
 
 	/**
 	 * Clean up expired queue items (older than 7 days)
-	 * @return array Cleanup results
+	 * @return array{cleaned_count: int, errors: array<string>} Cleanup results
 	 */
 	public function cleanupExpiredQueueItems(): array {
 		$results = ['cleaned_count' => 0, 'errors' => []];
@@ -203,7 +203,7 @@ final class CleanupManager {
 
 	/**
 	 * Clean up stale state entries
-	 * @return array Cleanup results
+	 * @return array{cleaned_count: int, errors: array<string>} Cleanup results
 	 */
 	public function cleanupStaleStateEntries(): array {
 		$results = ['cleaned_count' => 0, 'errors' => []];
