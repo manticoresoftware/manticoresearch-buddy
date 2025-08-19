@@ -131,32 +131,35 @@ class TestableCluster {
 	/**
 	 * Add node IDs to cluster
 	 * @param \Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue
-	 * @param string ...$nodeIds
+	 * @param array<string> $nodeIds
+	 * @param string|null $operationGroup
 	 * @return static
 	 */
-	public function addNodeIds(\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue, string ...$nodeIds): static {
-		$this->cluster?->addNodeIds($queue, ...$nodeIds);
+	public function addNodeIds(\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue, array $nodeIds, ?string $operationGroup = null): static {
+		$this->cluster?->addNodeIds($queue, $nodeIds, $operationGroup);
 		return $this;
 	}
 
 	/**
 	 * Add tables to cluster
 	 * @param \Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue
-	 * @param string ...$tables
+	 * @param array<string> $tables
+	 * @param string|null $operationGroup
 	 * @return int
 	 */
-	public function addTables(\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue, string ...$tables): int {
-		return $this->cluster?->addTables($queue, ...$tables) ?? 0;
+	public function addTables(\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue, array $tables, ?string $operationGroup = null): int {
+		return $this->cluster?->addTables($queue, $tables, $operationGroup) ?? 0;
 	}
 
 	/**
 	 * Remove tables from cluster
 	 * @param \Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue
-	 * @param string ...$tables
+	 * @param array<string> $tables
+	 * @param string|null $operationGroup
 	 * @return int
 	 */
-	public function removeTables(\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue, string ...$tables): int {
-		return $this->cluster?->removeTables($queue, ...$tables) ?? 0;
+	public function removeTables(\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue, array $tables, ?string $operationGroup = null): int {
+		return $this->cluster?->removeTables($queue, $tables, $operationGroup) ?? 0;
 	}
 
 	/**
