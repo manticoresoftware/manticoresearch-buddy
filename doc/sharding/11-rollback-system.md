@@ -56,7 +56,7 @@ CREATE TABLE system.sharding_queue (
 ```
 Table Operations
     ├── Create operation_group
-    ├── Queue.addWithRollback() [multiple commands]
+    ├── Queue.add() with rollback [multiple commands]
     ├── On Success: Mark complete
     └── On Failure:
         └── Queue.rollbackOperationGroup()
@@ -177,7 +177,8 @@ The queue table is automatically created with rollback support:
 
 ```php
 $queue = new Queue($cluster, $client);
-$queue->migrateForRollbackSupport();
+// Queue table now always includes rollback columns
+// No migration needed - rollback is always enabled
 ```
 
 ### Monitoring Setup
@@ -220,9 +221,9 @@ Configure alerts for:
 
 ### Common Issues
 
-1. **Rollback Commands Not Generated**
-   - Check if command is supported by RollbackCommandGenerator
-   - Manually specify rollback command if needed
+1. **Missing Rollback Commands**
+   - All operations now require explicit rollback commands
+   - Provide appropriate rollback SQL when calling Queue::add()
 
 2. **Rollback Execution Fails**
    - Check rollback command syntax
