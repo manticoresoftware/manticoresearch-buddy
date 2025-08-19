@@ -18,8 +18,8 @@ public function shard(Queue $queue, int $shardCount, int $replicationFactor = 2)
     $operationGroup = "shard_create_{$this->name}_" . uniqid();
 
     try {
-        // All operations in this group
-        $queue->addWithRollback($node, $createSql, $rollbackSql, $operationGroup);
+        // All operations in this group (rollback required)
+        $queue->add($node, $createSql, $rollbackSql, $operationGroup);
         // ... more operations
 
         return $result;
