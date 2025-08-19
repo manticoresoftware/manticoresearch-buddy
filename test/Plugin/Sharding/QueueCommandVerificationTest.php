@@ -148,7 +148,7 @@ class QueueCommandVerificationTest extends TestCase {
 	}
 
 	private function createTestableQueue(): TestableQueue {
-		return new TestableQueue();
+		return new TestableQueue(null, [$this, 'addCapturedCommand']);
 	}
 
 
