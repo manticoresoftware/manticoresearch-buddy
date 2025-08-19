@@ -213,7 +213,7 @@ final class Payload extends BasePayload {
 				'/MATCH\s*\(\'(.*?)\'\)/ius',
 				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
-				'/\soption(?!.*option|.*from)/ius',
+				'/\soption(?!.*option|.*from),/ius',
 				'/\s*,\s*facet\s+/ius',
 				'/option\s+facet/ius',
 				],
@@ -241,7 +241,6 @@ final class Payload extends BasePayload {
 		}
 		Buddy::debug("Fuzzy: match: $match");
 		$queries = [sprintf($template, $match), ...$this->queries];
-		var_dump($queries);
 		return implode(';', $queries);
 	}
 
