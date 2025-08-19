@@ -78,22 +78,20 @@ Manages asynchronous command execution across cluster nodes with rollback suppor
 - **Rollback orchestration** (NEW)
 - **Group-based atomic operations** (NEW)
 
-**Enhanced Methods (NEW):**
-- `addWithRollback()`: Add command with rollback support
-- `rollbackOperationGroup()`: Execute rollback for entire group
-- `getRollbackCommands()`: Retrieve rollback commands
-- `executeRollbackSequence()`: Execute rollback in reverse order
-- `hasRollbackSupport()`: Check for rollback column support
-- `migrateForRollbackSupport()`: Upgrade existing tables
+**Core Methods:**
+- `add(string $nodeId, string $query, string $rollbackQuery, ?string $operationGroup = null)`: Add command with mandatory rollback support
+- `rollbackOperationGroup(string $operationGroup)`: Execute rollback for entire operation group
+- `getRollbackCommands(string $operationGroup)`: Retrieve rollback commands for group
+- `executeRollbackSequence(array $commands)`: Execute rollback commands in reverse order
 
 **Synchronization Pattern:**
 ```php
-// Command A with rollback
-$idA = $queue->addWithRollback($node, "CREATE TABLE t1", "DROP TABLE t1", $group);
+// Command A with rollback (rollback is now mandatory)
+$idA = $queue->add($node, "CREATE TABLE t1", "DROP TABLE IF EXISTS t1", $group);
 
 // Command B waits for A and has rollback
 $queue->setWaitForId($idA);
-$idB = $queue->addWithRollback($node, "ALTER CLUSTER c1 ADD t1", "ALTER CLUSTER c1 DROP t1", $group);
+$idB = $queue->add($node, "ALTER CLUSTER c1 ADD t1", "ALTER CLUSTER c1 DROP t1", $group);
 
 // On failure, rollback entire group
 if ($error) {
@@ -133,17 +131,19 @@ $rebalanceKey = "rebalance:{$tableName}";
 
 Manages cluster topology and node communication.
 
-**Key Features:**
-- Node discovery and health monitoring
-- Cluster configuration management
-- Inter-node communication setup
-- Active/inactive node tracking
+**Key Methods:**
+- `create(?Queue $queue = null, ?string $operationGroup = null)`: Create cluster with rollback support
+- `addNodeIds(Queue $queue, ?string $operationGroup = null, string ...$nodeIds)`: Add nodes to cluster
+- `addTables(Queue $queue, ?string $operationGroup = null, string ...$tables)`: Add tables to cluster
+- `removeTables(Queue $queue, ?string $operationGroup = null, string ...$tables)`: Remove tables from cluster
+- `processPendingTables(Queue $queue, ?string $operationGroup = null)`: Process pending table operations
 
 **Core Responsibilities:**
 - Cluster topology management
 - Node health monitoring
 - Communication channel setup
 - Cluster state synchronization
+- Rollback-aware cluster operations
 
 ### 6. Operator Class (`src/Plugin/Sharding/Operator.php`)
 
@@ -249,8 +249,8 @@ class TestableQueue {
         // Allow null for pure mocking scenarios
     }
 
-    public function add(string $nodeId, string $query): int {
-        return $this->queue?->add($nodeId, $query) ?? 0;
+    public function add(string $nodeId, string $query, string $rollbackQuery, ?string $operationGroup = null): int {
+        return $this->queue?->add($nodeId, $query, $rollbackQuery, $operationGroup) ?? 0;
     }
 
     // Other methods delegate similarly...
@@ -266,43 +266,9 @@ class TestableQueue {
 
 This component architecture provides a robust, scalable foundation for distributed table sharding with comprehensive testing coverage and production-ready reliability.
 
-## New Components (Rollback & Recovery System)
+## New Components (Recovery System)
 
-### 7. RollbackCommandGenerator Class (`src/Plugin/Sharding/RollbackCommandGenerator.php`)
-
-Generates reverse SQL commands for rollback operations.
-
-**Key Features:**
-- Automatic rollback command generation
-- Pattern matching for SQL commands
-- Safety checks for rollback operations
-- Batch generation support
-
-**Supported Conversions:**
-- `CREATE TABLE` → `DROP TABLE IF EXISTS`
-- `CREATE CLUSTER` → `DELETE CLUSTER`
-- `ALTER CLUSTER ADD` → `ALTER CLUSTER DROP`
-- `ALTER CLUSTER DROP` → `ALTER CLUSTER ADD`
-- `JOIN CLUSTER` → `DELETE CLUSTER`
-
-**Usage Pattern:**
-```php
-// Direct rollback command provision
-$forwardSql = "CREATE TABLE users (id bigint, name string)";
-$rollbackSql = "DROP TABLE IF EXISTS users";
-$queue->add($nodeId, $forwardSql, $rollbackSql, $operationGroup);
-
-// Common rollback patterns:
-"CREATE TABLE users" → "DROP TABLE IF EXISTS users"
-"CREATE CLUSTER c1" → "DELETE CLUSTER c1"
-"ALTER CLUSTER c1 ADD t1" → "ALTER CLUSTER c1 DROP t1"
-
-// All operations require explicit rollback commands
-$queue->add($node, $sql, $rollbackSql, $operationGroup);
-}
-```
-
-### 8. CleanupManager Class (`src/Plugin/Sharding/CleanupManager.php`)
+### 7. CleanupManager Class (`src/Plugin/Sharding/CleanupManager.php`)
 
 Manages cleanup of orphaned resources and failed operations.
 
@@ -326,7 +292,7 @@ $results = $cleanup->performFullCleanup();
 // Returns: ['resources_cleaned' => 42, 'actions_taken' => [...]]
 ```
 
-### 9. HealthMonitor Class (`src/Plugin/Sharding/HealthMonitor.php`)
+### 8. HealthMonitor Class (`src/Plugin/Sharding/HealthMonitor.php`)
 
 Monitors system health and performs auto-recovery.
 
@@ -373,7 +339,7 @@ if ($health['overall_status'] !== 'healthy') {
 ```
 Table.shard()
     ├── Creates operation_group
-    ├── Queue.addWithRollback() [multiple times]
+    ├── Queue.add() with rollback [multiple times]
     ├── On failure:
     │   └── Queue.rollbackOperationGroup()
     │       ├── getRollbackCommands()
