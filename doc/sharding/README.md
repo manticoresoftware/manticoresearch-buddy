@@ -12,7 +12,7 @@ The Manticore Buddy Sharding system provides automatic distribution of data acro
 - **Data Safety**: Ensures no data loss during rebalancing operations
 - **Concurrent Operation Control**: Prevents conflicting rebalancing operations
 - **Queue-Based Processing**: Asynchronous command execution with proper ordering
-- **Automatic Rollback**: Comprehensive rollback system for failed operations
+- **Automatic Rollback**: Simplified rollback system with required rollback commands
 - **Graceful Stop Control**: Ability to stop/pause/resume rebalancing operations
 - **Resource Cleanup**: Automatic cleanup of orphaned resources and failed operations
 - **Health Monitoring**: Built-in health checks and auto-recovery mechanisms

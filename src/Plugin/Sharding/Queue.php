@@ -12,11 +12,15 @@ use RuntimeException;
  * @phpstan-type QueryItem array{
  *  id:int,
  *  query:string,
+ *  rollback_query:string,
  *  wait_for_id:int,
+ *  rollback_wait_for_id:int,
+ *  operation_group:string,
  *  tries:int,
  *  status:string,
  *  created_at:int,
- *  updated_at:int
+ *  updated_at:int,
+ *  duration:int
  * }
  */
 final class Queue {
@@ -61,49 +65,31 @@ final class Queue {
 	 * Add new query for requested node to the queue
 	 * @param string $nodeId
 	 * @param string $query
-	 * @param string|null $rollbackQuery Optional rollback command
+	 * @param string $rollbackQuery Required rollback command (rollback always enabled)
 	 * @param string|null $operationGroup Optional operation group
 	 * @return int the queue id
 	 */
-	public function add(string $nodeId, string $query, ?string $rollbackQuery = null, ?string $operationGroup = null): int {
+	public function add(string $nodeId, string $query, string $rollbackQuery, ?string $operationGroup = null): int {
 		$table = $this->cluster->getSystemTableName($this->table);
 		$mt = (int)(microtime(true) * 1000);
 		$query = addcslashes($query, "'");
 		$id = hrtime(true);
 
-		// Auto-generate rollback if not provided and rollback is supported
-		if ($rollbackQuery === null && $this->hasRollbackSupport()) {
-			$rollbackQuery = RollbackCommandGenerator::generate($query);
-		}
+		$rollbackQuery = addcslashes($rollbackQuery, "'");
+		$operationGroup = $operationGroup ?? '';
 
-		// Use rollback columns if available
-		if ($this->hasRollbackSupport()) {
-			$rollbackQuery = $rollbackQuery ? addcslashes($rollbackQuery, "'") : '';
-			$operationGroup = $operationGroup ?? '';
-
-			$this->client->sendRequest(
-				"
-				INSERT INTO {$table}
-					(`id`, `node`, `query`, `rollback_query`, `wait_for_id`,
-					 `rollback_wait_for_id`, `operation_group`, `tries`, `status`,
-					 `created_at`, `updated_at`, `duration`)
-				VALUES
-					($id, '{$nodeId}', '{$query}', '{$rollbackQuery}',
-					 $this->waitForId, 0, '{$operationGroup}', 0, 'created',
-					 {$mt}, {$mt}, 0)
-				"
-			);
-		} else {
-			// Fallback to old schema
-			$this->client->sendRequest(
-				"
-				INSERT INTO {$table}
-					(`id`, `node`, `query`, `wait_for_id`, `tries`, `status`, `created_at`, `updated_at`, `duration`)
-				VALUES
-					($id, '{$nodeId}', '{$query}', $this->waitForId, 0,'created', {$mt}, {$mt}, 0)
-				"
-			);
-		}
+		$this->client->sendRequest(
+			"
+			INSERT INTO {$table}
+			(`id`, `node`, `query`, `rollback_query`, `wait_for_id`,
+			`rollback_wait_for_id`, `operation_group`, `tries`, `status`,
+			`created_at`, `updated_at`, `duration`)
+			VALUES
+			($id, '{$nodeId}', '{$query}', '{$rollbackQuery}',
+			$this->waitForId, 0, '{$operationGroup}', 0, 'created',
+			{$mt}, {$mt}, 0)
+			"
+		);
 
 		return $id;
 	}
@@ -310,7 +296,10 @@ final class Queue {
 		$query = "CREATE TABLE {$this->table} (
 			`node` string,
 			`query` string,
+			`rollback_query` string,
 			`wait_for_id` bigint,
+			`rollback_wait_for_id` bigint,
+			`operation_group` string,
 			`tries` int,
 			`status` string,
 			`created_at` bigint,
@@ -351,11 +340,6 @@ final class Queue {
 	 */
 	public function rollbackOperationGroup(string $operationGroup): bool {
 		try {
-			if (!$this->hasRollbackSupport()) {
-				Buddy::debugvv('Rollback not supported - queue table missing rollback columns');
-				return false;
-			}
-
 			$rollbackCommands = $this->getRollbackCommands($operationGroup);
 			if (empty($rollbackCommands)) {
 				Buddy::debugvv("No rollback commands found for group {$operationGroup}");
@@ -427,70 +411,5 @@ final class Queue {
 		}
 
 		return $allSuccess;
-	}
-
-	/**
-	 * Check if the queue table has rollback support columns
-	 * @return bool
-	 */
-	protected function hasRollbackSupport(): bool {
-		static $hasSupport = null;
-
-		if ($hasSupport !== null) {
-			return $hasSupport;
-		}
-
-		try {
-			$table = $this->cluster->getSystemTableName($this->table);
-			// Try to query rollback columns
-			$query = "SELECT rollback_query, operation_group FROM {$table} LIMIT 1";
-			$res = $this->client->sendRequest($query);
-			$hasSupport = !$res->hasError();
-		} catch (\Throwable $e) {
-			$hasSupport = false;
-		}
-
-		return $hasSupport;
-	}
-
-	/**
-	 * Migrate existing queue table to support rollback
-	 * Call this during system upgrade
-	 * @return bool Success status
-	 */
-	public function migrateForRollbackSupport(): bool {
-		$table = $this->cluster->getSystemTableName($this->table);
-
-		try {
-			// Check if migration is needed
-			if ($this->hasRollbackSupport()) {
-				Buddy::debugvv('Queue table already has rollback support');
-				return true;
-			}
-
-			// Add new columns for rollback support
-			$alterQueries = [
-				"ALTER TABLE {$table} ADD COLUMN rollback_query string",
-				"ALTER TABLE {$table} ADD COLUMN rollback_wait_for_id bigint",
-				"ALTER TABLE {$table} ADD COLUMN operation_group string",
-			];
-
-			foreach ($alterQueries as $query) {
-				try {
-					$this->client->sendRequest($query);
-					Buddy::debugvv("Added rollback column: {$query}");
-				} catch (\Throwable $e) {
-					// Column might already exist - that's OK
-					Buddy::debugvv('Column might already exist: ' . $e->getMessage());
-				}
-			}
-
-			// Clear the cache
-			$hasSupport = null;
-			return true;
-		} catch (\Throwable $e) {
-			Buddy::debugvv('Queue migration failed: ' . $e->getMessage());
-			return false;
-		}
 	}
 }
