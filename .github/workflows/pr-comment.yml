@@ -67,27 +67,27 @@ jobs:
             if (isForkPR) {
               comment = `## 🐳 Docker Images Built (Fork PR)
 
-**Buddy Test-Kit Images Built Locally:**
-- **Branch image:** \`${branchImage}\`
-- **Commit image:** \`${commitImage}\`
+            **Buddy Test-Kit Images Built Locally:**
+            - **Branch image:** \`${branchImage}\`
+            - **Commit image:** \`${commitImage}\`
 
-**Base image used:** \`${baseImage}\`
+            **Base image used:** \`${baseImage}\`
 
-⚠️ **Note:** Images were built successfully but not pushed to the registry because this PR comes from a fork. The images are available locally for testing during the CI run.
+            ⚠️ **Note:** Images were built successfully but not pushed to the registry because this PR comes from a fork. The images are available locally for testing during the CI run.
 
-*Built from commit: ${headSha}*`;
+            *Built from commit: ${headSha}*`;
             } else {
               comment = `## 🐳 Docker Images Pushed
 
-**Buddy Test-Kit Images:**
-- **Branch image:** \`${branchImage}\`
-- **Commit image:** \`${commitImage}\`
+            **Buddy Test-Kit Images:**
+            - **Branch image:** \`${branchImage}\`
+            - **Commit image:** \`${commitImage}\`
 
-**Base image used:** \`${baseImage}\`
+            **Base image used:** \`${baseImage}\`
 
-These images contain the buddy code from this PR and can be used for testing.
+            These images contain the buddy code from this PR and can be used for testing.
 
-*Built from commit: ${headSha}*`;
+            *Built from commit: ${headSha}*`;
             }
 
             github.rest.issues.createComment({
