@@ -13,9 +13,7 @@ use Manticoresearch\Buddy\Base\Plugin\Show\Payload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request as NetRequest;
-
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Manticoresearch\BuddyTest\Trait\TestHTTPServerTrait;
 use PHPUnit\Framework\TestCase;
 
 class ShowVersionHandlerTest extends TestCase {
@@ -23,14 +21,16 @@ class ShowVersionHandlerTest extends TestCase {
 	public function testShowVersionRejectedOnSqlEndpoint(): void {
 		echo "\nTesting that 'SHOW VERSION' is rejected on /sql endpoint\n";
 
-		$request = NetRequest::fromArray([
+		$request = NetRequest::fromArray(
+			[
 			'error' => '',  // Add this line - empty string for successful requests
 			'payload' => 'SHOW VERSION',
 			'version' => Buddy::PROTOCOL_VERSION,
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
 			'path' => 'sql', // SQL endpoint
-		]);
+			]
+		);
 
 		// Verify that Payload::hasMatch returns false for /sql endpoint
 		$this->assertFalse(Payload::hasMatch($request));
@@ -39,14 +39,16 @@ class ShowVersionHandlerTest extends TestCase {
 	public function testShowVersionAcceptedOnRootEndpoint(): void {
 		echo "\nTesting that 'SHOW VERSION' is accepted on root endpoint\n";
 
-		$request = NetRequest::fromArray([
+		$request = NetRequest::fromArray(
+			[
 			'error' => '',  // Add this line - empty string for successful requests
 			'payload' => 'SHOW VERSION',
 			'version' => Buddy::PROTOCOL_VERSION,
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
 			'path' => 'sql?mode=raw', // Root endpoint (also fix path)
-		]);
+			]
+		);
 
 		// Verify that Payload::hasMatch returns true for root endpoint
 		$this->assertTrue(Payload::hasMatch($request));
