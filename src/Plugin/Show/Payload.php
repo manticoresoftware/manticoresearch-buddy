@@ -175,7 +175,8 @@ final class Payload extends BasePayload {
 			return true;
 		}
 
-		if ($payloadLen === 12 && stripos($request->payload, 'show version') === 0) {
+		if ($request->path !== 'sql' && $payloadLen === 12
+			&& stripos($request->payload, 'show version') === 0) {
 			static::$type = 'version';
 			return true;
 		}

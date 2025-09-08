@@ -27,6 +27,7 @@ final class Payload extends BasePayload {
 	const MAX_BOOST = 50;
 	const DECREASE_FACTOR = 1.44;
 	const ESCAPE_CHARS = '()[]<!|*/-~^$@';
+	const MATCH_REG_PATTERN = '/MATCH\s*\(\'(.*?)\'(\s*,\s*\w*?)?\s*\)/ius';
 
 	/** @var string */
 	public string $path;
@@ -108,8 +109,19 @@ final class Payload extends BasePayload {
 		$tableName = $matches[1] ?? '';
 
 		// Check that we have match
-		if (!preg_match('/match\s*\(\'(.*?)\'\)/ius', $query, $matches)) {
-			throw QueryParseError::create("The 'fuzzy' option requires a full-text query");
+		if (!preg_match(static::MATCH_REG_PATTERN, $query, $matches)) {
+			throw QueryParseError::create(
+				"The 'fuzzy' option requires a full-text query. " .
+					"Use: MATCH('search query') or MATCH('search query', table_name)"
+			);
+		}
+
+		$searchTableName = $matches[2] ?? null;
+		if (isset($searchTableName) && trim($searchTableName) === ',') {
+			throw QueryParseError::create(
+				'MATCH() clause has a trailing comma but table name is not defined. ' .
+					"Did you mean to specify a table? Eample: MATCH('search query', table_name)"
+			);
 		}
 
 		// I did not figure out how to make with regxp case OPTION fuzzy=1 so do this way
@@ -162,7 +174,7 @@ final class Payload extends BasePayload {
 		$additionalQueries = [];
 
 		// Find the position of the first semicolon
-		$firstSemicolonPos = strpos($query, ';', strripos($query, ' option ') ?: 0) ?: 0;
+		$firstSemicolonPos = strpos($query, ';', strripos($query, ' where ') ?: 0) ?: 0;
 
 		// If a semicolon exists
 		if ($firstSemicolonPos > 0) {
@@ -206,34 +218,33 @@ final class Payload extends BasePayload {
 	public function getQueriesSQLRequest(callable $fn): string {
 		/** @var string */
 		$payload = $this->payload;
-		preg_match('/MATCH\s*\(\'(.*?)\'\)/ius', $payload, $matches);
+		preg_match(static::MATCH_REG_PATTERN, $payload, $matches);
 		$searchValue = $matches[1] ?? '';
+		$searchTableName = $matches[2] ?? '';
 		$template = (string)preg_replace(
 			[
-				'/MATCH\s*\(\'(.*?)\'\)/ius',
+				static::MATCH_REG_PATTERN,
 				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,(?!.*option|.*from)/ius',
 				'/\soption(?!.*option|.*from)/ius',
 				'/\s*,\s*facet\s+/ius',
+				'/option\s+facet/ius',
 				],
 			[
-				'MATCH(\'%s\')',
+				'MATCH(\'%s\'%s)',
 				'',
 				'',
-				'option ',
-				' option idf=\'plain,tfidf_normalized\',', // TODO: hack
+				' ',
+				' option ',
 				' facet ',
+				'facet',
 			],
 			$payload
 		);
 		$template = trim($template, ' ,');
 		if (str_ends_with($template, 'option')) {
 			$template = substr($template, 0, -6);
-		}
-		// TODO: hack
-		if (false === strpos($template, 'option idf=\'plain,tfidf_normalized\'')) {
-			$template .= ' option idf=\'plain,tfidf_normalized\'';
 		}
 
 		// If not fuzzy enabled, we do not need to run function and simply assign search value
@@ -243,7 +254,7 @@ final class Payload extends BasePayload {
 			$match = $searchValue;
 		}
 		Buddy::debug("Fuzzy: match: $match");
-		$queries = [sprintf($template, $match), ...$this->queries];
+		$queries = [sprintf($template, $match, $searchTableName), ...$this->queries];
 		return implode(';', $queries);
 	}
 
@@ -423,13 +434,9 @@ final class Payload extends BasePayload {
 	public static function cleanUpPayloadOptions(array $payload): array {
 		$excludedOptions = ['distance', 'fuzzy', 'layouts', 'preserve'];
 		$payload['options'] = array_diff_key($payload['options'], array_flip($excludedOptions));
-		// TODO: hack
-		if (!isset($payload['options']['idf'])) { // @phpstan-ignore-line
-			$payload['options']['idf'] = 'plain,tfidf_normalized';
+		if (empty($payload['options'])) {
+			unset($payload['options']);
 		}
-		/* if (empty($payload['options'])) { */
-		/* 	unset($payload['options']); */
-		/* } */
 
 		return $payload;
 	}

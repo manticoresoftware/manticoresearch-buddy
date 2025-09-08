@@ -1,0 +1,98 @@
+name: PR Comment
+
+on:
+  workflow_run:
+    workflows: ["tests"]
+    types:
+      - completed
+
+jobs:
+  comment:
+    name: Comment on PR with Docker images
+    runs-on: ubuntu-22.04
+    if: github.event.workflow_run.event == 'pull_request'
+
+    permissions:
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Download PR comment data
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-comment-data
+          path: pr-comment/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Read PR data
+        id: pr_data
+        run: |
+          if [ -f pr-comment/data.json ]; then
+            echo "PR comment data found"
+            cat pr-comment/data.json
+
+            # Extract data from JSON
+            PR_NUMBER=$(jq -r '.pr_number' pr-comment/data.json)
+            BRANCH_IMAGE=$(jq -r '.branch_image' pr-comment/data.json)
+            COMMIT_IMAGE=$(jq -r '.commit_image' pr-comment/data.json)
+            BASE_IMAGE=$(jq -r '.base_image' pr-comment/data.json)
+            IS_FORK_PR=$(jq -r '.is_fork_pr' pr-comment/data.json)
+            HEAD_SHA=$(jq -r '.head_sha' pr-comment/data.json)
+
+            echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+            echo "branch_image=${BRANCH_IMAGE}" >> $GITHUB_OUTPUT
+            echo "commit_image=${COMMIT_IMAGE}" >> $GITHUB_OUTPUT
+            echo "base_image=${BASE_IMAGE}" >> $GITHUB_OUTPUT
+            echo "is_fork_pr=${IS_FORK_PR}" >> $GITHUB_OUTPUT
+            echo "head_sha=${HEAD_SHA}" >> $GITHUB_OUTPUT
+          else
+            echo "No PR comment data found"
+            exit 1
+          fi
+
+      - name: Comment on PR with Docker images
+        if: steps.pr_data.outputs.pr_number != ''
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const prNumber = '${{ steps.pr_data.outputs.pr_number }}';
+            const branchImage = '${{ steps.pr_data.outputs.branch_image }}';
+            const commitImage = '${{ steps.pr_data.outputs.commit_image }}';
+            const baseImage = '${{ steps.pr_data.outputs.base_image }}';
+            const isForkPR = '${{ steps.pr_data.outputs.is_fork_pr }}' === 'true';
+            const headSha = '${{ steps.pr_data.outputs.head_sha }}';
+
+            let comment;
+            if (isForkPR) {
+              comment = `## 🐳 Docker Images Built (Fork PR)
+
+            **Buddy Test-Kit Images Built Locally:**
+            - **Branch image:** \`${branchImage}\`
+            - **Commit image:** \`${commitImage}\`
+
+            **Base image used:** \`${baseImage}\`
+
+            ⚠️ **Note:** Images were built successfully but not pushed to the registry because this PR comes from a fork. The images are available locally for testing during the CI run.
+
+            *Built from commit: ${headSha}*`;
+            } else {
+              comment = `## 🐳 Docker Images Pushed
+
+            **Buddy Test-Kit Images:**
+            - **Branch image:** \`${branchImage}\`
+            - **Commit image:** \`${commitImage}\`
+
+            **Base image used:** \`${baseImage}\`
+
+            These images contain the buddy code from this PR and can be used for testing.
+
+            *Built from commit: ${headSha}*`;
+            }
+
+            github.rest.issues.createComment({
+              issue_number: parseInt(prNumber),
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

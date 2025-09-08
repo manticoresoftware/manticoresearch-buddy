@@ -180,44 +180,30 @@ jobs:
           docker push ${{ steps.vars.outputs.image }}
           docker push ${{ steps.vars.outputs.image_commit }}
 
-      - name: Comment on PR with Docker images
-        if: github.event_name == 'pull_request' && steps.vars.outputs.is_fork_pr == 'false'
-        uses: actions/github-script@v6
+      - name: Save PR comment data
+        if: github.event_name == 'pull_request'
+        run: |
+          # Save PR comment data as artifact for the comment workflow
+          mkdir -p pr-comment
+          cat > pr-comment/data.json << 'EOF'
+          {
+            "pr_number": "${{ github.event.number }}",
+            "branch_image": "${{ steps.vars.outputs.image }}",
+            "commit_image": "${{ steps.vars.outputs.image_commit }}",
+            "base_image": "${{ steps.vars.outputs.base_image }}",
+            "is_fork_pr": "${{ steps.vars.outputs.is_fork_pr }}",
+            "head_sha": "${{ github.event.pull_request.head.sha }}"
+          }
+          EOF
+          echo "PR comment data saved to artifact"
+
+      - name: Upload PR comment data
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const branchImage = '${{ steps.vars.outputs.image }}';
-            const commitImage = '${{ steps.vars.outputs.image_commit }}';
-            const isForkPR = '${{ steps.vars.outputs.is_fork_pr }}' === 'true';
-
-            let comment;
-            if (isForkPR) {
-              comment = `## 🐳 Docker Images Built (Fork PR)
-
-              **Buddy Test-Kit Images Built Locally:**
-              - **Branch image:** \`${branchImage}\`
-              - **Commit image:** \`${commitImage}\`
-
-              **Base image used:** \`${{ steps.vars.outputs.base_image }}\`
-
-              ⚠️ **Note:** Images were built successfully but not pushed to the registry because this PR comes from a fork. The images are available locally for testing during the CI run.`;
-            } else {
-              comment = `## 🐳 Docker Images Pushed
-
-              **Buddy Test-Kit Images:**
-              - **Branch image:** \`${branchImage}\`
-              - **Commit image:** \`${commitImage}\`
-
-              **Base image used:** \`${{ steps.vars.outputs.base_image }}\`
-
-              These images contain the buddy code from this PR and can be used for testing.`;
-            }
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
+          name: pr-comment-data
+          path: pr-comment/
+          retention-days: 1
 
 
   clt:
