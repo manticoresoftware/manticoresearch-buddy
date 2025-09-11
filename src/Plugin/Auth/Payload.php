@@ -141,13 +141,22 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasDropUser(Request $request): bool {
-		$result = (str_starts_with(
-				$request->error,
-				'P03: syntax error, unexpected tablename, '.
-				"expecting FUNCTION or PLUGIN or TABLE near 'user"
-			)
-			&& stripos($request->payload, 'DROP USER') !== false);
-		Buddy::debug("hasDropUser for query '{$request->payload}': " . ($result ? 'yes' : 'no'));
+		// More robust pattern matching for DROP USER detection
+		$patterns = [
+			'P03: syntax error, unexpected tablename, expecting FUNCTION or PLUGIN or TABLE near',
+			'P03: syntax error, unexpected identifier near'
+		];
+
+		$matchesPattern = false;
+		foreach ($patterns as $pattern) {
+			if (str_starts_with($request->error, $pattern)) {
+				$matchesPattern = true;
+				break;
+			}
+		}
+
+		$result = $matchesPattern && stripos($request->payload, 'DROP USER') !== false;
+		Buddy::debug("hasDropUser for query '{$request->payload}' (error: '{$request->error}'): " . ($result ? 'yes' : 'no'));
 		return $result;
 	}
 
