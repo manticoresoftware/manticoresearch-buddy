@@ -88,6 +88,38 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
     }
 
     /**
+     * Check if a permission already exists for the user
+     *
+     * @param string $username The username to check
+     * @param string $action The action to check
+     * @param string $target The target to check
+     * @return bool
+     * @throws GenericError
+     */
+    private function permissionExists(string $username, string $action, string $target): bool {
+        $tablePerms = Payload::AUTH_PERMISSIONS_TABLE;
+        $query = "SELECT count(*) as c FROM {$tablePerms} WHERE username = '{$username}' AND action = '{$action}' AND target = '{$target}'";
+
+        /** @var Response $resp */
+        $resp = $this->manticoreClient->sendRequest($query);
+
+        if ($resp->hasError()) {
+            Buddy::debug("Permission existence check failed: {$resp->getError()}");
+            throw GenericError::create($resp->getError());
+        }
+
+        $result = $resp->getResult();
+        if (!isset($result[0]['data'][0]['c'])) {
+            Buddy::debug('Unexpected response format: ' . json_encode($result));
+            throw GenericError::create('Unexpected response format when checking permission existence.');
+        }
+
+        $count = (int)$result[0]['data'][0]['c'];
+        Buddy::debug("Permission count for {$username}:{$action}:{$target}: {$count}");
+        return $count > 0;
+    }
+
+    /**
      * Handle GRANT command by adding a permission
      *
      * @param string $username The username to grant permissions to
@@ -103,8 +135,14 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
             throw GenericError::create("User '{$username}' does not exist.");
         }
 
+        // Check if permission already exists
+        if ($this->permissionExists($username, $action, $target)) {
+            Buddy::debug("Grant failed: Permission already exists for user '{$username}' on '{$target}' with action '{$action}'");
+            throw GenericError::create("User '{$username}' already has '{$action}' permission on '{$target}'.");
+        }
+
         $tablePerms = Payload::AUTH_PERMISSIONS_TABLE;
-        $query = "REPLACE INTO {$tablePerms} (username, action, target, allow, budget) " .
+        $query = "INSERT INTO {$tablePerms} (username, action, target, allow, budget) " .
             "VALUES ('{$username}', '{$action}', '{$target}', 1, '{$budget}')";
         Buddy::debug("Executing grant query: {$query}");
         Buddy::debug("To manually test, run: {$query};");
@@ -130,6 +168,17 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
      * @throws GenericError
      */
     private function handleRevoke(string $username, string $action, string $target): TaskResult {
+        if (!$this->userExists($username)) {
+            Buddy::debug("Revoke failed: User '{$username}' does not exist");
+            throw GenericError::create("User '{$username}' does not exist.");
+        }
+
+        // Check if permission exists before revoking
+        if (!$this->permissionExists($username, $action, $target)) {
+            Buddy::debug("Revoke failed: Permission does not exist for user '{$username}' on '{$target}' with action '{$action}'");
+            throw GenericError::create("User '{$username}' does not have '{$action}' permission on '{$target}'.");
+        }
+
         $tablePerms = Payload::AUTH_PERMISSIONS_TABLE;
         $query = "DELETE FROM {$tablePerms} WHERE username = '{$username}' AND action = '{$action}' AND target = '{$target}'";
         Buddy::debug("Executing revoke query: {$query}");
