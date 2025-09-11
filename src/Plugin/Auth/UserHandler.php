@@ -14,6 +14,8 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 final class UserHandler extends BaseHandlerWithClient {
 	use HashGeneratorTrait;
 
+	private const TOKEN_BYTES = 32; // 256 bits
+
 	/**
 	 * Initialize the executor
 	 *
@@ -81,6 +83,38 @@ final class UserHandler extends BaseHandlerWithClient {
 	}
 
 	/**
+	 * Validate username format and constraints
+	 *
+	 * @param string $username The username to validate
+	 * @throws GenericError
+	 */
+	private function validateUsername(string $username): void {
+		if (empty($username)) {
+			throw GenericError::create('Username cannot be empty.');
+		}
+		if (strlen($username) > 64) {
+			throw GenericError::create('Username is too long (max 64 characters).');
+		}
+		if (!preg_match('/^[a-zA-Z0-9_.-]+$/', $username)) {
+			throw GenericError::create('Username contains invalid characters.');
+		}
+	}
+
+	/**
+	 * Generate a cryptographically secure random token
+	 *
+	 * @return string
+	 * @throws GenericError
+	 */
+	private function generateToken(): string {
+		try {
+			return bin2hex(random_bytes(self::TOKEN_BYTES));
+		} catch (Exception $e) {
+			throw GenericError::create('Failed to generate secure token: ' . $e->getMessage());
+		}
+	}
+
+	/**
 	 * Handle user creation
 	 *
 	 * @param string $username The username to create
@@ -89,6 +123,8 @@ final class UserHandler extends BaseHandlerWithClient {
 	 * @throws GenericError
 	 */
 	private function handleCreateUser(string $username, int $count): TaskResult {
+		$this->validateUsername($username);
+
 		if ($count > 0) {
 			throw GenericError::create("User '{$username}' already exists.");
 		}
@@ -97,18 +133,26 @@ final class UserHandler extends BaseHandlerWithClient {
 			throw GenericError::create('Password is required for CREATE USER.');
 		}
 
-		$salt = bin2hex(random_bytes(16));
-		$hashesJson = $this->generateHashes($this->payload->password, $salt);
+		$salt = bin2hex(random_bytes(20));
+		$token = $this->generateToken();
+
+		// Generate hashes including the token hash for bearer_sha256
+		$hashesJson = $this->generateHashesWithToken($this->payload->password, $token, $salt);
+
 		$tableUsers = Payload::AUTH_USERS_TABLE;
 		$query = "INSERT INTO {$tableUsers} (username, salt, hashes) VALUES ('{$username}', '{$salt}', '{$hashesJson}')";
-		/** @var Response $resp */
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
 			throw GenericError::create($resp->getError());
 		}
 
-		return TaskResult::none();
+		// Return the generated token to the user
+		return TaskResult::withRow([
+			'token' => $token,
+			'username' => $username,
+			'generated_at' => date('Y-m-d H:i:s')
+		]);
 	}
 
 	/**

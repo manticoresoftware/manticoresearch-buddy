@@ -35,6 +35,24 @@ final class PasswordHandler extends BaseHandlerWithClient {
     }
 
     /**
+     * Validate password strength and constraints
+     *
+     * @param string $password The password to validate
+     * @throws GenericError
+     */
+    private function validatePassword(string $password): void {
+        if (empty($password)) {
+            throw GenericError::create('Password cannot be empty.');
+        }
+        if (strlen($password) < 8) {
+            throw GenericError::create('Password must be at least 8 characters long.');
+        }
+        if (strlen($password) > 128) {
+            throw GenericError::create('Password is too long (max 128 characters).');
+        }
+    }
+
+    /**
      * Process the password update request
      *
      * @return TaskResult
@@ -45,12 +63,20 @@ final class PasswordHandler extends BaseHandlerWithClient {
         $username = addslashes($username);
         $password = $this->payload->password;
 
-        if (!$password) {
-            throw GenericError::create('Password is required for SET PASSWORD.');
-        }
+        $this->validatePassword($password);
 
         $userData = $this->getUserData($username);
-        $hashesJson = $this->generateHashes($password, $userData['salt']);
+        $existingHashes = json_decode($userData['hashes'], true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw GenericError::create('Failed to parse user hash data: ' . json_last_error_msg());
+        }
+
+        // Validate hash structure before proceeding
+        $this->validateHashesStructure($existingHashes);
+
+        // Update only password hashes, preserve bearer_sha256
+        $hashesJson = $this->updatePasswordHashes($password, $userData['salt'], $existingHashes);
         $this->replaceUserData($username, $userData['salt'], $hashesJson);
 
         return TaskResult::none();
