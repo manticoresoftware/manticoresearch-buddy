@@ -8,7 +8,6 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class ShowHandler extends BaseHandlerWithClient {
 	/**
@@ -42,7 +41,7 @@ final class ShowHandler extends BaseHandlerWithClient {
 
 			$myPermissions = [];
 			$allPermissions = $document[0]['data'];
-			foreach ($allPermissions as $k => $row) {
+			foreach ($allPermissions as $row) {
 				if ($row['Username'] !== $payload->actingUser) {
 					continue;
 				}

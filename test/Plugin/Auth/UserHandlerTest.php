@@ -59,7 +59,7 @@ class UserHandlerTest extends TestCase {
 
 		$handler = new UserHandler($payload);
 		$this->expectException(\Manticoresearch\Buddy\Core\Error\GenericError::class);
-		$this->expectExceptionMessage("Password is required for CREATE USER.");
+		$this->expectExceptionMessage('Password is required for CREATE USER.');
 		self::invokeMethod($handler, 'handleCreateUser', ['testuser', 0]);
 	}
 

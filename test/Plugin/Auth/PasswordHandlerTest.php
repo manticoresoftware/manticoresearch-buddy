@@ -9,8 +9,8 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Base\Plugin\Auth\Payload;
 use Manticoresearch\Buddy\Base\Plugin\Auth\PasswordHandler;
+use Manticoresearch\Buddy\Base\Plugin\Auth\Payload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -45,7 +45,7 @@ class PasswordHandlerTest extends TestCase {
 
 		$handler = new PasswordHandler($payload);
 		$this->expectException(\Manticoresearch\Buddy\Core\Error\GenericError::class);
-		$this->expectExceptionMessage("Password is required for SET PASSWORD.");
+		$this->expectExceptionMessage('Password is required for SET PASSWORD.');
 		self::invokeMethod($handler, 'processRequest');
 	}
 

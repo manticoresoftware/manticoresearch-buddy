@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * This is simple do nothing request that handle empty queries
@@ -71,7 +70,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 * @throws GenericError
 	 */
- 	public static function fromRequest(Request $request): static {
+	public static function fromRequest(Request $request): static {
 		$self = new static();
 		$self->actingUser = $request->user;
 
@@ -107,7 +106,7 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		$result = (
+		return (
 			self::hasCreateUser($request) ||
 			self::hasDropUser($request) ||
 			self::hasGrant($request) ||
@@ -115,8 +114,6 @@ final class Payload extends BasePayload {
 			self::hasShowMyPermissions($request) ||
 			self::hasSetPassword($request)
 		);
-
-		return $result;
 	}
 
 	/**
@@ -124,14 +121,12 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasCreateUser(Request $request): bool {
-		$result = (str_starts_with(
-				$request->error,
-				'P03: syntax error, unexpected tablename, '.
+		return (str_starts_with(
+			$request->error,
+			'P03: syntax error, unexpected tablename, '.
 				"expecting CLUSTER or FUNCTION or PLUGIN or TABLE near 'USER"
-			)
+		)
 			&& stripos($request->payload, 'CREATE USER') !== false);
-
-		return $result;
 	}
 
 	/**
@@ -142,7 +137,7 @@ final class Payload extends BasePayload {
 		// More robust pattern matching for DROP USER detection
 		$patterns = [
 			'P03: syntax error, unexpected tablename, expecting FUNCTION or PLUGIN or TABLE near',
-			'P03: syntax error, unexpected identifier near'
+			'P03: syntax error, unexpected identifier near',
 		];
 
 		$matchesPattern = false;
@@ -153,9 +148,7 @@ final class Payload extends BasePayload {
 			}
 		}
 
-		$result = $matchesPattern && stripos($request->payload, 'DROP USER') !== false;
-
-		return $result;
+		return $matchesPattern && stripos($request->payload, 'DROP USER') !== false;
 	}
 
 	/**
@@ -163,13 +156,11 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasGrant(Request $request): bool {
-		$result = (str_starts_with(
-				$request->error,
-				"P02: syntax error, unexpected identifier near 'GRANT"
-			)
+		return (str_starts_with(
+			$request->error,
+			"P02: syntax error, unexpected identifier near 'GRANT"
+		)
 			&& stripos($request->payload, 'GRANT') !== false);
-
-		return $result;
 	}
 
 	/**
@@ -177,13 +168,11 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasRevoke(Request $request): bool {
-		$result = (str_starts_with(
-				$request->error,
-				"P02: syntax error, unexpected identifier near 'REVOKE"
-			)
+		return (str_starts_with(
+			$request->error,
+			"P02: syntax error, unexpected identifier near 'REVOKE"
+		)
 			&& stripos($request->payload, 'REVOKE') !== false);
-
-		return $result;
 	}
 
 	/**
@@ -191,14 +180,12 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasShowMyPermissions(Request $request): bool {
-		$result = (str_starts_with(
-				$request->error,
-				'P01: syntax error, unexpected identifier, '.
+		return (str_starts_with(
+			$request->error,
+			'P01: syntax error, unexpected identifier, '.
 				"expecting VARIABLES near 'MY PERMISSIONS'"
-			)
+		)
 			&& stripos($request->payload, 'SHOW MY PERMISSIONS') !== false);
-
-		return $result;
 	}
 
 	/**
@@ -206,14 +193,12 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasSetPassword(Request $request): bool {
-		$result = (str_starts_with(
-				$request->error,
-				'P01: syntax error, unexpected string, '.
+		return (str_starts_with(
+			$request->error,
+			'P01: syntax error, unexpected string, '.
 				"expecting '=' near"
-			)
+		)
 			&& stripos($request->payload, 'SET PASSWORD') !== false);
-
-		return $result;
 	}
 
 	/**
@@ -238,7 +223,8 @@ final class Payload extends BasePayload {
 	 * @throws GenericError
 	 */
 	private static function parseGrantRevokeCommand(string $payload, self $self): void {
-		$pattern = '/^(GRANT|REVOKE)\s+([\w]+)\s+ON\s+(\*|\'([^\']*)\')\s+(TO|FROM)\s+\'([^\']+)\'(?:\s+WITH\s+BUDGET\s+([\'"]?\{.*?\}[\'"]?))?$/i';
+		$pattern = '/^(GRANT|REVOKE)\s+([\w]+)\s+ON\s+(\*|\'([^\']*)\')'.
+			'\s+(TO|FROM)\s+\'([^\']+)\'(?:\s+WITH\s+BUDGET\s+([\'"]?\{.*?\}[\'"]?))?$/i';
 
 		if (!preg_match($pattern, $payload, $matches)) {
 			throw GenericError::create('Invalid payload: Does not match GRANT or REVOKE command.', true);

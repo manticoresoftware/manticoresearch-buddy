@@ -141,7 +141,8 @@ final class UserHandler extends BaseHandlerWithClient {
 		$hashesJson = $this->generateHashesWithToken($this->payload->password, $token, $salt);
 
 		$tableUsers = Payload::AUTH_USERS_TABLE;
-		$query = "INSERT INTO {$tableUsers} (username, salt, hashes) VALUES ('{$username}', '{$salt}', '{$hashesJson}')";
+		$query = "INSERT INTO {$tableUsers} (username, salt, hashes) ".
+			"VALUES ('{$username}', '{$salt}', '{$hashesJson}')";
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
@@ -149,11 +150,13 @@ final class UserHandler extends BaseHandlerWithClient {
 		}
 
 		// Return the generated token to the user
-		return TaskResult::withRow([
+		return TaskResult::withRow(
+			[
 			'token' => $token,
 			'username' => $username,
-			'generated_at' => date('Y-m-d H:i:s')
-		])->column('token', Column::String)
+			'generated_at' => date('Y-m-d H:i:s'),
+			]
+		)->column('token', Column::String)
 		 ->column('username', Column::String)
 		 ->column('generated_at', Column::String);
 	}

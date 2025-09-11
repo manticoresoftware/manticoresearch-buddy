@@ -48,7 +48,7 @@ class PayloadTest extends TestCase {
 				'expected' => true,
 			],
 			[
-				'query' => "SHOW MY PERMISSIONS",
+				'query' => 'SHOW MY PERMISSIONS',
 				'error' => "P01: syntax error, unexpected identifier, expecting VARIABLES near 'MY PERMISSIONS'",
 				'expected' => true,
 			],
@@ -58,21 +58,23 @@ class PayloadTest extends TestCase {
 				'expected' => true,
 			],
 			[
-				'query' => "INVALID QUERY",
-				'error' => "P01: syntax error, unexpected identifier",
+				'query' => 'INVALID QUERY',
+				'error' => 'P01: syntax error, unexpected identifier',
 				'expected' => false,
 			],
 		];
 
 		foreach ($testCases as $case) {
-			$request = Request::fromArray([
+			$request = Request::fromArray(
+				[
 				'version' => Buddy::PROTOCOL_VERSION,
 				'error' => $case['error'],
 				'payload' => $case['query'],
 				'format' => RequestFormat::SQL,
 				'endpointBundle' => ManticoreEndpoint::Sql,
 				'path' => 'sql?mode=raw',
-			]);
+				]
+			);
 			$this->assertEquals($case['expected'], Payload::hasMatch($request), "Failed for query: {$case['query']}");
 		}
 	}
@@ -82,7 +84,8 @@ class PayloadTest extends TestCase {
 	 */
 	public function testFromRequestGrant(): void {
 		echo "\nTesting fromRequest for GRANT command\n";
-		$request = Request::fromArray([
+		$request = Request::fromArray(
+			[
 			'version' => Buddy::PROTOCOL_VERSION,
 			'error' => "P02: syntax error, unexpected identifier near 'GRANT read ON * TO 'testuser''",
 			'payload' => "GRANT read ON * TO 'testuser'",
@@ -90,7 +93,8 @@ class PayloadTest extends TestCase {
 			'endpointBundle' => ManticoreEndpoint::Sql,
 			'path' => 'sql?mode=raw',
 			'user' => 'all',
-		]);
+			]
+		);
 		$payload = Payload::fromRequest($request);
 
 		$this->assertEquals('grant', $payload->type);
@@ -107,7 +111,8 @@ class PayloadTest extends TestCase {
 	 */
 	public function testFromRequestRevoke(): void {
 		echo "\nTesting fromRequest for REVOKE command\n";
-		$request = Request::fromArray([
+		$request = Request::fromArray(
+			[
 			'version' => Buddy::PROTOCOL_VERSION,
 			'error' => "P02: syntax error, unexpected identifier near 'REVOKE read ON * FROM 'testuser''",
 			'payload' => "REVOKE read ON * FROM 'testuser'",
@@ -115,7 +120,8 @@ class PayloadTest extends TestCase {
 			'endpointBundle' => ManticoreEndpoint::Sql,
 			'path' => 'sql?mode=raw',
 			'user' => 'all',
-		]);
+			]
+		);
 		$payload = Payload::fromRequest($request);
 
 		$this->assertEquals('revoke', $payload->type);
@@ -146,7 +152,8 @@ class PayloadTest extends TestCase {
 	 */
 	public function testFromRequestInvalidQuery(): void {
 		echo "\nTesting fromRequest with invalid query\n";
-		$request = Request::fromArray([
+		$request = Request::fromArray(
+			[
 			'version' => Buddy::PROTOCOL_VERSION,
 			'error' => 'P01: syntax error, unexpected identifier',
 			'payload' => 'INVALID QUERY',
@@ -154,7 +161,8 @@ class PayloadTest extends TestCase {
 			'endpointBundle' => ManticoreEndpoint::Sql,
 			'path' => 'sql?mode=raw',
 			'user' => 'all',
-		]);
+			]
+		);
 		$this->expectException(BuddyRequestError::class);
 		$this->expectExceptionMessage('Failed to handle your query');
 		Payload::fromRequest($request);

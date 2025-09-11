@@ -25,9 +25,13 @@ class ShowHandlerTest extends TestCase {
 		$handler = new ShowHandler($payload);
 		$clientMock = $this->createMock(HTTPClient::class);
 		$clientMock->method('sendRequest')
-			->willReturn(new Response([['data' => [
-				['Username' => 'testuser', 'action' => 'read', 'Target' => '*', 'Allow' => 'true', 'Budget' => '{}'],
-			]]]));
+			->willReturn(
+				new Response(
+					[['data' => [
+					['Username' => 'testuser', 'action' => 'read', 'Target' => '*', 'Allow' => 'true', 'Budget' => '{}'],
+					]]]
+				)
+			);
 		$handler->setManticoreClient($clientMock);
 
 		$task = $handler->run();
