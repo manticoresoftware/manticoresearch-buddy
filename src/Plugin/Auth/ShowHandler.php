@@ -30,17 +30,13 @@ final class ShowHandler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, Client $client): TaskResult {
 			$request = $client->sendRequest('SHOW PERMISSIONS');
 			if ($request->hasError()) {
-				throw GenericError::create(
-					$request->getError()
-				);
+				throw GenericError::create($request->getError());
 			}
 
 			$document = $request->getResult();
 
 			if (!isset($document[0]['data'])) {
-				throw GenericError::create(
-					'Searchd failed with an empty response.'
-				);
+				throw GenericError::create('Searchd failed with an empty response.');
 			}
 
 
@@ -53,8 +49,6 @@ final class ShowHandler extends BaseHandlerWithClient {
 
 				$myPermissions[] = $row;
 			}
-
-			Buddy::debug(json_encode($myPermissions));
 
 			return TaskResult::withData($myPermissions)
 				->column('Username', Column::String)

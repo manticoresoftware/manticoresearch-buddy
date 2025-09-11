@@ -67,23 +67,19 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
     private function userExists(string $username): bool {
         $tableUsers = Payload::AUTH_USERS_TABLE;
         $query = "SELECT count(*) as c FROM {$tableUsers} WHERE username = '{$username}'";
-        Buddy::debug("Executing user existence query: {$query}");
         /** @var Response $resp */
         $resp = $this->manticoreClient->sendRequest($query);
 
         if ($resp->hasError()) {
-            Buddy::debug("User existence query failed: {$resp->getError()}");
             throw GenericError::create($resp->getError());
         }
 
         $result = $resp->getResult();
         if (!isset($result[0]['data'][0]['c'])) {
-            Buddy::debug('Unexpected response format: ' . json_encode($result));
             throw GenericError::create('Unexpected response format when checking user existence.');
         }
 
         $count = (int)$result[0]['data'][0]['c'];
-        Buddy::debug("User count for {$username}: {$count}");
         return $count > 0;
     }
 
@@ -99,23 +95,19 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
     private function permissionExists(string $username, string $action, string $target): bool {
         $tablePerms = Payload::AUTH_PERMISSIONS_TABLE;
         $query = "SELECT count(*) as c FROM {$tablePerms} WHERE username = '{$username}' AND action = '{$action}' AND target = '{$target}'";
-
         /** @var Response $resp */
         $resp = $this->manticoreClient->sendRequest($query);
 
         if ($resp->hasError()) {
-            Buddy::debug("Permission existence check failed: {$resp->getError()}");
             throw GenericError::create($resp->getError());
         }
 
         $result = $resp->getResult();
         if (!isset($result[0]['data'][0]['c'])) {
-            Buddy::debug('Unexpected response format: ' . json_encode($result));
             throw GenericError::create('Unexpected response format when checking permission existence.');
         }
 
         $count = (int)$result[0]['data'][0]['c'];
-        Buddy::debug("Permission count for {$username}:{$action}:{$target}: {$count}");
         return $count > 0;
     }
 
@@ -131,30 +123,24 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
      */
     private function handleGrant(string $username, string $action, string $target, string $budget): TaskResult {
         if (!$this->userExists($username)) {
-            Buddy::debug("Grant failed: User '{$username}' does not exist");
             throw GenericError::create("User '{$username}' does not exist.");
         }
 
         // Check if permission already exists
         if ($this->permissionExists($username, $action, $target)) {
-            Buddy::debug("Grant failed: Permission already exists for user '{$username}' on '{$target}' with action '{$action}'");
             throw GenericError::create("User '{$username}' already has '{$action}' permission on '{$target}'.");
         }
 
         $tablePerms = Payload::AUTH_PERMISSIONS_TABLE;
         $query = "INSERT INTO {$tablePerms} (username, action, target, allow, budget) " .
             "VALUES ('{$username}', '{$action}', '{$target}', 1, '{$budget}')";
-        Buddy::debug("Executing grant query: {$query}");
-        Buddy::debug("To manually test, run: {$query};");
         /** @var Response $resp */
         $resp = $this->manticoreClient->sendRequest($query);
 
         if ($resp->hasError()) {
-            Buddy::debug("Grant query failed: {$resp->getError()}");
             throw GenericError::create($resp->getError());
         }
 
-        Buddy::debug("Granted {$action} on {$target} to {$username} successfully.");
         return TaskResult::none();
     }
 
@@ -169,29 +155,23 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
      */
     private function handleRevoke(string $username, string $action, string $target): TaskResult {
         if (!$this->userExists($username)) {
-            Buddy::debug("Revoke failed: User '{$username}' does not exist");
             throw GenericError::create("User '{$username}' does not exist.");
         }
 
         // Check if permission exists before revoking
         if (!$this->permissionExists($username, $action, $target)) {
-            Buddy::debug("Revoke failed: Permission does not exist for user '{$username}' on '{$target}' with action '{$action}'");
             throw GenericError::create("User '{$username}' does not have '{$action}' permission on '{$target}'.");
         }
 
         $tablePerms = Payload::AUTH_PERMISSIONS_TABLE;
         $query = "DELETE FROM {$tablePerms} WHERE username = '{$username}' AND action = '{$action}' AND target = '{$target}'";
-        Buddy::debug("Executing revoke query: {$query}");
-        Buddy::debug("To manually test, run: {$query};");
         /** @var Response $resp */
         $resp = $this->manticoreClient->sendRequest($query);
 
         if ($resp->hasError()) {
-            Buddy::debug("Revoke query failed: {$resp->getError()}");
             throw GenericError::create($resp->getError());
         }
 
-        Buddy::debug("Revoked {$action} on {$target} from {$username} successfully.");
         return TaskResult::none();
     }
 }
