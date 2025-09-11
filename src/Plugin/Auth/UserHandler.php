@@ -5,6 +5,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
+use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
@@ -152,7 +153,9 @@ final class UserHandler extends BaseHandlerWithClient {
 			'token' => $token,
 			'username' => $username,
 			'generated_at' => date('Y-m-d H:i:s')
-		]);
+		])->column('token', Column::String)
+		 ->column('username', Column::String)
+		 ->column('generated_at', Column::String);
 	}
 
 	/**
