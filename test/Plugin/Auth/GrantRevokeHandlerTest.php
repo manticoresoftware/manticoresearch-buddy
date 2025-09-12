@@ -1,155 +1,315 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2024-2025, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2023-present, Manticore Software LTD (https://manticoresearch.com)
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License version 2 or any later
+  version. You should have received a copy of the GPL license along with this
+  program; if you did not, you can find it at http://www.gnu.org/
 */
 
 namespace Manticoresearch\BuddyTest\Plugin\Auth;
 
 use Manticoresearch\Buddy\Base\Plugin\Auth\GrantRevokeHandler;
 use Manticoresearch\Buddy\Base\Plugin\Auth\Payload;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
-use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
-use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
-use Manticoresearch\BuddyTest\Lib\BuddyRequestError;
+use Manticoresearch\BuddyTest\Trait\TestProtectedTrait;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Tests for the Auth plugin GrantRevokeHandler class
- */
 class GrantRevokeHandlerTest extends TestCase {
-	use TestHTTPServerTrait;
+	use TestProtectedTrait;
 
-	protected function tearDown(): void {
-		self::finishMockManticoreServer();
-	}
+	private function createMockClient(array $responses): HTTPClient {
+		$clientMock = $this->createMock(HTTPClient::class);
+		$responseIndex = 0;
 
-	/**
-	 * Test GRANT command with valid user
-	 */
-	public function testGrantSuccess(): void {
-		echo "\nTesting GRANT command executes properly\n";
-		$request = Request::fromArray(
-			[
-			'version' => Buddy::PROTOCOL_VERSION,
-			'error' => "P02: syntax error, unexpected identifier near 'GRANT read ON * TO 'testuser''",
-			'payload' => "GRANT read ON * TO 'testuser'",
-			'format' => RequestFormat::SQL,
-			'endpointBundle' => ManticoreEndpoint::Sql,
-			'path' => 'sql?mode=raw',
-			'user' => 'all',
-			]
-		);
-		$payload = Payload::fromRequest($request);
-		$serverUrl = self::setUpMockManticoreServer(false);
-		$manticoreClient = new HTTPClient($serverUrl);
-		$manticoreClient->setForceSync(true);
-
-		$manticoreClient->method('sendRequest')
+		$clientMock->method('sendRequest')
 			->willReturnCallback(
-				function ($query) {
-					if (strpos($query, 'SELECT count(*)') !== false) {
-						return new \Manticoresearch\Buddy\Core\ManticoreSearch\Response([['data' => [['c' => 1]]]]);
+				function () use ($responses, &$responseIndex) {
+					if ($responseIndex < sizeof($responses)) {
+						return $responses[$responseIndex++];
 					}
-					if (strpos($query, 'REPLACE INTO system.auth_permissions') !== false) {
-						return new \Manticoresearch\Buddy\Core\ManticoreSearch\Response([['total' => 1, 'error' => '', 'warning' => '']]);
-					}
-					return new \Manticoresearch\Buddy\Core\ManticoreSearch\Response([]);
+					return Response::fromBody(json_encode([]));
 				}
 			);
 
-		$handler = new GrantRevokeHandler($payload);
-		$handler->setManticoreClient($manticoreClient);
-		go(
-			function () use ($handler) {
-				$task = $handler->run();
-				$task->wait(true);
-				$this->assertTrue($task->isSucceed());
-				$this->assertInstanceOf(TaskResult::class, $task->getResult());
-				$this->assertEmpty($task->getResult()->getData());
-				self::finishMockManticoreServer();
-			}
-		);
-		\Swoole\Event::wait();
+		return $clientMock;
 	}
 
-	/**
-	 * Test GRANT command with non-existent user
-	 */
+	private function setClientOnHandler($handler, HTTPClient $client): void {
+		$reflection = new \ReflectionClass($handler);
+		$property = $reflection->getProperty('manticoreClient');
+		$property->setAccessible(true);
+		$property->setValue($handler, $client);
+	}
+
+	public function testGrantSuccess(): void {
+		$payload = new Payload();
+		$payload->type = 'grant';
+		$payload->username = 'testuser';
+		$payload->action = 'read';
+		$payload->target = '*';
+		$payload->budget = '{}';
+
+		$handler = new GrantRevokeHandler($payload);
+
+		$responses = [
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 1]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // User exists
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 0]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // Permission doesn't exist
+			Response::fromBody(json_encode([])), // INSERT success
+		];
+
+		$client = $this->createMockClient($responses);
+		$this->setClientOnHandler($handler, $client);
+
+		$result = $this->invokeMethod($handler, 'handleGrant', ['testuser', 'read', '*', '{}']);
+		$this->assertInstanceOf(TaskResult::class, $result);
+		$struct = $result->getStruct();
+		$this->assertEmpty($struct[0]['data'] ?? []);
+	}
+
 	public function testGrantNonExistentUser(): void {
-		echo "\nTesting GRANT command with non-existent user\n";
-		$request = Request::fromArray(
-			[
-			'version' => Buddy::PROTOCOL_VERSION,
-			'error' => "P02: syntax error, unexpected identifier near 'GRANT read ON * TO 'nonexistent''",
-			'payload' => "GRANT read ON * TO 'nonexistent'",
-			'format' => RequestFormat::SQL,
-			'endpointBundle' => ManticoreEndpoint::Sql,
-			'path' => 'sql?mode=raw',
-			'user' => 'all',
-			]
-		);
-		$payload = Payload::fromRequest($request);
-		$serverUrl = self::setUpMockManticoreServer(false);
-		$manticoreClient = new HTTPClient($serverUrl);
-		$manticoreClient->setForceSync(true);
-
-		$manticoreClient->method('sendRequest')
-			->willReturn(new \Manticoresearch\Buddy\Core\ManticoreSearch\Response([['data' => [['c' => 0]]]]));
+		$payload = new Payload();
+		$payload->type = 'grant';
+		$payload->username = 'nonexistent';
+		$payload->action = 'read';
+		$payload->target = '*';
+		$payload->budget = '{}';
 
 		$handler = new GrantRevokeHandler($payload);
-		$handler->setManticoreClient($manticoreClient);
-		go(
-			function () use ($handler) {
-				$task = $handler->run();
-				$this->expectException(BuddyRequestError::class);
-				$this->expectExceptionMessage("User 'nonexistent' does not exist.");
-				$task->getResult();
-				self::finishMockManticoreServer();
-			}
-		);
-		\Swoole\Event::wait();
+
+		$responses = [
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 0]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // User doesn't exist
+		];
+
+		$client = $this->createMockClient($responses);
+		$this->setClientOnHandler($handler, $client);
+
+		try {
+			$this->invokeMethod($handler, 'handleGrant', ['nonexistent', 'read', '*', '{}']);
+			$this->fail('Expected GenericError to be thrown');
+		} catch (GenericError $e) {
+			$this->assertEquals("User 'nonexistent' does not exist.", $e->getResponseError());
+		}
 	}
 
-	/**
-	 * Test REVOKE command
-	 */
-	public function testRevokeSuccess(): void {
-		echo "\nTesting REVOKE command executes properly\n";
-		$request = Request::fromArray(
-			[
-			'version' => Buddy::PROTOCOL_VERSION,
-			'error' => "P02: syntax error, unexpected identifier near 'REVOKE read ON * FROM 'testuser''",
-			'payload' => "REVOKE read ON * FROM 'testuser'",
-			'format' => RequestFormat::SQL,
-			'endpointBundle' => ManticoreEndpoint::Sql,
-			'path' => 'sql?mode=raw',
-			'user' => 'all',
-			]
-		);
-		$payload = Payload::fromRequest($request);
-		$serverUrl = self::setUpMockManticoreServer(false);
-		$manticoreClient = new HTTPClient($serverUrl);
-		$manticoreClient->setForceSync(true);
-
-		$manticoreClient->method('sendRequest')
-			->willReturn(new \Manticoresearch\Buddy\Core\ManticoreSearch\Response([['total' => 1, 'error' => '', 'warning' => '']]));
+	public function testGrantDuplicatePermission(): void {
+		$payload = new Payload();
+		$payload->type = 'grant';
+		$payload->username = 'testuser';
+		$payload->action = 'read';
+		$payload->target = '*';
+		$payload->budget = '{}';
 
 		$handler = new GrantRevokeHandler($payload);
-		$handler->setManticoreClient($manticoreClient);
-		go(
-			function () use ($handler) {
-				$task = $handler->run();
-				$task->wait(true);
-				$this->assertTrue($task->isSucceed());
-				$this->assertInstanceOf(TaskResult::class, $task->getResult());
-				$this->assertEmpty($task->getResult()->getData());
-				self::finishMockManticoreServer();
-			}
-		);
-		\Swoole\Event::wait();
+
+		$responses = [
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 1]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // User exists
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 1]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // Permission already exists
+		];
+
+		$client = $this->createMockClient($responses);
+		$this->setClientOnHandler($handler, $client);
+
+		try {
+			$this->invokeMethod($handler, 'handleGrant', ['testuser', 'read', '*', '{}']);
+			$this->fail('Expected GenericError to be thrown');
+		} catch (GenericError $e) {
+			$this->assertEquals("User 'testuser' already has 'read' permission on '*'.", $e->getResponseError());
+		}
+	}
+
+	public function testRevokeSuccess(): void {
+		$payload = new Payload();
+		$payload->type = 'revoke';
+		$payload->username = 'testuser';
+		$payload->action = 'read';
+		$payload->target = '*';
+
+		$handler = new GrantRevokeHandler($payload);
+
+		$responses = [
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 1]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // User exists
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 1]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // Permission exists
+			Response::fromBody(json_encode([])), // DELETE success
+		];
+
+		$client = $this->createMockClient($responses);
+		$this->setClientOnHandler($handler, $client);
+
+		$result = $this->invokeMethod($handler, 'handleRevoke', ['testuser', 'read', '*']);
+		$this->assertInstanceOf(TaskResult::class, $result);
+		$struct = $result->getStruct();
+		$this->assertEmpty($struct[0]['data'] ?? []);
+	}
+
+	public function testRevokeNonExistentUser(): void {
+		$payload = new Payload();
+		$payload->type = 'revoke';
+		$payload->username = 'nonexistent';
+		$payload->action = 'read';
+		$payload->target = '*';
+
+		$handler = new GrantRevokeHandler($payload);
+
+		$responses = [
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 0]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // User doesn't exist
+		];
+
+		$client = $this->createMockClient($responses);
+		$this->setClientOnHandler($handler, $client);
+
+		try {
+			$this->invokeMethod($handler, 'handleRevoke', ['nonexistent', 'read', '*']);
+			$this->fail('Expected GenericError to be thrown');
+		} catch (GenericError $e) {
+			$this->assertEquals("User 'nonexistent' does not exist.", $e->getResponseError());
+		}
+	}
+
+	public function testRevokeNonExistentPermission(): void {
+		$payload = new Payload();
+		$payload->type = 'revoke';
+		$payload->username = 'testuser';
+		$payload->action = 'write';
+		$payload->target = '*';
+
+		$handler = new GrantRevokeHandler($payload);
+
+		$responses = [
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 1]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // User exists
+			Response::fromBody(
+				json_encode(
+					[
+					[
+					'data' => [['c' => 0]],
+					'columns' => [['c' => 'count(*)']],
+					'total' => 1,
+					],
+					]
+				)
+			), // Permission doesn't exist
+		];
+
+		$client = $this->createMockClient($responses);
+		$this->setClientOnHandler($handler, $client);
+
+		try {
+			$this->invokeMethod($handler, 'handleRevoke', ['testuser', 'write', '*']);
+			$this->fail('Expected GenericError to be thrown');
+		} catch (GenericError $e) {
+			$this->assertEquals("User 'testuser' does not have 'write' permission on '*'.", $e->getResponseError());
+		}
+	}
+
+	public function testInvalidOperationType(): void {
+		$payload = new Payload();
+		$payload->type = 'invalid';
+		$payload->username = 'testuser';
+		$payload->action = 'read';
+		$payload->target = '*';
+
+		$handler = new GrantRevokeHandler($payload);
+
+		try {
+			$this->invokeMethod($handler, 'processRequest', []);
+			$this->fail('Expected GenericError to be thrown');
+		} catch (GenericError $e) {
+			$this->assertEquals('Invalid operation type for GrantRevokeHandler.', $e->getResponseError());
+		}
 	}
 }
