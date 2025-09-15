@@ -41,30 +41,8 @@ final class ShowHandler extends BaseHandlerWithClient {
 				throw GenericError::create((string)$request->getError());
 			}
 
-			$document = $request->getResult()->toArray();
-
-			if (!is_array($document) || !isset($document[0]['data'])) {
-				throw GenericError::create('Searchd failed with an empty response.');
-			}
-
-			$myPermissions = [];
-			$allPermissions = $document[0]['data'];
-
-			if (!is_array($allPermissions)) {
-				throw GenericError::create('Invalid permissions data format.');
-			}
-
-			foreach ($allPermissions as $row) {
-				if (!is_array($row) || !isset($row['Username'])) {
-					continue;
-				}
-
-				if ($row['Username'] !== $payload->actingUser) {
-					continue;
-				}
-
-				$myPermissions[] = $row;
-			}
+			$allPermissions = static::extractPermissionsFromResponse($request->getResult()->toArray());
+			$myPermissions = static::filterPermissionsByUser($allPermissions, $payload->actingUser);
 
 			return TaskResult::withData($myPermissions)
 				->column('Username', Column::String)
@@ -74,8 +52,53 @@ final class ShowHandler extends BaseHandlerWithClient {
 				->column('Budget', Column::String);
 		};
 
-		return Task::create(
-			$taskFn, [$this->payload, $this->manticoreClient]
-		)->run();
+			return Task::create(
+				$taskFn, [$this->payload, $this->manticoreClient]
+			)->run();
+	}
+
+	/**
+	 * Extract permissions data from API response
+	 *
+	 * @param mixed $document
+	 * @return array<array<string,mixed>>
+	 * @throws GenericError
+	 */
+	private static function extractPermissionsFromResponse(mixed $document): array {
+		if (!is_array($document) || !isset($document[0]['data'])) {
+			throw GenericError::create('Searchd failed with an empty response.');
+		}
+
+		$allPermissions = $document[0]['data'];
+		if (!is_array($allPermissions)) {
+			throw GenericError::create('Invalid permissions data format.');
+		}
+
+		return $allPermissions;
+	}
+
+	/**
+	 * Filter permissions by username
+	 *
+	 * @param array<array<string,mixed>> $allPermissions
+	 * @param string $actingUser
+	 * @return array<array<string,mixed>>
+	 */
+	private static function filterPermissionsByUser(array $allPermissions, string $actingUser): array {
+		$myPermissions = [];
+
+		foreach ($allPermissions as $row) {
+			if (!is_array($row) || !isset($row['Username'])) {
+				continue;
+			}
+
+			if ($row['Username'] !== $actingUser) {
+				continue;
+			}
+
+			$myPermissions[] = $row;
+		}
+
+		return $myPermissions;
 	}
 }

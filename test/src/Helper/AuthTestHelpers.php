@@ -23,7 +23,7 @@ class AuthTestHelpers {
 	 */
 	public static function createPermissionResponse(array $permissions): Response {
 		return Response::fromBody(
-			(string) json_encode(
+			(string)json_encode(
 				[
 				[
 					'data' => $permissions,
@@ -49,7 +49,7 @@ class AuthTestHelpers {
 	 */
 	public static function createUserExistsResponse(bool $userExists): Response {
 		return Response::fromBody(
-			(string) json_encode(
+			(string)json_encode(
 				[
 				[
 					'data' => [['c' => $userExists ? 1 : 0]],
@@ -69,7 +69,7 @@ class AuthTestHelpers {
 	 */
 	public static function createPermissionExistsResponse(bool $permissionExists): Response {
 		return Response::fromBody(
-			(string) json_encode(
+			(string)json_encode(
 				[
 				[
 					'data' => [['c' => $permissionExists ? 1 : 0]],
@@ -87,7 +87,7 @@ class AuthTestHelpers {
 	 * @return Response
 	 */
 	public static function createEmptySuccessResponse(): Response {
-		return Response::fromBody((string) json_encode([]));
+		return Response::fromBody((string)json_encode([]));
 	}
 
 	/**
@@ -98,7 +98,7 @@ class AuthTestHelpers {
 	 */
 	public static function createErrorResponse(string $errorMessage): Response {
 		return Response::fromBody(
-			(string) json_encode(
+			(string)json_encode(
 				[
 				'error' => $errorMessage,
 				]
@@ -115,7 +115,7 @@ class AuthTestHelpers {
 	 */
 	public static function createUserDataResponse(string $salt, string $hashesJson): Response {
 		return Response::fromBody(
-			(string) json_encode(
+			(string)json_encode(
 				[
 				[
 					'data' => [['salt' => $salt, 'hashes' => $hashesJson]],
@@ -137,7 +137,7 @@ class AuthTestHelpers {
 	 */
 	public static function createEmptyUserDataResponse(): Response {
 		return Response::fromBody(
-			(string) json_encode(
+			(string)json_encode(
 				[
 				[
 					'data' => [],
