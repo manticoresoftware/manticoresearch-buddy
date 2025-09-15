@@ -38,19 +38,27 @@ final class ShowHandler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, Client $client): TaskResult {
 			$request = $client->sendRequest('SHOW PERMISSIONS');
 			if ($request->hasError()) {
-				throw GenericError::create($request->getError());
+				throw GenericError::create((string)$request->getError());
 			}
 
-			$document = $request->getResult();
+			$document = $request->getResult()->toArray();
 
-			if (!isset($document[0]['data'])) {
+			if (!is_array($document) || !isset($document[0]['data'])) {
 				throw GenericError::create('Searchd failed with an empty response.');
 			}
 
-
 			$myPermissions = [];
 			$allPermissions = $document[0]['data'];
+
+			if (!is_array($allPermissions)) {
+				throw GenericError::create('Invalid permissions data format.');
+			}
+
 			foreach ($allPermissions as $row) {
+				if (!is_array($row) || !isset($row['Username'])) {
+					continue;
+				}
+
 				if ($row['Username'] !== $payload->actingUser) {
 					continue;
 				}

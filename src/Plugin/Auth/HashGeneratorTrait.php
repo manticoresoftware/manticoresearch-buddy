@@ -50,7 +50,7 @@ trait HashGeneratorTrait {
 	 *
 	 * @param string $newPassword The new password to hash
 	 * @param string $salt The salt to use for hashing
-	 * @param array $existingHashes The existing hashes array to preserve bearer_sha256
+	 * @param array<string, mixed> $existingHashes The existing hashes array to preserve bearer_sha256
 	 * @return string JSON-encoded updated hashes
 	 * @throws GenericError
 	 */
@@ -76,7 +76,7 @@ trait HashGeneratorTrait {
 	/**
 	 * Validate hash structure
 	 *
-	 * @param array $hashes The hashes array to validate
+	 * @param array<string, mixed> $hashes The hashes array to validate
 	 * @throws GenericError
 	 */
 	private function validateHashesStructure(array $hashes): void {

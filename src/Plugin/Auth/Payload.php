@@ -233,7 +233,7 @@ final class Payload extends BasePayload {
 
 		$command = strtolower($matches[1]);
 		$action = $matches[2];
-		$target = $matches[3] === '*' ? '*' : ($matches[4] ?? '');
+		$target = $matches[3] === '*' ? '*' : $matches[4];
 		$preposition = $matches[5];
 		$username = $matches[6];
 		$budget = isset($matches[7]) ? trim($matches[7], "'\"") : null;

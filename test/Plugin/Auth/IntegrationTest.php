@@ -64,8 +64,10 @@ class IntegrationTest extends TestCase {
 		$this->assertTrue($createTask->isSucceed());
 		$createResult = $createTask->getResult();
 		$struct = $createResult->getStruct();
+		$this->assertIsArray($struct);
 		$this->assertNotEmpty($struct);
 		$data = $struct[0]['data'][0];
+		$this->assertIsArray($data);
 		$this->assertArrayHasKey('token', $data);
 		$this->assertArrayHasKey('username', $data);
 		$this->assertEquals('testuser', $data['username']);
@@ -130,6 +132,7 @@ class IntegrationTest extends TestCase {
 		$this->assertTrue($showTask->isSucceed());
 		$showResult = $showTask->getResult();
 		$showStruct = $showResult->getStruct();
+		$this->assertIsArray($showStruct);
 		$this->assertCount(1, $showStruct[0]['data']);
 		$this->assertEquals('testuser', $showStruct[0]['data'][0]['Username']);
 
@@ -210,7 +213,7 @@ class IntegrationTest extends TestCase {
 		$passwordHandler = new PasswordHandler($passwordPayload);
 
 		// Mock existing user data
-		$existingHashes = json_encode(
+		$existingHashes = (string)json_encode(
 			[
 			'password_sha1_no_salt' => 'old_sha1_hash',
 			'password_sha256' => 'old_sha256_hash',

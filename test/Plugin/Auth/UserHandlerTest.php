@@ -44,8 +44,10 @@ class UserHandlerTest extends TestCase {
 
 		// Should return token data for user
 		$struct = $result->getStruct();
+		$this->assertIsArray($struct);
 		$this->assertNotEmpty($struct);
 		$data = $struct[0]['data'][0];
+		$this->assertIsArray($data);
 		$this->assertArrayHasKey('token', $data);
 		$this->assertArrayHasKey('username', $data);
 		$this->assertEquals('testuser', $data['username']);
@@ -96,6 +98,7 @@ class UserHandlerTest extends TestCase {
 		$result = self::invokeMethod($handler, 'handleDropUser', ['testuser', 1]);
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = $result->getStruct();
+		$this->assertIsArray($struct);
 		$this->assertEmpty($struct[0]['data'] ?? []);
 	}
 

@@ -23,6 +23,9 @@ use PHPUnit\Framework\TestCase;
 class GrantRevokeHandlerTest extends TestCase {
 	use TestProtectedTrait;
 
+	/**
+	 * @param array<Response> $responses
+	 */
 	private function createMockClient(array $responses): HTTPClient {
 		$clientMock = $this->createMock(HTTPClient::class);
 		$responseIndex = 0;
@@ -33,14 +36,14 @@ class GrantRevokeHandlerTest extends TestCase {
 					if ($responseIndex < sizeof($responses)) {
 						return $responses[$responseIndex++];
 					}
-					return Response::fromBody(json_encode([]));
+					return Response::fromBody((string)json_encode([]));
 				}
 			);
 
 		return $clientMock;
 	}
 
-	private function setClientOnHandler($handler, HTTPClient $client): void {
+	private function setClientOnHandler(GrantRevokeHandler $handler, HTTPClient $client): void {
 		$reflection = new \ReflectionClass($handler);
 		$property = $reflection->getProperty('manticoreClient');
 		$property->setAccessible(true);
@@ -59,7 +62,7 @@ class GrantRevokeHandlerTest extends TestCase {
 
 		$responses = [
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 1]],
@@ -70,7 +73,7 @@ class GrantRevokeHandlerTest extends TestCase {
 				)
 			), // User exists
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 0]],
@@ -80,7 +83,7 @@ class GrantRevokeHandlerTest extends TestCase {
 					]
 				)
 			), // Permission doesn't exist
-			Response::fromBody(json_encode([])), // INSERT success
+			Response::fromBody((string)json_encode([])), // INSERT success
 		];
 
 		$client = $this->createMockClient($responses);
@@ -89,6 +92,7 @@ class GrantRevokeHandlerTest extends TestCase {
 		$result = $this->invokeMethod($handler, 'handleGrant', ['testuser', 'read', '*', '{}']);
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = $result->getStruct();
+		$this->assertIsArray($struct);
 		$this->assertEmpty($struct[0]['data'] ?? []);
 	}
 
@@ -104,7 +108,7 @@ class GrantRevokeHandlerTest extends TestCase {
 
 		$responses = [
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 0]],
@@ -139,7 +143,7 @@ class GrantRevokeHandlerTest extends TestCase {
 
 		$responses = [
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 1]],
@@ -150,7 +154,7 @@ class GrantRevokeHandlerTest extends TestCase {
 				)
 			), // User exists
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 1]],
@@ -184,7 +188,7 @@ class GrantRevokeHandlerTest extends TestCase {
 
 		$responses = [
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 1]],
@@ -195,7 +199,7 @@ class GrantRevokeHandlerTest extends TestCase {
 				)
 			), // User exists
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 1]],
@@ -205,7 +209,7 @@ class GrantRevokeHandlerTest extends TestCase {
 					]
 				)
 			), // Permission exists
-			Response::fromBody(json_encode([])), // DELETE success
+			Response::fromBody((string)json_encode([])), // DELETE success
 		];
 
 		$client = $this->createMockClient($responses);
@@ -214,6 +218,7 @@ class GrantRevokeHandlerTest extends TestCase {
 		$result = $this->invokeMethod($handler, 'handleRevoke', ['testuser', 'read', '*']);
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = $result->getStruct();
+		$this->assertIsArray($struct);
 		$this->assertEmpty($struct[0]['data'] ?? []);
 	}
 
@@ -228,7 +233,7 @@ class GrantRevokeHandlerTest extends TestCase {
 
 		$responses = [
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 0]],
@@ -262,7 +267,7 @@ class GrantRevokeHandlerTest extends TestCase {
 
 		$responses = [
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 1]],
@@ -273,7 +278,7 @@ class GrantRevokeHandlerTest extends TestCase {
 				)
 			), // User exists
 			Response::fromBody(
-				json_encode(
+				(string)json_encode(
 					[
 					[
 					'data' => [['c' => 0]],

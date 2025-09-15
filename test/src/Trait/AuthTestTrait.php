@@ -23,9 +23,9 @@ trait AuthTestTrait {
 	 * Inject a mock HTTP client into a handler's protected manticoreClient property
 	 *
 	 * @param object $handler The handler instance
-	 * @param HTTPClient $client The mock client to inject
+	 * @param HTTPClient|MockObject $client The mock client to inject
 	 */
-	protected function injectClientMock(object $handler, HTTPClient $client): void {
+	protected function injectClientMock(object $handler, HTTPClient|MockObject $client): void {
 		$reflection = new \ReflectionClass($handler);
 		$property = $reflection->getProperty('manticoreClient');
 		$property->setAccessible(true);

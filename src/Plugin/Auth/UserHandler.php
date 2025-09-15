@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
+use Exception;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
@@ -53,6 +54,9 @@ final class UserHandler extends BaseHandlerWithClient {
 	 * @throws GenericError
 	 */
 	private function processRequest(): TaskResult {
+		if ($this->payload->username === null) {
+			throw GenericError::create('Username is required.');
+		}
 		$username = addslashes($this->payload->username);
 		$count = $this->getUserCount($username);
 
@@ -81,11 +85,11 @@ final class UserHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create($resp->getError());
+			throw GenericError::create((string)$resp->getError());
 		}
 
-		$result = $resp->getResult();
-		if (!isset($result[0]['data'][0]['c'])) {
+		$result = $resp->getResult()->toArray();
+		if (!is_array($result) || !isset($result[0]['data'][0]['c'])) {
 			throw GenericError::create('Unexpected response format when checking user existence.');
 		}
 
@@ -155,7 +159,7 @@ final class UserHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create($resp->getError());
+			throw GenericError::create((string)$resp->getError());
 		}
 
 		// Return the generated token to the user
@@ -189,7 +193,7 @@ final class UserHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create($resp->getError());
+			throw GenericError::create((string)$resp->getError());
 		}
 
 		$tableUsers = Payload::AUTH_USERS_TABLE;
@@ -198,7 +202,7 @@ final class UserHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create($resp->getError());
+			throw GenericError::create((string)$resp->getError());
 		}
 
 		return TaskResult::none();

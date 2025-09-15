@@ -48,6 +48,9 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 	 * @throws GenericError
 	 */
 	private function processRequest(): TaskResult {
+		assert($this->payload->username !== null);
+		assert($this->payload->action !== null);
+		assert($this->payload->target !== null);
 		$username = addslashes($this->payload->username);
 		$action = addslashes($this->payload->action);
 		$target = addslashes($this->payload->target);
@@ -78,11 +81,11 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create($resp->getError());
+			throw GenericError::create((string)$resp->getError());
 		}
 
-		$result = $resp->getResult();
-		if (!isset($result[0]['data'][0]['c'])) {
+		$result = $resp->getResult()->toArray();
+		if (!is_array($result) || !isset($result[0]['data'][0]['c'])) {
 			throw GenericError::create('Unexpected response format when checking user existence.');
 		}
 
@@ -107,11 +110,11 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create($resp->getError());
+			throw GenericError::create((string)$resp->getError());
 		}
 
-		$result = $resp->getResult();
-		if (!isset($result[0]['data'][0]['c'])) {
+		$result = $resp->getResult()->toArray();
+		if (!is_array($result) || !isset($result[0]['data'][0]['c'])) {
 			throw GenericError::create('Unexpected response format when checking permission existence.');
 		}
 
@@ -146,7 +149,7 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create($resp->getError());
+			throw GenericError::create((string)$resp->getError());
 		}
 
 		return TaskResult::none();
@@ -178,7 +181,7 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create($resp->getError());
+			throw GenericError::create((string)$resp->getError());
 		}
 
 		return TaskResult::none();

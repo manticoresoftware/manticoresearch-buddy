@@ -37,6 +37,7 @@ class ShowHandlerTest extends TestCase {
 
 		$permissionsResponse = AuthTestHelpers::createPermissionResponse($permissionsData);
 		$struct = $this->getStruct($permissionsResponse, $handler);
+		$this->assertIsArray($struct);
 		$this->assertEquals($permissionsData, $struct[0]['data']);
 	}
 
@@ -47,6 +48,7 @@ class ShowHandlerTest extends TestCase {
 		$handler = new ShowHandler($payload);
 		$emptyResponse = AuthTestHelpers::createPermissionResponse([]);
 		$struct = $this->getStruct($emptyResponse, $handler);
+		$this->assertIsArray($struct);
 		$this->assertEmpty($struct[0]['data'] ?? []);
 	}
 
@@ -80,6 +82,7 @@ class ShowHandlerTest extends TestCase {
 		$this->assertTrue($task->isSucceed());
 
 		$struct = $task->getResult()->getStruct();
+		$this->assertIsArray($struct);
 		$resultData = $struct[0]['data'];
 		$this->assertCount(1, $resultData); // Only user2 permissions
 		$this->assertEquals('user2', $resultData[0]['Username']);

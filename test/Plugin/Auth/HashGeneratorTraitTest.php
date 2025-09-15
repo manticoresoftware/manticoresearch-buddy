@@ -20,17 +20,34 @@ class HashGeneratorTraitTest extends TestCase {
 	use TestProtectedTrait;
 
 	private function getTraitInstance(): object {
+		/**
+		 * @method string callGenerateHashesWithToken(string $password, string $token, string $salt)
+		 * @method string callUpdatePasswordHashes(string $newPassword, string $salt, array $existingHashes)
+		 * @method void callValidateHashesStructure(array $hashes)
+		 * @method string callGenerateTokenHash(string $token, string $salt)
+		 */
 		return new class {
 			use HashGeneratorTrait;
+
+			// Hash key constants
+			private const PASSWORD_SHA1_KEY = 'password_sha1_no_salt';
+			private const PASSWORD_SHA256_KEY = 'password_sha256';
+			private const BEARER_SHA256_KEY = 'bearer_sha256';
 
 			public function callGenerateHashesWithToken(string $password, string $token, string $salt): string {
 				return $this->generateHashesWithToken($password, $token, $salt);
 			}
 
+			/**
+			 * @param array<string, mixed> $existingHashes
+			 */
 			public function callUpdatePasswordHashes(string $newPassword, string $salt, array $existingHashes): string {
 				return $this->updatePasswordHashes($newPassword, $salt, $existingHashes);
 			}
 
+			/**
+			 * @param array<string, mixed> $hashes
+			 */
 			public function callValidateHashesStructure(array $hashes): void {
 				$this->validateHashesStructure($hashes);
 			}
@@ -47,6 +64,7 @@ class HashGeneratorTraitTest extends TestCase {
 		$token = 'abcdef123456';
 		$salt = 'testsalt';
 
+		/** @phpstan-ignore-next-line */
 		$result = $instance->callGenerateHashesWithToken($password, $token, $salt);
 		$this->assertIsString($result);
 
@@ -77,6 +95,7 @@ class HashGeneratorTraitTest extends TestCase {
 			'bearer_sha256' => $existingBearerHash,
 		];
 
+		/** @phpstan-ignore-next-line */
 		$result = $instance->callUpdatePasswordHashes($newPassword, $salt, $existingHashes);
 		$this->assertIsString($result);
 
@@ -103,6 +122,7 @@ class HashGeneratorTraitTest extends TestCase {
 		];
 
 		try {
+			/** @phpstan-ignore-next-line */
 			$instance->callUpdatePasswordHashes('newpass', 'salt', $existingHashes);
 			$this->fail('Expected GenericError to be thrown');
 		} catch (GenericError $e) {
@@ -121,6 +141,7 @@ class HashGeneratorTraitTest extends TestCase {
 		];
 
 		// Should not throw exception
+		/** @phpstan-ignore-next-line */
 		$instance->callValidateHashesStructure($validHashes);
 		$this->assertTrue(true); // If we get here, validation passed
 	}
@@ -148,6 +169,7 @@ class HashGeneratorTraitTest extends TestCase {
 
 		foreach ($invalidStructures as $index => $invalidHashes) {
 			try {
+				/** @phpstan-ignore-next-line */
 				$instance->callValidateHashesStructure($invalidHashes);
 				$this->fail("Expected exception for invalid structure #$index");
 			} catch (GenericError $e) {
@@ -179,6 +201,7 @@ class HashGeneratorTraitTest extends TestCase {
 
 		foreach ($invalidTypes as $index => $invalidHashes) {
 			try {
+				/** @phpstan-ignore-next-line */
 				$instance->callValidateHashesStructure($invalidHashes);
 				$this->fail("Expected exception for invalid type #$index");
 			} catch (GenericError $e) {
@@ -192,6 +215,7 @@ class HashGeneratorTraitTest extends TestCase {
 		$token = 'test_token_123';
 		$salt = 'test_salt';
 
+		/** @phpstan-ignore-next-line */
 		$result = $instance->callGenerateTokenHash($token, $salt);
 		$this->assertIsString($result);
 
@@ -200,13 +224,16 @@ class HashGeneratorTraitTest extends TestCase {
 		$this->assertTrue(ctype_xdigit($result)); // Should be hex string
 
 		// Should be deterministic
+		/** @phpstan-ignore-next-line */
 		$result2 = $instance->callGenerateTokenHash($token, $salt);
 		$this->assertEquals($result, $result2);
 
 		// Different inputs should produce different results
+		/** @phpstan-ignore-next-line */
 		$result3 = $instance->callGenerateTokenHash('different_token', $salt);
 		$this->assertNotEquals($result, $result3);
 
+		/** @phpstan-ignore-next-line */
 		$result4 = $instance->callGenerateTokenHash($token, 'different_salt');
 		$this->assertNotEquals($result, $result4);
 
@@ -222,10 +249,14 @@ class HashGeneratorTraitTest extends TestCase {
 		$salt = 'salt789';
 
 		// Generate hashes with token
+		/** @phpstan-ignore-next-line */
 		$hashesJson = $instance->callGenerateHashesWithToken($password, $token, $salt);
 		$hashes = json_decode(stripslashes($hashesJson), true);
 
+		$this->assertIsArray($hashes);
+
 		// Generate token hash separately
+		/** @phpstan-ignore-next-line */
 		$separateTokenHash = $instance->callGenerateTokenHash($token, $salt);
 
 		// They should match
@@ -243,6 +274,7 @@ class HashGeneratorTraitTest extends TestCase {
 		];
 
 		foreach ($specialCases as $case) {
+			/** @phpstan-ignore-next-line */
 			$result = $instance->callGenerateHashesWithToken($case['password'], $case['token'], $case['salt']);
 			$this->assertIsString($result);
 

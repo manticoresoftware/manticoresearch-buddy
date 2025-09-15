@@ -53,6 +53,7 @@ class PasswordHandlerTest extends TestCase {
 		$result = self::invokeMethod($handler, 'processRequest');
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = $result->getStruct();
+		$this->assertIsArray($struct);
 		$this->assertEmpty($struct[0]['data'] ?? []);
 	}
 
