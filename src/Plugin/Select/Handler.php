@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 /** @package Manticoresearch\Buddy\Base\Plugin\Select */
@@ -192,11 +193,26 @@ final class Handler extends BaseHandler {
 	 * @param Payload $payload
 	 * @return TaskResult
 	 */
+	protected static function handleTableCount(Client $manticoreClient, Payload $payload): TaskResult {
+		$query = "SHOW TABLES";
+		/** @var array{0:array{data:array<mixed>}} */
+		$descResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+		$count = sizeof($descResult[0]['data']);
+		return TaskResult::withRow(['COUNT(*)' => $count])
+			->column('COUNT(*)', Column::String);
+	}
+
+	/**
+	 * @param Client $manticoreClient
+	 * @param Payload $payload
+	 * @return TaskResult
+	 */
 	protected static function handleSelectFromTables(Client $manticoreClient, Payload $payload): TaskResult {
 		if (sizeof($payload->fields) === 1 && stripos($payload->fields[0], 'count(*)') === 0) {
-			return static::handleFieldCount($manticoreClient, $payload);
+			return empty($payload->where)
+				? static::handleTableCount($manticoreClient, $payload)
+				: static::handleFieldCount($manticoreClient, $payload);
 		}
-
 		$table = $payload->where['table_name']['value'] ?? $payload->where['TABLE_NAME']['value'] ?? null;
 		$data = [];
 		if ($table) {
@@ -228,7 +244,6 @@ final class Handler extends BaseHandler {
 		} else {
 			$data = static::processSelectOtherFromTables($manticoreClient, $payload);
 		}
-
 		$result = $payload->getTaskResult();
 		return $result->data($data);
 	}
@@ -792,6 +807,7 @@ final class Handler extends BaseHandler {
 		// Checking for field aliases first
 		$fieldNames = $aliasFields = [];
 		[$fieldNames, $aliasFields] = self::getFieldNamesAndAliases($payload->fields);
+		Buddy::debug(json_encode($payload->fields));
 		// Get unsupported var names from the error message
 		$errorFields = preg_split('/\s*;\s*/', str_replace('unknown sysvar ', '', $payload->error)) ?: [];
 		// Error message has var names in lowercase,
@@ -815,6 +831,7 @@ final class Handler extends BaseHandler {
 				$allVars[$fieldName] = null;
 			}
 		}
+		Buddy::debug('TEST4');
 		// If an original query contained supported vars as well, we need to get their values
 		if ($requeryFields) {
 			$requery = 'SELECT ' . implode(',', $requeryFields);
@@ -824,7 +841,7 @@ final class Handler extends BaseHandler {
 				$allVars[$field] = $value;
 			}
 		}
-
+		Buddy::debug('TEST5');
 		foreach ($fieldNames as $i => $fieldName) {
 			$fieldNames[$i] = $aliasFields[$fieldName] ?? $fieldName;
 		}
