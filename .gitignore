@@ -9,3 +9,4 @@ plugins/*
 !plugins/.gitkeep
 bin/manticore-*.conf
 .env
+.project
