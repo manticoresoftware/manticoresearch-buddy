@@ -172,7 +172,7 @@ final class Payload extends BasePayload {
 	protected static function removeLimitStatement(string $fieldClause): string {
 		$limitClausePattern = '/\s+LIMIT\s+\d+(\s*,\s*\d+)?\s*$/i';
 		if (preg_match('/\s+LIMIT\s+\d+(\s*,\d+)?\s*$/i', $fieldClause) !== false) {
-			$fieldClause = preg_replace($limitClausePattern, '', $fieldClause);
+			$fieldClause = (string)preg_replace($limitClausePattern, '', $fieldClause);
 		}
 		return $fieldClause;
 	}

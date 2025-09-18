@@ -193,7 +193,7 @@ final class Handler extends BaseHandler {
 	 * @return TaskResult
 	 */
 	protected static function handleTableCount(Client $manticoreClient, Payload $payload): TaskResult {
-		$query = "SHOW TABLES";
+		$query = 'SHOW TABLES';
 		/** @var array{0:array{data:array<mixed>}} */
 		$descResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
 		$count = sizeof($descResult[0]['data']);
@@ -219,26 +219,28 @@ final class Handler extends BaseHandler {
 			/** @var array<array{data:array<array<string,string>>}> */
 			$schemaResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
 			$createTable = $schemaResult[0]['data'][0]['Create Table'] ?? '';
+			if (!$createTable) {
+				$result = $payload->getTaskResult();
+				return $result->data($data);
+			}
 
-			if ($createTable) {
-				$createTables = [$createTable];
-				$i = 0;
-				foreach ($createTables as $createTable) {
-					$row = static::parseTableSchema($createTable);
-					$data[$i] = [];
-					self::unifyFieldNames($payload->fields);
-					foreach ($payload->fields as $field) {
-						[$type, $value] = static::TABLES_FIELD_MAP[$field]
-							?? static::TABLES_FIELD_MAP[strtolower($field)] ?? ['field', strtolower($field)];
-						$data[$i][$field] = match ($type) {
-							'field' => $row[$value] ?? (static::DEFAULT_FIELD_VALUES[$field] ?? null),
-							'table' => $table,
-							'static' => $value,
-							// default => $row[$field] ?? null,
-						};
-					}
-					++$i;
+			$createTables = [$createTable];
+			$i = 0;
+			foreach ($createTables as $createTable) {
+				$row = static::parseTableSchema($createTable);
+				$data[$i] = [];
+				self::unifyFieldNames($payload->fields);
+				foreach ($payload->fields as $field) {
+					[$type, $value] = static::TABLES_FIELD_MAP[$field]
+						?? static::TABLES_FIELD_MAP[strtolower($field)] ?? ['field', strtolower($field)];
+					$data[$i][$field] = match ($type) {
+						'field' => $row[$value] ?? (static::DEFAULT_FIELD_VALUES[$field] ?? null),
+						'table' => $table,
+						'static' => $value,
+						// default => $row[$field] ?? null,
+					};
 				}
+				++$i;
 			}
 		} else {
 			$data = static::processSelectOtherFromTables($manticoreClient, $payload);
@@ -607,7 +609,7 @@ final class Handler extends BaseHandler {
 			return;
 		}
 		$payload->originalQuery = (string)preg_replace(
-			"/{$payload->originalTable}\s+$alias\s+/is",
+			"/{$payload->originalTable}(\s+AS)?\s+$alias\s*/is",
 			$payload->originalTable . ' ',
 			$payload->originalQuery
 		);
