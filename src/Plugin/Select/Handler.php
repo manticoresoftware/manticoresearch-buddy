@@ -17,7 +17,6 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 /** @package Manticoresearch\Buddy\Base\Plugin\Select */
@@ -807,7 +806,6 @@ final class Handler extends BaseHandler {
 		// Checking for field aliases first
 		$fieldNames = $aliasFields = [];
 		[$fieldNames, $aliasFields] = self::getFieldNamesAndAliases($payload->fields);
-		Buddy::debug(json_encode($payload->fields));
 		// Get unsupported var names from the error message
 		$errorFields = preg_split('/\s*;\s*/', str_replace('unknown sysvar ', '', $payload->error)) ?: [];
 		// Error message has var names in lowercase,
@@ -831,7 +829,6 @@ final class Handler extends BaseHandler {
 				$allVars[$fieldName] = null;
 			}
 		}
-		Buddy::debug('TEST4');
 		// If an original query contained supported vars as well, we need to get their values
 		if ($requeryFields) {
 			$requery = 'SELECT ' . implode(',', $requeryFields);
@@ -841,7 +838,6 @@ final class Handler extends BaseHandler {
 				$allVars[$field] = $value;
 			}
 		}
-		Buddy::debug('TEST5');
 		foreach ($fieldNames as $i => $fieldName) {
 			$fieldNames[$i] = $aliasFields[$fieldName] ?? $fieldName;
 		}

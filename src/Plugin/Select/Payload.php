@@ -17,7 +17,6 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * @phpstan-extends BasePayload<array>
@@ -171,13 +170,10 @@ final class Payload extends BasePayload {
 	 * @param string $fieldClause
 	 */
 	protected static function removeLimitStatement(string $fieldClause): string {
-		Buddy::debug($fieldClause);
 		$limitClausePattern = '/\s+LIMIT\s+\d+(\s*,\s*\d+)?\s*$/i';
 		if (preg_match('/\s+LIMIT\s+\d+(\s*,\d+)?\s*$/i', $fieldClause) !== false) {
-			Buddy::debug('TEST1');
 			$fieldClause = preg_replace($limitClausePattern, '', $fieldClause);
 		}
-		Buddy::debug($fieldClause);
 		return $fieldClause;
 	}
 
