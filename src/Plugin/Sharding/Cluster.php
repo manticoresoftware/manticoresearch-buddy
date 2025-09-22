@@ -5,6 +5,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 use Ds\Set;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 final class Cluster {
@@ -371,15 +372,41 @@ final class Cluster {
 		return $this->getTableName($table);
 	}
 
+	/**
+	 * Verify that specified tables are present in the cluster
+	 * @param string $clusterName
+	 * @param array<string> $tableNames
+	 * @return bool
+	 */
+	public function verifyTablesInCluster(string $clusterName, array $tableNames): bool {
+		try {
+			$clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
+			/** @var array{0?:array{data?:array<array{cluster:string,tables?:string}>}} */
+			$data = $clusterResult->getResult();
+			
+			if (!isset($data[0]['data'])) {
+				return false;
+			}
 
+			foreach ($data[0]['data'] as $cluster) {
+				if ($cluster['cluster'] === $clusterName) {
+					$clusterTables = isset($cluster['tables']) ? 
+						array_map('trim', explode(',', $cluster['tables'])) : [];
+					
+					// Check if all requested tables are in cluster
+					foreach ($tableNames as $tableName) {
+						if (!in_array($tableName, $clusterTables)) {
+							return false;
+						}
+					}
+					return true;
+				}
+			}
+		} catch (\Throwable $e) {
+			Buddy::debugvv("Error verifying tables in cluster: " . $e->getMessage());
+		}
 
-
-
-
-
-
-
-
-
+		return false;
+	}
 
 }

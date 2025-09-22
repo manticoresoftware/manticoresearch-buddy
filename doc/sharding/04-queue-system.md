@@ -521,4 +521,71 @@ $failureRate = $queue->getFailureRate();
 3. **Graceful Degradation**: Continue with reduced functionality when possible
 4. **Clear Error Messages**: Provide actionable error information
 
+## ALTER CLUSTER ADD TABLE Verification System
+
+### Background
+
+`ALTER CLUSTER ADD TABLE` commands present unique challenges in distributed environments:
+
+- **Blocking Operations**: Commands can block for extended periods during table synchronization
+- **Network Intensive**: Large tables require significant time to sync across cluster nodes  
+- **Timeout Issues**: Client timeouts may occur while background synchronization continues
+- **False Failures**: Commands may appear to fail but tables sync successfully
+
+### Verification Mechanism
+
+The queue system implements intelligent verification for `ALTER CLUSTER ADD TABLE` commands:
+
+#### Detection Phase
+```php
+// Automatic detection of ALTER CLUSTER ADD TABLE commands
+if ($this->isAlterClusterAddTableQuery($query['query'])) {
+    // Apply special handling
+}
+```
+
+#### Verification Flow
+1. **Initial Execution**: Command executes normally through queue system
+2. **Error Detection**: If command returns error/timeout
+3. **Running Check**: Use `SHOW QUERIES` to check if command still executing
+4. **Status Verification**: If not running, use `SHOW CLUSTERS` to verify table synchronization
+5. **Final Status**: Mark as 'processed' if tables verified, 'error' if not
+
+#### Implementation Details
+```php
+protected function handleAlterClusterAddTableError(string $query, Struct $errorResult): string {
+    // Check if query still running
+    if ($this->checkQueryStillRunning($query)) {
+        return 'error'; // Will retry with existing mechanism
+    }
+    
+    // Verify cluster status
+    $clusterName = $this->extractClusterNameFromQuery($query);
+    $tableNames = $this->extractTableNamesFromQuery($query);
+    
+    if ($this->cluster->verifyTablesInCluster($clusterName, $tableNames)) {
+        return 'processed'; // Success despite timeout
+    }
+    
+    return 'error'; // Genuine failure
+}
+```
+
+### Benefits
+
+- **Reliability**: Eliminates false failures for long-running operations
+- **Efficiency**: Reduces unnecessary retries when tables are already synchronized
+- **Transparency**: No impact on other command types
+- **Robustness**: Handles network issues and large table synchronization gracefully
+
+### Monitoring
+
+The system provides detailed logging for operational visibility:
+
+```
+[DEBUG] Checking if ALTER CLUSTER ADD TABLE still running
+[DEBUG] Query no longer running, verifying cluster status
+[DEBUG] Tables verified in cluster, marking as processed
+```
+
 The queue system provides the foundation for reliable, ordered execution of complex distributed operations while maintaining data safety and system consistency.
