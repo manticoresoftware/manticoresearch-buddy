@@ -175,6 +175,11 @@ final class Queue {
 		$res = $this->executeQuery($query);
 		$status = empty($res['error']) ? 'processed' : 'error';
 
+		// Special handling for ALTER CLUSTER ADD TABLE commands
+		if ($status === 'error' && $this->isAlterClusterAddTableQuery($query['query'])) {
+			$status = $this->handleAlterClusterAddTableError($query['query'], $res);
+		}
+
 		Buddy::debugvv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
 
 		$duration = (int)((microtime(true) - $mt) * 1000);
@@ -331,6 +336,104 @@ final class Queue {
 		}
 
 		mkdir($dir, 0755);
+	}
+
+	/**
+	 * Check if query is ALTER CLUSTER ADD TABLE command
+	 * @param string $query
+	 * @return bool
+	 */
+	protected function isAlterClusterAddTableQuery(string $query): bool {
+		return (bool)preg_match('/^\s*ALTER\s+CLUSTER\s+\w+\s+ADD\s+/i', $query);
+	}
+
+	/**
+	 * Handle error for ALTER CLUSTER ADD TABLE by checking if query is still running
+	 * or if tables are already synced in cluster
+	 * @param string $query
+	 * @param Struct $errorResult
+	 * @return string 'processed' if verified successful, 'error' otherwise
+	 */
+	protected function handleAlterClusterAddTableError(string $query, Struct $errorResult): string {
+		// First check if query is still running
+		if ($this->checkQueryStillRunning($query)) {
+			Buddy::debugvv("ALTER CLUSTER ADD TABLE still running, will retry later");
+			return 'error'; // Will be retried by existing mechanism
+		}
+
+		// Query finished, check if tables are actually in cluster
+		Buddy::debugvv("ALTER CLUSTER ADD TABLE no longer running, verifying cluster status");
+		
+		$clusterName = $this->extractClusterNameFromQuery($query);
+		$tableNames = $this->extractTableNamesFromQuery($query);
+		
+		if ($clusterName && !empty($tableNames)) {
+			if ($this->cluster->verifyTablesInCluster($clusterName, $tableNames)) {
+				Buddy::debugvv("Tables verified in cluster, marking as processed");
+				return 'processed';
+			}
+		}
+
+		return 'error';
+	}
+
+	/**
+	 * Check if the query is still running using SHOW QUERIES
+	 * @param string $query
+	 * @return bool
+	 */
+	protected function checkQueryStillRunning(string $query): bool {
+		try {
+			$res = $this->client->sendRequest('SHOW QUERIES')->getResult();
+			/** @var array{0?:array{data?:array<array{query:string}>}} */
+			$data = $res;
+			
+			if (!isset($data[0]['data'])) {
+				return false;
+			}
+
+			$normalizedQuery = preg_replace('/\s+/', ' ', trim($query));
+			
+			foreach ($data[0]['data'] as $runningQuery) {
+				$runningQueryText = preg_replace('/\s+/', ' ', trim($runningQuery['query'] ?? ''));
+				if (stripos($runningQueryText, 'ALTER CLUSTER') !== false && 
+					stripos($runningQueryText, 'ADD') !== false) {
+					// Simple pattern match for ALTER CLUSTER ... ADD queries
+					return true;
+				}
+			}
+		} catch (\Throwable $e) {
+			Buddy::debugvv("Error checking running queries: " . $e->getMessage());
+		}
+
+		return false;
+	}
+
+	/**
+	 * Extract cluster name from ALTER CLUSTER ADD TABLE query
+	 * @param string $query
+	 * @return string|null
+	 */
+	protected function extractClusterNameFromQuery(string $query): ?string {
+		if (preg_match('/ALTER\s+CLUSTER\s+(\w+)\s+ADD/i', $query, $matches)) {
+			return $matches[1];
+		}
+		return null;
+	}
+
+	/**
+	 * Extract table names from ALTER CLUSTER ADD TABLE query
+	 * @param string $query
+	 * @return array<string>
+	 */
+	protected function extractTableNamesFromQuery(string $query): array {
+		if (preg_match('/ADD\s+(.+)$/i', $query, $matches)) {
+			$tablesStr = trim($matches[1]);
+			// Split by comma and clean up table names
+			$tables = array_map('trim', explode(',', $tablesStr));
+			return array_filter($tables);
+		}
+		return [];
 	}
 
 	/**

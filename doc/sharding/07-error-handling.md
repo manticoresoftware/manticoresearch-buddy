@@ -2,6 +2,150 @@
 
 The sharding system implements comprehensive error handling and recovery mechanisms to ensure system reliability and data safety during failures. This section covers error scenarios, recovery strategies, rollback mechanisms, and troubleshooting procedures.
 
+## ALTER CLUSTER ADD TABLE Special Handling
+
+### The Blocking Query Problem
+
+`ALTER CLUSTER ADD TABLE` commands have unique characteristics that require special handling:
+
+**Why Special Handling is Needed:**
+- **Blocking Nature**: These commands can block for extended periods during table synchronization
+- **Network-Intensive**: Large tables may take significant time to sync across cluster nodes
+- **Timeout vs Success**: Query may timeout/fail but table synchronization continues in background
+- **False Negatives**: Command appears to fail but tables are actually being synchronized successfully
+
+### Implementation Strategy
+
+The system implements a two-phase verification approach for `ALTER CLUSTER ADD TABLE` commands:
+
+#### Phase 1: Query Execution Detection
+When an `ALTER CLUSTER ADD TABLE` command returns an error:
+
+```php
+// Check if query is still running using SHOW QUERIES
+if ($this->checkQueryStillRunning($query)) {
+    // Query still executing - let existing retry mechanism handle it
+    return 'error'; // Will be retried later
+}
+```
+
+#### Phase 2: Cluster Status Verification
+If query is no longer running, verify actual cluster state:
+
+```php
+// Extract cluster and table information
+$clusterName = $this->extractClusterNameFromQuery($query);
+$tableNames = $this->extractTableNamesFromQuery($query);
+
+// Verify tables are actually in cluster
+if ($this->cluster->verifyTablesInCluster($clusterName, $tableNames)) {
+    return 'processed'; // Success despite error response
+}
+```
+
+### Technical Implementation
+
+#### Query Detection
+```php
+protected function isAlterClusterAddTableQuery(string $query): bool {
+    return (bool)preg_match('/^\s*ALTER\s+CLUSTER\s+\w+\s+ADD\s+/i', $query);
+}
+```
+
+#### Running Query Check
+```php
+protected function checkQueryStillRunning(string $query): bool {
+    $res = $this->client->sendRequest('SHOW QUERIES')->getResult();
+    
+    foreach ($res[0]['data'] as $runningQuery) {
+        if (stripos($runningQuery['query'], 'ALTER CLUSTER') !== false && 
+            stripos($runningQuery['query'], 'ADD') !== false) {
+            return true; // Still running
+        }
+    }
+    return false;
+}
+```
+
+#### Cluster Verification
+```php
+public function verifyTablesInCluster(string $clusterName, array $tableNames): bool {
+    $clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
+    $data = $clusterResult->getResult();
+    
+    foreach ($data[0]['data'] as $cluster) {
+        if ($cluster['cluster'] === $clusterName) {
+            $clusterTables = array_map('trim', explode(',', $cluster['tables']));
+            
+            // Check if all requested tables are in cluster
+            foreach ($tableNames as $tableName) {
+                if (!in_array($tableName, $clusterTables)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+```
+
+### Flow Diagram
+
+```
+ALTER CLUSTER ADD TABLE executed
+           ↓
+    Returns error/timeout
+           ↓
+    Check SHOW QUERIES
+           ↓
+    ┌─────────────────┐
+    │ Still running?  │
+    └─────────────────┘
+           ↓
+    ┌─────────────────┐         ┌─────────────────┐
+    │      YES        │         │       NO        │
+    │ Return 'error'  │         │ Check cluster   │
+    │ (retry later)   │         │ status          │
+    └─────────────────┘         └─────────────────┘
+                                        ↓
+                                ┌─────────────────┐
+                                │ Tables synced?  │
+                                └─────────────────┘
+                                        ↓
+                        ┌─────────────────┐         ┌─────────────────┐
+                        │      YES        │         │       NO        │
+                        │ Return          │         │ Return 'error'  │
+                        │ 'processed'     │         │ (actual failure)│
+                        └─────────────────┘         └─────────────────┘
+```
+
+### Benefits
+
+1. **Reliability**: Prevents false failures for long-running synchronization operations
+2. **Efficiency**: Avoids unnecessary retries when tables are already synchronized
+3. **Transparency**: Maintains existing queue behavior for all other command types
+4. **Robustness**: Handles network timeouts and large table synchronization gracefully
+
+### Logging and Monitoring
+
+The system provides detailed logging for troubleshooting:
+
+```
+[DEBUG] ALTER CLUSTER ADD TABLE still running, will retry later
+[DEBUG] ALTER CLUSTER ADD TABLE no longer running, verifying cluster status  
+[DEBUG] Tables verified in cluster, marking as processed
+[INFO] Queue query error: ALTER CLUSTER cluster1 ADD table1,table2
+```
+
+### Configuration
+
+No additional configuration is required. The feature:
+- Automatically detects `ALTER CLUSTER ADD TABLE` commands
+- Uses existing retry mechanisms and timeouts
+- Maintains backward compatibility with all other command types
+- Integrates seamlessly with existing error handling
+
 ## Rollback System
 
 ### Overview
