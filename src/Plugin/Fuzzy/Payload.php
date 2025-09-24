@@ -105,7 +105,7 @@ final class Payload extends BasePayload {
 		$query = $request->payload;
 		$additionalQueries = static::extractAdditionalQueries($query);
 
-		preg_match('/FROM\s+`?(\w+)`?\s+WHERE/ius', $query, $matches);
+		preg_match('/\s+FROM\s+`?(\w+)`?\s+(WHERE|INNER|LEFT|JOIN)\s+/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
 		// Check that we have match
