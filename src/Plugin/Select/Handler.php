@@ -17,6 +17,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 /** @package Manticoresearch\Buddy\Base\Plugin\Select */
@@ -193,6 +194,7 @@ final class Handler extends BaseHandler {
 	 * @return TaskResult
 	 */
 	protected static function handleSelectFromTables(Client $manticoreClient, Payload $payload): TaskResult {
+		Buddy::debug('TEST1 ' . json_encode($payload->where) . ' ' . json_encode($payload->fields));
 		if (sizeof($payload->fields) === 1 && stripos($payload->fields[0], 'count(*)') === 0) {
 			return static::handleFieldCount($manticoreClient, $payload);
 		}
@@ -200,6 +202,7 @@ final class Handler extends BaseHandler {
 		$table = $payload->where['table_name']['value'] ?? $payload->where['TABLE_NAME']['value'] ?? null;
 		$data = [];
 		if ($table) {
+			Buddy::debug('TEST2');
 			$query = "SHOW CREATE TABLE {$table}";
 			/** @var array<array{data:array<array<string,string>>}> */
 			$schemaResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
@@ -226,6 +229,7 @@ final class Handler extends BaseHandler {
 				}
 			}
 		} else {
+			Buddy::debug('TEST3');
 			$data = static::processSelectOtherFromTables($manticoreClient, $payload);
 		}
 
@@ -243,12 +247,20 @@ final class Handler extends BaseHandler {
 		// grafana: SELECT DISTINCT TABLE_SCHEMA from information_schema.TABLES
 		// where TABLE_TYPE != 'SYSTEM VIEW' ORDER BY TABLE_SCHEMA
 		if (sizeof($payload->fields) === 1
-			&& stripos($payload->fields[0], 'table_schema') !== false
+			&& (stripos($payload->fields[0], 'table_schema') !== false
+				|| (
+					isset($payload->where['table_schema']['value'])
+					&& strtolower($payload->where['table_schema']['value']) == 'manticore'
+				)
+			)
 		) {
+			Buddy::debug('TEST4');
 			$data[] = [
-				'TABLE_SCHEMA' => 'Manticore',
+				'TABLE_SCHEMA1' => 'Manticore1',
+				'test' => 1,
 			];
 		} elseif (stripos($payload->fields[0], 'table_name') !== false) {
+			Buddy::debug('TEST5');
 			self::unifyFieldNames($payload->fields);
 			$query = 'SHOW TABLES';
 			/** @var array<array{data:array<array<string,string>>}> */
