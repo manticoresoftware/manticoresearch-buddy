@@ -142,18 +142,42 @@ final class Handler extends BaseHandlerWithClient {
 		Payload $payload,
 		array $fields
 	): array {
-		$sql = "SELECT * FROM  {$payload->table}  WHERE id = {$payload->id}";
+		$idValue = $payload->id;
 
-		/** @var array<int, array<string, array<int, array<string, string>>>> $records */
-		$records = $manticoreClient
-			->sendRequest($sql)
-			->getResult();
+		if ($payload->id < 0) {
+			$unsignedIdSql = "SELECT UINT64({$payload->id}) as unsigned_id";
+			$unsignedIdResult = $manticoreClient->sendRequest($unsignedIdSql, null, false, true);
 
-		if (isset($records[0]['data'][0])) {
-			return self::morphValuesByFieldType($records[0]['data'][0], $fields);
+			if ($unsignedIdResult->hasError()) {
+				throw ManticoreSearchClientError::create((string)$unsignedIdResult->getError());
+			}
+
+			$unsignedIdData = $unsignedIdResult->getResult();
+
+			if (is_array($unsignedIdData[0]) && isset($unsignedIdData[0]['data'][0]['unsigned_id'])) {
+				$idValue = $unsignedIdData[0]['data'][0]['unsigned_id'];
+			}
 		}
 
-		return ['id' => $payload->id];
+		$sql = "SELECT * FROM  {$payload->table}  WHERE id = {$payload->id}";
+
+		$selectResult = $manticoreClient->sendRequest($sql);
+
+		if ($selectResult->hasError()) {
+			throw ManticoreSearchClientError::create((string)$selectResult->getError());
+		}
+
+		/** @var array<int, array<string, array<int, array<string, string>>>> $records */
+		$records = $selectResult->getResult();
+
+		if (isset($records[0]['data'][0])) {
+			$result = self::morphValuesByFieldType($records[0]['data'][0], $fields);
+			$result['id'] = $idValue;
+
+			return $result;
+		}
+
+		return ['id' => $idValue];
 	}
 
 	/**
