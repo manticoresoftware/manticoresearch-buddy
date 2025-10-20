@@ -173,7 +173,8 @@ final class Payload extends BasePayload {
 	protected static function extractAdditionalQueries(string $query): array {
 		$additionalQueries = [];
 
-		// Find the position of the first semicolon
+		// Find the position of the first semicolon that is a multi query delimiter
+		$query = (string)preg_replace(['/\'([^\']*)\'/uis', '/"([^"]*)"/uis'], '', $query);
 		$firstSemicolonPos = strpos($query, ';', strripos($query, ' where ') ?: 0) ?: 0;
 
 		// If a semicolon exists
@@ -224,6 +225,7 @@ final class Payload extends BasePayload {
 		$template = (string)preg_replace(
 			[
 				static::MATCH_REG_PATTERN,
+				'/;[\s\S]*/ius',
 				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,(?!.*option|.*from)/ius',
@@ -233,6 +235,7 @@ final class Payload extends BasePayload {
 				],
 			[
 				'MATCH(\'%s\'%s)',
+				'',
 				'',
 				'',
 				' ',

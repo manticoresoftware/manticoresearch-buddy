@@ -185,4 +185,31 @@ class MultipleQueriesTest extends TestCase {
 		$out = static::runSqlQuery("select col1,col2 from {$this->testTable1}");
 		$this->assertEquals($selectResult, $out);
 	}
+
+	public function testSqlMultipleQueriesWithFuzzySearchOk(): void {
+		static::runSqlQuery('CREATE TABLE ' . $this->testTable1 . "(f text)  min_infix_len='2'");
+		static::runSqlQuery('INSERT INTO ' . $this->testTable1 . "(f) VALUES ('abcdef')");
+		$selectResult = [
+			'+--------+',
+			'| f      |',
+			'+--------+',
+			'| abcdef |',
+			'+--------+',
+			'+----------------+-------+',
+			'| Variable_name  | Value |',
+			'+----------------+-------+',
+			'| total          | 1     |',
+			'| total_found    | 1     |',
+			'| total_relation | eq    |',
+			'| time           | 0.001 |',
+			'+----------------+-------+',
+		];
+		$out = static::runSqlQuery(
+			'SELECT f FROM ' . $this->testTable1 . " WHERE MATCH('abcdeg') OPTION fuzzy=1; SHOW META"
+		);
+		//Removing time value from response to avoid possible inconsistencies
+		array_splice($selectResult, 11, 1);
+		array_splice($out, 11, 1);
+		$this->assertEquals($selectResult, $out);
+	}
 }
