@@ -145,18 +145,7 @@ final class Handler extends BaseHandlerWithClient {
 		$idValue = $payload->id;
 
 		if ($payload->id < 0) {
-			$unsignedIdSql = "SELECT UINT64({$payload->id}) as unsigned_id";
-			$unsignedIdResult = $manticoreClient->sendRequest($unsignedIdSql, null, false, true);
-
-			if ($unsignedIdResult->hasError()) {
-				throw ManticoreSearchClientError::create((string)$unsignedIdResult->getError());
-			}
-
-			$unsignedIdData = $unsignedIdResult->getResult();
-
-			if (is_array($unsignedIdData[0]) && isset($unsignedIdData[0]['data'][0]['unsigned_id'])) {
-				$idValue = $unsignedIdData[0]['data'][0]['unsigned_id'];
-			}
+			$idValue = sprintf('%u', $payload->id);
 		}
 
 		$sql = "SELECT * FROM  {$payload->table}  WHERE id = {$payload->id}";
