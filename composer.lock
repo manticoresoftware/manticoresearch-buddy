@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0f82f6d49d35818243816a36a9d6291d",
+    "content-hash": "f8b8f7446a01b57af60c5fcd61adb8c7",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -705,16 +705,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-force_bigrams",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "67b975afae7ff043074cd9f91281ef47e167c25d"
+                "reference": "1c508e670c787a2d5558533e6435bcf4c69a846a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/67b975afae7ff043074cd9f91281ef47e167c25d",
-                "reference": "67b975afae7ff043074cd9f91281ef47e167c25d",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/1c508e670c787a2d5558533e6435bcf4c69a846a",
+                "reference": "1c508e670c787a2d5558533e6435bcf4c69a846a",
                 "shasum": ""
             },
             "require": {
@@ -730,6 +730,7 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -750,9 +751,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/force_bigrams"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2025-10-21T05:08:49+00:00"
+            "time": "2025-10-21T11:56:11+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
