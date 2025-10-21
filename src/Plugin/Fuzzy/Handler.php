@@ -88,8 +88,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 			[$variations, $variationScores] = $this->manticoreClient->fetchFuzzyVariations(
 				$phrase,
 				$this->payload->table,
-				$this->payload->distance,
-				forceBigrams: $this->payload->forceBigrams
+				$this->payload->forceBigrams,
+				$this->payload->distance
 			);
 			Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
 			// Extend varitions for each iteration we have
