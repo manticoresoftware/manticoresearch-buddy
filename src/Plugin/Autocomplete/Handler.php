@@ -213,7 +213,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 				$phrase,
 				$this->payload->table,
 				$distance,
-				forceBigrams: false // force_bigrams - not used in autocomplete
+				forceBigrams: $this->payload->forceBigrams
 			);
 		}
 
@@ -323,9 +323,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		}
 		$wordLen = strlen($word);
 		// If we set fuzziness, we choose minimal distance from out algo and parameter set
+		// When force_bigrams is true, use distance=2 for wordLen > 3 instead of > 6
+		$distanceThreshold = $this->payload->forceBigrams ? 3 : 6;
 		return min(
 			$this->payload->fuzziness, match (true) {
-				$wordLen > 6 => 2,
+				$wordLen > $distanceThreshold => 2,
 				$wordLen > 2 => 1,
 				default => 0,
 			}
