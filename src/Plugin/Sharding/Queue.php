@@ -12,11 +12,15 @@ use RuntimeException;
  * @phpstan-type QueryItem array{
  *  id:int,
  *  query:string,
+ *  rollback_query:string,
  *  wait_for_id:int,
+ *  rollback_wait_for_id:int,
+ *  operation_group:string,
  *  tries:int,
  *  status:string,
  *  created_at:int,
- *  updated_at:int
+ *  updated_at:int,
+ *  duration:int
  * }
  */
 final class Queue {
@@ -61,23 +65,36 @@ final class Queue {
 	 * Add new query for requested node to the queue
 	 * @param string $nodeId
 	 * @param string $query
+	 * @param string $rollbackQuery Required rollback command (rollback always enabled)
+	 * @param string|null $operationGroup Optional operation group
 	 * @return int the queue id
 	 */
-	public function add(string $nodeId, string $query): int {
+	public function add(string $nodeId, string $query, string $rollbackQuery, ?string $operationGroup = null): int {
 		$table = $this->cluster->getSystemTableName($this->table);
 		$mt = (int)(microtime(true) * 1000);
 		$query = addcslashes($query, "'");
 		$id = hrtime(true);
+
+		$rollbackQuery = addcslashes($rollbackQuery, "'");
+		$operationGroup = $operationGroup ?? '';
+
 		$this->client->sendRequest(
 			"
 			INSERT INTO {$table}
-				(`id`, `node`, `query`, `wait_for_id`, `tries`, `status`, `created_at`, `updated_at`, `duration`)
+			(`id`, `node`, `query`, `rollback_query`, `wait_for_id`,
+			`rollback_wait_for_id`, `operation_group`, `tries`, `status`,
+			`created_at`, `updated_at`, `duration`)
 			VALUES
-				($id, '{$nodeId}', '{$query}', $this->waitForId, 0,'created', {$mt}, {$mt}, 0)
+			($id, '{$nodeId}', '{$query}', '{$rollbackQuery}',
+			$this->waitForId, 0, '{$operationGroup}', 0, 'created',
+			{$mt}, {$mt}, 0)
 			"
 		);
+
 		return $id;
 	}
+
+
 
 	/**
 	 * Get the single row by id
@@ -279,7 +296,10 @@ final class Queue {
 		$query = "CREATE TABLE {$this->table} (
 			`node` string,
 			`query` string,
+			`rollback_query` string,
 			`wait_for_id` bigint,
+			`rollback_wait_for_id` bigint,
+			`operation_group` string,
 			`tries` int,
 			`status` string,
 			`created_at` bigint,
@@ -311,5 +331,86 @@ final class Queue {
 		}
 
 		mkdir($dir, 0755);
+	}
+
+	/**
+	 * Rollback entire operation group
+	 * @param string $operationGroup Group to rollback
+	 * @return bool Success status
+	 */
+	public function rollbackOperationGroup(string $operationGroup): bool {
+		try {
+			$rollbackCommands = $this->getRollbackCommands($operationGroup);
+			if (empty($rollbackCommands)) {
+				Buddy::debugvv("No rollback commands found for group {$operationGroup}");
+				return true; // Nothing to rollback is considered success
+			}
+
+			return $this->executeRollbackSequence($rollbackCommands);
+		} catch (\Throwable $e) {
+			Buddy::debugvv("Rollback failed for group {$operationGroup}: " . $e->getMessage());
+			return false;
+		}
+	}
+
+	/**
+	 * Get rollback commands for operation group in reverse order
+	 * @param string $operationGroup
+	 * @return array<array{id:int,node:string,rollback_query:string,rollback_wait_for_id:int}>
+	 *         Rollback commands in reverse execution order
+	 */
+	protected function getRollbackCommands(string $operationGroup): array {
+		$table = $this->cluster->getSystemTableName($this->table);
+
+		// Get completed commands with rollback queries in reverse order
+		$query = "
+			SELECT id, node, rollback_query, rollback_wait_for_id
+			FROM {$table}
+			WHERE operation_group = '{$operationGroup}'
+			AND status = 'processed'
+			AND rollback_query != ''
+			ORDER BY id DESC
+		";
+
+		/** @var array{0?:array{data?:array<array{id:int,node:string,rollback_query:string,rollback_wait_for_id:int}>}} */
+		$result = $this->client->sendRequest($query)->getResult();
+
+		return $result[0]['data'] ?? [];
+	}
+
+	/**
+	 * Execute rollback commands in sequence
+	 * @param array<array{id:int,node:string,rollback_query:string,rollback_wait_for_id:int}> $rollbackCommands
+	 * @return bool Success status
+	 */
+	protected function executeRollbackSequence(array $rollbackCommands): bool {
+		$allSuccess = true;
+
+		foreach ($rollbackCommands as $command) {
+			try {
+				// Execute rollback command on the specific node
+				$nodeId = $command['node'];
+				$rollbackQuery = $command['rollback_query'];
+
+				Buddy::debugvv("Executing rollback on {$nodeId}: {$rollbackQuery}");
+
+				// Execute the rollback query
+				$res = $this->client->sendRequest($rollbackQuery);
+				if ($res->hasError()) {
+					$error = $res->getError();
+					Buddy::debugvv("Rollback command failed: {$rollbackQuery} - Error: {$error}");
+					$allSuccess = false;
+					// Continue with other rollback commands even if one fails
+				} else {
+					Buddy::debugvv("Rollback successful: {$rollbackQuery}");
+				}
+			} catch (\Throwable $e) {
+				Buddy::debugvv("Rollback command exception: {$command['rollback_query']} - " . $e->getMessage());
+				$allSuccess = false;
+				// Continue with other rollback commands
+			}
+		}
+
+		return $allSuccess;
 	}
 }
