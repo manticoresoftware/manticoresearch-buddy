@@ -210,6 +210,10 @@ jobs:
     name: Run CLT tests
     needs: [test_kit, ref_detection]
     uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@master
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
     with:
       docker_image: ${{ needs.test_kit.outputs.docker_repo }}:${{ needs.test_kit.outputs.docker_tag }}
       repository: manticoresoftware/manticoresearch

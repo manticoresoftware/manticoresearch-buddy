@@ -25,6 +25,7 @@ final class Handler extends BaseHandler {
 		'engine' => ['field', 'engine'],
 		'table_type' => ['static', 'BASE TABLE'],
 		'table_name' => ['table', ''],
+		'table_schema' => ['static', 'Manticore'],
 	];
 
 	const COLUMNS_FIELD_MAP = [
@@ -250,6 +251,45 @@ final class Handler extends BaseHandler {
 	}
 
 	/**
+	 *
+	 * @param bool $isWildcardSelect
+	 * @param Client $manticoreClient
+	 * @param Payload $payload
+	 * @return array<array<string,mixed>>
+	 */
+	protected static function processSelectFromInfoSchema(
+		bool $isWildcardSelect,
+		Client $manticoreClient,
+		Payload $payload
+	): array {
+		$data = [];
+		self::unifyFieldNames($payload->fields);
+		$query = 'SHOW TABLES';
+		/** @var array<array{data:array<array<string,string>>}> */
+		$tablesResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+		if ($isWildcardSelect) {
+			$payload->fields = [];
+			foreach (self::TABLES_FIELD_MAP as $field => $fieldInfo) {
+				if ($fieldInfo[0] !== 'static' && $fieldInfo[0] !== 'table') {
+					continue;
+				}
+				$payload->fields[] = $field;
+			}
+		}
+		foreach ($tablesResult[0]['data'] as $row) {
+			$dataRow = [];
+			foreach ($payload->fields as $f) {
+				$dataRow[$f] = isset(self::TABLES_FIELD_MAP[$f]) && self::TABLES_FIELD_MAP[$f][1]
+				? self::TABLES_FIELD_MAP[$f][1]
+				: self::getFieldValue($f, $row);
+			}
+			$data[] = $dataRow;
+		}
+
+		return $data;
+	}
+
+	/**
 	 * @param Client $manticoreClient
 	 * @param Payload $payload
 	 * @return array<array<string,mixed>>
@@ -258,23 +298,16 @@ final class Handler extends BaseHandler {
 		$data = [];
 		// grafana: SELECT DISTINCT TABLE_SCHEMA from information_schema.TABLES
 		// where TABLE_TYPE != 'SYSTEM VIEW' ORDER BY TABLE_SCHEMA
-		if (sizeof($payload->fields) === 1
-			&& stripos($payload->fields[0], 'table_schema') !== false
-		) {
+		$isSingleFieldSelect = sizeof($payload->fields) === 1;
+		$isWildcardSelect = $isSingleFieldSelect
+			&& stripos($payload->fields[0], '*') !== false
+			&& $payload->table === 'information_schema.tables';
+		if ($isSingleFieldSelect && stripos($payload->fields[0], 'table_schema') !== false) {
 			$data[] = [
 				'TABLE_SCHEMA' => 'Manticore',
 			];
-		} elseif (stripos($payload->fields[0], 'table_name') !== false) {
-			self::unifyFieldNames($payload->fields);
-			$query = 'SHOW TABLES';
-			/** @var array<array{data:array<array<string,string>>}> */
-			$tablesResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
-			$row = $tablesResult[0]['data'][0];
-			$dataRow = [];
-			foreach ($payload->fields as $f) {
-				$dataRow[$f] = self::getFieldValue($f, $row);
-			}
-			$data[] = $dataRow;
+		} elseif ($isWildcardSelect || stripos($payload->fields[0], 'table_name') !== false) {
+			$data = self::processSelectFromInfoSchema($isWildcardSelect, $manticoreClient, $payload);
 		}
 
 		return $data;
@@ -460,7 +493,7 @@ final class Handler extends BaseHandler {
 	 * @return mixed
 	 */
 	protected static function getFieldValue(string $field, array $row, ?string $table = null): mixed {
-		if ($field === 'TABLE_NAME') {
+		if (strtolower($field) === 'table_name') {
 			return $table ?? ($row['Table'] ?? null);
 		}
 		return static::DEFAULT_FIELD_VALUES[$field] ?? null;

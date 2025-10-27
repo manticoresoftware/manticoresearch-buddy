@@ -47,6 +47,9 @@ final class Payload extends BasePayload {
 	/** @var bool */
 	public bool $preserve;
 
+	/** @var bool */
+	public bool $forceBigrams;
+
 	/** @var string|array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>} */
 	public array|string $payload;
 
@@ -81,7 +84,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{index:string,table?:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool}} $payload */
+		/** @var array{index:string,table?:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool,force_bigrams?:bool}} $payload */
 		$payload = simdjson_decode($request->payload, true);
 		$self = new static();
 		$self->path = $request->path;
@@ -90,6 +93,7 @@ final class Payload extends BasePayload {
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 		$self->preserve = (bool)($payload['options']['preserve'] ?? false);
+		$self->forceBigrams = (bool)($payload['options']['force_bigrams'] ?? false);
 
 		$payload = static::cleanUpPayloadOptions($payload);
 		$self->payload = $payload;
@@ -105,7 +109,7 @@ final class Payload extends BasePayload {
 		$query = $request->payload;
 		$additionalQueries = static::extractAdditionalQueries($query);
 
-		preg_match('/FROM\s+`?(\w+)`?\s+WHERE/ius', $query, $matches);
+		preg_match('/\s+FROM\s+`?(\w+)`?\s+(WHERE|INNER|LEFT|JOIN)\s+/ius', $query, $matches);
 		$tableName = $matches[1] ?? '';
 
 		// Check that we have match
@@ -154,6 +158,10 @@ final class Payload extends BasePayload {
 		preg_match('/(?:OPTION\s+|,\s+)layouts\s*=\s*\'([a-zA-Z, ]*)\'/ius', $query, $matches);
 		$layouts = static::parseLayouts($matches[1] ?? null);
 
+		// Parse force_bigrams
+		preg_match('/force_bigrams\s*=\s*(\d+)/ius', $query, $matches);
+		$forceBigrams = (bool)($matches[1] ?? 0);
+
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $tableName;
@@ -161,6 +169,7 @@ final class Payload extends BasePayload {
 		$self->distance = $distanceValue;
 		$self->layouts = $layouts;
 		$self->preserve = $preserve;
+		$self->forceBigrams = $forceBigrams;
 		$self->payload = $query;
 		$self->queries = $additionalQueries;
 		return $self;
@@ -224,7 +233,7 @@ final class Payload extends BasePayload {
 		$template = (string)preg_replace(
 			[
 				static::MATCH_REG_PATTERN,
-				'/(fuzzy|distance|preserve)\s*=\s*\d+[,\s]*/ius',
+				'/(fuzzy|distance|preserve|force_bigrams)\s*=\s*\d+[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,(?!.*option|.*from)/ius',
 				'/\soption(?!.*option|.*from)/ius',
@@ -426,13 +435,14 @@ final class Payload extends BasePayload {
 	 *         fuzzy?: bool,
 	 *         distance?: int,
 	 *         layouts?: string,
-	 *         preserve?: bool
+	 *         preserve?: bool,
+	 *         force_bigrams?: bool
 	 *     }
 	 * } $payload
 	 * @return array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>}
 	 */
 	public static function cleanUpPayloadOptions(array $payload): array {
-		$excludedOptions = ['distance', 'fuzzy', 'layouts', 'preserve'];
+		$excludedOptions = ['distance', 'fuzzy', 'layouts', 'preserve', 'force_bigrams'];
 		$payload['options'] = array_diff_key($payload['options'], array_flip($excludedOptions));
 		if (empty($payload['options'])) {
 			unset($payload['options']);
