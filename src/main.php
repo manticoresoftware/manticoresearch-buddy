@@ -137,8 +137,7 @@ $server->beforeStart(
 	->addHandler('request', EventHandler::request(...))
 	->addTicker(
 		static function () {
-			$memory = memory_get_usage() / 1024;
-			$formatted = number_format($memory, 3).'K';
+			$formatted = memory_get_usage() . ' bytes';
 			Buddy::debugv("memory usage: {$formatted}");
 		}, 60
 	);
