@@ -143,6 +143,17 @@ final class Payload extends BasePayload {
 	}
 
 	/**
+	 * Check if RT mode is enabled in daemon
+	 * @return void
+	 */
+	protected function checkRTMode(): void {
+		$settings = $this->getSettings();
+		if (!$settings->isRtMode()) {
+			throw new Exception("Request {$this->path} is not supported in Plain mode. RT mode must be enabled.");
+		}
+	}
+
+	/**
 	 * @param array<string> $pathParts
 	 * @param Payload $payload
 	 * @return void
@@ -209,6 +220,8 @@ final class Payload extends BasePayload {
 	 * @return string
 	 */
 	public function getHandlerClassName(): string {
+		self::checkRTMode();
+
 		$namespace = __NAMESPACE__ . '\\';
 		$handlerName = match (static::$requestTarget) {
 			'_alias' => 'GetAliasesHandler',
