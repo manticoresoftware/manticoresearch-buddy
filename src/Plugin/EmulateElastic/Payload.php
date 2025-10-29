@@ -139,14 +139,21 @@ final class Payload extends BasePayload {
 				throw new Exception("Unsupported request type in {$request->path}: " . static::$requestTarget);
 		}
 
-		// Adding check for RT mode enabled in daemon
-		$settings = $this->getSettings();
-		if (!$settings->isRtMode()) {
-			throw GenericError::create(
-				'Request is not supported in Plain mode. RT mode must be enabled.'
-			);
-		}
+		self::checkRTMode($self);
+
 		return $self;
+	}
+
+	/**
+	 * Check if RT mode is enabled in daemon
+	 * @param Payload $payload
+	 * @return void
+	 */
+	protected static function checkRTMode(Payload &$payload): void {
+		$settings = $payload->getSettings();
+		if (!$settings->isRtMode()) {
+			throw new Exception("Request {$request->path} is not supported in Plain mode. RT mode must be enabled.");
+		}
 	}
 
 	/**
