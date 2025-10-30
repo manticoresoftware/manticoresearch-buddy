@@ -1,10 +1,9 @@
 # AlterColumn Plugin
 
 ## Description
-Enhances changing distributed table definitions (agents, locals) safely.
+Enables adding/dropping table fields.
 
 
 ## Examples
 - `ALTER TABLE table1 ADD COLUMN f int`
 - `ALTER TABLE table1 DROP COLUMN f`
-

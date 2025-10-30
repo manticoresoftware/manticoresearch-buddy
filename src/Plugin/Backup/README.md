@@ -1,7 +1,7 @@
 # Backup Plugin
 
 ## Description
-Implements table backup.
+Implements table(s) backup.
 
 ## Examples
 - `BACKUP TABLE a TO /backup_dir;`

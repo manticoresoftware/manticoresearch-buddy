@@ -1,7 +1,7 @@
 # Show Plugin
 
 ## Description
-Various "show" queries handlers, for example, `show version`.
+Implements various "show" queries handlers, for example, `show version`.
 
 ## Examples
 

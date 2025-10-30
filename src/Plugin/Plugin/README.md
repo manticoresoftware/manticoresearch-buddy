@@ -1,7 +1,7 @@
 # Plugin Plugin
 
 ## Description
-Implements operations  with Buddy plugins.
+Implements operations with Buddy plugins.
 
 ## Examples
 - `CREATE BUDDY PLUGIN plugin1 VERSION 'v1';`

@@ -1,7 +1,7 @@
 # Alias Plugin
 
 ## Description
-Helper for using/maintaining table aliases during queries or alias ops.
+Helper for using table aliases in queries.
 
 
 ## Examples
