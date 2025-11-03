@@ -82,6 +82,48 @@ abstract class BaseProvider {
 	}
 
 	/**
+	 * Convert value to integer if it's a numeric string
+	 */
+	protected function convertToInt(mixed $value): mixed {
+		if (is_string($value) && is_numeric($value)) {
+			return (int)$value;
+		}
+		return $value;
+	}
+
+	/**
+	 * Convert value to float if it's a numeric string
+	 */
+	protected function convertToFloat(mixed $value): mixed {
+		if (is_string($value) && is_numeric($value)) {
+			return (float)$value;
+		}
+		return $value;
+	}
+
+	/**
+	 * Convert settings array types from strings to proper types
+	 */
+	protected function convertSettingsTypes(array $settings): array {
+		$numericFields = ['temperature', 'max_tokens', 'top_p', 'frequency_penalty', 'presence_penalty', 'k_results'];
+
+		foreach ($numericFields as $field) {
+			if (!isset($settings[$field]) || !is_string($settings[$field]) || !is_numeric($settings[$field])) {
+				continue;
+			}
+
+			// Convert to int for integer fields, float for others
+			if (in_array($field, ['max_tokens', 'k_results'])) {
+				$settings[$field] = (int)$settings[$field];
+			} else {
+				$settings[$field] = (float)$settings[$field];
+			}
+		}
+
+		return $settings;
+	}
+
+	/**
 	 * Get or create HTTP client
 	 *
 	 * @return object
@@ -129,17 +171,19 @@ abstract class BaseProvider {
 		// Extract settings from main config
 		if (isset($this->config['settings']) && is_string($this->config['settings'])) {
 			$settings = json_decode($this->config['settings'], true) ?? [];
+			// Convert string numeric values to proper types
+			$settings = $this->convertSettingsTypes($settings);
 		} elseif (isset($this->config['settings']) && is_array($this->config['settings'])) {
 			$settings = $this->config['settings'];
 		}
 
-		// Merge direct config values
+		// Merge direct config values with type conversion
 		$directSettings = [
-			'temperature' => $this->getConfig('temperature'),
-			'max_tokens' => $this->getConfig('max_tokens'),
-			'top_p' => $this->getConfig('top_p'),
-			'frequency_penalty' => $this->getConfig('frequency_penalty'),
-			'presence_penalty' => $this->getConfig('presence_penalty'),
+			'temperature' => $this->convertToFloat($this->getConfig('temperature')),
+			'max_tokens' => $this->convertToInt($this->getConfig('max_tokens')),
+			'top_p' => $this->convertToFloat($this->getConfig('top_p')),
+			'frequency_penalty' => $this->convertToFloat($this->getConfig('frequency_penalty')),
+			'presence_penalty' => $this->convertToFloat($this->getConfig('presence_penalty')),
 		];
 
 		foreach ($directSettings as $key => $value) {
@@ -150,7 +194,8 @@ abstract class BaseProvider {
 			$settings[$key] = $value;
 		}
 
-		// Apply overrides
+		// Apply overrides with type conversion
+		$overrides = $this->convertSettingsTypes($overrides);
 		return array_merge($settings, $overrides);
 	}
 

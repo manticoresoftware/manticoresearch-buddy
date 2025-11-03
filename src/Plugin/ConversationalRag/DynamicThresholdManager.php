@@ -11,6 +11,8 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
+use Manticoresearch\Buddy\Core\Tool\Buddy;
+
 /**
  * LLM-driven dynamic threshold manager (based on original calculateDynamicThreshold)
  * Uses LLM to detect expansion intent instead of hardcoded patterns
@@ -35,7 +37,7 @@ class DynamicThresholdManager {
 	 */
 	public function calculateDynamicThreshold(
 		string $userQuery,
-		array $conversationHistory,
+		string $conversationHistory,
 		LLMProviderManager $llmProvider,
 		array $modelConfig,
 		float $baseThreshold = 0.8
@@ -46,12 +48,12 @@ class DynamicThresholdManager {
 		if (!isset(self::$expansionState[$conversationId])) {
 			self::$expansionState[$conversationId] = [
 				'count' => 0,
-				'last_conversation_hash' => md5(json_encode($conversationHistory)),
+				'last_conversation_hash' => md5($conversationHistory),
 			];
 		}
 
 		// Reset expansion count if conversation changed significantly
-		$currentHash = md5(json_encode($conversationHistory));
+		$currentHash = md5($conversationHistory);
 		if (self::$expansionState[$conversationId]['last_conversation_hash'] !== $currentHash) {
 			self::$expansionState[$conversationId] = [
 				'count' => 0,
@@ -77,6 +79,9 @@ class DynamicThresholdManager {
 		// Detect if user wants broader search using LLM (from original detectExpansionIntent)
 		$wantsExpansion = $this->detectExpansionIntent($userQuery, $conversationHistory, $llmProvider, $modelConfig);
 
+		Buddy::info("\n[DEBUG DYNAMIC THRESHOLD]");
+		Buddy::info('├─ Wants expansion: ' . ($wantsExpansion ? 'YES' : 'NO'));
+
 		if ($wantsExpansion) {
 			self::$expansionState[$conversationId]['count']++;
 			$expansionCount = self::$expansionState[$conversationId]['count'];
@@ -91,6 +96,13 @@ class DynamicThresholdManager {
 			// Progressive expansion with calculated step (original logic)
 			$threshold = min($baseThreshold + ($expansionCount * $step), $maxThreshold);
 
+			Buddy::info("├─ Expansion level: {$expansionCount} / " . self::MAX_EXPANSIONS);
+			Buddy::info("├─ Base threshold: {$baseThreshold}");
+			Buddy::info("├─ Max threshold: {$maxThreshold} (+" . (self::MAX_EXPANSION_PERCENT * 100) . '%)');
+			Buddy::info("├─ Step size: {$step}");
+			Buddy::info("├─ Calculated threshold: {$threshold}");
+			Buddy::info('└─ Expansion percent: ' . round((($threshold - $baseThreshold) / $baseThreshold) * 100, 1) . '%');
+
 			return [
 				'threshold' => $threshold,
 				'expansion_level' => $expansionCount,
@@ -103,6 +115,9 @@ class DynamicThresholdManager {
 		// Reset on non-expansion queries (original logic)
 		self::$expansionState[$conversationId]['count'] = 0;
 
+		Buddy::info("├─ Using base threshold: {$baseThreshold}");
+		Buddy::info('└─ Expansion count reset to 0');
+
 		return [
 			'threshold' => $baseThreshold,
 			'expansion_level' => 0,
@@ -113,27 +128,30 @@ class DynamicThresholdManager {
 	}
 
 	/**
-	 * Detect expansion intent using LLM (based on original detectExpansionIntent)
+	 * Detect if user wants to broaden their search (expansion intent)
 	 *
 	 * @param string $userQuery
-	 * @param array $conversationHistory
+	 * @param string $conversationHistory
 	 * @param LLMProviderManager $llmProvider
 	 * @param array $modelConfig
 	 * @return bool
 	 */
 	private function detectExpansionIntent(
 		string $userQuery,
-		array $conversationHistory,
+		string $conversationHistory,
 		LLMProviderManager $llmProvider,
 		array $modelConfig
 	): bool {
 		try {
 			// CRITICAL: If no conversation history, cannot be expansion (from original)
-			if (empty($conversationHistory)) {
+			if (empty(trim($conversationHistory))) {
+				Buddy::info("\n[DEBUG EXPANSION CHECK]");
+				Buddy::info('├─ No conversation history');
+				Buddy::info('└─ Expansion: NO (no prior results to expand from)');
 				return false;
 			}
 
-			$historyText = $this->formatConversationHistory($conversationHistory);
+			$historyText = $conversationHistory;
 
 			// Use original expansion prompt
 			$expansionPrompt = "
@@ -171,6 +189,12 @@ Answer: YES or NO";
 			}
 
 			$result = trim(strtolower($response['content']));
+
+			Buddy::info("\n[DEBUG EXPANSION CHECK]");
+			Buddy::info('├─ Has conversation history: YES');
+			Buddy::info("├─ LLM response: {$result}");
+			Buddy::info('└─ Expansion: ' . ($result === 'yes' ? 'YES' : 'NO'));
+
 			return $result === 'yes';
 		} catch (\Exception $e) {
 			// Fallback to false on error
@@ -184,29 +208,19 @@ Answer: YES or NO";
 	 * @param array $conversationHistory
 	 * @return string
 	 */
-	private function getConversationId(array $conversationHistory): string {
-		// Generate a consistent ID based on conversation content
-		return md5(json_encode(array_slice($conversationHistory, 0, 2)));
+	private function getConversationId(string $conversationHistory): string {
+		// Generate a consistent ID based on conversation content (first 200 chars for consistency)
+		return md5(substr($conversationHistory, 0, 200));
 	}
 
 	/**
-	 * Format conversation history for LLM prompt
+	 * Format conversation history for LLM prompt (conversationHistory is already formatted)
 	 *
-	 * @param array $conversationHistory
+	 * @param string $conversationHistory
 	 * @return string
 	 */
-	private function formatConversationHistory(array $conversationHistory): string {
-		if (empty($conversationHistory)) {
-			return '';
-		}
-
-		$lines = [];
-		foreach ($conversationHistory as $message) {
-			$role = $message['role'] ?? 'unknown';
-			$content = $message['message'] ?? '';
-			$lines[] = "{$role}: {$content}";
-		}
-
-		return implode("\n", $lines);
+	private function formatConversationHistory(string $conversationHistory): string {
+		// Conversation history is already formatted as "role: message\nrole: message\n"
+		return $conversationHistory;
 	}
 }

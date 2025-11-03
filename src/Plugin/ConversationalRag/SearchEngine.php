@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Enhanced KNN search engine based on the original php_rag implementation
@@ -98,6 +99,12 @@ class SearchEngine {
 		int $kResults,
 		float $threshold
 	): array {
+		Buddy::info("\n[DEBUG KNN SEARCH]");
+		Buddy::info("├─ Search query: '{$searchQuery}'");
+		Buddy::info("├─ Exclude query: '{$excludeQuery}'");
+		Buddy::info("├─ k: {$kResults}");
+		Buddy::info("├─ Threshold: {$threshold}");
+
 		$searchEscaped = $this->escapeString($searchQuery);
 		$excludeIds = [];
 
@@ -118,10 +125,16 @@ class SearchEngine {
 				if (count($excludeIds) > $maxExclusions) {
 					$excludeIds = array_slice($excludeIds, 0, $maxExclusions);
 				}
+
+				Buddy::info("├─ Exclusion SQL: {$excludeSql}");
+				Buddy::info('├─ Excluded IDs: [' . implode(', ', $excludeIds) . ']');
+				Buddy::info('├─ Exclusion count: ' . count($excludeIds));
 			} catch (\Exception $e) {
 				// Continue without exclusions if query fails
 				$excludeIds = [];
 			}
+		} else {
+			Buddy::info('├─ No exclusions');
 		}
 
 		// Step 2: Build KNN query with SQL-level exclusion (from original)
@@ -130,6 +143,8 @@ class SearchEngine {
 
 		// Ensure threshold is a valid float
 		$threshold = floatval($threshold);
+
+		Buddy::info("├─ Adjusted k: {$adjustedK}");
 
 		if (!empty($excludeIds)) {
 			// Sanitize IDs - they should be integers
@@ -143,17 +158,25 @@ class SearchEngine {
 					AND id NOT IN ({$excludeList})
 					LIMIT {$kResults}";
 		} else {
-			$sql = "SELECT *, knn_dist() as knn_dist 
-					FROM {$table} 
-					WHERE knn({$vectorField}, {$kResults}, '{$searchEscaped}') 
+			$sql = "SELECT *, knn_dist() as knn_dist
+					FROM {$table}
+					WHERE knn({$vectorField}, {$kResults}, '{$searchEscaped}')
 					AND knn_dist < {$threshold}";
 		}
 
+		Buddy::info("├─ Final SQL: {$sql}");
+
 		try {
 			$response = $client->sendRequest($sql);
-			return $response->getResult()[0]['data'] ?? [];
+			$result = $response->getResult()[0]['data'] ?? [];
+
+			Buddy::info('└─ Results found: ' . count($result));
+
+			// Filter out embedding vector fields (matches original php_rag behavior)
+			return $this->filterVectorFields($result, $table, $client);
 		} catch (\Exception $e) {
 			// Return empty result structure
+			Buddy::info('Vector search failed: ' . $e->getMessage());
 			return [];
 		}
 	}
@@ -194,7 +217,9 @@ class SearchEngine {
 
 		try {
 			$response = $client->sendRequest($query);
-			return $response->getResult()[0]['data'] ?? [];
+			$result = $response->getResult()[0]['data'] ?? [];
+			// Filter out embedding vector fields (matches original php_rag behavior)
+			return $this->filterVectorFields($result, $table, $client);
 		} catch (\Exception $e) {
 			return [];
 		}
@@ -334,6 +359,68 @@ class SearchEngine {
 		}
 
 		return self::DEFAULT_SIMILARITY_THRESHOLD;
+	}
+
+	/**
+	 * Remove embedding vector fields from search results (matches original php_rag behavior)
+	 *
+	 * @param array $results
+	 * @param string $table
+	 * @param HTTPClient $client
+	 * @return array
+	 */
+	private function filterVectorFields(array $results, string $table, HTTPClient $client): array {
+		if (empty($results)) {
+			return $results;
+		}
+
+		// Get all float_vector fields from table schema
+		$vectorFields = $this->getVectorFields($client, $table);
+
+		if (empty($vectorFields)) {
+			return $results;
+		}
+
+		// Remove vector fields from each result (matches php_rag.php:511)
+		return array_map(
+			function ($result) use ($vectorFields) {
+				foreach ($vectorFields as $field) {
+					unset($result[$field]);
+				}
+				return $result;
+			}, $results
+		);
+	}
+
+	/**
+	 * Get all float_vector field names from table schema
+	 *
+	 * @param HTTPClient $client
+	 * @param string $table
+	 * @return array
+	 */
+	private function getVectorFields(HTTPClient $client, string $table): array {
+		try {
+			$query = "DESCRIBE {$table}";
+			$response = $client->sendRequest($query);
+			$schema = $response->getResult()[0]['data'] ?? [];
+
+			$vectorFields = [];
+			foreach ($schema as $field) {
+				$fieldType = strtoupper($field['Type'] ?? '');
+				// Match any float_vector type
+				if (strpos($fieldType, 'FLOAT_VECTOR') === false) {
+					continue;
+				}
+
+				$vectorFields[] = $field['Field'];
+			}
+
+			return $vectorFields;
+		} catch (\Exception $e) {
+			// If schema detection fails, fallback to common vector field names
+			return ['embedding_vector', 'embedding', 'vector', 'embeddings'];
+		}
 	}
 
 	/**

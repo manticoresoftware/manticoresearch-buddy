@@ -24,7 +24,6 @@ class ConversationalTest extends TestCase {
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
 				llm_api_key = 'sk-test-key-123456789',
-				llm_base_url = 'https://api.openai.com/v1',
 				style_prompt = 'You are a helpful assistant.',
 				temperature = 0.7,
 				max_tokens = 1000,
@@ -124,7 +123,6 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'test_model' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_base_url = 'https://api.openai.com/v1',
 			style_prompt = 'You are a helpful assistant.',
 			temperature = 0.7,
 			max_tokens = 1000,
@@ -134,7 +132,7 @@ class ConversationalTest extends TestCase {
 
 		$this->assertQueryResult(
 			"DESCRIBE RAG MODEL 'test_model'",
-			['test_model', 'openai', 'gpt-4', 'https://api.openai.com/v1']
+			['test_model', 'openai', 'gpt-4']
 		);
 
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
@@ -202,7 +200,6 @@ class ConversationalTest extends TestCase {
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
 			llm_api_key = 'sk-test-key-123456789',
-			llm_base_url = 'https://api.openai.com/v1',
 			style_prompt = 'You are a helpful assistant.',
 			temperature = 0.7,
 			max_tokens = 1000,
@@ -257,7 +254,6 @@ class ConversationalTest extends TestCase {
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
 				llm_api_key = 'sk-test-key-123456789',
-				llm_base_url = 'https://api.openai.com/v1',
 				style_prompt = 'You are a helpful assistant with extensive knowledge.',
 				temperature = 1.5,
 				max_tokens = 2000,

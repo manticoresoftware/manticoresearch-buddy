@@ -46,7 +46,6 @@ class IntegrationTest extends TestCase {
 		$query = "CREATE RAG MODEL 'test_model' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_base_url = 'https://api.openai.com/v1',
 			style_prompt = 'You are a helpful assistant.',
 			temperature = 0.7,
 			max_tokens = 1000,
@@ -70,7 +69,6 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('test_model', $payload->params['name']);
 		$this->assertEquals('openai', $payload->params['llm_provider']);
 		$this->assertEquals('gpt-4', $payload->params['llm_model']);
-		$this->assertEquals('https://api.openai.com/v1', $payload->params['llm_base_url']);
 		$this->assertEquals('You are a helpful assistant.', $payload->params['style_prompt']);
 		$this->assertEquals(0.7, $payload->params['temperature']);
 		$this->assertEquals(1000, $payload->params['max_tokens']);

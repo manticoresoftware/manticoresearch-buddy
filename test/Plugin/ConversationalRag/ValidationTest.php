@@ -322,7 +322,6 @@ class ValidationTest extends TestCase {
 		$query = "CREATE RAG MODEL 'test_model' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_base_url = 'https://api.openai.com/v1',
 			style_prompt = 'You are a helpful assistant.',
 			temperature = 0.7,
 			max_tokens = 1000,

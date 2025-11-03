@@ -19,8 +19,8 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
  * Manages RAG model persistence and database operations
  */
 class ModelManager {
+	use SqlEscapeTrait;
 	public const MODELS_TABLE = 'system.rag_models';
-	public const CONVERSATIONS_TABLE = 'rag_conversations';
 
 	// Mapping of LLM providers to their environment variable names
 	public const PROVIDER_ENV_VARS = [
@@ -47,7 +47,6 @@ class ModelManager {
 		}
 
 		$this->createModelsTable($client);
-		$this->createConversationsTable($client);
 
 		$this->tablesInitialized = true;
 	}
@@ -66,36 +65,10 @@ class ModelManager {
 			name string,
 			llm_provider text,
 			llm_model text,
-			llm_base_url text,
 			style_prompt text,
 			settings json,
 			created_at bigint,
 			updated_at bigint
-		)';
-
-		$client->sendRequest($sql);
-	}
-
-	/**
-	 * Create conversations history table
-	 *
-	 * @param HTTPClient $client
-	 *
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function createConversationsTable(HTTPClient $client): void {
-		$sql = /** @lang Manticore */ 'CREATE TABLE IF NOT EXISTS ' . self::CONVERSATIONS_TABLE . ' (
-			conversation_uuid string,
-			model_uuid bigint,
-			created_at bigint,
-			role text,
-			message text,
-			metadata json,
-			intent text,
-			tokens_used int,
-			response_time_ms int,
-			ttl bigint
 		)';
 
 		$client->sendRequest($sql);
@@ -125,20 +98,18 @@ class ModelManager {
 
 			// Insert model
 			$currentTime = time();
-			$sql = 'INSERT INTO ' . self::MODELS_TABLE . ' (
-				uuid, name, llm_provider, llm_model, llm_base_url,
-				style_prompt, settings, created_at, updated_at
-			) VALUES (
-				\'' . $this->sqlEscape($modelUuid) . '\',
-				\'' . $this->sqlEscape($config['name']) . '\',
-				\'' . $this->sqlEscape($config['llm_provider']) . '\',
-				\'' . $this->sqlEscape($config['llm_model']) . '\',
-				\'' . $this->sqlEscape($config['llm_base_url'] ?? '') . '\',
-				\'' . $this->sqlEscape($config['style_prompt'] ?? '') . '\',
-				\'' . $this->sqlEscape(json_encode($settings)) . '\',
-				' . $currentTime . ',
-				' . $currentTime . '
-			)';
+			$sql = sprintf(
+				'INSERT INTO %s (uuid, name, llm_provider, llm_model, style_prompt, settings, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %d, %d)',
+				self::MODELS_TABLE,
+				$this->quote($modelUuid),
+				$this->quote($config['name']),
+				$this->quote($config['llm_provider']),
+				$this->quote($config['llm_model']),
+				$this->quote($config['style_prompt'] ?? ''),
+				$this->quote(json_encode($settings)),
+				$currentTime,
+				$currentTime
+			);
 
 		$client->sendRequest($sql);
 
@@ -209,40 +180,14 @@ class ModelManager {
 		}
 
 		// Soft delete by setting is_active = false
-		$sql = /** @lang Manticore */ 'DELETE FROM ' . self::MODELS_TABLE .
-			' WHERE uuid = \'' . $this->sqlEscape($model['uuid']) . '\'';
+		$sql = sprintf(
+			/** @lang Manticore */            'DELETE FROM %s WHERE uuid = %s',
+			self::MODELS_TABLE,
+			$this->quote($model['uuid'])
+		);
 
 		$client->sendRequest($sql);
-
-		// Clean up related conversations using the model ID
-		$this->cleanupModelConversations($client, $model['uuid']);
 	}
-
-
-	/**
-	 * Get conversation history
-	 *
-	 * @param HTTPClient $client
-	 * @param string $conversationId
-	 * @param int $limit
-	 *
-	 * @return array
-	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
-	 */
-	public function getConversationHistory(HTTPClient $client, string $conversationUuid, int $limit = 50): array {
-		$sql = /** @lang Manticore */ 'SELECT * FROM ' . self::CONVERSATIONS_TABLE . '
-				WHERE conversation_uuid = \'' . $this->sqlEscape($conversationUuid) . '\'
-				AND ttl > ' . time() . '
-				ORDER BY created_at DESC
-				LIMIT ' . $limit . ' OPTION max_matches=' . $limit;
-
-		$response = $client->sendRequest($sql);
-		return array_reverse($response->getResult()[0]['data'] ?? []);
-	}
-
-
-
-
 
 	/**
 	 * Check if model exists
@@ -252,9 +197,11 @@ class ModelManager {
 	 * @return bool
 	 */
 	private function modelExists(HTTPClient $client, string $modelName): bool {
-		$escapedName = $this->sqlEscape($modelName);
-		$sql = /** @lang Manticore */ 'SELECT COUNT(*) as count FROM ' . self::MODELS_TABLE . '
-				WHERE name = \'' . $escapedName . '\'';
+		$sql = sprintf(
+			/** @lang Manticore */            'SELECT COUNT(*) as count FROM %s WHERE name = %s',
+			self::MODELS_TABLE,
+			$this->quote($modelName)
+		);
 
 		$response = $client->sendRequest($sql);
 		$data = $response->getResult()[0]['data'] ?? [];
@@ -271,7 +218,7 @@ class ModelManager {
 	 * @return array
 	 */
 	private function extractSettings(array $config): array {
-		$coreFields = ['id', 'name', 'llm_provider', 'llm_model', 'llm_api_key', 'llm_base_url', 'style_prompt'];
+		$coreFields = ['id', 'name', 'llm_provider', 'llm_model', 'llm_api_key', 'style_prompt'];
 		$settings = [];
 
 		foreach ($config as $key => $value) {
@@ -293,12 +240,7 @@ class ModelManager {
 	 *
 	 * @return void
 	 */
-	private function cleanupModelConversations(HTTPClient $client, string $modelUuid): void {
-		$sql = /** @lang Manticore */ 'DELETE FROM ' . self::CONVERSATIONS_TABLE . "
-				WHERE model_uuid = '" . $this->sqlEscape($modelUuid)."'";
 
-		$client->sendRequest($sql);
-	}
 
 	/**
 	 * Escape special characters for strings
@@ -317,15 +259,7 @@ class ModelManager {
 		return str_replace($specialChars, $escapedChars, $value);
 	}
 
-	/**
-	 * Escape special characters for SQL string literals
-	 *
-	 * @param string $value
-	 * @return string
-	 */
-	private function sqlEscape(string $value): string {
-		return addslashes($value);
-	}
+
 
 	/**
 	 * Generate a UUID v4

@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * LLM-driven intent classifier and query generator
@@ -23,7 +24,7 @@ class IntentClassifier {
 	 * Classify user intent using LLM analysis of conversation context
 	 *
 	 * @param string $userQuery
-	 * @param array $conversationHistory
+	 * @param string $conversationHistory
 	 * @param array $lastSearchResults
 	 * @param LLMProviderManager $llmProvider
 	 * @param array $modelConfig
@@ -31,15 +32,15 @@ class IntentClassifier {
 	 */
 	public function classifyIntent(
 		string $userQuery,
-		array $conversationHistory,
+		string $conversationHistory,
 		array $lastSearchResults,
 		LLMProviderManager $llmProvider,
 		array $modelConfig
 	): array {
 		try {
-			// Limit history size for LLM context
+			// Limit history size for LLM context (conversationHistory is already a formatted string)
 			$conversationHistory = $this->limitConversationHistory($conversationHistory);
-			$historyText = $this->formatConversationHistory($conversationHistory);
+			$historyText = $conversationHistory;
 
 			$intentPrompt = "Analyze user intent from conversation.
 
@@ -69,6 +70,10 @@ Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_
 
 			$intent = $this->validateIntent(trim(strtoupper($response['content'])));
 
+			// Debug: Log intent classification
+			Buddy::info("\n[DEBUG INTENT CLASSIFICATION]");
+			Buddy::info("└─ Detected intent: {$intent}");
+
 			return [
 				'intent' => $intent,
 				'confidence' => 0.9,
@@ -85,11 +90,11 @@ Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_
 	}
 
 	/**
-	 * Generate search and exclusion queries using LLM analysis
+	 * Generate search queries based on user intent and conversation context
 	 *
 	 * @param string $userQuery
 	 * @param string $intent
-	 * @param array $conversationHistory
+	 * @param string $conversationHistory
 	 * @param LLMProviderManager $llmProvider
 	 * @param array $modelConfig
 	 * @return array
@@ -97,14 +102,18 @@ Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_
 	public function generateQueries(
 		string $userQuery,
 		string $intent,
-		array $conversationHistory,
+		string $conversationHistory,
 		LLMProviderManager $llmProvider,
 		array $modelConfig
 	): array {
+
+		$searchQuery = '';
+		$excludeQuery = '';
+
 		try {
-			// Limit history size for LLM context
+			// Limit history size for LLM context (conversationHistory is already a formatted string)
 			$conversationHistory = $this->limitConversationHistory($conversationHistory);
-			$historyText = $this->formatConversationHistory($conversationHistory);
+			$historyText = $conversationHistory;
 
 			$queryPrompt = "Generate search query based on user request.
 
@@ -171,9 +180,6 @@ Answer ONLY in the format above.";
 				throw new ManticoreSearchClientError('Query generation failed: ' . ($response['error'] ?? 'Unknown error'));
 			}
 
-			$searchQuery = '';
-			$excludeQuery = '';
-
 			$lines = explode("\n", trim($response['content']));
 			foreach ($lines as $line) {
 				$line = trim($line);
@@ -204,47 +210,40 @@ Answer ONLY in the format above.";
 			];
 		} catch (\Exception $e) {
 			// Fallback to safe defaults
+			if (empty($searchQuery)) {
+				$searchQuery = $userQuery;
+			}
+
+			// Debug: Log query generation
+			Buddy::info("\n[DEBUG QUERY GENERATION]");
+			Buddy::info("├─ User query: '{$userQuery}'");
+			Buddy::info("├─ Intent: {$intent}");
+			Buddy::info("├─ Generated SEARCH_QUERY: '{$searchQuery}'");
+			Buddy::info("└─ Generated EXCLUDE_QUERY: '{$excludeQuery}'");
+
 			return [
-				'search_query' => $userQuery,
-				'exclude_query' => '',
-				'error' => $e->getMessage(),
+				'search_query' => $searchQuery,
+				'exclude_query' => $excludeQuery,
+				'llm_response' => $response['content'] ?? $e->getMessage(),
 			];
 		}
 	}
 
 	/**
-	 * Limit conversation history size for LLM context
+	 * Limit conversation history size for LLM context (matches original php_rag implementation)
 	 *
-	 * @param array $history
+	 * @param string $history
 	 * @param int $maxExchanges
-	 * @return array
-	 */
-	private function limitConversationHistory(array $history, int $maxExchanges = 10): array {
-		// Keep only last N exchanges (2 messages per exchange)
-		$maxMessages = $maxExchanges * 2;
-		if (count($history) > $maxMessages) {
-			$history = array_slice($history, -$maxMessages);
-		}
-
-		return $history;
-	}
-
-	/**
-	 * Format conversation history for LLM prompt
-	 *
-	 * @param array $history
 	 * @return string
 	 */
-	private function formatConversationHistory(array $history): string {
-		if (empty($history)) {
-			return '';
-		}
+	private function limitConversationHistory(string $history, int $maxExchanges = 10): string {
+		// Split by role markers (matches php_rag Line 57)
+		$lines = explode("\n", $history);
 
-		$lines = [];
-		foreach ($history as $message) {
-			$role = $message['role'] ?? 'unknown';
-			$content = $message['message'] ?? '';
-			$lines[] = "{$role}: {$content}";
+		// Keep only last N exchanges (2 lines per exchange) (matches php_rag Line 60-63)
+		$maxLines = $maxExchanges * 2;
+		if (count($lines) > $maxLines) {
+			$lines = array_slice($lines, -$maxLines);
 		}
 
 		return implode("\n", $lines);

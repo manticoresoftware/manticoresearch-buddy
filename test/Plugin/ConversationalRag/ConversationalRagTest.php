@@ -54,7 +54,6 @@ class ConversationalRagTest extends TestCase {
 		$query = "CREATE RAG MODEL 'functional_test_model' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_base_url = 'https://api.openai.com/v1',
 			style_prompt = 'You are a helpful assistant.',
 			temperature = 0.7,
 			max_tokens = 1000,
@@ -221,7 +220,6 @@ class ConversationalRagTest extends TestCase {
 						'llm_provider' => 'openai',
 						'llm_model' => 'gpt-4',
 						'llm_api_key' => '', // Empty for security
-						'llm_base_url' => 'https://api.openai.com/v1',
 						'style_prompt' => 'You are a helpful assistant.',
 						'temperature' => 0.7,
 						'max_tokens' => 1000,
@@ -278,7 +276,7 @@ class ConversationalRagTest extends TestCase {
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock responses for initializeTables (2) + getModel (1) + delete model (1) + cleanup conversations (1)
+		// Mock responses for initializeTables (2) + getModel (1) + delete model (1)
 		$initResponse1 = $this->createMock(Response::class);
 		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
 
@@ -307,12 +305,9 @@ class ConversationalRagTest extends TestCase {
 		$deleteModelResponse = $this->createMock(Response::class);
 		$deleteModelResponse->method('getResult')->willReturn(Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']]));
 
-		$cleanupResponse = $this->createMock(Response::class);
-		$cleanupResponse->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
-
-		$mockClient->expects($this->exactly(5))
+		$mockClient->expects($this->exactly(4))
 			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $getModelResponse, $deleteModelResponse, $cleanupResponse);
+			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $getModelResponse, $deleteModelResponse);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();

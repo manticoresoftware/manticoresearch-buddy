@@ -17,7 +17,7 @@ use CurlHandle;
  * OpenAI LLM Provider implementation
  */
 class OpenAIProvider extends BaseProvider {
-	private const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
+	private const BASE_URL = 'https://api.openai.com/v1';
 	private const DEFAULT_MODEL = 'gpt-4o-mini';
 
 	// OpenAI pricing per 1K tokens (as of 2024)
@@ -55,10 +55,11 @@ class OpenAIProvider extends BaseProvider {
 	 */
 	public function generateResponse(string $prompt, array $options = []): array {
 		try {
-			$baseUrl = $this->getConfig('llm_base_url', self::DEFAULT_BASE_URL);
+			// Provider handles its own base URL - no user configuration needed
+			$baseUrl = self::BASE_URL;
+
 			$apiKey = $this->getApiKey();
 			$model = $this->getConfig('llm_model', self::DEFAULT_MODEL);
-
 			$settings = $this->getSettings($options);
 			$stylePrompt = $this->getStylePrompt();
 
@@ -197,16 +198,4 @@ class OpenAIProvider extends BaseProvider {
 
 		return ['success' => true, 'data' => $decoded];
 	}
-
-	/**
-	 * Make streaming HTTP request to OpenAI API
-	 *
-	 * @param string $baseUrl
-	 * @param string $apiKey
-	 * @param string $endpoint
-	 * @param array $data
-	 * @param callable $callback
-	 * @return array
-	 */
-
 }

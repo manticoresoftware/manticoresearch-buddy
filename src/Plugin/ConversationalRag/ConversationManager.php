@@ -15,6 +15,9 @@ use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 
 class ConversationManager {
+	use SqlEscapeTrait;
+	public const CONVERSATIONS_TABLE = 'rag_conversations';
+
 	/**
 	 * @param Client $client
 	 */
@@ -22,14 +25,32 @@ class ConversationManager {
 	}
 
 	/**
+	 * Initialize conversations table if it doesn't exist
+	 *
+	 * @param Client $client
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 */
+	public function initializeTable(Client $client): void {
+		$sql = /** @lang Manticore */ 'CREATE TABLE IF NOT EXISTS ' . self::CONVERSATIONS_TABLE . ' (
+			conversation_uuid string,
+			model_uuid string,
+			created_at bigint,
+			role text,
+			message text,
+			tokens_used int,
+			ttl bigint
+		)';
+
+		$client->sendRequest($sql);
+	}
+
+	/**
 	 * @param string $conversationId
 	 * @param int $modelId
 	 * @param string $role
 	 * @param string $message
-	 * @param array $metadata
-	 * @param string $intent
 	 * @param int $tokensUsed
-	 * @param int $responseTimeMs
 	 *
 	 * @return bool
 	 * @throws ManticoreSearchClientError
@@ -39,29 +60,20 @@ class ConversationManager {
 		string $modelUuid,
 		string $role,
 		string $message,
-		array $metadata = [],
-		string $intent = '',
-		int $tokensUsed = 0,
-		int $responseTimeMs = 0
+		int $tokensUsed = 0
 	): bool {
 
 		$currentTime = time();
 		$ttlTime = $currentTime + (24 * 60 * 60); // 1 day from now
-		$pattern = /** @lang Manticore */ 'INSERT INTO ' . ModelManager::CONVERSATIONS_TABLE . ' '.
-			'(conversation_uuid, model_uuid, created_at, role, message, metadata, intent, '.
-			'tokens_used, response_time_ms, ttl) VALUES '.
-			"('%s', '%d', %d, '%s', '%s', '%s', '%s', %d, %d, %d)";
 		$sql = sprintf(
-			$pattern,
-			addslashes($conversationUuid),
-			$modelUuid,
+			/** @lang Manticore */            'INSERT INTO %s (conversation_uuid, model_uuid, created_at, role, message, tokens_used, ttl) VALUES (%s, %s, %d, %s, %s, %d, %d)',
+			self::CONVERSATIONS_TABLE,
+			$this->quote($conversationUuid),
+			$this->quote($modelUuid),
 			$currentTime,
-			addslashes($role),
-			addslashes($message),
-			addslashes(json_encode($metadata)),
-			addslashes($intent),
+			$this->quote($role),
+			$this->quote($message),
 			$tokensUsed,
-			$responseTimeMs,
 			$ttlTime
 		);
 
@@ -73,20 +85,24 @@ class ConversationManager {
 	 * @param string $conversationId
 	 * @param int $limit
 	 *
-	 * @return array
+	 * @return string
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function getConversationHistory(string $conversationUuid, int $limit = 100): array {
+	public function getConversationHistory(string $conversationUuid, int $limit = 100): string {
 		$currentTime = time();
-		$sql = /** @lang Manticore */ 'SELECT * FROM ' . ModelManager::CONVERSATIONS_TABLE . ' '.
+		$sql = /** @lang Manticore */ 'SELECT role, message FROM ' . self::CONVERSATIONS_TABLE . ' '.
 			"WHERE conversation_uuid = '$conversationUuid' AND ttl > $currentTime ".
-			"ORDER BY created_at DESC LIMIT $limit";
+			"ORDER BY created_at ASC LIMIT $limit";
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
-			return [];
+			return '';
 		}
 		$data = $result->getResult();
-		return array_reverse($data[0]['data'] ?? []);
+		$history = '';
+		foreach (($data[0]['data'] ?? []) as $row) {
+			$history .= "{$row['role']}: {$row['message']}\n";
+		}
+		return $history;
 	}
 }

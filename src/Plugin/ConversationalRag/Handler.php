@@ -18,6 +18,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * This class handles all ConversationalRag plugin operations
@@ -47,10 +48,10 @@ final class Handler extends BaseHandlerWithClient {
 			$providerManager = new LLMProviderManager();
 			$conversationManager = new ConversationManager($client);
 			$intentClassifier = new IntentClassifier();
-			$searchEngine = new SearchEngine($client);
+			$searchEngine = new SearchEngine();
 
 			// Ensure database tables exist
-			self::initializeTables($modelManager, $client);
+			self::initializeTables($modelManager, $conversationManager, $client);
 
 			// Route to appropriate handler based on action
 			return match ($payload->action) {
@@ -73,13 +74,15 @@ final class Handler extends BaseHandlerWithClient {
 	 * Initialize database tables if they don't exist
 	 *
 	 * @param ModelManager $modelManager
+	 * @param ConversationManager $conversationManager
 	 * @param Client $client
 	 *
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	private static function initializeTables(ModelManager $modelManager, Client $client): void {
+	private static function initializeTables(ModelManager $modelManager, ConversationManager $conversationManager, Client $client): void {
 		$modelManager->initializeTables($client);
+		$conversationManager->initializeTable($client);
 	}
 
 	/**
@@ -237,7 +240,6 @@ final class Handler extends BaseHandlerWithClient {
 			throw ManticoreSearchClientError::create('Model not found');
 		}
 
-			$modelName = $model['name'];
 
 			$conversationHistory = $conversationManager->getConversationHistory($conversationUuid);
 
@@ -251,6 +253,13 @@ final class Handler extends BaseHandlerWithClient {
 			$queries = $intentClassifier->generateQueries(
 				$params['query'], $intent, $conversationHistory, $providerManager, $model
 			);
+
+			// Debug: Log preprocessing results
+			Buddy::info('[DEBUG PREPROCESSING]');
+			Buddy::info("├─ User query: '{$params['query']}'");
+			Buddy::info("├─ Intent: {$intent}");
+			Buddy::info("├─ Generated SEARCH_QUERY: '{$queries['search_query']}'");
+			Buddy::info("└─ Generated EXCLUDE_QUERY: '{$queries['exclude_query']}'");
 
 			// Merge model settings with overrides
 			$modelSettings = is_string($model['settings'])
@@ -278,34 +287,44 @@ final class Handler extends BaseHandlerWithClient {
 				$thresholdInfo['threshold']
 			);
 
-		// Add threshold info to results
-			$searchResults['threshold_info'] = $thresholdInfo;
+			$context = self::buildContext($searchResults, $effectiveSettings);
 
-			$context = self::buildContext($searchResults['results'], $effectiveSettings);
+			// Debug: Log context building
+			Buddy::info('[DEBUG CONTEXT]');
+			Buddy::info('├─ Documents count: ' . count($searchResults));
+			Buddy::info('├─ Total context length: ' . strlen($context) . ' chars');
+			Buddy::info('└─ Max doc length: ' . ($effectiveSettings['max_document_length'] ?? 2000) . ' chars');
 
 			$response = self::generateResponse(
 				$model, $params['query'], $context, $conversationHistory, $effectiveSettings, $providerManager
 			);
 
+			// Fix: Add error handling for failed LLM requests
+		if (!$response['success']) {
+			return TaskResult::withError('LLM request failed: ' . ($response['error'] ?? 'Unknown error'));
+		}
+
+			// Fix: Extract values from correct response structure
+			$responseText = $response['content'];
+			$tokensUsed = $response['metadata']['tokens_used'] ?? 0;
+
 			// Save messages
 			$conversationManager->saveMessage(
-				$conversationUuid, $modelName, 'user', $params['query'], [], $intent
+				$conversationUuid, $model['uuid'], 'user', $params['query']
 			);
 			$conversationManager->saveMessage(
-				$conversationUuid, $modelName, 'assistant',
-				$response['response'], [], '', $response['tokens_used'], $response['response_time_ms']
+				$conversationUuid, $model['uuid'], 'assistant', $responseText, $tokensUsed
 			);
 
-			return TaskResult::raw(
+			return TaskResult::withRow(
 				[
 				'conversation_uuid' => $conversationUuid,
-				'response' => $response['response'],
-				'intent' => $intent,
-				'sources' => count($searchResults['results']),
-				'threshold_info' => $searchResults['threshold_info'],
-				'search_type' => $searchResults['search_type'],
+				'response' => $responseText,
+				'sources' => json_encode($searchResults),
 				]
-			);
+			)->column('conversation_uuid', Column::String)
+				->column('response', Column::String)
+				->column('sources', Column::String);
 	}
 
 
@@ -373,12 +392,12 @@ final class Handler extends BaseHandlerWithClient {
 		array $model,
 		string $query,
 		string $context,
-		array $history,
+		string $history,
 		array $effectiveSettings,
 		LLMProviderManager $providerManager
 	): array {
 		// Use LLM provider manager for proper connection handling
-		$modelId = $model['id'] ?? null;
+		$modelId = $model['uuid'] ?? null;
 		if ($modelId === null) {
 			throw ManticoreSearchClientError::create('Model ID is null');
 		}
@@ -391,7 +410,7 @@ final class Handler extends BaseHandlerWithClient {
 
 		$prompt = self::buildPrompt($model['style_prompt'], $query, $context, $history);
 
-		return $provider->generateResponse($prompt, [], $effectiveSettings);
+		return $provider->generateResponse($prompt, $effectiveSettings);
 	}
 
 	private static function buildContext(array $searchResults, array $settings): string {
@@ -410,14 +429,10 @@ final class Handler extends BaseHandlerWithClient {
 		return implode("\n", $truncatedDocs);
 	}
 
-	private static function buildPrompt(string $stylePrompt, string $query, string $context, array $history): string {
+	private static function buildPrompt(string $stylePrompt, string $query, string $context, string $history): string {
 		// Build prompt similar to original implementation
-		$historyText = '';
-		if (!empty($history)) {
-			foreach ($history as $msg) {
-				$historyText .= "{$msg['role']}: {$msg['message']}\n";
-			}
-		}
+		// History is already formatted as "role: message\nrole: message\n"
+		$historyText = $history;
 
 		// Format similar to original custom_rag.php prompt
 		return 'Respond conversationally. Response should be based ONLY on the provided context section' .

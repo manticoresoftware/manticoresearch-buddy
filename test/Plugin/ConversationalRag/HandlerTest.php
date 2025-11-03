@@ -68,7 +68,6 @@ class HandlerTest extends TestCase {
 		$query = "CREATE RAG MODEL 'test_model' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_base_url = 'https://api.openai.com/v1',
 			style_prompt = 'You are a helpful assistant.',
 			temperature = 0.7,
 			max_tokens = 1000,
@@ -232,7 +231,6 @@ class HandlerTest extends TestCase {
 						'name' => 'test_model',
 						'llm_provider' => 'openai',
 						'llm_api_key' => '',
-						'llm_base_url' => 'https://api.openai.com/v1',
 						'style_prompt' => 'You are a helpful assistant.',
 						'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
 						'created_at' => '2023-01-01 00:00:00',
@@ -281,7 +279,7 @@ class HandlerTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 
-		// Mock the manticore client - dropModel calls sendRequest 5 times (init tables + getModel + delete model + cleanup conversations)
+		// Mock the manticore client - dropModel calls sendRequest 4 times (init tables + getModel + delete model)
 		$mockClient = $this->createMock(HTTPClient::class);
 
 		// Create mock responses for each call
@@ -306,7 +304,6 @@ class HandlerTest extends TestCase {
 						'name' => 'test_model',
 						'llm_provider' => 'openai',
 						'llm_api_key' => '',
-						'llm_base_url' => 'https://api.openai.com/v1',
 						'style_prompt' => 'You are a helpful assistant.',
 						'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
 						'created_at' => '2023-01-01 00:00:00',
@@ -318,14 +315,11 @@ class HandlerTest extends TestCase {
 		);
 
 		$deleteModelResponse = $this->createMock(Response::class);
-		$deleteModelResponse->method('getResult')->willReturn(Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']]));
+		$deleteModelResponse->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
 
-		$cleanupResponse = $this->createMock(Response::class);
-		$cleanupResponse->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
-
-		$mockClient->expects($this->exactly(5)) // initializeTables (2) + getModel (1) + delete model (1) + cleanup conversations (1)
+		$mockClient->expects($this->exactly(4)) // initializeTables (2) + getModel (1) + delete model (1)
 			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $getModelResponse, $deleteModelResponse, $cleanupResponse);
+			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $getModelResponse, $deleteModelResponse);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
@@ -497,7 +491,6 @@ class HandlerTest extends TestCase {
 		$query = "CREATE RAG MODEL 'encrypted_test_model' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_base_url = 'https://api.openai.com/v1',
 			style_prompt = 'You are a helpful assistant.',
 			temperature = 0.7,
 			max_tokens = 1000,
@@ -599,8 +592,7 @@ class HandlerTest extends TestCase {
 						'uuid' => 'encrypted-uuid-123',
 						'name' => 'encrypted_test_model',
 						'llm_provider' => 'openai',
-						'llm_api_key' => 'encrypted-api-key-data-here', // This would be encrypted in real scenario
-						'llm_base_url' => 'https://api.openai.com/v1',
+						'llm_api_key' => '',
 						'style_prompt' => 'You are a helpful assistant.',
 						'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
 						'created_at' => '2023-01-01 00:00:00',
@@ -638,7 +630,6 @@ class HandlerTest extends TestCase {
 			$query = "CREATE RAG MODEL 'keyfile_test_model' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_base_url = 'https://api.openai.com/v1',
 				style_prompt = 'You are a helpful assistant.',
 				temperature = 0.7,
 				max_tokens = 1000,
