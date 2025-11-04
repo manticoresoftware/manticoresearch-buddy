@@ -89,7 +89,7 @@ final class Payload extends BasePayload {
 	protected static function fromJsonRequest(Request $request): static {
 		/** @var array{index:string,table?:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool,force_bigrams?:bool,quorum?:float}} $payload */
 		$payload = simdjson_decode($request->payload, true);
-		
+
 		// Check if quorum is present in JSON request - not supported yet
 		if (isset($payload['options']['quorum'])) {
 			throw QueryParseError::create(
@@ -97,7 +97,7 @@ final class Payload extends BasePayload {
 				'Please use SQL syntax instead.'
 			);
 		}
-		
+
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $payload['table'] ?? $payload['index'];
@@ -144,7 +144,8 @@ final class Payload extends BasePayload {
 		// I did not figure out how to make with regxp case OPTION fuzzy=1 so do this way
 		$optionPos = strripos($query, ' OPTION ');
 		if ($optionPos !== false && substr_count($query, '=', $optionPos) > 1) {
-			$pattern = '/(?:^OPTION\s+|\s*,\s*)(?:[a-zA-Z\_]+)\s*=\s*([\'"][^\'"]*[\'"]|\d+|\d+\.\d+)(?=\s*\;?\s*$|\s*,)/iu';
+			$pattern = '/(?:^OPTION\s+|\s*,\s*)(?:[a-zA-Z\_]+)\s*=\s*'
+				. '([\'"][^\'"]*[\'"]|\d+|\d+\.\d+)(?=\s*\;?\s*$|\s*,)/iu';
 			if (!preg_match($pattern, $query)) {
 				throw QueryParseError::create(
 					'Invalid options in query string, ' .
