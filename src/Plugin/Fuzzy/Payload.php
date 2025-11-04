@@ -89,6 +89,15 @@ final class Payload extends BasePayload {
 	protected static function fromJsonRequest(Request $request): static {
 		/** @var array{index:string,table?:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool,force_bigrams?:bool,quorum?:float}} $payload */
 		$payload = simdjson_decode($request->payload, true);
+		
+		// Check if quorum is present in JSON request - not supported yet
+		if (isset($payload['options']['quorum'])) {
+			throw QueryParseError::create(
+				'The \'quorum\' option is not supported for JSON requests. ' .
+				'Please use SQL syntax instead.'
+			);
+		}
+		
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $payload['table'] ?? $payload['index'];
@@ -97,7 +106,7 @@ final class Payload extends BasePayload {
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 		$self->preserve = (bool)($payload['options']['preserve'] ?? false);
 		$self->forceBigrams = (bool)($payload['options']['force_bigrams'] ?? false);
-		$self->quorum = (float)($payload['options']['quorum'] ?? 0);
+		$self->quorum = 0;
 
 		$payload = static::cleanUpPayloadOptions($payload);
 		$self->payload = $payload;
