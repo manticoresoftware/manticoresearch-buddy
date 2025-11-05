@@ -50,6 +50,9 @@ final class Payload extends BasePayload {
 	/** @var bool */
 	public bool $forceBigrams;
 
+	/** @var float */
+	public float $quorum;
+
 	/** @var string|array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>} */
 	public array|string $payload;
 
@@ -84,8 +87,17 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromJsonRequest(Request $request): static {
-		/** @var array{index:string,table?:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool,force_bigrams?:bool}} $payload */
+		/** @var array{index:string,table?:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:bool,distance?:int,layouts?:string,preserve?:bool,force_bigrams?:bool,quorum?:float}} $payload */
 		$payload = simdjson_decode($request->payload, true);
+
+		// Check if quorum is present in JSON request - not supported yet
+		if (isset($payload['options']['quorum'])) {
+			throw QueryParseError::create(
+				'The \'quorum\' option is not supported for JSON requests. ' .
+				'Please use SQL syntax instead.'
+			);
+		}
+
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $payload['table'] ?? $payload['index'];
@@ -94,6 +106,7 @@ final class Payload extends BasePayload {
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 		$self->preserve = (bool)($payload['options']['preserve'] ?? false);
 		$self->forceBigrams = (bool)($payload['options']['force_bigrams'] ?? false);
+		$self->quorum = 0;
 
 		$payload = static::cleanUpPayloadOptions($payload);
 		$self->payload = $payload;
@@ -131,7 +144,8 @@ final class Payload extends BasePayload {
 		// I did not figure out how to make with regxp case OPTION fuzzy=1 so do this way
 		$optionPos = strripos($query, ' OPTION ');
 		if ($optionPos !== false && substr_count($query, '=', $optionPos) > 1) {
-			$pattern = '/(?:^OPTION\s+|\s*,\s*)(?:[a-zA-Z\_]+)\s*=\s*([\'"][^\'"]*[\'"]|\d+)(?=\s*\;?\s*$|\s*,)/iu';
+			$pattern = '/(?:^OPTION\s+|\s*,\s*)(?:[a-zA-Z\_]+)\s*=\s*'
+				. '([\'"][^\'"]*[\'"]|\d+|\d+\.\d+)(?=\s*\;?\s*$|\s*,)/iu';
 			if (!preg_match($pattern, $query)) {
 				throw QueryParseError::create(
 					'Invalid options in query string, ' .
@@ -162,6 +176,10 @@ final class Payload extends BasePayload {
 		preg_match('/force_bigrams\s*=\s*(\d+)/ius', $query, $matches);
 		$forceBigrams = (bool)($matches[1] ?? 0);
 
+		// Parse quorum
+		preg_match('/quorum\s*=\s*([0-9]*\.?[0-9]+)/ius', $query, $matches);
+		$quorum = (float)($matches[1] ?? 0);
+
 		$self = new static();
 		$self->path = $request->path;
 		$self->table = $tableName;
@@ -170,6 +188,7 @@ final class Payload extends BasePayload {
 		$self->layouts = $layouts;
 		$self->preserve = $preserve;
 		$self->forceBigrams = $forceBigrams;
+		$self->quorum = $quorum;
 		$self->payload = $query;
 		$self->queries = $additionalQueries;
 		return $self;
@@ -233,7 +252,7 @@ final class Payload extends BasePayload {
 		$template = (string)preg_replace(
 			[
 				static::MATCH_REG_PATTERN,
-				'/(fuzzy|distance|preserve|force_bigrams)\s*=\s*\d+[,\s]*/ius',
+				'/(fuzzy|distance|preserve|force_bigrams|quorum)\s*=\s*([0-9]*\.?[0-9]+)[,\s]*/ius',
 				'/(layouts)\s*=\s*\'([a-zA-Z, ]*)\'[,\s]*/ius',
 				'/option,(?!.*option|.*from)/ius',
 				'/\soption(?!.*option|.*from)/ius',
@@ -318,6 +337,11 @@ final class Payload extends BasePayload {
 			$match = $searchValue;
 		}
 
+		// Append original query with quorum if quorum > 0
+		if ($this->quorum > 0) {
+			$match .= ' | "' . $searchValue . '"/' . $this->quorum;
+		}
+
 		return $match;
 	}
 
@@ -327,7 +351,7 @@ final class Payload extends BasePayload {
 	 * @return string
 	 */
 	public function getQueriesHTTPRequest(callable $fn): string {
-		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,other?:string}} $request */
+		/** @var array{index:string,query:array{match:array{'*'?:string}},options:array{fuzzy?:string,distance?:int,layouts?:string,quorum?:float,other?:string}} $request */
 		$request = $this->payload;
 
 		// If not fuzzy enabled, we do not need to run function and simply assign search value
@@ -436,13 +460,14 @@ final class Payload extends BasePayload {
 	 *         distance?: int,
 	 *         layouts?: string,
 	 *         preserve?: bool,
-	 *         force_bigrams?: bool
+	 *         force_bigrams?: bool,
+	 *         quorum?: float
 	 *     }
 	 * } $payload
 	 * @return array{index:string,query:array{match:array{'*'?:string}},options?:array<string,mixed>}
 	 */
 	public static function cleanUpPayloadOptions(array $payload): array {
-		$excludedOptions = ['distance', 'fuzzy', 'layouts', 'preserve', 'force_bigrams'];
+		$excludedOptions = ['distance', 'fuzzy', 'layouts', 'preserve', 'force_bigrams', 'quorum'];
 		$payload['options'] = array_diff_key($payload['options'], array_flip($excludedOptions));
 		if (empty($payload['options'])) {
 			unset($payload['options']);
