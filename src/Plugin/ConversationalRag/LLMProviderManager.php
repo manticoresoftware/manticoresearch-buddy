@@ -32,7 +32,7 @@ class LLMProviderManager {
 	 */
 	public function getConnection(string $modelId, array $modelConfig): BaseProvider {
 		if (!isset($this->connections[$modelId])) {
-			$provider = $this->getProvider($modelConfig['llm_provider']);
+			$provider = $this->createProvider($modelConfig['llm_provider']);
 			$provider->configure($modelConfig);
 			$this->connections[$modelId] = $provider;
 		}

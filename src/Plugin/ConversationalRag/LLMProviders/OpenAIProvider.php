@@ -137,7 +137,7 @@ class OpenAIProvider extends BaseProvider {
 	 * @param array $data
 	 * @return array
 	 */
-	private function makeRequest(string $baseUrl, string $apiKey, string $endpoint, array $data): array {
+	protected function makeRequest(string $baseUrl, string $apiKey, string $endpoint, array $data): array {
 		$curl = $this->getClient();
 
 		$url = rtrim($baseUrl, '/') . '/' . ltrim($endpoint, '/');

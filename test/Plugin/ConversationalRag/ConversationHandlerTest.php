@@ -10,6 +10,8 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Handler as RagHandler;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\BaseProvider;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Payload as RagPayload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
@@ -21,7 +23,7 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use PHPUnit\Framework\TestCase;
 
-class HandlerTest extends TestCase {
+class ConversationHandlerTest extends TestCase {
 	/**
 	 * @return void
 	 */
@@ -44,6 +46,34 @@ class HandlerTest extends TestCase {
 		// Clean up test environment variables
 		putenv('TEST_OPENAI_API_KEY');
 		putenv('TEST_ANTHROPIC_API_KEY');
+	}
+
+	/**
+	 * Create a mock LLM provider manager with predefined responses
+	 *
+	 * @param array $responses Array of LLM response arrays
+	 * @return LLMProviderManager
+	 */
+	private function createMockLLMProviderManager(array $responses): LLMProviderManager {
+		$mockProviderManager = $this->createMock(LLMProviderManager::class);
+		$mockProvider = $this->createMock(BaseProvider::class);
+
+		$mockProviderManager->method('getConnection')->willReturn($mockProvider);
+
+		$callCount = 0;
+		$mockProvider->method('generateResponse')
+			->willReturnCallback(
+				function ($prompt, $options = []) use (&$responses, &$callCount) {
+					if ($callCount >= count($responses)) {
+						throw new \Exception('Too many LLM calls: expected ' . count($responses) . ', got ' . ($callCount + 1));
+					}
+					$result = $responses[$callCount];
+					$callCount++;
+					return $result;
+				}
+			);
+
+		return $mockProviderManager;
 	}
 
 	public function testHandlerInitialization(): void {
@@ -672,16 +702,243 @@ class HandlerTest extends TestCase {
 				->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $modelExistsResponse, $insertResponse);
 			$handler->setManticoreClient($mockClient);
 
-			$task = $handler->run();
-			$this->assertTrue($task->isSucceed());
+			try {
+				echo "About to call handler->run()...\n";
+				$task = $handler->run();
+				echo "Handler->run() completed\n";
 
-			$result = $task->getResult();
+				$this->assertTrue($task->isSucceed());
+				$result = $task->getResult();
+			} catch (Exception $e) {
+				echo 'Exception: ' . $e->getMessage() . "\n";
+				echo 'Stack trace: ' . $e->getTraceAsString() . "\n";
+				throw $e;
+			}
+
 			$this->assertInstanceOf(TaskResult::class, $result);
+			/** @var Struct<string,mixed> $struct */
+			$struct = $result->getStruct();
+			$this->assertCount(1, $struct);
+			$this->assertArrayHasKey('data', $struct[0]);
+			$this->assertGreaterThan(0, count($struct[0]['data']));
 		} finally {
-			// Clean up
+			// Clean up the temporary key file
 			if (file_exists($tempKeyFile)) {
 				unlink($tempKeyFile);
 			}
 		}
+	}
+
+	public function testHandleConversation_NewQuestionGeneratesNewContext(): void {
+		$query = "CALL CONVERSATIONAL_RAG('Show me action movies', 'movies', 'model-uuid', 'conv-uuid')";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler(
+			$payload, $this->createMockLLMProviderManager(
+				[
+				['content' => 'NEW_SEARCH', 'success' => true, 'metadata' => []], // classifyIntent response
+				['content' => 'SEARCH_QUERY: action movies\nEXCLUDE_QUERY: none', 'success' => true, 'metadata' => []], // generateQueries response
+				['content' => 'YES', 'success' => true, 'metadata' => []], // detectExpansionIntent response
+				['content' => 'Here are some action movies!', 'metadata' => ['tokens_used' => 120], 'success' => true], // generateResponse
+				]
+			)
+		);
+
+		// Mock the manticore client with all expected calls
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		// Expected responses in order:
+		// 1-2: initializeTables (model and conversation tables)
+		$initResponse = $this->createMock(Response::class);
+		$initResponse->method('hasError')->willReturn(false);
+
+		// 3: getModelByUuidOrName
+		$modelResponse = $this->createMock(Response::class);
+		$modelResponse->method('hasError')->willReturn(false);
+		$modelResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'data' => [
+						[
+							'uuid' => 'model-uuid',
+							'name' => 'test_model',
+							'llm_provider' => 'openai',
+							'llm_api_key' => '',
+							'style_prompt' => 'You are a helpful assistant.',
+							'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
+							'created_at' => '2023-01-01 00:00:00',
+						],
+					],
+				],
+				]
+			)
+		);
+
+		// 4: getConversationHistory
+		$historyResponse = $this->createMock(Response::class);
+		$historyResponse->method('hasError')->willReturn(false);
+		$historyResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'total' => 0,
+					'error' => '',
+					'warning' => '',
+					'data' => [],
+				],
+				]
+			)
+		);
+
+		// 5: saveMessage (user)
+		$saveUserResponse = $this->createMock(Response::class);
+		$saveUserResponse->method('hasError')->willReturn(false);
+		$saveUserResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+					'total' => 1,
+					'error' => '',
+					'warning' => '',
+					'data' => [],
+				]
+			)
+		);
+
+		// 6: getConversationHistoryForQueryGeneration
+		$queryHistoryResponse = $this->createMock(Response::class);
+		$queryHistoryResponse->method('hasError')->willReturn(false);
+		$queryHistoryResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'total' => 0,
+					'error' => '',
+					'warning' => '',
+					'data' => [],
+				],
+				]
+			)
+		);
+
+		// 7: detectVectorField (DESCRIBE table for main search)
+		$describeResponse = $this->createMock(Response::class);
+		$describeResponse->method('hasError')->willReturn(false);
+		$describeResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'data' => [
+						['Field' => 'id', 'Type' => 'bigint'],
+						['Field' => 'content', 'Type' => 'text'],
+						['Field' => 'embedding', 'Type' => 'FLOAT_VECTOR(1536)'],
+					],
+				],
+				]
+			)
+		);
+
+		// 8: getExcludedIds (KNN search for exclusions - but since exclude_query is 'none', this might not be called)
+		// Since exclude_query is 'none', getExcludedIds returns []
+		// So no call here
+
+		// 9: detectVectorField (DESCRIBE table for main search)
+		$describeResponse2 = $this->createMock(Response::class);
+		$describeResponse2->method('hasError')->willReturn(false);
+		$describeResponse2->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'data' => [
+						['Field' => 'id', 'Type' => 'bigint'],
+						['Field' => 'content', 'Type' => 'text'],
+						['Field' => 'embedding', 'Type' => 'FLOAT_VECTOR(1536)'],
+					],
+				],
+				]
+			)
+		);
+
+
+
+		// 8: performSearchWithExcludedIds (main KNN search)
+		$searchResponse = $this->createMock(Response::class);
+		$searchResponse->method('hasError')->willReturn(false);
+		$searchResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'data' => [
+						['id' => 1, 'content' => 'Action movie content...', 'knn_dist' => 0.1],
+					],
+				],
+				]
+			)
+		);
+
+		// 9: saveMessage (user with context)
+		$saveUserContextResponse = $this->createMock(Response::class);
+		$saveUserContextResponse->method('hasError')->willReturn(false);
+
+		// 10: saveMessage (assistant)
+		$saveAssistantResponse = $this->createMock(Response::class);
+		$saveAssistantResponse->method('hasError')->willReturn(false);
+
+		$callCounter = 0;
+		$responses = [
+			$initResponse, $initResponse, // initializeTables
+			$modelResponse, // getModelByUuidOrName
+			$historyResponse, // getConversationHistory
+			$saveUserResponse, // saveMessage user initial
+			$queryHistoryResponse, // getConversationHistoryForQueryGeneration
+			$describeResponse, // detectVectorField for main search
+			$searchResponse, // performSearchWithExcludedIds
+			$saveUserContextResponse, // saveMessage user with context
+			$saveAssistantResponse, // saveMessage assistant
+		];
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function ($sql) use (&$callCounter, $responses) {
+					echo 'DB Call #' . (++$callCounter) . ': ' . substr($sql, 0, 100) . "...\n";
+					if ($callCounter > count($responses)) {
+						echo "ERROR: More calls than expected responses!\n";
+						echo 'Available responses: ' . count($responses) . "\n";
+						echo 'This is call #' . $callCounter . "\n";
+						throw new Exception("Unexpected database call #$callCounter");
+					}
+					$response = $responses[$callCounter - 1];
+					echo '  Returning response type: ' . $response::class . "\n";
+					return $response;
+				}
+			);
+
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertTrue($task->isSucceed());
+		$result = $task->getResult();
+
+		$this->assertInstanceOf(TaskResult::class, $result);
+		$struct = $result->getStruct();
+
+		$this->assertCount(1, $struct);
+		$this->assertArrayHasKey('data', $struct[0]);
+		$this->assertArrayHasKey('conversation_uuid', $struct[0]['data'][0]);
+		$this->assertArrayHasKey('response', $struct[0]['data'][0]);
+		$this->assertArrayHasKey('sources', $struct[0]['data'][0]);
+		$this->assertEquals('conv-uuid', $struct[0]['data'][0]['conversation_uuid']);
 	}
 }

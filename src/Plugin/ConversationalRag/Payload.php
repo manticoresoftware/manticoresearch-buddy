@@ -323,7 +323,12 @@ final class Payload extends BasePayload {
 	 * @return array
 	 */
 	private function handleCharacterInQuotes(
-		string $char, bool $inQuotes, string $quoteChar, string $current, string $params, int $i
+		string $char,
+		bool $inQuotes,
+		string $quoteChar,
+		string $current,
+		string $params,
+		int $i
 	): array {
 		$charsConsumed = 1;
 		$skipAppend = false;

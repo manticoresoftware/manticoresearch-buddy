@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
-use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -45,26 +44,19 @@ class SearchEngine {
 		array $options = [],
 		?float $threshold = null
 	): array {
+		// Get excluded IDs first
+		$excludedIds = $this->getExcludedIds($client, $table, $excludeQuery, $modelConfig);
 
-			// Get search parameters
-			$kResults = $this->getKResults($modelConfig, $options);
-			$threshold = $threshold ?? $this->getSimilarityThreshold($modelConfig, $options);
-
-			// Detect if table has vector embeddings
-			$vectorField = $this->detectVectorField($client, $table);
-
-		if ($vectorField) {
-			// Perform vector search with exclusions
-			return $this->performVectorSearch(
-				$client,
-				$table,
-				$vectorField,
-				$searchQuery,
-				$excludeQuery,
-				$kResults,
-				$threshold
-			);
-		}
+		// Use optimized search with pre-computed excluded IDs
+		return $this->performSearchWithExcludedIds(
+			$client,
+			$table,
+			$searchQuery,
+			$excludedIds,
+			$modelConfig,
+			$options,
+			$threshold ?? $this->getSimilarityThreshold($modelConfig, $options)
+		);
 	}
 
 	/**
@@ -167,98 +159,80 @@ class SearchEngine {
 	}
 
 	/**
-	 * Perform vector-based similarity search with exclusions (original approach)
+	 * Get excluded document IDs for a given exclusion query
 	 *
 	 * @param HTTPClient $client
 	 * @param string $table
-	 * @param string $vectorField
-	 * @param string $searchQuery
 	 * @param string $excludeQuery
-	 * @param int $kResults
-	 * @param float $threshold
-	 *
+	 * @param array $modelConfig
 	 * @return array
-	 * @throws ManticoreSearchClientError
 	 */
-	private function performVectorSearch(
+	public function getExcludedIds(
 		HTTPClient $client,
 		string $table,
-		string $vectorField,
-		string $searchQuery,
 		string $excludeQuery,
-		int $kResults,
-		float $threshold
+		array $modelConfig
 	): array {
-		Buddy::info("\n[DEBUG KNN SEARCH]");
-		Buddy::info("├─ Search query: '{$searchQuery}'");
-		Buddy::info("├─ Exclude query: '{$excludeQuery}'");
-		Buddy::info("├─ k: {$kResults}");
-		Buddy::info("├─ Threshold: {$threshold}");
-
-		$searchEscaped = $this->escapeString($searchQuery);
-		$excludeIds = [];
-
-		// Maximum exclusions limit to prevent massive IN clauses
-		$maxExclusions = 50;
-
-		// Step 1: Get IDs to exclude if needed (from original)
-		if ($excludeQuery !== 'none' && !empty(trim($excludeQuery))) {
-			$excludeEscaped = $this->escapeString($excludeQuery);
-			$excludeSql
-				= "SELECT id, knn_dist() as knn_dist FROM {$table} WHERE knn({$vectorField}, 15, '{$excludeEscaped}') AND knn_dist < 0.75";
-
-
-			$excludeResponse = $client->sendRequest($excludeSql);
-
-			if ($excludeResponse->hasError()) {
-				throw ManticoreSearchResponseError::create(
-					'Exclusion query failed: '
-					. $excludeResponse->getError()
-				);
-			}
-
-			// Debug the actual response structure
-			$result = $excludeResponse->getResult();
-			Buddy::info(
-				'├─ Exclusion response structure: '
-				. json_encode(array_keys($result[0] ?? []))
-			);
-
-			$excludeResults = $result[0]['data'] ?? [];
-			Buddy::info('├─ Raw exclusion results: ' . json_encode($excludeResults));
-
-			$excludeIds = array_column($excludeResults, 'id');
-
-			// Limit exclusions
-			if (count($excludeIds) > $maxExclusions) {
-				Buddy::info(
-					'├─ [WARNING] Too many exclusions (' . count($excludeIds)
-					. "), limiting to $maxExclusions"
-				);
-				$excludeIds = array_slice($excludeIds, 0, $maxExclusions);
-			}
-
-			Buddy::info("├─ Exclusion SQL: {$excludeSql}");
-			Buddy::info('├─ Excluded IDs: [' . implode(', ', $excludeIds) . ']');
-			Buddy::info('├─ Exclusion count: ' . count($excludeIds));
-		} else {
-			Buddy::info('├─ No exclusions');
+		if (empty($excludeQuery) || $excludeQuery === 'none') {
+			return [];
 		}
 
-		// Step 2: Build KNN query with SQL-level exclusion (from original)
-		// Increase k when we have exclusions to ensure we get enough results
-		$adjustedK = !empty($excludeIds) ? ($kResults + count($excludeIds) + 5)
-			: $kResults;
+		$vectorField = $this->detectVectorField($client, $table);
+		if (!$vectorField) {
+			return [];
+		}
 
-		// Ensure threshold is a valid float
-		$threshold = floatval($threshold);
+		$excludeEscaped = $this->escapeString($excludeQuery);
+		$sql = "SELECT id FROM {$table}
+				WHERE knn({$vectorField}, 15, '{$excludeEscaped}')
+				AND knn_dist < 0.75";
 
-		Buddy::info("├─ Adjusted k: {$adjustedK}");
+		$response = $client->sendRequest($sql);
+		if ($response->hasError()) {
+			return []; // Return empty array on error
+		}
 
-		if (!empty($excludeIds)) {
-			// Sanitize IDs - they should be integers
-			$safeExcludeIds = array_map('intval', $excludeIds);
+		$result = $response->getResult();
+		$excludeResults = $result[0]['data'] ?? [];
+
+		return array_column($excludeResults, 'id');
+	}
+
+	/**
+	 * Perform vector search with pre-computed excluded IDs (optimized for reuse)
+	 *
+	 * @param HTTPClient $client
+	 * @param string $table
+	 * @param string $searchQuery
+	 * @param array $excludedIds
+	 * @param array $modelConfig
+	 * @param array $options
+	 * @param float $threshold
+	 * @return array
+	 */
+	public function performSearchWithExcludedIds(
+		HTTPClient $client,
+		string $table,
+		string $searchQuery,
+		array $excludedIds,
+		array $modelConfig,
+		array $options,
+		float $threshold
+	): array {
+		$kResults = $this->getKResults($modelConfig, $options);
+		$vectorField = $this->detectVectorField($client, $table);
+
+		if (!$vectorField) {
+			return [];
+		}
+
+		$searchEscaped = $this->escapeString($searchQuery);
+
+		if (!empty($excludedIds)) {
+			// Use pre-computed excluded IDs - NO additional KNN search needed!
+			$safeExcludeIds = array_map('intval', $excludedIds);
 			$excludeList = implode(',', $safeExcludeIds);
+			$adjustedK = $kResults + count($excludedIds) + 5;
 
 			$sql = "SELECT *, knn_dist() as knn_dist
 					FROM {$table}
@@ -273,24 +247,25 @@ class SearchEngine {
 					AND knn_dist < {$threshold}";
 		}
 
+		Buddy::info("\n[DEBUG KNN SEARCH]");
+		Buddy::info("├─ Search query: '{$searchQuery}'");
+		Buddy::info('├─ Excluded IDs: [' . implode(', ', $excludedIds) . ']');
+		Buddy::info("├─ k: {$kResults}");
+		Buddy::info("├─ Threshold: {$threshold}");
 		Buddy::info("├─ Final SQL: {$sql}");
 
 		$response = $client->sendRequest($sql);
-
 		if ($response->hasError()) {
-			throw ManticoreSearchResponseError::create(
-				'Vector search failed: '
-				. $response->getError()
-			);
+			throw ManticoreSearchResponseError::create('Vector search failed: ' . $response->getError());
 		}
 
 		$result = $response->getResult()[0]['data'] ?? [];
-
 		Buddy::info('└─ Results found: ' . count($result));
 
-		// Filter out embedding vector fields (matches original php_rag behavior)
 		return $this->filterVectorFields($result, $table, $client);
 	}
+
+
 
 	/**
 	 * Escape string for SQL safety

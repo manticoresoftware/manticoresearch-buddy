@@ -56,11 +56,12 @@ Classify as ONE of:
 - TOPIC_CHANGE: User switching to new topic (like 'I want comedies instead', 'show me action movies')
 - INTEREST: User likes content and wants similar (like 'sounds good, what else like this', 'tell me more')
 - NEW_SEARCH: Fresh search with no prior context
-- QUESTION: User asking about shown content (like 'what's it about', 'who's in it')
+- CONTENT_QUESTION: User asking about previously shown content (like 'what's the cast', 'who directed it', 'when was it made', 'what's it about')
+- NEW_QUESTION: User asking about new topic requiring search (like 'what about action movies', 'show me comedies', 'tell me about programming')
 - CLARIFICATION: User providing additional details or correcting previous query (like 'no it's from a movie', 'I meant something else')
 - UNCLEAR: Cannot determine intent (like gibberish, confusing, ambiguous)
 
-Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_SEARCH, QUESTION, CLARIFICATION, or UNCLEAR";
+Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 
 			$provider = $llmProvider->getConnection('intent_classifier', $modelConfig);
 			$response = $provider->generateResponse($intentPrompt, [], ['temperature' => 0.1, 'max_tokens' => 50]);
@@ -119,8 +120,8 @@ Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_
 	private function validateIntent(string $intent): string {
 		$validIntents = ['REJECTION',
 			'ALTERNATIVES', 'TOPIC_CHANGE',
-			'INTEREST', 'NEW_SEARCH', 'QUESTION',
-			'CLARIFICATION', 'UNCLEAR'];
+			'INTEREST', 'NEW_SEARCH', 'CONTENT_QUESTION',
+			'NEW_QUESTION', 'CLARIFICATION', 'UNCLEAR'];
 
 		// Extract just the intent word if LLM added explanation
 		foreach ($validIntents as $valid) {

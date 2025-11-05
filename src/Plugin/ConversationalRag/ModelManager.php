@@ -172,7 +172,20 @@ class ModelManager {
 				continue;
 			}
 
-			$settings[$key] = $value;
+			// If settings is a JSON string, parse it
+			if ($key === 'settings' && is_string($value)) {
+				$parsedSettings = json_decode($value, true);
+				if (json_last_error() === JSON_ERROR_NONE) {
+					$settings = array_merge($settings, $parsedSettings);
+				} else {
+					$settings[$key] = $value;
+				}
+			} elseif ($key === 'settings' && is_array($value)) {
+				// If settings is already an array, merge it
+				$settings = array_merge($settings, $value);
+			} else {
+				$settings[$key] = $value;
+			}
 		}
 
 		return $settings;
@@ -248,9 +261,7 @@ class ModelManager {
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	public function getModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): ?array {
-		$escapedIdentifier = $this->escape($modelNameOrUuid);
-		$sql = /** @lang Manticore */ 'SELECT * FROM ' . self::MODELS_TABLE . "
-				WHERE (name = '" . $escapedIdentifier . "' OR uuid = '" . $escapedIdentifier . "')";
+		$sql = /** @lang Manticore */ 'SELECT * FROM ' . self::MODELS_TABLE . ' WHERE (name = ' . $this->quote($modelNameOrUuid) . ' OR uuid = ' . $this->quote($modelNameOrUuid) . ')';
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
