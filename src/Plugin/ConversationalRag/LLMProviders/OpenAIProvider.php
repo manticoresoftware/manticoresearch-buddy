@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders;
 
 use CurlHandle;
+use Exception;
 
 /**
  * OpenAI LLM Provider implementation
@@ -113,7 +114,7 @@ class OpenAIProvider extends BaseProvider {
 
 				]
 			);
-		} catch (\Exception $e) {
+		} catch (Exception $e) {
 			return $this->formatError('OpenAI request failed', $e);
 		}
 	}
@@ -126,30 +127,6 @@ class OpenAIProvider extends BaseProvider {
 	 * @param callable|null $callback
 	 * @return array
 	 */
-
-
-
-
-	/**
-	 * Create HTTP client
-	 *
-	 * @return CurlHandle
-	 */
-	protected function createClient(): CurlHandle {
-		$curl = curl_init();
-
-		curl_setopt_array(
-			$curl, [
-			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_TIMEOUT => 120,
-			CURLOPT_FOLLOWLOCATION => true,
-			CURLOPT_SSL_VERIFYPEER => true,
-			CURLOPT_USERAGENT => 'ManticoreSearch-Buddy-RAG/1.0',
-			]
-		);
-
-		return $curl;
-	}
 
 	/**
 	 * Make HTTP request to OpenAI API
@@ -197,5 +174,26 @@ class OpenAIProvider extends BaseProvider {
 		}
 
 		return ['success' => true, 'data' => $decoded];
+	}
+
+	/**
+	 * Create HTTP client
+	 *
+	 * @return CurlHandle
+	 */
+	protected function createClient(): CurlHandle {
+		$curl = curl_init();
+
+		curl_setopt_array(
+			$curl, [
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_TIMEOUT => 120,
+			CURLOPT_FOLLOWLOCATION => true,
+			CURLOPT_SSL_VERIFYPEER => true,
+			CURLOPT_USERAGENT => 'ManticoreSearch-Buddy-RAG/1.0',
+			]
+		);
+
+		return $curl;
 	}
 }

@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders;
 
+use Exception;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ModelManager;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 
@@ -41,15 +42,6 @@ abstract class BaseProvider {
 	 */
 	abstract public function generateResponse(string $prompt, array $options = []): array;
 
-
-
-	/**
-	 * Get the provider name
-	 *
-	 * @return string
-	 */
-	abstract public function getName(): string;
-
 	/**
 	 * Get supported models for this provider
 	 *
@@ -66,61 +58,6 @@ abstract class BaseProvider {
 	public function estimateTokens(string $text): int {
 		// Simple estimation: ~4 characters per token
 		return (int)ceil(strlen($text) / 4);
-	}
-
-
-
-	/**
-	 * Get configuration value
-	 *
-	 * @param string $key
-	 * @param mixed $default
-	 * @return mixed
-	 */
-	protected function getConfig(string $key, mixed $default = null): mixed {
-		return $this->config[$key] ?? $default;
-	}
-
-	/**
-	 * Convert value to integer if it's a numeric string
-	 */
-	protected function convertToInt(mixed $value): mixed {
-		if (is_string($value) && is_numeric($value)) {
-			return (int)$value;
-		}
-		return $value;
-	}
-
-	/**
-	 * Convert value to float if it's a numeric string
-	 */
-	protected function convertToFloat(mixed $value): mixed {
-		if (is_string($value) && is_numeric($value)) {
-			return (float)$value;
-		}
-		return $value;
-	}
-
-	/**
-	 * Convert settings array types from strings to proper types
-	 */
-	protected function convertSettingsTypes(array $settings): array {
-		$numericFields = ['temperature', 'max_tokens', 'top_p', 'frequency_penalty', 'presence_penalty', 'k_results'];
-
-		foreach ($numericFields as $field) {
-			if (!isset($settings[$field]) || !is_string($settings[$field]) || !is_numeric($settings[$field])) {
-				continue;
-			}
-
-			// Convert to int for integer fields, float for others
-			if (in_array($field, ['max_tokens', 'k_results'])) {
-				$settings[$field] = (int)$settings[$field];
-			} else {
-				$settings[$field] = (float)$settings[$field];
-			}
-		}
-
-		return $settings;
 	}
 
 	/**
@@ -200,6 +137,59 @@ abstract class BaseProvider {
 	}
 
 	/**
+	 * Convert settings array types from strings to proper types
+	 */
+	protected function convertSettingsTypes(array $settings): array {
+		$numericFields = ['temperature', 'max_tokens', 'top_p', 'frequency_penalty', 'presence_penalty', 'k_results'];
+
+		foreach ($numericFields as $field) {
+			if (!isset($settings[$field]) || !is_string($settings[$field]) || !is_numeric($settings[$field])) {
+				continue;
+			}
+
+			// Convert to int for integer fields, float for others
+			if (in_array($field, ['max_tokens', 'k_results'])) {
+				$settings[$field] = (int)$settings[$field];
+			} else {
+				$settings[$field] = (float)$settings[$field];
+			}
+		}
+
+		return $settings;
+	}
+
+	/**
+	 * Convert value to float if it's a numeric string
+	 */
+	protected function convertToFloat(mixed $value): mixed {
+		if (is_string($value) && is_numeric($value)) {
+			return (float)$value;
+		}
+		return $value;
+	}
+
+	/**
+	 * Get configuration value
+	 *
+	 * @param string $key
+	 * @param mixed $default
+	 * @return mixed
+	 */
+	protected function getConfig(string $key, mixed $default = null): mixed {
+		return $this->config[$key] ?? $default;
+	}
+
+	/**
+	 * Convert value to integer if it's a numeric string
+	 */
+	protected function convertToInt(mixed $value): mixed {
+		if (is_string($value) && is_numeric($value)) {
+			return (int)$value;
+		}
+		return $value;
+	}
+
+	/**
 	 * Build style prompt
 	 *
 	 * @return string
@@ -218,10 +208,10 @@ abstract class BaseProvider {
 	 * Format error response
 	 *
 	 * @param string $message
-	 * @param \Exception|null $exception
+	 * @param Exception|null $exception
 	 * @return array
 	 */
-	protected function formatError(string $message, ?\Exception $exception = null): array {
+	protected function formatError(string $message, ?Exception $exception = null): array {
 		return [
 			'success' => false,
 			'error' => $message,
@@ -229,6 +219,13 @@ abstract class BaseProvider {
 			'provider' => $this->getName(),
 		];
 	}
+
+	/**
+	 * Get the provider name
+	 *
+	 * @return string
+	 */
+	abstract public function getName(): string;
 
 	/**
 	 * Format success response

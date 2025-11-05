@@ -42,7 +42,10 @@ class ConversationManager {
 			ttl bigint
 		)';
 
-		$client->sendRequest($sql);
+		$response = $client->sendRequest($sql);
+		if ($response->hasError()) {
+			throw ManticoreSearchClientError::create('Failed to create conversations table: ' . $response->getError());
+		}
 	}
 
 	/**
@@ -61,7 +64,7 @@ class ConversationManager {
 		string $role,
 		string $message,
 		int $tokensUsed = 0
-	): bool {
+	): void {
 
 		$currentTime = time();
 		$ttlTime = $currentTime + (24 * 60 * 60); // 1 day from now
@@ -78,7 +81,9 @@ class ConversationManager {
 		);
 
 		$result = $this->client->sendRequest($sql);
-		return !$result->hasError();
+		if ($result->hasError()) {
+			throw ManticoreSearchClientError::create('Failed to create conversations table: ' . $result->getError());
+		}
 	}
 
 	/**
@@ -96,7 +101,7 @@ class ConversationManager {
 			"ORDER BY created_at ASC LIMIT $limit";
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
-			return '';
+			throw ManticoreSearchClientError::create('Failed to retrieve conversation history: ' . $result->getError());
 		}
 		$data = $result->getResult();
 		$history = '';

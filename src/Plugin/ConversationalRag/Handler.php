@@ -109,6 +109,54 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
+	 * Validate model configuration
+	 *
+	 * @param array $config
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private static function validateModelConfig(array $config): void {
+		$required = ['llm_provider', 'llm_model'];
+
+		foreach ($required as $field) {
+			if (!isset($config[$field]) || empty($config[$field])) {
+				throw QueryParseError::create("Required field '{$field}' is missing or empty");
+			}
+		}
+
+		$validProviders = ['openai'];
+		if (!in_array($config['llm_provider'], $validProviders)) {
+			throw QueryParseError::create(
+				"Invalid LLM provider: {$config['llm_provider']}. Only 'openai' is supported."
+			);
+		}
+
+		// Validate numeric parameters
+		if (isset($config['temperature'])) {
+			$temp = (float)$config['temperature'];
+			if ($temp < 0 || $temp > 2) {
+				throw QueryParseError::create('Temperature must be between 0 and 2');
+			}
+		}
+
+		if (isset($config['max_tokens'])) {
+			$tokens = (int)$config['max_tokens'];
+			if ($tokens < 1 || $tokens > 32768) {
+				throw QueryParseError::create('max_tokens must be between 1 and 32768');
+			}
+		}
+
+		if (!isset($config['k_results'])) {
+			return;
+		}
+
+		$k = (int)$config['k_results'];
+		if ($k < 1 || $k > 50) {
+			throw QueryParseError::create('k_results must be between 1 and 50');
+		}
+	}
+
+	/**
 	 * Show all RAG models
 	 *
 	 * @param ModelManager $modelManager
@@ -119,7 +167,7 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private static function showModels(ModelManager $modelManager, Client $client): TaskResult {
 
-			$models = $modelManager->getAllModels($client);
+		$models = $modelManager->getAllModels($client);
 
 			$data = [];
 		foreach ($models as $model) {
@@ -139,7 +187,6 @@ final class Handler extends BaseHandlerWithClient {
 				->column('llm_model', Column::String)
 				->column('created_at', Column::String);
 	}
-
 
 	/**
 	 * Describe a specific RAG model
@@ -327,56 +374,6 @@ final class Handler extends BaseHandlerWithClient {
 				->column('sources', Column::String);
 	}
 
-
-
-	/**
-	 * Validate model configuration
-	 *
-	 * @param array $config
-	 * @return void
-	 * @throws QueryParseError
-	 */
-	private static function validateModelConfig(array $config): void {
-		$required = ['llm_provider', 'llm_model'];
-
-		foreach ($required as $field) {
-			if (!isset($config[$field]) || empty($config[$field])) {
-				throw QueryParseError::create("Required field '{$field}' is missing or empty");
-			}
-		}
-
-		$validProviders = ['openai'];
-		if (!in_array($config['llm_provider'], $validProviders)) {
-			throw QueryParseError::create(
-				"Invalid LLM provider: {$config['llm_provider']}. Only 'openai' is supported."
-			);
-		}
-
-		// Validate numeric parameters
-		if (isset($config['temperature'])) {
-			$temp = (float)$config['temperature'];
-			if ($temp < 0 || $temp > 2) {
-				throw QueryParseError::create('Temperature must be between 0 and 2');
-			}
-		}
-
-		if (isset($config['max_tokens'])) {
-			$tokens = (int)$config['max_tokens'];
-			if ($tokens < 1 || $tokens > 32768) {
-				throw QueryParseError::create('max_tokens must be between 1 and 32768');
-			}
-		}
-
-		if (!isset($config['k_results'])) {
-			return;
-		}
-
-		$k = (int)$config['k_results'];
-		if ($k < 1 || $k > 50) {
-			throw QueryParseError::create('k_results must be between 1 and 50');
-		}
-	}
-
 	private static function parseCallRagParams(Payload $payload): array {
 		// Parse CALL CONVERSATIONAL_RAG parameters from payload
 		return [
@@ -386,6 +383,34 @@ final class Handler extends BaseHandlerWithClient {
 			'conversation_uuid' => $payload->params['conversation_uuid'] ?? '',
 			'overrides' => $payload->params['overrides'] ?? [],
 		];
+	}
+
+	/**
+	 * Generate a UUID v4
+	 *
+	 * @return string
+	 */
+	private static function generateUuid(): string {
+		$data = random_bytes(16);
+		$data[6] = chr(ord($data[6]) & 0x0f | 0x40); // Version 4
+		$data[8] = chr(ord($data[8]) & 0x3f | 0x80); // Variant 10
+		return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+	}
+
+	private static function buildContext(array $searchResults, array $settings): string {
+		if (empty($searchResults)) {
+			return '';
+		}
+
+		$maxDocLength = $settings['max_document_length'] ?? 2000;
+		$truncatedDocs = array_map(
+			function ($doc) use ($maxDocLength) {
+				$content = $doc['content'] ?? '';
+				return strlen($content) > $maxDocLength ? substr($content, 0, $maxDocLength) . '...' : $content;
+			}, $searchResults
+		);
+
+		return implode("\n", $truncatedDocs);
 	}
 
 	private static function generateResponse(
@@ -413,22 +438,6 @@ final class Handler extends BaseHandlerWithClient {
 		return $provider->generateResponse($prompt, $effectiveSettings);
 	}
 
-	private static function buildContext(array $searchResults, array $settings): string {
-		if (empty($searchResults)) {
-			return '';
-		}
-
-		$maxDocLength = $settings['max_document_length'] ?? 2000;
-		$truncatedDocs = array_map(
-			function ($doc) use ($maxDocLength) {
-				$content = $doc['content'] ?? '';
-				return strlen($content) > $maxDocLength ? substr($content, 0, $maxDocLength) . '...' : $content;
-			}, $searchResults
-		);
-
-		return implode("\n", $truncatedDocs);
-	}
-
 	private static function buildPrompt(string $stylePrompt, string $query, string $context, string $history): string {
 		// Build prompt similar to original implementation
 		// History is already formatted as "role: message\nrole: message\n"
@@ -445,18 +454,6 @@ final class Handler extends BaseHandlerWithClient {
 			"<query>{$query}</query>\n" .
 			"</main>\n" .
 			"<style>{$stylePrompt}</style>";
-	}
-
-	/**
-	 * Generate a UUID v4
-	 *
-	 * @return string
-	 */
-	private static function generateUuid(): string {
-		$data = random_bytes(16);
-		$data[6] = chr(ord($data[6]) & 0x0f | 0x40); // Version 4
-		$data[8] = chr(ord($data[8]) & 0x3f | 0x80); // Variant 10
-		return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 	}
 
 

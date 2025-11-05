@@ -140,10 +140,7 @@ final class Payload extends BasePayload {
 		} elseif (preg_match('/^DROP\s+RAG\s+MODEL\s+[\'"]?([^\'"]+)[\'"]?$/i', $sql, $matches)) {
 			$this->action = self::ACTION_DROP_MODEL;
 			$this->params = ['model_name_or_uuid' => $matches[1]];
-		}
-
-		// Conversation queries
-		elseif (preg_match('/^CALL\s+CONVERSATIONAL_RAG\s*\((.*)\)$/si', $sql, $matches)) {
+		} elseif (preg_match('/^CALL\s+CONVERSATIONAL_RAG\s*\((.*)\)$/si', $sql, $matches)) {
 			$this->action = self::ACTION_CONVERSATION;
 			$this->params = $this->parseConversationParams($matches[1]);
 		} else {
@@ -185,9 +182,57 @@ final class Payload extends BasePayload {
 		return $config;
 	}
 
+	/**
+	 * Parse key=value parameters
+	 *
+	 * @param string $params
+	 * @return array
+	 */
+	private function parseKeyValueParams(string $params): array {
+		$result = [];
+		$lines = array_map('trim', explode(',', $params));
 
+		foreach ($lines as $line) {
+			if (empty($line)) {
+				continue;
+			}
 
+			// Split on first = sign
+			$parts = explode('=', $line, 2);
+			if (sizeof($parts) !== 2) {
+				continue;
+			}
 
+			$key = trim($parts[0]);
+			$value = trim($parts[1]);
+			$result[$key] = $value;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Remove quotes from string
+	 *
+	 * @param string $str
+	 * @return string
+	 */
+	private function unquoteString(string $str): string {
+		$str = trim($str);
+
+		if ((str_starts_with($str, '"')
+		&& str_ends_with($str, '"'))
+			|| (str_starts_with($str, "'")
+			&& str_ends_with($str, "'"))) {
+			$unquoted = substr($str, 1, -1);
+			// Handle SQL escaped quotes
+			$unquoted = str_replace("\\'", "'", $unquoted);
+			$unquoted = str_replace('\\"', '"', $unquoted);
+			return $unquoted;
+		}
+
+		return $str;
+	}
 
 	/**
 	 * Parse conversation parameters
@@ -229,30 +274,34 @@ final class Payload extends BasePayload {
 		$inQuotes = false;
 		$quoteChar = '';
 
-		for ($i = 0; $i < strlen($params); $i++) {
+		$i = 0;
+		while ($i < strlen($params)) {
 			$char = $params[$i];
+			$charsConsumed = 1;
+			$skipAppend = false;
 
-			if (!$inQuotes && ($char === '"' || $char === "'")) {
-				$inQuotes = true;
-				$quoteChar = $char;
-			} elseif ($inQuotes && $char === $quoteChar) {
-				$inQuotes = false;
-				$quoteChar = '';
-			}
+			[$inQuotes, $quoteChar, $current, $charsConsumed, $skipAppend] = $this->handleCharacterInQuotes(
+				$char, $inQuotes, $quoteChar, $current, $params, $i
+			);
 
-			if (!$inQuotes) {
+			if (!$inQuotes && $char === ',' && $depth === 0) {
+				// We found a parameter separator
+				$result[] = trim($current);
+				$current = '';
+			} elseif (!$inQuotes) {
+				// Handle other non-quote characters outside quotes
 				if ($char === '(' || $char === '{' || $char === '[') {
 					$depth++;
 				} elseif ($char === ')' || $char === '}' || $char === ']') {
 					$depth--;
-				} elseif ($char === ',' && $depth === 0) {
-					$result[] = trim($current);
-					$current = '';
-					continue;
 				}
+				$current .= $char;
+			} elseif (!$skipAppend) {
+				// We're in quotes and should append this character
+				$current .= $char;
 			}
 
-			$current .= $char;
+			$i += $charsConsumed;
 		}
 
 		if (!empty(trim($current))) {
@@ -263,50 +312,42 @@ final class Payload extends BasePayload {
 	}
 
 	/**
-	 * Parse key=value parameters
+	 * Handle character processing when inside quotes
 	 *
+	 * @param string $char
+	 * @param bool $inQuotes
+	 * @param string $quoteChar
+	 * @param string $current
 	 * @param string $params
+	 * @param int $i
 	 * @return array
 	 */
-	private function parseKeyValueParams(string $params): array {
-		$result = [];
-		$lines = array_map('trim', explode(',', $params));
+	private function handleCharacterInQuotes(
+		string $char, bool $inQuotes, string $quoteChar, string $current, string $params, int $i
+	): array {
+		$charsConsumed = 1;
+		$skipAppend = false;
 
-		foreach ($lines as $line) {
-			if (empty($line)) {
-				continue;
-			}
-
-			// Split on first = sign
-			$parts = explode('=', $line, 2);
-			if (count($parts) !== 2) {
-				continue;
-			}
-
-			$key = trim($parts[0]);
-			$value = trim($parts[1]);
-			$result[$key] = $value;
+		// Check for escaped characters when in quotes
+		if ($inQuotes && $char === '\\' && $i + 1 < strlen($params)) {
+			// Add both the escape and the escaped character
+			$current .= $char;
+			$current .= $params[$i + 1];
+			$charsConsumed = 2;
+			$skipAppend = true;
+			return [$inQuotes, $quoteChar, $current, $charsConsumed, $skipAppend];
 		}
 
-		return $result;
-	}
-
-	/**
-	 * Remove quotes from string
-	 *
-	 * @param string $str
-	 * @return string
-	 */
-	private function unquoteString(string $str): string {
-		$str = trim($str);
-
-		if ((str_starts_with($str, '"')
-		&& str_ends_with($str, '"'))
-			|| (str_starts_with($str, "'")
-			&& str_ends_with($str, "'"))) {
-			return substr($str, 1, -1);
+		if (!$inQuotes && ($char === '"' || $char === "'")) {
+			$inQuotes = true;
+			$quoteChar = $char;
+		} elseif ($inQuotes && $char === $quoteChar) {
+			$inQuotes = false;
+			$quoteChar = '';
 		}
 
-		return $str;
+		return [$inQuotes, $quoteChar, $current, $charsConsumed, $skipAppend];
 	}
+
+
 }

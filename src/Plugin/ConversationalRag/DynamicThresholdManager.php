@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
+use Exception;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
@@ -128,6 +129,17 @@ class DynamicThresholdManager {
 	}
 
 	/**
+	 * Get conversation ID from history
+	 *
+	 * @param array $conversationHistory
+	 * @return string
+	 */
+	private function getConversationId(string $conversationHistory): string {
+		// Generate a consistent ID based on conversation content (first 200 chars for consistency)
+		return md5(substr($conversationHistory, 0, 200));
+	}
+
+	/**
 	 * Detect if user wants to broaden their search (expansion intent)
 	 *
 	 * @param string $userQuery
@@ -196,21 +208,10 @@ Answer: YES or NO";
 			Buddy::info('└─ Expansion: ' . ($result === 'yes' ? 'YES' : 'NO'));
 
 			return $result === 'yes';
-		} catch (\Exception $e) {
+		} catch (Exception $e) {
 			// Fallback to false on error
 			return false;
 		}
-	}
-
-	/**
-	 * Get conversation ID from history
-	 *
-	 * @param array $conversationHistory
-	 * @return string
-	 */
-	private function getConversationId(string $conversationHistory): string {
-		// Generate a consistent ID based on conversation content (first 200 chars for consistency)
-		return md5(substr($conversationHistory, 0, 200));
 	}
 
 	/**

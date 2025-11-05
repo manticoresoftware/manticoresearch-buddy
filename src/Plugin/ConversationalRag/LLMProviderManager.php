@@ -23,21 +23,6 @@ class LLMProviderManager {
 	private array $connections = [];
 
 	/**
-	 * Get provider instance by name
-	 *
-	 * @param string $providerName
-	 * @return BaseProvider
-	 * @throws ManticoreSearchClientError
-	 */
-	public function getProvider(string $providerName): BaseProvider {
-		if (!isset($this->providers[$providerName])) {
-			$this->providers[$providerName] = $this->createProvider($providerName);
-		}
-
-		return $this->providers[$providerName];
-	}
-
-	/**
 	 * Get configured connection for a model
 	 *
 	 * @param string $modelId
@@ -53,6 +38,21 @@ class LLMProviderManager {
 		}
 
 		return $this->connections[$modelId];
+	}
+
+	/**
+	 * Get provider instance by name
+	 *
+	 * @param string $providerName
+	 * @return BaseProvider
+	 * @throws ManticoreSearchClientError
+	 */
+	public function getProvider(string $providerName): BaseProvider {
+		if (!isset($this->providers[$providerName])) {
+			$this->providers[$providerName] = $this->createProvider($providerName);
+		}
+
+		return $this->providers[$providerName];
 	}
 
 	/**

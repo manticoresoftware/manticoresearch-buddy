@@ -180,5 +180,28 @@ class ConversationalPayloadTest extends TestCase {
 		);
 	}
 
+	public function testEscapedQuotesInConversationParams(): void {
+		$query = "CALL CONVERSATIONAL_RAG('I\\'m like programming, lets talk about it', 'docs', 'test_model', 'conversation_1')";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$this->assertEquals('conversation', $payload->action);
+		$this->assertEquals("I'm like programming, lets talk about it", $payload->params['query']);
+		$this->assertEquals('docs', $payload->params['table']);
+		$this->assertEquals('test_model', $payload->params['model_uuid']);
+		$this->assertEquals('conversation_1', $payload->params['conversation_uuid']);
+	}
+
 
 }

@@ -71,7 +71,10 @@ class ModelManager {
 			updated_at bigint
 		)';
 
-		$client->sendRequest($sql);
+		$response = $client->sendRequest($sql);
+		if ($response->hasError()) {
+			throw ManticoreSearchClientError::create('Failed to create models table: ' . $response->getError());
+		}
 	}
 
 
@@ -111,9 +114,68 @@ class ModelManager {
 				$currentTime
 			);
 
-		$client->sendRequest($sql);
+		$response = $client->sendRequest($sql);
+		if ($response->hasError()) {
+			throw ManticoreSearchClientError::create('Failed to create model: ' . $response->getError());
+		}
 
 		return $modelUuid;
+	}
+
+	/**
+	 * Generate a UUID v4
+	 *
+	 * @return string
+	 */
+	private function generateUuid(): string {
+		$data = random_bytes(16);
+		$data[6] = chr(ord($data[6]) & 0x0f | 0x40); // Version 4
+		$data[8] = chr(ord($data[8]) & 0x3f | 0x80); // Variant 10
+		return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+	}
+
+	/**
+	 * Check if model exists
+	 *
+	 * @param HTTPClient $client
+	 * @param string $modelName
+	 * @return bool
+	 */
+	private function modelExists(HTTPClient $client, string $modelName): bool {
+		$sql = sprintf(
+			/** @lang Manticore */            'SELECT COUNT(*) as count FROM %s WHERE name = %s',
+			self::MODELS_TABLE,
+			$this->quote($modelName)
+		);
+
+		$response = $client->sendRequest($sql);
+		if ($response->hasError()) {
+			throw ManticoreSearchClientError::create('Failed to check model existence: ' . $response->getError());
+		}
+		$data = $response->getResult()[0]['data'] ?? [];
+
+		return !empty($data) && ($data[0]['count'] ?? 0) > 0;
+	}
+
+	/**
+	 * Extract settings from config into separate array
+	 *
+	 * @param array $config
+	 * @return array
+	 */
+	private function extractSettings(array $config): array {
+		$coreFields = ['id', 'name', 'llm_provider', 'llm_model', 'llm_api_key', 'style_prompt'];
+		$settings = [];
+
+		foreach ($config as $key => $value) {
+			if (in_array($key, $coreFields)) {
+				continue;
+			}
+
+			$settings[$key] = $value;
+		}
+
+		return $settings;
 	}
 
 	/**
@@ -131,36 +193,11 @@ class ModelManager {
 				ORDER BY created_at DESC';
 
 		$response = $client->sendRequest($sql);
+		if ($response->hasError()) {
+			throw ManticoreSearchResponseError::create('Failed to get all models: ' . $response->getError());
+		}
 		return $response->getResult()[0]['data'] ?? [];
 	}
-
-
-	/**
-	 * Get model by name or UUID (returns environment variable names, does not resolve them)
-	 *
-	 * @param HTTPClient $client
-	 * @param string $modelNameOrUuid Model name or UUID
-	 *
-	 * @return array|null
-	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
-	 */
-	public function getModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): ?array {
-		$escapedIdentifier = $this->escape($modelNameOrUuid);
-		$sql = /** @lang Manticore */ 'SELECT * FROM ' . self::MODELS_TABLE . "
-				WHERE (name = '" . $escapedIdentifier . "' OR uuid = '" . $escapedIdentifier . "')";
-
-		$response = $client->sendRequest($sql);
-		$data = $response->getResult()[0]['data'] ?? [];
-
-		if (empty($data)) {
-			return null;
-		}
-
-		return $data[0];
-	}
-
-
-
 
 	/**
 	 * Delete RAG model by name
@@ -186,50 +223,10 @@ class ModelManager {
 			$this->quote($model['uuid'])
 		);
 
-		$client->sendRequest($sql);
-	}
-
-	/**
-	 * Check if model exists
-	 *
-	 * @param HTTPClient $client
-	 * @param string $modelName
-	 * @return bool
-	 */
-	private function modelExists(HTTPClient $client, string $modelName): bool {
-		$sql = sprintf(
-			/** @lang Manticore */            'SELECT COUNT(*) as count FROM %s WHERE name = %s',
-			self::MODELS_TABLE,
-			$this->quote($modelName)
-		);
-
 		$response = $client->sendRequest($sql);
-		$data = $response->getResult()[0]['data'] ?? [];
-
-		return !empty($data) && ($data[0]['count'] ?? 0) > 0;
-	}
-
-
-
-	/**
-	 * Extract settings from config into separate array
-	 *
-	 * @param array $config
-	 * @return array
-	 */
-	private function extractSettings(array $config): array {
-		$coreFields = ['id', 'name', 'llm_provider', 'llm_model', 'llm_api_key', 'style_prompt'];
-		$settings = [];
-
-		foreach ($config as $key => $value) {
-			if (in_array($key, $coreFields)) {
-				continue;
-			}
-
-			$settings[$key] = $value;
+		if ($response->hasError()) {
+			throw ManticoreSearchClientError::create('Failed to delete model: ' . $response->getError());
 		}
-
-		return $settings;
 	}
 
 	/**
@@ -241,6 +238,32 @@ class ModelManager {
 	 * @return void
 	 */
 
+	/**
+	 * Get model by name or UUID (returns environment variable names, does not resolve them)
+	 *
+	 * @param HTTPClient $client
+	 * @param string $modelNameOrUuid Model name or UUID
+	 *
+	 * @return array|null
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
+	 */
+	public function getModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): ?array {
+		$escapedIdentifier = $this->escape($modelNameOrUuid);
+		$sql = /** @lang Manticore */ 'SELECT * FROM ' . self::MODELS_TABLE . "
+				WHERE (name = '" . $escapedIdentifier . "' OR uuid = '" . $escapedIdentifier . "')";
+
+		$response = $client->sendRequest($sql);
+		if ($response->hasError()) {
+			throw  ManticoreSearchResponseError::create('Failed to get model by UUID/name: ' . $response->getError());
+		}
+		$data = $response->getResult()[0]['data'] ?? [];
+
+		if (empty($data)) {
+			return null;
+		}
+
+		return $data[0];
+	}
 
 	/**
 	 * Escape special characters for strings
@@ -257,19 +280,5 @@ class ModelManager {
 
 		// Replace all in one call
 		return str_replace($specialChars, $escapedChars, $value);
-	}
-
-
-
-	/**
-	 * Generate a UUID v4
-	 *
-	 * @return string
-	 */
-	private function generateUuid(): string {
-		$data = random_bytes(16);
-		$data[6] = chr(ord($data[6]) & 0x0f | 0x40); // Version 4
-		$data[8] = chr(ord($data[8]) & 0x3f | 0x80); // Variant 10
-		return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 	}
 }

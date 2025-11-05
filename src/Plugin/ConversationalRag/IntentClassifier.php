@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
+use Exception;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
@@ -79,7 +80,7 @@ Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_
 				'confidence' => 0.9,
 				'llm_response' => $response['content'],
 			];
-		} catch (\Exception $e) {
+		} catch (Exception $e) {
 			// Fallback to NEW_SEARCH
 			return [
 				'intent' => 'NEW_SEARCH',
@@ -87,6 +88,49 @@ Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_
 				'error' => $e->getMessage(),
 			];
 		}
+	}
+
+	/**
+	 * Limit conversation history size for LLM context (matches original php_rag implementation)
+	 *
+	 * @param string $history
+	 * @param int $maxExchanges
+	 * @return string
+	 */
+	private function limitConversationHistory(string $history, int $maxExchanges = 10): string {
+		// Split by role markers (matches php_rag Line 57)
+		$lines = explode("\n", $history);
+
+		// Keep only last N exchanges (2 lines per exchange) (matches php_rag Line 60-63)
+		$maxLines = $maxExchanges * 2;
+		if (count($lines) > $maxLines) {
+			$lines = array_slice($lines, -$maxLines);
+		}
+
+		return implode("\n", $lines);
+	}
+
+	/**
+	 * Validate and clean intent from LLM response
+	 *
+	 * @param string $intent
+	 * @return string
+	 */
+	private function validateIntent(string $intent): string {
+		$validIntents = ['REJECTION',
+			'ALTERNATIVES', 'TOPIC_CHANGE',
+			'INTEREST', 'NEW_SEARCH', 'QUESTION',
+			'CLARIFICATION', 'UNCLEAR'];
+
+		// Extract just the intent word if LLM added explanation
+		foreach ($validIntents as $valid) {
+			if (stripos($intent, $valid) !== false) {
+				return $valid;
+			}
+		}
+
+		// Default fallback
+		return 'NEW_SEARCH';
 	}
 
 	/**
@@ -208,7 +252,7 @@ Answer ONLY in the format above.";
 				'exclude_query' => $excludeQuery,
 				'llm_response' => $response['content'],
 			];
-		} catch (\Exception $e) {
+		} catch (Exception $e) {
 			// Fallback to safe defaults
 			if (empty($searchQuery)) {
 				$searchQuery = $userQuery;
@@ -227,48 +271,5 @@ Answer ONLY in the format above.";
 				'llm_response' => $response['content'] ?? $e->getMessage(),
 			];
 		}
-	}
-
-	/**
-	 * Limit conversation history size for LLM context (matches original php_rag implementation)
-	 *
-	 * @param string $history
-	 * @param int $maxExchanges
-	 * @return string
-	 */
-	private function limitConversationHistory(string $history, int $maxExchanges = 10): string {
-		// Split by role markers (matches php_rag Line 57)
-		$lines = explode("\n", $history);
-
-		// Keep only last N exchanges (2 lines per exchange) (matches php_rag Line 60-63)
-		$maxLines = $maxExchanges * 2;
-		if (count($lines) > $maxLines) {
-			$lines = array_slice($lines, -$maxLines);
-		}
-
-		return implode("\n", $lines);
-	}
-
-	/**
-	 * Validate and clean intent from LLM response
-	 *
-	 * @param string $intent
-	 * @return string
-	 */
-	private function validateIntent(string $intent): string {
-		$validIntents = ['REJECTION',
-			'ALTERNATIVES', 'TOPIC_CHANGE',
-			'INTEREST', 'NEW_SEARCH', 'QUESTION',
-			'CLARIFICATION', 'UNCLEAR'];
-
-		// Extract just the intent word if LLM added explanation
-		foreach ($validIntents as $valid) {
-			if (stripos($intent, $valid) !== false) {
-				return $valid;
-			}
-		}
-
-		// Default fallback
-		return 'NEW_SEARCH';
 	}
 }
