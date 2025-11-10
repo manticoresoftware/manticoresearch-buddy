@@ -13,6 +13,7 @@ use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Handler as RagHandler;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\BaseProvider;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Payload as RagPayload;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
@@ -48,39 +49,12 @@ class ConversationHandlerTest extends TestCase {
 		putenv('TEST_ANTHROPIC_API_KEY');
 	}
 
-	/**
-	 * Create a mock LLM provider manager with predefined responses
-	 *
-	 * @param array $responses Array of LLM response arrays
-	 * @return LLMProviderManager
-	 */
-	private function createMockLLMProviderManager(array $responses): LLMProviderManager {
-		$mockProviderManager = $this->createMock(LLMProviderManager::class);
-		$mockProvider = $this->createMock(BaseProvider::class);
-
-		$mockProviderManager->method('getConnection')->willReturn($mockProvider);
-
-		$callCount = 0;
-		$mockProvider->method('generateResponse')
-			->willReturnCallback(
-				function ($prompt, $options = []) use (&$responses, &$callCount) {
-					if ($callCount >= count($responses)) {
-						throw new \Exception('Too many LLM calls: expected ' . count($responses) . ', got ' . ($callCount + 1));
-					}
-					$result = $responses[$callCount];
-					$callCount++;
-					return $result;
-				}
-			);
-
-		return $mockProviderManager;
-	}
-
 	public function testHandlerInitialization(): void {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => 'SHOW RAG MODELS',
 				'format' => RequestFormat::SQL,
@@ -107,7 +81,8 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -124,18 +99,24 @@ class ConversationHandlerTest extends TestCase {
 
 		// Create mock responses for each call - successful operations return standard result format
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$modelExistsResponse = $this->createMock(Response::class);
-		$modelExistsResponse->method('getResult')->willReturn(Struct::fromData([['data' => [['count' => 0]]]]));
+		$modelExistsResponse->method('getResult')
+			->willReturn(Struct::fromData([['data' => [['count' => 0]]]]));
 
 		$insertResponse = $this->createMock(Response::class);
-		$insertResponse->method('getResult')->willReturn(Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']]));
+		$insertResponse->method('getResult')
+			->willReturn(Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']]));
 
-		$mockClient->expects($this->exactly(4)) // initializeTables (2 calls) + modelExists (1 call) + createModel (1 call)
+		$mockClient->expects($this->exactly(4))
 			->method('sendRequest')
 			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $modelExistsResponse, $insertResponse);
 		$handler->setManticoreClient($mockClient);
@@ -152,21 +133,20 @@ class ConversationHandlerTest extends TestCase {
 		$struct = $result->getStruct();
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
-		$this->assertCount(1, $struct[0]['data']);
 		$this->assertArrayHasKey('uuid', $struct[0]['data'][0]);
-		$this->assertIsString($struct[0]['data'][0]['uuid']);
+		$this->assertNotEmpty($struct[0]['data'][0]['uuid']);
 	}
 
 	public function testShowModelsSuccess(): void {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => 'SHOW RAG MODELS',
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => 'SHOW RAG MODELS',
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => '',
 				]
 			)
 		);
@@ -178,29 +158,33 @@ class ConversationHandlerTest extends TestCase {
 
 		// Create mock responses for each call
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$selectResponse = $this->createMock(Response::class);
 		// getAllModels expects getResult()[0]['data'] to contain the models array
 		$selectResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[['data' => [
-				[
-				'uuid' => 'test-uuid',
-				'name' => 'test_model',
-				'llm_provider' => 'openai',
-				'llm_model' => 'gpt-4',
-				'created_at' => '2023-01-01',
-				],
+					[
+						'uuid' => 'test-uuid',
+						'name' => 'test_model',
+						'llm_provider' => 'openai',
+						'llm_model' => 'gpt-4',
+						'created_at' => '2023-01-01',
+					],
 				]]]
 			)
 		);
 
 		$mockClient->expects($this->exactly(3)) // initializeTables (2 calls) + getAllModels (1 call)
-			->method('sendRequest')
+		->method('sendRequest')
 			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $selectResponse);
 		$handler->setManticoreClient($mockClient);
 
@@ -224,12 +208,12 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => $query,
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => '',
 				]
 			)
 		);
@@ -241,38 +225,42 @@ class ConversationHandlerTest extends TestCase {
 
 		// Create mock responses for each call
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$selectResponse = $this->createMock(Response::class);
 		// getModelByUiidOrName expects getResult()[0]['data'][0] to be the model
 		$selectResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-				'total' => 1,
-				'error' => '',
-				'warning' => '',
-				'data' => [
 					[
-						'uuid' => 'test-uuid',
-						'name' => 'test_model',
-						'llm_provider' => 'openai',
-						'llm_api_key' => '',
-						'style_prompt' => 'You are a helpful assistant.',
-						'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
-						'created_at' => '2023-01-01 00:00:00',
+						'total' => 1,
+						'error' => '',
+						'warning' => '',
+						'data' => [
+							[
+								'uuid' => 'test-uuid',
+								'name' => 'test_model',
+								'llm_provider' => 'openai',
+								'llm_api_key' => '',
+								'style_prompt' => 'You are a helpful assistant.',
+								'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
+								'created_at' => '2023-01-01 00:00:00',
+							],
+						],
 					],
-				],
-				],
 				]
 			)
 		);
 
 		$mockClient->expects($this->exactly(3)) // initializeTables (2 calls) + getModelByUiidOrName (1 call)
-			->method('sendRequest')
+		->method('sendRequest')
 			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $selectResponse);
 		$handler->setManticoreClient($mockClient);
 
@@ -285,7 +273,7 @@ class ConversationHandlerTest extends TestCase {
 		$struct = $result->getStruct();
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
-		$this->assertGreaterThan(0, count($struct[0]['data']));
+		$this->assertGreaterThan(0, sizeof($struct[0]['data']));
 		// Should have multiple property-value pairs for the model description
 		$this->assertEquals('uuid', $struct[0]['data'][0]['property']);
 		$this->assertEquals('test-uuid', $struct[0]['data'][0]['value']);
@@ -297,7 +285,8 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -314,10 +303,14 @@ class ConversationHandlerTest extends TestCase {
 
 		// Create mock responses for each call
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$getModelResponse = $this->createMock(Response::class);
 		// getModelByUiidOrName expects getResult()[0]['data'][0] to be the model
@@ -345,7 +338,9 @@ class ConversationHandlerTest extends TestCase {
 		);
 
 		$deleteModelResponse = $this->createMock(Response::class);
-		$deleteModelResponse->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$deleteModelResponse->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$mockClient->expects($this->exactly(4)) // initializeTables (2) + getModel (1) + delete model (1)
 			->method('sendRequest')
@@ -373,7 +368,8 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -390,8 +386,11 @@ class ConversationHandlerTest extends TestCase {
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
-		$this->assertInstanceOf(\Manticoresearch\Buddy\Core\Error\QueryParseError::class, $error);
-		$this->assertStringContainsString("Required field 'llm_provider' is missing or empty", $error->getResponseError());
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString(
+			"Required field 'llm_provider' is missing or empty",
+			$error->getResponseError()
+		);
 	}
 
 	public function testCreateModelValidationInvalidProvider(): void {
@@ -403,7 +402,8 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -420,8 +420,11 @@ class ConversationHandlerTest extends TestCase {
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
-		$this->assertInstanceOf(\Manticoresearch\Buddy\Core\Error\QueryParseError::class, $error);
-		$this->assertStringContainsString("Invalid LLM provider: anthropic. Only 'openai' is supported.", $error->getResponseError());
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString(
+			"Invalid LLM provider: anthropic. Only 'openai' is supported.",
+			$error->getResponseError()
+		);
 	}
 
 	public function testCreateModelValidationTemperatureTooHigh(): void {
@@ -434,7 +437,8 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -451,7 +455,7 @@ class ConversationHandlerTest extends TestCase {
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
-		$this->assertInstanceOf(\Manticoresearch\Buddy\Core\Error\QueryParseError::class, $error);
+		$this->assertInstanceOf(QueryParseError::class, $error);
 		$this->assertStringContainsString('Temperature must be between 0 and 2', $error->getResponseError());
 	}
 
@@ -465,7 +469,8 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -482,7 +487,7 @@ class ConversationHandlerTest extends TestCase {
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
-		$this->assertInstanceOf(\Manticoresearch\Buddy\Core\Error\QueryParseError::class, $error);
+		$this->assertInstanceOf(QueryParseError::class, $error);
 		$this->assertStringContainsString('max_tokens must be between 1 and 32768', $error->getResponseError());
 	}
 
@@ -496,7 +501,8 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -513,7 +519,7 @@ class ConversationHandlerTest extends TestCase {
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
-		$this->assertInstanceOf(\Manticoresearch\Buddy\Core\Error\QueryParseError::class, $error);
+		$this->assertInstanceOf(QueryParseError::class, $error);
 		$this->assertStringContainsString('k_results must be between 1 and 50', $error->getResponseError());
 	}
 
@@ -530,7 +536,8 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -547,18 +554,23 @@ class ConversationHandlerTest extends TestCase {
 
 		// Create mock responses for each call - successful operations return standard result format
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$modelExistsResponse = $this->createMock(Response::class);
 		$modelExistsResponse->method('getResult')->willReturn(Struct::fromData([['data' => [['count' => 0]]]]));
 
 		$insertResponse = $this->createMock(Response::class);
-		$insertResponse->method('getResult')->willReturn(Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']]));
+		$insertResponse->method('getResult')
+			->willReturn(Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']]));
 
-		$mockClient->expects($this->exactly(4)) // initializeTables (2 calls) + modelExists (1 call) + createModel (1 call)
+		$mockClient->expects($this->exactly(4))
 			->method('sendRequest')
 			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $modelExistsResponse, $insertResponse);
 		$handler->setManticoreClient($mockClient);
@@ -586,7 +598,8 @@ class ConversationHandlerTest extends TestCase {
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -603,10 +616,14 @@ class ConversationHandlerTest extends TestCase {
 
 		// Create mock responses for each call
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$selectResponse = $this->createMock(Response::class);
 		// getModelByUiidOrName expects getResult()[0]['data'][0] to be the model
@@ -647,7 +664,7 @@ class ConversationHandlerTest extends TestCase {
 		$struct = $result->getStruct();
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
-		$this->assertGreaterThan(0, count($struct[0]['data']));
+		$this->assertGreaterThan(0, sizeof($struct[0]['data']));
 	}
 
 	public function testEncryptionKeyFileIntegration(): void {
@@ -669,7 +686,8 @@ class ConversationHandlerTest extends TestCase {
 			$payload = RagPayload::fromRequest(
 				Request::fromArray(
 					[
-					'version' => Buddy::PROTOCOL_VERSION,
+					'version' =>
+					Buddy::PROTOCOL_VERSION,
 					'error' => '',
 					'payload' => $query,
 					'format' => RequestFormat::SQL,
@@ -686,16 +704,22 @@ class ConversationHandlerTest extends TestCase {
 
 			// Create mock responses
 			$initResponse1 = $this->createMock(Response::class);
-			$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+			$initResponse1->method('getResult')->willReturn(
+				Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+			);
 
 			$initResponse2 = $this->createMock(Response::class);
-			$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+			$initResponse2->method('getResult')->willReturn(
+				Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+			);
 
 			$modelExistsResponse = $this->createMock(Response::class);
 			$modelExistsResponse->method('getResult')->willReturn(Struct::fromData([['data' => [['count' => 0]]]]));
 
 			$insertResponse = $this->createMock(Response::class);
-			$insertResponse->method('getResult')->willReturn(Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']]));
+			$insertResponse->method('getResult')->willReturn(
+				Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']])
+			);
 
 			$mockClient->expects($this->exactly(4))
 				->method('sendRequest')
@@ -720,7 +744,7 @@ class ConversationHandlerTest extends TestCase {
 			$struct = $result->getStruct();
 			$this->assertCount(1, $struct);
 			$this->assertArrayHasKey('data', $struct[0]);
-			$this->assertGreaterThan(0, count($struct[0]['data']));
+			$this->assertGreaterThan(0, sizeof($struct[0]['data']));
 		} finally {
 			// Clean up the temporary key file
 			if (file_exists($tempKeyFile)) {
@@ -729,13 +753,14 @@ class ConversationHandlerTest extends TestCase {
 		}
 	}
 
-	public function testHandleConversation_NewQuestionGeneratesNewContext(): void {
+	public function testHandleConversationNewQuestionGeneratesNewContext(): void {
 		$query = "CALL CONVERSATIONAL_RAG('Show me action movies', 'movies', 'model-uuid', 'conv-uuid')";
 
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
+				'version' =>
+				Buddy::PROTOCOL_VERSION,
 				'error' => '',
 				'payload' => $query,
 				'format' => RequestFormat::SQL,
@@ -749,9 +774,17 @@ class ConversationHandlerTest extends TestCase {
 			$payload, $this->createMockLLMProviderManager(
 				[
 				['content' => 'NEW_SEARCH', 'success' => true, 'metadata' => []], // classifyIntent response
-				['content' => 'SEARCH_QUERY: action movies\nEXCLUDE_QUERY: none', 'success' => true, 'metadata' => []], // generateQueries response
+				[
+					'content' => 'SEARCH_QUERY: action movies\nEXCLUDE_QUERY: none',
+					'success' => true,
+					'metadata' => [],
+				], // generateQueries response
 				['content' => 'YES', 'success' => true, 'metadata' => []], // detectExpansionIntent response
-				['content' => 'Here are some action movies!', 'metadata' => ['tokens_used' => 120], 'success' => true], // generateResponse
+				[
+					'content' => 'Here are some action movies!',
+					'metadata' => ['tokens_used' => 120],
+					'success' => true,
+				], // generateResponse
 				]
 			)
 		);
@@ -913,9 +946,9 @@ class ConversationHandlerTest extends TestCase {
 			->willReturnCallback(
 				function ($sql) use (&$callCounter, $responses) {
 					echo 'DB Call #' . (++$callCounter) . ': ' . substr($sql, 0, 100) . "...\n";
-					if ($callCounter > count($responses)) {
+					if ($callCounter > sizeof($responses)) {
 						echo "ERROR: More calls than expected responses!\n";
-						echo 'Available responses: ' . count($responses) . "\n";
+						echo 'Available responses: ' . sizeof($responses) . "\n";
 						echo 'This is call #' . $callCounter . "\n";
 						throw new Exception("Unexpected database call #$callCounter");
 					}
@@ -928,7 +961,10 @@ class ConversationHandlerTest extends TestCase {
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
-		$this->assertTrue($task->isSucceed());
+		if (!$task->isSucceed()) {
+			$error = $task->getError();
+			$this->fail('Task failed: ' . ($error ? $error->getMessage() : 'Unknown error'));
+		}
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
@@ -940,5 +976,36 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertArrayHasKey('response', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('sources', $struct[0]['data'][0]);
 		$this->assertEquals('conv-uuid', $struct[0]['data'][0]['conversation_uuid']);
+	}
+
+	/**
+	 * Create a mock LLM provider manager with predefined responses
+	 *
+	 * @param array $responses Array of LLM response arrays
+	 * @return LLMProviderManager
+	 */
+	private function createMockLLMProviderManager(array $responses): LLMProviderManager {
+		$mockProviderManager = $this->createMock(LLMProviderManager::class);
+		$mockProvider = $this->createMock(BaseProvider::class);
+
+		$mockProviderManager->method('getConnection')->willReturn($mockProvider);
+
+		$callCount = 0;
+		$mockProvider->method('generateResponse')
+			->willReturnCallback(
+				function ($_prompt, $_options = []) use (&$responses, &$callCount) {
+					unset($_prompt, $_options);
+					if ($callCount >= sizeof($responses)) {
+						throw new \Exception(
+							'Too many LLM calls: expected ' . sizeof($responses) . ', got ' . ($callCount + 1)
+						);
+					}
+					$result = $responses[$callCount];
+					$callCount++;
+					return $result;
+				}
+			);
+
+		return $mockProviderManager;
 	}
 }

@@ -161,7 +161,7 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('test_model', $payload->params['model_name_or_uuid']);
 	}
 
-	public function testConversationalRagFlow_NewSearch(): void {
+	public function testConversationalRagFlowNewSearch(): void {
 		$query = "CALL CONVERSATIONAL_RAG('What is machine learning?', 'docs', 'test_model')";
 
 		$payload = RagPayload::fromRequest(
@@ -183,8 +183,9 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('test_model', $payload->params['model_uuid']);
 	}
 
-	public function testConversationalRagFlow_WithOptions(): void {
-		$query = "CALL CONVERSATIONAL_RAG('What is AI?', 'docs', 'test_model', '', '{\"temperature\": 0.8, \"max_tokens\": 2000, \"k_results\": 10}')";
+	public function testConversationalRagFlowWithOptions(): void {
+		$query = "CALL CONVERSATIONAL_RAG('What is AI?', 'docs', 'test_model', '', "
+			. "'{\"temperature\": 0.8, \"max_tokens\": 2000, \"k_results\": 10}')";
 
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
@@ -204,10 +205,13 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('docs', $payload->params['table']);
 		$this->assertEquals('test_model', $payload->params['model_uuid']);
 		$this->assertEquals('', $payload->params['conversation_uuid']);
-		$this->assertEquals(['temperature' => 0.8, 'max_tokens' => 2000, 'k_results' => 10], $payload->params['overrides']);
+		$this->assertEquals(
+			['temperature' => 0.8, 'max_tokens' => 2000, 'k_results' => 10],
+			$payload->params['overrides']
+		);
 	}
 
-	public function testConversationalRagFlow_WithTable(): void {
+	public function testConversationalRagFlowWithTable(): void {
 		$query = "CALL CONVERSATIONAL_RAG('Search this table', 'my_table', 'test_model')";
 
 		$payload = RagPayload::fromRequest(
@@ -333,12 +337,12 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('lifecycle_test', $dropPayload->params['model_name_or_uuid']);
 	}
 
-	public function testErrorHandling_InvalidSyntax(): void {
+	public function testErrorHandlingInvalidSyntax(): void {
 		// Test that invalid syntax is properly rejected during parsing
 		$query = 'CREATE RAG MODEL invalid syntax here';
 
 		try {
-			$payload = RagPayload::fromRequest(
+			RagPayload::fromRequest(
 				Request::fromArray(
 					[
 					'version' => Buddy::PROTOCOL_VERSION,

@@ -41,6 +41,22 @@ class LLMProviderManager {
 	}
 
 	/**
+	 * Create provider instance by name
+	 *
+	 * @param string $providerName
+	 * @return BaseProvider
+	 * @throws ManticoreSearchClientError
+	 */
+	private function createProvider(string $providerName): BaseProvider {
+		return match ($providerName) {
+			'openai' => new OpenAIProvider(),
+			default => throw ManticoreSearchClientError::create(
+				"Unsupported LLM provider: {$providerName}. Only 'openai' is supported."
+			)
+		};
+	}
+
+	/**
 	 * Get provider instance by name
 	 *
 	 * @param string $providerName
@@ -53,20 +69,6 @@ class LLMProviderManager {
 		}
 
 		return $this->providers[$providerName];
-	}
-
-	/**
-	 * Create provider instance by name
-	 *
-	 * @param string $providerName
-	 * @return BaseProvider
-	 * @throws ManticoreSearchClientError
-	 */
-	private function createProvider(string $providerName): BaseProvider {
-		return match ($providerName) {
-			'openai' => new OpenAIProvider(),
-			default => throw new ManticoreSearchClientError("Unsupported LLM provider: {$providerName}. Only 'openai' is supported.")
-		};
 	}
 
 

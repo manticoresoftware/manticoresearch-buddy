@@ -102,7 +102,10 @@ class DynamicThresholdManager {
 			Buddy::info("├─ Max threshold: {$maxThreshold} (+" . (self::MAX_EXPANSION_PERCENT * 100) . '%)');
 			Buddy::info("├─ Step size: {$step}");
 			Buddy::info("├─ Calculated threshold: {$threshold}");
-			Buddy::info('└─ Expansion percent: ' . round((($threshold - $baseThreshold) / $baseThreshold) * 100, 1) . '%');
+			Buddy::info(
+				'└─ Expansion percent: ' .
+				round((($threshold - $baseThreshold) / $baseThreshold) * 100, 1) . '%'
+			);
 
 			return [
 				'threshold' => $threshold,

@@ -19,7 +19,7 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use PHPUnit\Framework\TestCase;
 
-class ValidationTest extends TestCase {
+class ConversationValidationTest extends TestCase {
 	/**
 	 * @return void
 	 */
@@ -70,7 +70,9 @@ class ValidationTest extends TestCase {
 		$this->assertFalse($task->isSucceed(), 'Task should fail for missing llm_provider');
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error, 'Error should be QueryParseError');
-		$this->assertStringContainsString("Required field 'llm_provider' is missing or empty", $error->getResponseError());
+		$this->assertStringContainsString(
+			"Required field 'llm_provider' is missing or empty", $error->getResponseError()
+		);
 	}
 
 	public function testMissingRequiredFieldLlmModel(): void {
@@ -129,7 +131,9 @@ class ValidationTest extends TestCase {
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString("Invalid LLM provider: invalid_provider. Only 'openai' is supported.", $error->getResponseError());
+		$this->assertStringContainsString(
+			"Invalid LLM provider: invalid_provider. Only 'openai' is supported.", $error->getResponseError()
+		);
 	}
 
 	public function testTemperatureBelowMinimum(): void {

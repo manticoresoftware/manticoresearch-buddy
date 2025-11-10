@@ -30,7 +30,7 @@ class SearchEngineTest extends TestCase {
 		putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 	}
 
-	public function testDetectVectorField_WithFloatVector(): void {
+	public function testDetectVectorFieldWithFloatVector(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -67,7 +67,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertEquals('embedding', $result);
 	}
 
-	public function testDetectVectorField_WithCommonNames(): void {
+	public function testDetectVectorFieldWithCommonNames(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -104,7 +104,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertEquals('content_embedding', $result);
 	}
 
-	public function testDetectVectorField_NoVectorFields(): void {
+	public function testDetectVectorFieldNoVectorFields(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -141,7 +141,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertNull($result);
 	}
 
-	public function testPerformVectorSearch_Successful(): void {
+	public function testPerformVectorSearchSuccessful(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -197,9 +197,15 @@ class SearchEngineTest extends TestCase {
 			)
 		);
 
-		$mockClient->expects($this->exactly(5)) // schema (detect for exclusion), exclusion query, schema (detect for search), search query, schema (detect for filtering)
+		$mockClient->expects($this->exactly(5)) // schema, exclusion, schema, search, schema
 			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($schemaResponse, $exclusionResponse, $schemaResponse, $searchResponse, $schemaResponse);
+			->willReturnOnConsecutiveCalls(
+				$schemaResponse,
+				$exclusionResponse,
+				$schemaResponse,
+				$searchResponse,
+				$schemaResponse
+			);
 
 		$modelConfig = ['k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
 		$result = $searchEngine->performSearch(
@@ -217,7 +223,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertArrayNotHasKey('embedding', $result[0]); // Should be filtered out
 	}
 
-	public function testPerformVectorSearch_WithExclusions(): void {
+	public function testPerformVectorSearchWithExclusions(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -274,9 +280,15 @@ class SearchEngineTest extends TestCase {
 			)
 		);
 
-		$mockClient->expects($this->exactly(5)) // schema (detect for exclusion), exclusion query, schema (detect for search), search query, schema (detect for filtering)
+		$mockClient->expects($this->exactly(5)) // schema, exclusion, schema, search, schema
 			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($schemaResponse, $exclusionResponse, $schemaResponse, $searchResponse, $schemaResponse);
+			->willReturnOnConsecutiveCalls(
+				$schemaResponse,
+				$exclusionResponse,
+				$schemaResponse,
+				$searchResponse,
+				$schemaResponse
+			);
 
 		$modelConfig = ['k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
 		$result = $searchEngine->performSearch(
@@ -291,7 +303,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertCount(1, $result);
 	}
 
-	public function testPerformVectorSearch_NoVectorFields(): void {
+	public function testPerformVectorSearchNoVectorFields(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -330,7 +342,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertEmpty($result);
 	}
 
-	public function testGetVectorFields_Successful(): void {
+	public function testGetVectorFieldsSuccessful(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -371,7 +383,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertContains('title_embedding', $result);
 	}
 
-	public function testFilterVectorFields_RemovesEmbeddings(): void {
+	public function testFilterVectorFieldsRemovesEmbeddings(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -420,7 +432,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertArrayNotHasKey('embedding', $result[0]);
 	}
 
-	public function testEscapeString_HandlesSpecialChars(): void {
+	public function testEscapeStringHandlesSpecialChars(): void {
 		$searchEngine = new SearchEngine();
 
 		// Use reflection to access private method
@@ -435,7 +447,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertEquals('normal string', $result);
 	}
 
-	public function testGetExcludedIds_ReturnsCorrectIds(): void {
+	public function testGetExcludedIdsReturnsCorrectIds(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -489,7 +501,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertEquals([1, 2, 5], $result);
 	}
 
-	public function testGetExcludedIds_NoExclusions(): void {
+	public function testGetExcludedIdsNoExclusions(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -507,7 +519,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertEmpty($result);
 	}
 
-	public function testPerformSearchWithExcludedIds_SkipsExclusionSearch(): void {
+	public function testPerformSearchWithExcludedIdsSkipsExclusionSearch(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -548,9 +560,13 @@ class SearchEngineTest extends TestCase {
 			)
 		);
 
-		$mockClient->expects($this->exactly(3)) // schema (detect for search), search query, schema (detect for filtering)
+		$mockClient->expects($this->exactly(3)) // schema, search, schema
 			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($schemaResponse, $searchResponse, $schemaResponse);
+			->willReturnOnConsecutiveCalls(
+				$schemaResponse,
+				$searchResponse,
+				$schemaResponse
+			);
 
 		$modelConfig = ['k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
 		$result = $searchEngine->performSearchWithExcludedIds(
@@ -569,7 +585,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertArrayNotHasKey('embedding', $result[0]); // Should be filtered out
 	}
 
-	public function testGetExcludedIds_BuildsCorrectSQL(): void {
+	public function testGetExcludedIdsBuildsCorrectSQL(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
@@ -605,9 +621,10 @@ class SearchEngineTest extends TestCase {
 						return $schemaResponse;
 					}
 				// Verify the exclusion SQL matches actual implementation
-					if (strpos($sql, 'SELECT id FROM test_table') !== false
-					&& strpos($sql, "WHERE knn(embedding, 15, 'exclude query')") !== false
-					&& strpos($sql, 'AND knn_dist < 0.75') !== false) {
+					if (str_contains($sql, 'SELECT id FROM test_table')
+					&& str_contains($sql, "WHERE knn(embedding, 15, 'exclude query')")
+					&& str_contains($sql, 'AND knn_dist < 0.75')
+					) {
 						return $exclusionResponse;
 					}
 					throw new \Exception("Unexpected SQL: $sql");

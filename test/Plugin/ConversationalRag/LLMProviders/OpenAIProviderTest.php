@@ -36,7 +36,7 @@ class OpenAIProviderTest extends TestCase {
 		$this->assertContains('gpt-3.5-turbo', $models);
 	}
 
-	public function testGenerateResponse_MissingApiKey(): void {
+	public function testGenerateResponseMissingApiKey(): void {
 		$this->provider->configure(['llm_provider' => 'openai']);
 		putenv('OPENAI_API_KEY'); // Remove API key
 
@@ -47,7 +47,7 @@ class OpenAIProviderTest extends TestCase {
 		$this->assertStringContainsString('not found or empty', $result['details'] ?? $result['error']);
 	}
 
-	public function testGenerateResponse_DefaultModel(): void {
+	public function testGenerateResponseDefaultModel(): void {
 		$this->provider->configure(['llm_provider' => 'openai']);
 
 		// Create a partial mock to avoid actual HTTP calls
@@ -72,7 +72,7 @@ class OpenAIProviderTest extends TestCase {
 		$this->assertEquals('Default model response', $result['content']);
 	}
 
-	public function testGenerateResponse_CustomSettings(): void {
+	public function testGenerateResponseCustomSettings(): void {
 		$mockProvider = $this->getMockBuilder(OpenAIProvider::class)
 			->onlyMethods(['makeRequest'])
 			->getMock();
@@ -102,7 +102,7 @@ class OpenAIProviderTest extends TestCase {
 		$this->assertEquals('Custom settings response', $result['content']);
 	}
 
-	public function testGenerateResponse_MakeRequestFailure(): void {
+	public function testGenerateResponseMakeRequestFailure(): void {
 		$mockProvider = $this->getMockBuilder(OpenAIProvider::class)
 			->onlyMethods(['makeRequest'])
 			->getMock();
@@ -119,7 +119,7 @@ class OpenAIProviderTest extends TestCase {
 		$this->assertEquals('API Error', $result['error']);
 	}
 
-	public function testGenerateResponse_ExceptionHandling(): void {
+	public function testGenerateResponseExceptionHandling(): void {
 		$mockProvider = $this->getMockBuilder(OpenAIProvider::class)
 			->onlyMethods(['getApiKey'])
 			->getMock();
@@ -136,7 +136,7 @@ class OpenAIProviderTest extends TestCase {
 		$this->assertStringContainsString('OpenAI request failed', $result['error']);
 	}
 
-	public function testCreateClient_ReturnsCurlHandle(): void {
+	public function testCreateClientReturnsCurlHandle(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('createClient');

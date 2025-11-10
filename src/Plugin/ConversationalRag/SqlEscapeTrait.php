@@ -16,16 +16,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
  */
 trait SqlEscapeTrait {
 	/**
-	 * Escape string values for SQL queries using backslash escaping for ManticoreSearch
-	 *
-	 * @param string $value
-	 * @return string
-	 */
-	protected function sqlEscape(string $value): string {
-		return str_replace("'", "\\'", $value);
-	}
-
-	/**
 	 * Quote and escape a string value for SQL queries
 	 *
 	 * @param string $value
@@ -33,5 +23,15 @@ trait SqlEscapeTrait {
 	 */
 	protected function quote(string $value): string {
 		return "'" . $this->sqlEscape($value) . "'";
+	}
+
+	/**
+	 * Escape string values for SQL queries using backslash escaping for ManticoreSearch
+	 *
+	 * @param string $value
+	 * @return string
+	 */
+	protected function sqlEscape(string $value): string {
+		return str_replace("'", "\\'", $value);
 	}
 }

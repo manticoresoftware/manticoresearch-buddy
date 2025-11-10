@@ -10,6 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\IntentClassifier;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\BaseProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -28,10 +29,11 @@ class IntentClassifierTest extends TestCase {
 		putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 	}
 
-	public function testClassifyIntent_Rejection(): void {
+	public function testClassifyIntentRejection(): void {
 		$intentClassifier = new IntentClassifier();
 
 		// Mock LLM provider
+		/** @var BaseProvider $mockProvider */
 		$mockProvider = $this->createMock(BaseProvider::class);
 		$mockProvider->method('generateResponse')
 			->willReturn(
@@ -42,7 +44,9 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -51,7 +55,6 @@ class IntentClassifierTest extends TestCase {
 		$result = $intentClassifier->classifyIntent(
 			'I already watched that movie',
 			"user: I want to watch a comedy\nassistant: I recommend The Office\nuser: I already watched that",
-			[],
 			$mockProviderManager,
 			$modelConfig
 		);
@@ -60,7 +63,7 @@ class IntentClassifierTest extends TestCase {
 		$this->assertIsFloat($result['confidence']);
 	}
 
-	public function testClassifyIntent_Alternatives(): void {
+	public function testClassifyIntentAlternatives(): void {
 		$intentClassifier = new IntentClassifier();
 
 		// Mock LLM provider
@@ -74,7 +77,9 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -83,7 +88,6 @@ class IntentClassifierTest extends TestCase {
 		$result = $intentClassifier->classifyIntent(
 			'What else do you have?',
 			"user: Show me comedies\nassistant: I recommend The Office\nuser: What else do you have?",
-			[],
 			$mockProviderManager,
 			$modelConfig
 		);
@@ -91,7 +95,7 @@ class IntentClassifierTest extends TestCase {
 		$this->assertEquals('ALTERNATIVES', $result['intent']);
 	}
 
-	public function testClassifyIntent_NewSearch(): void {
+	public function testClassifyIntentNewSearch(): void {
 		$intentClassifier = new IntentClassifier();
 
 		// Mock LLM provider
@@ -105,7 +109,9 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -114,7 +120,6 @@ class IntentClassifierTest extends TestCase {
 		$result = $intentClassifier->classifyIntent(
 			'Show me action movies',
 			'', // No conversation history
-			[],
 			$mockProviderManager,
 			$modelConfig
 		);
@@ -122,7 +127,7 @@ class IntentClassifierTest extends TestCase {
 		$this->assertEquals('NEW_SEARCH', $result['intent']);
 	}
 
-	public function testClassifyIntent_LLMFailure(): void {
+	public function testClassifyIntentLLMFailure(): void {
 		$intentClassifier = new IntentClassifier();
 
 		// Mock LLM provider that fails
@@ -136,7 +141,9 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -145,7 +152,6 @@ class IntentClassifierTest extends TestCase {
 		$result = $intentClassifier->classifyIntent(
 			'What movies do you recommend?',
 			'',
-			[],
 			$mockProviderManager,
 			$modelConfig
 		);
@@ -155,7 +161,7 @@ class IntentClassifierTest extends TestCase {
 		$this->assertArrayHasKey('error', $result);
 	}
 
-	public function testGenerateQueries_WithExclusions(): void {
+	public function testGenerateQueriesWithExclusions(): void {
 		$intentClassifier = new IntentClassifier();
 
 		// Mock LLM provider
@@ -169,7 +175,9 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -187,7 +195,7 @@ class IntentClassifierTest extends TestCase {
 		$this->assertEquals('comedy movies', $result['exclude_query']);
 	}
 
-	public function testGenerateQueries_NoExclusions(): void {
+	public function testGenerateQueriesNoExclusions(): void {
 		$intentClassifier = new IntentClassifier();
 
 		// Mock LLM provider
@@ -201,7 +209,9 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -219,7 +229,7 @@ class IntentClassifierTest extends TestCase {
 		$this->assertEquals('', $result['exclude_query']); // Should be empty when 'none'
 	}
 
-	public function testGenerateQueries_IntentBased(): void {
+	public function testGenerateQueriesIntentBased(): void {
 		$intentClassifier = new IntentClassifier();
 
 		// Mock LLM provider
@@ -233,7 +243,9 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -251,7 +263,7 @@ class IntentClassifierTest extends TestCase {
 		$this->assertEquals('Inception', $result['exclude_query']);
 	}
 
-	public function testLimitConversationHistory_ShortHistory(): void {
+	public function testLimitConversationHistoryShortHistory(): void {
 		$intentClassifier = new IntentClassifier();
 
 		$shortHistory = "user: hello\nassistant: hi\nuser: how are you?\nassistant: good";
@@ -266,7 +278,7 @@ class IntentClassifierTest extends TestCase {
 		$this->assertEquals($shortHistory, $result);
 	}
 
-	public function testLimitConversationHistory_LongHistory(): void {
+	public function testLimitConversationHistoryLongHistory(): void {
 		$intentClassifier = new IntentClassifier();
 
 		// Create history with more than 10 exchanges (20 lines)
@@ -283,15 +295,18 @@ class IntentClassifierTest extends TestCase {
 		$result = $method->invoke($intentClassifier, $longHistory);
 
 		$lines = explode("\n", trim($result));
-		$this->assertGreaterThanOrEqual(18, count($lines)); // Should be limited, at least 9 exchanges (18 lines)
-		$this->assertLessThanOrEqual(20, count($lines)); // Should not exceed 10 exchanges (20 lines)
+		$this->assertGreaterThanOrEqual(18, sizeof($lines)); // Should be limited, at least 9 exchanges (18 lines)
+		$this->assertLessThanOrEqual(20, sizeof($lines)); // Should not exceed 10 exchanges (20 lines)
 		$this->assertStringContainsString('message', $result); // Should contain messages
 	}
 
-	public function testValidateIntent_ValidIntents(): void {
+	public function testValidateIntentValidIntents(): void {
 		$intentClassifier = new IntentClassifier();
 
-		$validIntents = ['REJECTION', 'ALTERNATIVES', 'TOPIC_CHANGE', 'INTEREST', 'NEW_SEARCH', 'CONTENT_QUESTION', 'NEW_QUESTION', 'CLARIFICATION', 'UNCLEAR'];
+		$validIntents = [
+			'REJECTION', 'ALTERNATIVES', 'TOPIC_CHANGE', 'INTEREST', 'NEW_SEARCH',
+			'CONTENT_QUESTION', 'NEW_QUESTION', 'CLARIFICATION', 'UNCLEAR',
+		];
 
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($intentClassifier);

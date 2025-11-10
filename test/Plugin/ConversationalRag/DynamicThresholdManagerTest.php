@@ -10,6 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\DynamicThresholdManager;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\BaseProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -28,7 +29,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 	}
 
-	public function testCalculateDynamicThreshold_NoExpansion(): void {
+	public function testCalculateDynamicThresholdNoExpansion(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that says no expansion
@@ -42,7 +43,9 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -62,7 +65,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$this->assertEquals(0, $result['expansion_percent']);
 	}
 
-	public function testCalculateDynamicThreshold_WithExpansion(): void {
+	public function testCalculateDynamicThresholdWithExpansion(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that says yes to expansion
@@ -76,7 +79,9 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -96,7 +101,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$this->assertGreaterThan(0, $result['expansion_percent']);
 	}
 
-	public function testCalculateDynamicThreshold_MaxExpansion(): void {
+	public function testCalculateDynamicThresholdMaxExpansion(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that always says yes
@@ -110,7 +115,9 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -132,11 +139,13 @@ class DynamicThresholdManagerTest extends TestCase {
 		$this->assertEquals(0.8 * 1.2, $result['max_threshold']); // 20% expansion
 	}
 
-	public function testDetectExpansionIntent_NoHistory(): void {
+	public function testDetectExpansionIntentNoHistory(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
 		$mockProvider = $this->createMock(BaseProvider::class);
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -152,7 +161,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$this->assertFalse($result); // Should be false with no history
 	}
 
-	public function testDetectExpansionIntent_WithHistory(): void {
+	public function testDetectExpansionIntentWithHistory(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that says yes
@@ -166,7 +175,9 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -186,7 +197,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$this->assertTrue($result);
 	}
 
-	public function testDetectExpansionIntent_LLMFailure(): void {
+	public function testDetectExpansionIntentLLMFailure(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that fails
@@ -200,7 +211,9 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -220,7 +233,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$this->assertFalse($result); // Should return false on failure
 	}
 
-	public function testExpansionStateReset_OnNewConversation(): void {
+	public function testExpansionStateResetOnNewConversation(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that says yes
@@ -234,7 +247,9 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 
@@ -263,7 +278,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$this->assertEquals(1, $result2['expansion_level']); // Should be 1, not 2
 	}
 
-	public function testExpansionStateReset_OnTopicChange(): void {
+	public function testExpansionStateResetOnTopicChange(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider - first says yes, then no (topic change)
@@ -275,7 +290,9 @@ class DynamicThresholdManagerTest extends TestCase {
 				['success' => true, 'content' => 'no', 'metadata' => []]
 			);
 
-		$mockProviderManager = $this->createMock(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager::class);
+		$mockProviderManager = $this->createMock(
+			LLMProviderManager::class
+		);
 		$mockProviderManager->method('getConnection')
 			->willReturn($mockProvider);
 

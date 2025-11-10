@@ -11,10 +11,12 @@
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\BaseProvider;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\OpenAIProvider;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use PHPUnit\Framework\TestCase;
 
 class LLMProviderManagerTest extends TestCase {
-	public function testGetConnection_CachesInstances(): void {
+	public function testGetConnectionCachesInstances(): void {
 		$manager = new LLMProviderManager();
 
 		$modelId = 'test-model-123';
@@ -34,7 +36,7 @@ class LLMProviderManagerTest extends TestCase {
 		$this->assertInstanceOf(BaseProvider::class, $connection1);
 	}
 
-	public function testGetConnection_CreatesNewInstanceForDifferentModel(): void {
+	public function testGetConnectionCreatesNewInstanceForDifferentModel(): void {
 		$manager = new LLMProviderManager();
 
 		$modelConfig1 = [
@@ -58,7 +60,7 @@ class LLMProviderManagerTest extends TestCase {
 		$this->assertInstanceOf(BaseProvider::class, $connection2);
 	}
 
-	public function testGetProvider_CachesInstances(): void {
+	public function testGetProviderCachesInstances(): void {
 		$manager = new LLMProviderManager();
 
 		// Get provider twice
@@ -70,24 +72,27 @@ class LLMProviderManagerTest extends TestCase {
 		$this->assertInstanceOf(BaseProvider::class, $provider1);
 	}
 
-	public function testGetProvider_OpenAI(): void {
+	public function testGetProviderOpenAI(): void {
 		$manager = new LLMProviderManager();
 
 		$provider = $manager->getProvider('openai');
 
 		$this->assertInstanceOf(BaseProvider::class, $provider);
-		$this->assertInstanceOf(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\OpenAIProvider::class, $provider);
+		$this->assertInstanceOf(
+			OpenAIProvider::class,
+			$provider
+		);
 	}
 
-	public function testGetProvider_UnsupportedProvider(): void {
+	public function testGetProviderUnsupportedProvider(): void {
 		$manager = new LLMProviderManager();
 
-		$this->expectException(\Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError::class);
+		$this->expectException(ManticoreSearchClientError::class);
 
 		$manager->getProvider('unsupported');
 	}
 
-	public function testCreateProvider_OpenAI(): void {
+	public function testCreateProviderOpenAI(): void {
 		$manager = new LLMProviderManager();
 
 		// Use reflection to access private method
@@ -98,10 +103,13 @@ class LLMProviderManagerTest extends TestCase {
 		$provider = $method->invoke($manager, 'openai');
 
 		$this->assertInstanceOf(BaseProvider::class, $provider);
-		$this->assertInstanceOf(\Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\OpenAIProvider::class, $provider);
+		$this->assertInstanceOf(
+			OpenAIProvider::class,
+			$provider
+		);
 	}
 
-	public function testCreateProvider_UnsupportedProvider(): void {
+	public function testCreateProviderUnsupportedProvider(): void {
 		$manager = new LLMProviderManager();
 
 		// Use reflection to access private method
@@ -109,7 +117,7 @@ class LLMProviderManagerTest extends TestCase {
 		$method = $reflection->getMethod('createProvider');
 		$method->setAccessible(true);
 
-		$this->expectException(\Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError::class);
+		$this->expectException(ManticoreSearchClientError::class);
 
 		$method->invoke($manager, 'unsupported');
 	}

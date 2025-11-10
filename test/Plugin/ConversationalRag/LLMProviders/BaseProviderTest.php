@@ -9,29 +9,8 @@
   program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\BaseProvider;
+use Manticoresearch\BuddyTest\LLMProviders\TestableBaseProvider;
 use PHPUnit\Framework\TestCase;
-
-/**
- * Concrete implementation of BaseProvider for testing
- */
-class TestableBaseProvider extends BaseProvider {
-	public function generateResponse(string $prompt, array $options = []): array {
-		return ['success' => true, 'content' => 'test response'];
-	}
-
-	public function getSupportedModels(): array {
-		return ['test-model'];
-	}
-
-	protected function createClient(): object {
-		return (object)['test' => 'client'];
-	}
-
-	public function getName(): string {
-		return 'test_provider';
-	}
-}
 
 class BaseProviderTest extends TestCase {
 	private TestableBaseProvider $provider;
@@ -46,7 +25,7 @@ class BaseProviderTest extends TestCase {
 		putenv('ANTHROPIC_API_KEY');
 	}
 
-	public function testConfigure_ResetsClient(): void {
+	public function testConfigureResetsClient(): void {
 		$config = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
 		// Configure once
@@ -67,7 +46,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertNotSame($client1, $client2);
 	}
 
-	public function testValidateConfig_MissingFields(): void {
+	public function testValidateConfigMissingFields(): void {
 		$config = ['field1' => 'value1'];
 		$required = ['field1', 'field2'];
 
@@ -82,7 +61,7 @@ class BaseProviderTest extends TestCase {
 		$method->invoke($this->provider, $config, $required);
 	}
 
-	public function testValidateConfig_AllFieldsPresent(): void {
+	public function testValidateConfigAllFieldsPresent(): void {
 		$config = ['field1' => 'value1', 'field2' => 'value2'];
 		$required = ['field1', 'field2'];
 
@@ -96,7 +75,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertTrue(true); // If we get here, test passes
 	}
 
-	public function testGetSettings_MergesOverrides(): void {
+	public function testGetSettingsMergesOverrides(): void {
 		$config = [
 			'settings' => ['temperature' => 0.5, 'max_tokens' => 500],
 			'temperature' => 0.7,
@@ -119,7 +98,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals(0.1, $result['frequency_penalty']); // From overrides
 	}
 
-	public function testGetSettings_FromJsonString(): void {
+	public function testGetSettingsFromJsonString(): void {
 		$config = [
 			'settings' => '{"temperature":0.6,"max_tokens":600}',
 			'temperature' => 0.7, // This should override the JSON
@@ -138,7 +117,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals(600, $result['max_tokens']); // From JSON
 	}
 
-	public function testConvertSettingsTypes_NumericStrings(): void {
+	public function testConvertSettingsTypesNumericStrings(): void {
 		$settings = [
 			'temperature' => '0.7',
 			'max_tokens' => '1000',
@@ -165,7 +144,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals('text', $result['non_numeric']); // Unchanged
 	}
 
-	public function testConvertToFloat_ValidNumeric(): void {
+	public function testConvertToFloatValidNumeric(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('convertToFloat');
@@ -177,7 +156,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals(3.14, $method->invoke($this->provider, 3.14)); // Already float
 	}
 
-	public function testConvertToInt_ValidNumeric(): void {
+	public function testConvertToIntValidNumeric(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('convertToInt');
@@ -189,7 +168,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals(42, $method->invoke($this->provider, 42)); // Already int
 	}
 
-	public function testGetConfig_WithDefault(): void {
+	public function testGetConfigWithDefault(): void {
 		$config = ['existing_key' => 'value'];
 		$this->provider->configure($config);
 
@@ -210,7 +189,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals(3, $this->provider->estimateTokens('abcdefghijk')); // 12 chars / 4 = 3
 	}
 
-	public function testGetStylePrompt_Default(): void {
+	public function testGetStylePromptDefault(): void {
 		$this->provider->configure([]);
 
 		// Use reflection to access protected method
@@ -222,7 +201,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertStringContainsString('helpful AI assistant', $result);
 	}
 
-	public function testGetStylePrompt_Custom(): void {
+	public function testGetStylePromptCustom(): void {
 		$this->provider->configure(['style_prompt' => 'Custom prompt']);
 
 		// Use reflection to access protected method
@@ -275,7 +254,7 @@ class BaseProviderTest extends TestCase {
 		);
 	}
 
-	public function testGetApiKeyForProvider_Valid(): void {
+	public function testGetApiKeyForProviderValid(): void {
 		putenv('OPENAI_API_KEY=test-key-123');
 
 		$this->provider->configure(['llm_provider' => 'openai']);
@@ -289,7 +268,7 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals('test-key-123', $result);
 	}
 
-	public function testGetApiKeyForProvider_UnsupportedProvider(): void {
+	public function testGetApiKeyForProviderUnsupportedProvider(): void {
 		$this->provider->configure(['llm_provider' => 'openai']);
 
 		// Use reflection to access private method
@@ -303,7 +282,7 @@ class BaseProviderTest extends TestCase {
 		$method->invoke($this->provider, 'unsupported');
 	}
 
-	public function testGetApiKeyForProvider_MissingEnvVar(): void {
+	public function testGetApiKeyForProviderMissingEnvVar(): void {
 		$this->provider->configure(['llm_provider' => 'openai']);
 
 		// Use reflection to access private method

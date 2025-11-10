@@ -30,7 +30,7 @@ class ConversationManagerTest extends TestCase {
 		putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 	}
 
-	public function testInitializeTable_CreatesTable(): void {
+	public function testInitializeTableCreatesTable(): void {
 		$conversationManager = new ConversationManager($this->createMock(HTTPClient::class));
 
 		// Mock HTTP client
@@ -48,7 +48,7 @@ class ConversationManagerTest extends TestCase {
 		$conversationManager->initializeTable($mockClient);
 	}
 
-	public function testInitializeTable_AlreadyExists(): void {
+	public function testInitializeTableAlreadyExists(): void {
 		$conversationManager = new ConversationManager($this->createMock(HTTPClient::class));
 
 		// Mock HTTP client
@@ -66,7 +66,7 @@ class ConversationManagerTest extends TestCase {
 		$conversationManager->initializeTable($mockClient);
 	}
 
-	public function testSaveMessage_Successful(): void {
+	public function testSaveMessageSuccessful(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
@@ -100,7 +100,7 @@ class ConversationManagerTest extends TestCase {
 		);
 	}
 
-	public function testGetConversationHistory_Ordered(): void {
+	public function testGetConversationHistoryOrdered(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
@@ -136,7 +136,7 @@ class ConversationManagerTest extends TestCase {
 	}
 
 
-	public function testGetConversationHistory_Empty(): void {
+	public function testGetConversationHistoryEmpty(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
@@ -164,7 +164,7 @@ class ConversationManagerTest extends TestCase {
 		$this->assertEquals('', $result);
 	}
 
-	public function testGetConversationHistory_WithLimit(): void {
+	public function testGetConversationHistoryWithLimit(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
@@ -198,7 +198,7 @@ class ConversationManagerTest extends TestCase {
 		$this->assertEquals($expected, $result);
 	}
 
-	public function testGetLatestSearchContext_ReturnsCorrectData(): void {
+	public function testGetLatestSearchContextReturnsCorrectData(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
@@ -242,7 +242,7 @@ class ConversationManagerTest extends TestCase {
 		$this->assertEquals('[1,2,3]', $result['excluded_ids']);
 	}
 
-	public function testGetLatestSearchContext_NoContextFound(): void {
+	public function testGetLatestSearchContextNoContextFound(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
@@ -270,7 +270,7 @@ class ConversationManagerTest extends TestCase {
 		$this->assertNull($result);
 	}
 
-	public function testGetConversationHistoryForQueryGeneration_FiltersContentQuestions(): void {
+	public function testGetConversationHistoryForQueryGenerationFiltersContentQuestions(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
@@ -307,11 +307,13 @@ class ConversationManagerTest extends TestCase {
 		$result = $conversationManager->getConversationHistoryForQueryGeneration('conv-123');
 
 		// Should exclude the CONTENT_QUESTION exchange
-		$expected = "user: Show me movies about space\nassistant: Here are some space movies...\nuser: Show me more like this\n";
+		$expected = "user: Show me movies about space\n" .
+			"assistant: Here are some space movies...\n" .
+			"user: Show me more like this\n";
 		$this->assertEquals($expected, $result);
 	}
 
-	public function testSaveMessageWithSearchContext_StoresAllFields(): void {
+	public function testSaveMessageWithSearchContextStoresAllFields(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 

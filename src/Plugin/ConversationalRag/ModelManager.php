@@ -102,7 +102,8 @@ class ModelManager {
 			// Insert model
 			$currentTime = time();
 			$sql = sprintf(
-				'INSERT INTO %s (uuid, name, llm_provider, llm_model, style_prompt, settings, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %d, %d)',
+				'INSERT INTO %s (uuid, name, llm_provider, llm_model, style_prompt, settings, created_at, updated_at) '.
+				'VALUES (%s, %s, %s, %s, %s, %s, %d, %d)',
 				self::MODELS_TABLE,
 				$this->quote($modelUuid),
 				$this->quote($config['name']),
@@ -261,7 +262,8 @@ class ModelManager {
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	public function getModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): ?array {
-		$sql = /** @lang Manticore */ 'SELECT * FROM ' . self::MODELS_TABLE . ' WHERE (name = ' . $this->quote($modelNameOrUuid) . ' OR uuid = ' . $this->quote($modelNameOrUuid) . ')';
+		$sql = /** @lang Manticore */ 'SELECT * FROM ' . self::MODELS_TABLE .
+			' WHERE (name = ' . $this->quote($modelNameOrUuid) . ' OR uuid = ' . $this->quote($modelNameOrUuid) . ')';
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {

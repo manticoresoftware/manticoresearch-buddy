@@ -46,7 +46,11 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError
 	 */
 	public function run(): Task {
-		$taskFn = static function (Payload $payload, Client $client, ?LLMProviderManager $injectedProviderManager): TaskResult {
+		$taskFn = static function (
+			Payload $payload,
+			Client $client,
+			?LLMProviderManager $injectedProviderManager
+		): TaskResult {
 			// Initialize components with the client
 			$modelManager = new ModelManager();
 			$providerManager = $injectedProviderManager ?? new LLMProviderManager();
@@ -84,7 +88,11 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	private static function initializeTables(ModelManager $modelManager, ConversationManager $conversationManager, Client $client): void {
+	private static function initializeTables(
+		ModelManager $modelManager,
+		ConversationManager $conversationManager,
+		Client $client
+	): void {
 		$modelManager->initializeTables($client);
 		$conversationManager->initializeTable($client);
 	}
@@ -120,6 +128,21 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws QueryParseError
 	 */
 	private static function validateModelConfig(array $config): void {
+		self::validateRequiredFields($config);
+		self::validateLlmProvider($config);
+		self::validateTemperature($config);
+		self::validateMaxTokens($config);
+		self::validateKResults($config);
+	}
+
+	/**
+	 * Validate required fields
+	 *
+	 * @param array $config
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private static function validateRequiredFields(array $config): void {
 		$required = ['llm_provider', 'llm_model'];
 
 		foreach ($required as $field) {
@@ -127,29 +150,68 @@ final class Handler extends BaseHandlerWithClient {
 				throw QueryParseError::create("Required field '{$field}' is missing or empty");
 			}
 		}
+	}
 
+	/**
+	 * Validate LLM provider
+	 *
+	 * @param array $config
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private static function validateLlmProvider(array $config): void {
 		$validProviders = ['openai'];
 		if (!in_array($config['llm_provider'], $validProviders)) {
 			throw QueryParseError::create(
 				"Invalid LLM provider: {$config['llm_provider']}. Only 'openai' is supported."
 			);
 		}
+	}
 
-		// Validate numeric parameters
-		if (isset($config['temperature'])) {
-			$temp = (float)$config['temperature'];
-			if ($temp < 0 || $temp > 2) {
-				throw QueryParseError::create('Temperature must be between 0 and 2');
-			}
+	/**
+	 * Validate temperature parameter
+	 *
+	 * @param array $config
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private static function validateTemperature(array $config): void {
+		if (!isset($config['temperature'])) {
+			return;
 		}
 
-		if (isset($config['max_tokens'])) {
-			$tokens = (int)$config['max_tokens'];
-			if ($tokens < 1 || $tokens > 32768) {
-				throw QueryParseError::create('max_tokens must be between 1 and 32768');
-			}
+		$temp = (float)$config['temperature'];
+		if ($temp < 0 || $temp > 2) {
+			throw QueryParseError::create('Temperature must be between 0 and 2');
+		}
+	}
+
+	/**
+	 * Validate max_tokens parameter
+	 *
+	 * @param array $config
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private static function validateMaxTokens(array $config): void {
+		if (!isset($config['max_tokens'])) {
+			return;
 		}
 
+		$tokens = (int)$config['max_tokens'];
+		if ($tokens < 1 || $tokens > 32768) {
+			throw QueryParseError::create('max_tokens must be between 1 and 32768');
+		}
+	}
+
+	/**
+	 * Validate k_results parameter
+	 *
+	 * @param array $config
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private static function validateKResults(array $config): void {
 		if (!isset($config['k_results'])) {
 			return;
 		}
@@ -276,204 +338,53 @@ final class Handler extends BaseHandlerWithClient {
 		SearchEngine $searchEngine,
 		Client $client
 	): TaskResult {
+		$params = self::parseCallRagParams($payload);
+		$conversationUuid = self::ensureConversationUuid($params);
+		$model = self::getModel($modelManager, $client, $params['model_uuid']);
 
-			$params = self::parseCallRagParams($payload);
+		self::logConversationStart($conversationUuid);
+		$conversationHistory = $conversationManager->getConversationHistory($conversationUuid);
+		self::logConversationHistory($conversationHistory);
 
-			// Generate UUID if conversation_uuid not provided
-		if (empty($params['conversation_uuid'])) {
-			$params['conversation_uuid'] = self::generateUuid();
-		}
+		$intent = self::classifyIntent(
+			$intentClassifier, $params['query'], $conversationHistory, $providerManager, $model
+		);
 
-			$conversationUuid = $params['conversation_uuid'];
+		$effectiveSettings = self::getEffectiveSettings($model, $params['overrides']);
+		[$searchResults, $queries, $excludedIds] = self::performSearch(
+			$intent, $params, $conversationHistory, $conversationManager,
+			$conversationUuid, $providerManager, $model, $searchEngine, $client
+		);
 
-			$model = $modelManager->getModelByUuidOrName($client, $params['model_uuid']);
-		if (!$model) {
-			throw ManticoreSearchClientError::create('Model not found');
-		}
+		self::logPreprocessingResults($params, $intent, $queries);
+		$context = self::buildContext($searchResults, $effectiveSettings);
+		self::logContextBuilding($searchResults, $context, $effectiveSettings);
 
+		$response = self::generateResponse(
+			$model, $params['query'], $context, $conversationHistory, $effectiveSettings, $providerManager
+		);
 
-			// Debug: Log conversation history usage
-			Buddy::info("\n[DEBUG CONVERSATION FLOW]");
-			Buddy::info('├─ Starting conversation processing');
-			Buddy::info("├─ Conversation UUID: {$conversationUuid}");
-
-			$conversationHistory = $conversationManager->getConversationHistory($conversationUuid);
-
-			Buddy::info('├─ Retrieved history for intent classification');
-			Buddy::info('├─ History length: ' . strlen($conversationHistory) . ' chars');
-
-			// Step 1: Classify intent using LLM
-			$intentResult = $intentClassifier->classifyIntent(
-				$params['query'], $conversationHistory, [], $providerManager, $model
-			);
-			$intent = $intentResult['intent'];
-
-			Buddy::info("├─ Intent classified: {$intent}");
-
-			// Merge model settings with overrides
-			$modelSettings = is_string($model['settings'])
-				? json_decode($model['settings'], true) ?? []
-				: $model['settings'];
-			$effectiveSettings = array_merge($modelSettings, $params['overrides']);
-
-			// Step 2: Handle search context based on intent
-			$searchResults = [];
-			$queries = ['search_query' => '', 'exclude_query' => ''];
-
-		if ($intent === 'CONTENT_QUESTION') {
-			Buddy::info('├─ Processing CONTENT_QUESTION intent');
-			// Reuse latest non-CONTENT_QUESTION search context
-			$lastContext = $conversationManager->getLatestSearchContext($conversationUuid);
-
-			if ($lastContext) {
-				Buddy::info('├─ Found previous search context to reuse');
-				$queries = [
-					'search_query' => $lastContext['search_query'],
-					'exclude_query' => $lastContext['exclude_query'],
-				];
-
-				// Calculate dynamic threshold using LLM
-				$thresholdManager = new DynamicThresholdManager();
-				$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-					$params['query'],
-					$conversationHistory,
-					$providerManager,
-					$model
-				);
-
-				// Use stored excluded IDs and perform KNN search with previous parameters
-				$excludedIds = json_decode($lastContext['excluded_ids'], true) ?? [];
-
-				// For CONTENT_QUESTION, perform KNN search using previous search query parameters
-				$searchResults = $searchEngine->performSearchWithExcludedIds(
-					$client,
-					$params['table'],
-					$queries['search_query'],  // Previous search query
-					$excludedIds,              // Previous excluded IDs
-					$model,
-					['overrides' => $params['overrides']],
-					$thresholdInfo['threshold']
-				);
-				Buddy::info('├─ CONTENT_QUESTION performed KNN search with previous query parameters');
-			} else {
-				Buddy::info('├─ No previous search context found, falling back to NEW_SEARCH');
-				// No valid previous context found, fallback to NEW_SEARCH
-				$intent = 'NEW_SEARCH';
-				// Continue with NEW_SEARCH logic below
-			}
-		}
-
-			// Handle all intents except CONTENT_QUESTION (which has special handling above)
-		if ($intent !== 'CONTENT_QUESTION') {
-			Buddy::info("├─ Processing query-generating intent: {$intent}");
-			// Use filtered history for query generation (excludes CONTENT_QUESTION pollution)
-			$cleanHistory = $conversationManager->getConversationHistoryForQueryGeneration($conversationUuid);
-
-			Buddy::info('├─ Using filtered history for query generation');
-			Buddy::info('├─ Clean history length: ' . strlen($cleanHistory) . ' chars');
-
-			// Generate search and exclusion queries using LLM
-			$queries = $intentClassifier->generateQueries(
-				$params['query'], $intent, $cleanHistory, $providerManager, $model
-			);
-
-			// Calculate dynamic threshold using LLM
-			$thresholdManager = new DynamicThresholdManager();
-			$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-				$params['query'],
-				$conversationHistory,
-				$providerManager,
-				$model
-			);
-
-			// Get excluded IDs (perform exclusion KNN search once)
-			$excludedIds = [];
-			if (!empty($queries['exclude_query']) && $queries['exclude_query'] !== 'none') {
-				$excludedIds = $searchEngine->getExcludedIds(
-					$client, $params['table'], $queries['exclude_query'], $model
-				);
-			}
-
-			// Perform search with excluded IDs
-			$searchResults = $searchEngine->performSearchWithExcludedIds(
-				$client,
-				$params['table'],
-				$queries['search_query'],
-				$excludedIds,
-				$model,
-				['overrides' => $params['overrides']],
-				$thresholdInfo['threshold']
-			);
-		}
-
-			// Debug: Log preprocessing results
-			Buddy::info('[DEBUG PREPROCESSING]');
-			Buddy::info("├─ User query: '{$params['query']}'");
-			Buddy::info("├─ Intent: {$intent}");
-			Buddy::info("├─ Search query: '{$queries['search_query']}'");
-			Buddy::info("└─ Exclude query: '{$queries['exclude_query']}'");
-
-			// Build context from search results
-			$context = self::buildContext($searchResults, $effectiveSettings);
-
-			// Debug: Log context building
-			Buddy::info('[DEBUG CONTEXT]');
-			Buddy::info('├─ Documents count: ' . sizeof($searchResults));
-			Buddy::info('├─ Total context length: ' . strlen($context) . ' chars');
-			Buddy::info('└─ Max doc length: ' . ($effectiveSettings['max_document_length'] ?? 2000) . ' chars');
-
-			Buddy::info('├─ Generating LLM response with conversation history');
-			Buddy::info('├─ History passed to LLM: ' . strlen($conversationHistory) . ' chars');
-
-			$response = self::generateResponse(
-				$model, $params['query'], $context, $conversationHistory, $effectiveSettings, $providerManager
-			);
-
-			// Fix: Add error handling for failed LLM requests
 		if (!$response['success']) {
 			return TaskResult::withError('LLM request failed: ' . ($response['error'] ?? 'Unknown error'));
 		}
 
-			// Fix: Extract values from correct response structure
-			$responseText = $response['content'];
-			$tokensUsed = $response['metadata']['tokens_used'] ?? 0;
+		$responseText = $response['content'];
+		$tokensUsed = $response['metadata']['tokens_used'] ?? 0;
 
-			// Save user message with appropriate context before saving assistant response
-		if ($intent === 'CONTENT_QUESTION') {
-			// CONTENT_QUESTION stores only basic message, no search context
-			$conversationManager->saveMessage(
-				$conversationUuid, $model['uuid'], 'user', $params['query'], 0, $intent
-			);
-		} else {
-			// All other intents store search context
-			$conversationManager->saveMessage(
-				$conversationUuid, $model['uuid'], 'user', $params['query'],
-				0, $intent, $queries['search_query'], $queries['exclude_query'], $excludedIds
-			);
-		}
+		self::saveConversationMessages(
+			$conversationManager, $conversationUuid, $model['uuid'], $intent,
+			$params, $queries, $excludedIds, $responseText, $tokensUsed
+		);
 
-			// Save assistant message (inherit intent from user message for CONTENT_QUESTION)
-			$assistantIntent = ($intent === 'CONTENT_QUESTION') ? 'CONTENT_QUESTION' : null;
-			Buddy::info('├─ Saving assistant response');
-			Buddy::info('├─ Assistant intent: ' . ($assistantIntent ?? 'none'));
-			Buddy::info('├─ Response length: ' . strlen($responseText) . ' chars');
-			Buddy::info("├─ Tokens used: {$tokensUsed}");
-
-			$conversationManager->saveMessage(
-				$conversationUuid, $model['uuid'], 'assistant', $responseText, $tokensUsed, $assistantIntent
-			);
-
-			Buddy::info('└─ Conversation processing completed');
-
-			return TaskResult::withRow(
-				[
+		return TaskResult::withRow(
+			[
 				'conversation_uuid' => $conversationUuid,
 				'response' => $responseText,
 				'sources' => json_encode($searchResults),
-				]
-			)->column('conversation_uuid', Column::String)
-				->column('response', Column::String)
-				->column('sources', Column::String);
+			]
+		)->column('conversation_uuid', Column::String)
+			->column('response', Column::String)
+			->column('sources', Column::String);
 	}
 
 	private static function parseCallRagParams(Payload $payload): array {
@@ -488,6 +399,19 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
+	 * Ensure conversation UUID exists
+	 *
+	 * @param array $params
+	 * @return string
+	 */
+	private static function ensureConversationUuid(array $params): string {
+		if (empty($params['conversation_uuid'])) {
+			$params['conversation_uuid'] = self::generateUuid();
+		}
+		return $params['conversation_uuid'];
+	}
+
+	/**
 	 * Generate a UUID v4
 	 *
 	 * @return string
@@ -497,6 +421,250 @@ final class Handler extends BaseHandlerWithClient {
 		$data[6] = chr(ord($data[6]) & 0x0f | 0x40); // Version 4
 		$data[8] = chr(ord($data[8]) & 0x3f | 0x80); // Variant 10
 		return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+	}
+
+	/**
+	 * Get model by UUID or name
+	 *
+	 * @param ModelManager $modelManager
+	 * @param Client $client
+	 * @param string $modelUuid
+	 * @return array
+	 * @throws ManticoreSearchClientError
+	 */
+	private static function getModel(ModelManager $modelManager, Client $client, string $modelUuid): array {
+		$model = $modelManager->getModelByUuidOrName($client, $modelUuid);
+		if (!$model) {
+			throw ManticoreSearchClientError::create('Model not found');
+		}
+		return $model;
+	}
+
+	/**
+	 * Log conversation start
+	 *
+	 * @param string $conversationUuid
+	 * @return void
+	 */
+	private static function logConversationStart(string $conversationUuid): void {
+		Buddy::info("\n[DEBUG CONVERSATION FLOW]");
+		Buddy::info('├─ Starting conversation processing');
+		Buddy::info("├─ Conversation UUID: {$conversationUuid}");
+	}
+
+	/**
+	 * Log conversation history
+	 *
+	 * @param string $conversationHistory
+	 * @return void
+	 */
+	private static function logConversationHistory(string $conversationHistory): void {
+		Buddy::info('├─ Retrieved history for intent classification');
+		Buddy::info('├─ History length: ' . strlen($conversationHistory) . ' chars');
+	}
+
+	/**
+	 * Classify intent
+	 *
+	 * @param IntentClassifier $intentClassifier
+	 * @param string $query
+	 * @param string $conversationHistory
+	 * @param LLMProviderManager $providerManager
+	 * @param array $model
+	 * @return string
+	 */
+	private static function classifyIntent(
+		IntentClassifier $intentClassifier,
+		string $query,
+		string $conversationHistory,
+		LLMProviderManager $providerManager,
+		array $model
+	): string {
+		$intentResult = $intentClassifier->classifyIntent(
+			$query, $conversationHistory, $providerManager, $model
+		);
+		$intent = $intentResult['intent'];
+		Buddy::info("├─ Intent classified: {$intent}");
+		return $intent;
+	}
+
+	/**
+	 * Get effective settings by merging model settings with overrides
+	 *
+	 * @param array $model
+	 * @param array $overrides
+	 * @return array
+	 */
+	private static function getEffectiveSettings(array $model, array $overrides): array {
+		$modelSettings = is_string($model['settings'])
+			? json_decode($model['settings'], true) ?? []
+			: $model['settings'];
+		return array_merge($modelSettings, $overrides);
+	}
+
+	/**
+	 * Perform search based on intent
+	 *
+	 * @param string $intent
+	 * @param array $params
+	 * @param string $conversationHistory
+	 * @param ConversationManager $conversationManager
+	 * @param string $conversationUuid
+	 * @param LLMProviderManager $providerManager
+	 * @param array $model
+	 * @param SearchEngine $searchEngine
+	 * @param Client $client
+	 * @return array
+	 */
+	private static function performSearch(
+		string $intent,
+		array $params,
+		string $conversationHistory,
+		ConversationManager $conversationManager,
+		string $conversationUuid,
+		LLMProviderManager $providerManager,
+		array $model,
+		SearchEngine $searchEngine,
+		Client $client
+	): array {
+		if ($intent === 'CONTENT_QUESTION') {
+			return self::handleContentQuestionIntent(
+				$params, $conversationHistory, $conversationManager, $conversationUuid,
+				$providerManager, $model, $searchEngine, $client
+			);
+		}
+
+		return self::handleQueryGeneratingIntent(
+			$intent, $params, $conversationHistory, $conversationManager,
+			$conversationUuid, $providerManager, $model, $searchEngine, $client
+		);
+	}
+
+	/**
+	 * Handle CONTENT_QUESTION intent
+	 *
+	 * @param array $params
+	 * @param string $conversationHistory
+	 * @param ConversationManager $conversationManager
+	 * @param string $conversationUuid
+	 * @param LLMProviderManager $providerManager
+	 * @param array $model
+	 * @param SearchEngine $searchEngine
+	 * @param Client $client
+	 * @return array
+	 */
+	private static function handleContentQuestionIntent(
+		array $params,
+		string $conversationHistory,
+		ConversationManager $conversationManager,
+		string $conversationUuid,
+		LLMProviderManager $providerManager,
+		array $model,
+		SearchEngine $searchEngine,
+		Client $client
+	): array {
+		Buddy::info('├─ Processing CONTENT_QUESTION intent');
+		$lastContext = $conversationManager->getLatestSearchContext($conversationUuid);
+
+		if ($lastContext) {
+			Buddy::info('├─ Found previous search context to reuse');
+			$queries = [
+				'search_query' => $lastContext['search_query'],
+				'exclude_query' => $lastContext['exclude_query'],
+			];
+
+			$thresholdManager = new DynamicThresholdManager();
+			$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
+				$params['query'], $conversationHistory, $providerManager, $model
+			);
+
+			$excludedIds = json_decode($lastContext['excluded_ids'], true) ?? [];
+			$searchResults = $searchEngine->performSearchWithExcludedIds(
+				$client, $params['table'], $queries['search_query'], $excludedIds,
+				$model, ['overrides' => $params['overrides']], $thresholdInfo['threshold']
+			);
+			Buddy::info('├─ CONTENT_QUESTION performed KNN search with previous query parameters');
+			return [$searchResults, $queries, $excludedIds];
+		}
+
+		Buddy::info('├─ No previous search context found, falling back to NEW_SEARCH');
+		// Fallback to NEW_SEARCH logic
+		return self::handleQueryGeneratingIntent(
+			'NEW_SEARCH', $params, $conversationHistory, $conversationManager,
+			$conversationUuid, $providerManager, $model, $searchEngine, $client
+		);
+	}
+
+	/**
+	 * Handle query-generating intents
+	 *
+	 * @param string $intent
+	 * @param array $params
+	 * @param string $conversationHistory
+	 * @param ConversationManager $conversationManager
+	 * @param string $conversationUuid
+	 * @param LLMProviderManager $providerManager
+	 * @param array $model
+	 * @param SearchEngine $searchEngine
+	 * @param Client $client
+	 * @return array
+	 */
+	private static function handleQueryGeneratingIntent(
+		string $intent,
+		array $params,
+		string $conversationHistory,
+		ConversationManager $conversationManager,
+		string $conversationUuid,
+		LLMProviderManager $providerManager,
+		array $model,
+		SearchEngine $searchEngine,
+		Client $client
+	): array {
+		Buddy::info("├─ Processing query-generating intent: {$intent}");
+		$cleanHistory = $conversationManager->getConversationHistoryForQueryGeneration($conversationUuid);
+
+		Buddy::info('├─ Using filtered history for query generation');
+		Buddy::info('├─ Clean history length: ' . strlen($cleanHistory) . ' chars');
+
+		$intentClassifierInstance = new IntentClassifier();
+		$queries = $intentClassifierInstance->generateQueries(
+			$params['query'], $intent, $cleanHistory, $providerManager, $model
+		);
+
+		$thresholdManager = new DynamicThresholdManager();
+		$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
+			$params['query'], $conversationHistory, $providerManager, $model
+		);
+
+		$excludedIds = [];
+		if (!empty($queries['exclude_query']) && $queries['exclude_query'] !== 'none') {
+			$excludedIds = $searchEngine->getExcludedIds(
+				$client, $params['table'], $queries['exclude_query'], $model
+			);
+		}
+
+		$searchResults = $searchEngine->performSearchWithExcludedIds(
+			$client, $params['table'], $queries['search_query'], $excludedIds,
+			$model, ['overrides' => $params['overrides']], $thresholdInfo['threshold']
+		);
+
+		return [$searchResults, $queries, $excludedIds];
+	}
+
+	/**
+	 * Log preprocessing results
+	 *
+	 * @param array $params
+	 * @param string $intent
+	 * @param array $queries
+	 * @return void
+	 */
+	private static function logPreprocessingResults(array $params, string $intent, array $queries): void {
+		Buddy::info('[DEBUG PREPROCESSING]');
+		Buddy::info("├─ User query: '{$params['query']}'");
+		Buddy::info("├─ Intent: {$intent}");
+		Buddy::info("├─ Search query: '{$queries['search_query']}'");
+		Buddy::info("└─ Exclude query: '{$queries['exclude_query']}'");
 	}
 
 	private static function buildContext(array $searchResults, array $settings): string {
@@ -513,6 +681,21 @@ final class Handler extends BaseHandlerWithClient {
 		);
 
 		return implode("\n", $truncatedDocs);
+	}
+
+	/**
+	 * Log context building
+	 *
+	 * @param array $searchResults
+	 * @param string $context
+	 * @param array $effectiveSettings
+	 * @return void
+	 */
+	private static function logContextBuilding(array $searchResults, string $context, array $effectiveSettings): void {
+		Buddy::info('[DEBUG CONTEXT]');
+		Buddy::info('├─ Documents count: ' . sizeof($searchResults));
+		Buddy::info('├─ Total context length: ' . strlen($context) . ' chars');
+		Buddy::info('└─ Max doc length: ' . ($effectiveSettings['max_document_length'] ?? 2000) . ' chars');
 	}
 
 	private static function generateResponse(
@@ -556,6 +739,55 @@ final class Handler extends BaseHandlerWithClient {
 			"<query>{$query}</query>\n" .
 			"</main>\n" .
 			"<style>{$stylePrompt}</style>";
+	}
+
+	/**
+	 * Save conversation messages
+	 *
+	 * @param ConversationManager $conversationManager
+	 * @param string $conversationUuid
+	 * @param string $modelUuid
+	 * @param string $intent
+	 * @param array $params
+	 * @param array $queries
+	 * @param array $excludedIds
+	 * @param string $responseText
+	 * @param int $tokensUsed
+	 * @return void
+	 */
+	private static function saveConversationMessages(
+		ConversationManager $conversationManager,
+		string $conversationUuid,
+		string $modelUuid,
+		string $intent,
+		array $params,
+		array $queries,
+		array $excludedIds,
+		string $responseText,
+		int $tokensUsed
+	): void {
+		if ($intent === 'CONTENT_QUESTION') {
+			$conversationManager->saveMessage(
+				$conversationUuid, $modelUuid, 'user', $params['query'], 0, $intent
+			);
+		} else {
+			$conversationManager->saveMessage(
+				$conversationUuid, $modelUuid, 'user', $params['query'],
+				0, $intent, $queries['search_query'], $queries['exclude_query'], $excludedIds
+			);
+		}
+
+		$assistantIntent = ($intent === 'CONTENT_QUESTION') ? 'CONTENT_QUESTION' : null;
+		Buddy::info('├─ Saving assistant response');
+		Buddy::info('├─ Assistant intent: ' . ($assistantIntent ?? 'none'));
+		Buddy::info('├─ Response length: ' . strlen($responseText) . ' chars');
+		Buddy::info("├─ Tokens used: {$tokensUsed}");
+
+		$conversationManager->saveMessage(
+			$conversationUuid, $modelUuid, 'assistant', $responseText, $tokensUsed, $assistantIntent
+		);
+
+		Buddy::info('└─ Conversation processing completed');
 	}
 
 

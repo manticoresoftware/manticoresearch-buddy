@@ -45,7 +45,7 @@ class SearchEngine {
 		?float $threshold = null
 	): array {
 		// Get excluded IDs first
-		$excludedIds = $this->getExcludedIds($client, $table, $excludeQuery, $modelConfig);
+		$excludedIds = $this->getExcludedIds($client, $table, $excludeQuery);
 
 		// Use optimized search with pre-computed excluded IDs
 		return $this->performSearchWithExcludedIds(
@@ -60,67 +60,42 @@ class SearchEngine {
 	}
 
 	/**
-	 * Get K results from configuration
+	 * Get excluded document IDs for a given exclusion query
 	 *
+	 * @param HTTPClient $client
+	 * @param string $table
+	 * @param string $excludeQuery
 	 * @param array $modelConfig
-	 * @param array $options
-	 * @return int
+	 * @return array
 	 */
-	private function getKResults(array $modelConfig, array $options): int {
-		// Check overrides first
-		if (isset($options['overrides']['k_results'])) {
-			return (int)$options['overrides']['k_results'];
+	public function getExcludedIds(
+		HTTPClient $client,
+		string $table,
+		string $excludeQuery
+	): array {
+		if (empty($excludeQuery) || $excludeQuery === 'none') {
+			return [];
 		}
 
-		// Check direct config
-		if (isset($modelConfig['k_results'])) {
-			return (int)$modelConfig['k_results'];
+		$vectorField = $this->detectVectorField($client, $table);
+		if (!$vectorField) {
+			return [];
 		}
 
-		// Check settings
-		if (isset($modelConfig['settings'])) {
-			$settings = is_string($modelConfig['settings'])
-				? json_decode($modelConfig['settings'], true) ?? []
-				: $modelConfig['settings'];
+		$excludeEscaped = $this->escapeString($excludeQuery);
+		$sql = "SELECT id FROM {$table}
+				WHERE knn({$vectorField}, 15, '{$excludeEscaped}')
+				AND knn_dist < 0.75";
 
-			if (isset($settings['k_results'])) {
-				return (int)$settings['k_results'];
-			}
+		$response = $client->sendRequest($sql);
+		if ($response->hasError()) {
+			return []; // Return empty array on error
 		}
 
-		return self::DEFAULT_K_RESULTS;
-	}
+		$result = $response->getResult();
+		$excludeResults = $result[0]['data'] ?? [];
 
-	/**
-	 * Get similarity threshold from configuration
-	 *
-	 * @param array $modelConfig
-	 * @param array $options
-	 * @return float
-	 */
-	private function getSimilarityThreshold(array $modelConfig, array $options): float {
-		// Check overrides first
-		if (isset($options['overrides']['similarity_threshold'])) {
-			return (float)$options['overrides']['similarity_threshold'];
-		}
-
-		// Check direct config
-		if (isset($modelConfig['similarity_threshold'])) {
-			return (float)$modelConfig['similarity_threshold'];
-		}
-
-		// Check settings
-		if (isset($modelConfig['settings'])) {
-			$settings = is_string($modelConfig['settings'])
-				? json_decode($modelConfig['settings'], true) ?? []
-				: $modelConfig['settings'];
-
-			if (isset($settings['similarity_threshold'])) {
-				return (float)$settings['similarity_threshold'];
-			}
-		}
-
-		return self::DEFAULT_SIMILARITY_THRESHOLD;
+		return array_column($excludeResults, 'id');
 	}
 
 	/**
@@ -146,8 +121,11 @@ class SearchEngine {
 			}
 		}
 
-			// Common vector field names from original implementation
-			$commonNames = ['embedding_vector', 'embedding', 'vector', 'embeddings', 'content_embedding', 'text_embedding'];
+		// Common vector field names from original implementation
+		$commonNames = [
+			'embedding_vector', 'embedding', 'vector', 'embeddings',
+			'content_embedding', 'text_embedding',
+		];
 		foreach ($schema as $field) {
 			$fieldName = strtolower($field['Field'] ?? '');
 			if (in_array($fieldName, $commonNames)) {
@@ -159,43 +137,13 @@ class SearchEngine {
 	}
 
 	/**
-	 * Get excluded document IDs for a given exclusion query
+	 * Escape string for SQL safety
 	 *
-	 * @param HTTPClient $client
-	 * @param string $table
-	 * @param string $excludeQuery
-	 * @param array $modelConfig
-	 * @return array
+	 * @param string $string
+	 * @return string
 	 */
-	public function getExcludedIds(
-		HTTPClient $client,
-		string $table,
-		string $excludeQuery,
-		array $modelConfig
-	): array {
-		if (empty($excludeQuery) || $excludeQuery === 'none') {
-			return [];
-		}
-
-		$vectorField = $this->detectVectorField($client, $table);
-		if (!$vectorField) {
-			return [];
-		}
-
-		$excludeEscaped = $this->escapeString($excludeQuery);
-		$sql = "SELECT id FROM {$table}
-				WHERE knn({$vectorField}, 15, '{$excludeEscaped}')
-				AND knn_dist < 0.75";
-
-		$response = $client->sendRequest($sql);
-		if ($response->hasError()) {
-			return []; // Return empty array on error
-		}
-
-		$result = $response->getResult();
-		$excludeResults = $result[0]['data'] ?? [];
-
-		return array_column($excludeResults, 'id');
+	private function escapeString(string $string): string {
+		return str_replace("'", "''", $string);
 	}
 
 	/**
@@ -232,7 +180,7 @@ class SearchEngine {
 			// Use pre-computed excluded IDs - NO additional KNN search needed!
 			$safeExcludeIds = array_map('intval', $excludedIds);
 			$excludeList = implode(',', $safeExcludeIds);
-			$adjustedK = $kResults + count($excludedIds) + 5;
+			$adjustedK = $kResults + sizeof($excludedIds) + 5;
 
 			$sql = "SELECT *, knn_dist() as knn_dist
 					FROM {$table}
@@ -260,21 +208,41 @@ class SearchEngine {
 		}
 
 		$result = $response->getResult()[0]['data'] ?? [];
-		Buddy::info('└─ Results found: ' . count($result));
+		Buddy::info('└─ Results found: ' . sizeof($result));
 
 		return $this->filterVectorFields($result, $table, $client);
 	}
 
-
-
 	/**
-	 * Escape string for SQL safety
+	 * Get K results from configuration
 	 *
-	 * @param string $string
-	 * @return string
+	 * @param array $modelConfig
+	 * @param array $options
+	 * @return int
 	 */
-	private function escapeString(string $string): string {
-		return str_replace("'", "''", $string);
+	private function getKResults(array $modelConfig, array $options): int {
+		// Check overrides first
+		if (isset($options['overrides']['k_results'])) {
+			return (int)$options['overrides']['k_results'];
+		}
+
+		// Check direct config
+		if (isset($modelConfig['k_results'])) {
+			return (int)$modelConfig['k_results'];
+		}
+
+		// Check settings
+		if (isset($modelConfig['settings'])) {
+			$settings = is_string($modelConfig['settings'])
+				? json_decode($modelConfig['settings'], true) ?? []
+				: $modelConfig['settings'];
+
+			if (isset($settings['k_results'])) {
+				return (int)$settings['k_results'];
+			}
+		}
+
+		return self::DEFAULT_K_RESULTS;
 	}
 
 	/**
@@ -337,5 +305,37 @@ class SearchEngine {
 		}
 
 		return $vectorFields;
+	}
+
+	/**
+	 * Get similarity threshold from configuration
+	 *
+	 * @param array $modelConfig
+	 * @param array $options
+	 * @return float
+	 */
+	private function getSimilarityThreshold(array $modelConfig, array $options): float {
+		// Check overrides first
+		if (isset($options['overrides']['similarity_threshold'])) {
+			return (float)$options['overrides']['similarity_threshold'];
+		}
+
+		// Check direct config
+		if (isset($modelConfig['similarity_threshold'])) {
+			return (float)$modelConfig['similarity_threshold'];
+		}
+
+		// Check settings
+		if (isset($modelConfig['settings'])) {
+			$settings = is_string($modelConfig['settings'])
+				? json_decode($modelConfig['settings'], true) ?? []
+				: $modelConfig['settings'];
+
+			if (isset($settings['similarity_threshold'])) {
+				return (float)$settings['similarity_threshold'];
+			}
+		}
+
+		return self::DEFAULT_SIMILARITY_THRESHOLD;
 	}
 }

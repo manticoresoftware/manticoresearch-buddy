@@ -181,7 +181,8 @@ class ConversationalPayloadTest extends TestCase {
 	}
 
 	public function testEscapedQuotesInConversationParams(): void {
-		$query = "CALL CONVERSATIONAL_RAG('I\\'m like programming, lets talk about it', 'docs', 'test_model', 'conversation_1')";
+		$query = "CALL CONVERSATIONAL_RAG('I\\'m like programming, ".
+			"lets talk about it', 'docs', 'test_model', 'conversation_1')";
 
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(

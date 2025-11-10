@@ -80,16 +80,24 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock responses for initializeTables (2 calls) + modelExists (1 call) + createModel (1 call)
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$modelExistsResponse = $this->createMock(Response::class);
-		$modelExistsResponse->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$modelExistsResponse->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$insertResponse = $this->createMock(Response::class);
-		$insertResponse->method('getResult')->willReturn(Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']]));
+		$insertResponse->method('getResult')->willReturn(
+			Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']])
+		);
 
 		$mockClient->expects($this->exactly(4))
 			->method('sendRequest')
@@ -135,13 +143,19 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock responses for initializeTables (2 calls) + getAllModels (1 call)
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$selectResponse = $this->createMock(Response::class);
-		$selectResponse->method('getResult')->willReturn(Struct::fromData([['data' => [], 'total' => 0, 'error' => '', 'warning' => '']]));
+		$selectResponse->method('getResult')->willReturn(
+			Struct::fromData([['data' => [], 'total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$mockClient->expects($this->exactly(3))
 			->method('sendRequest')
@@ -200,10 +214,14 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock responses for initializeTables (2 calls) + getModelByUuidOrName (1 call)
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$selectResponse = $this->createMock(Response::class);
 		$selectResponse->method('getResult')->willReturn(
@@ -246,7 +264,7 @@ class ConversationalRagTest extends TestCase {
 		$struct = $result->getStruct();
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
-		$this->assertGreaterThan(0, count($struct[0]['data']));
+		$this->assertGreaterThan(0, sizeof($struct[0]['data']));
 
 		$data = $struct[0]['data'];
 
@@ -278,10 +296,14 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock responses for initializeTables (2) + getModel (1) + delete model (1)
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$getModelResponse = $this->createMock(Response::class);
 		$getModelResponse->method('getResult')->willReturn(
@@ -303,7 +325,9 @@ class ConversationalRagTest extends TestCase {
 		);
 
 		$deleteModelResponse = $this->createMock(Response::class);
-		$deleteModelResponse->method('getResult')->willReturn(Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']]));
+		$deleteModelResponse->method('getResult')->willReturn(
+			Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']])
+		);
 
 		$mockClient->expects($this->exactly(4))
 			->method('sendRequest')
@@ -374,13 +398,19 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock responses for initializeTables (2 calls) + getModelByUuidOrName (1 call that returns no results)
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$selectResponse = $this->createMock(Response::class);
-		$selectResponse->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$selectResponse->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$mockClient->expects($this->exactly(3))
 			->method('sendRequest')
@@ -417,13 +447,19 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock responses for initializeTables (2 calls) + getModel (1 call that returns no results)
 		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse1->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$initResponse2->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$getModelResponse = $this->createMock(Response::class);
-		$getModelResponse->method('getResult')->willReturn(Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']]));
+		$getModelResponse->method('getResult')->willReturn(
+			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
+		);
 
 		$mockClient->expects($this->exactly(3))
 			->method('sendRequest')

@@ -34,7 +34,6 @@ class IntentClassifier {
 	public function classifyIntent(
 		string $userQuery,
 		string $conversationHistory,
-		array $lastSearchResults,
 		LLMProviderManager $llmProvider,
 		array $modelConfig
 	): array {
@@ -53,21 +52,29 @@ Query: {$userQuery}
 Classify as ONE of:
 - REJECTION: User declining shown content (like 'no', 'not interested', 'don't like')
 - ALTERNATIVES: User wants more options (like 'what else', 'other options', 'anything else')
-- TOPIC_CHANGE: User switching to new topic (like 'I want comedies instead', 'show me action movies')
-- INTEREST: User likes content and wants similar (like 'sounds good, what else like this', 'tell me more')
+- TOPIC_CHANGE: User switching to new topic (like 'I want comedies instead',
+  'show me action movies')
+- INTEREST: User likes content and wants similar (like 'sounds good, what else like this',
+  'tell me more')
 - NEW_SEARCH: Fresh search with no prior context
-- CONTENT_QUESTION: User asking about previously shown content (like 'what's the cast', 'who directed it', 'when was it made', 'what's it about')
-- NEW_QUESTION: User asking about new topic requiring search (like 'what about action movies', 'show me comedies', 'tell me about programming')
-- CLARIFICATION: User providing additional details or correcting previous query (like 'no it's from a movie', 'I meant something else')
+- CONTENT_QUESTION: User asking about previously shown content (like 'what's the cast',
+  'who directed it', 'when was it made', 'what's it about')
+- NEW_QUESTION: User asking about new topic requiring search (like 'what about action movies',
+  'show me comedies', 'tell me about programming')
+- CLARIFICATION: User providing additional details or correcting previous query
+  (like 'no it's from a movie', 'I meant something else')
 - UNCLEAR: Cannot determine intent (like gibberish, confusing, ambiguous)
 
-Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
+Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST,
+NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 
 			$provider = $llmProvider->getConnection('intent_classifier', $modelConfig);
 			$response = $provider->generateResponse($intentPrompt, [], ['temperature' => 0.1, 'max_tokens' => 50]);
 
 			if (!$response['success']) {
-				throw new ManticoreSearchClientError('Intent classification failed: ' . ($response['error'] ?? 'Unknown error'));
+				throw new ManticoreSearchClientError(
+					'Intent classification failed: ' . ($response['error'] ?? 'Unknown error')
+				);
 			}
 
 			$intent = $this->validateIntent(trim(strtoupper($response['content'])));
@@ -104,7 +111,7 @@ Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST, NEW_
 
 		// Keep only last N exchanges (2 lines per exchange) (matches php_rag Line 60-63)
 		$maxLines = $maxExchanges * 2;
-		if (count($lines) > $maxLines) {
+		if (sizeof($lines) > $maxLines) {
 			$lines = array_slice($lines, -$maxLines);
 		}
 
@@ -168,7 +175,7 @@ History:
 Query: {$userQuery}
 Intent: {$intent}
 
-Generate a rich search query with:
+Generate a rich search query separated by commas, sorted by relativity with:
 - Content type (movies, TV shows, books, etc.)
 - Genre/theme/topic keywords
 - Multiple relevant terms
@@ -222,7 +229,9 @@ Answer ONLY in the format above.";
 			$response = $provider->generateResponse($queryPrompt, [], ['temperature' => 0.3, 'max_tokens' => 200]);
 
 			if (!$response['success']) {
-				throw new ManticoreSearchClientError('Query generation failed: ' . ($response['error'] ?? 'Unknown error'));
+				throw new ManticoreSearchClientError(
+					'Query generation failed: ' . ($response['error'] ?? 'Unknown error')
+				);
 			}
 
 			$lines = explode("\n", trim($response['content']));

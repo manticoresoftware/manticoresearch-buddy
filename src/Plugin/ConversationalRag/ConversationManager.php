@@ -38,7 +38,7 @@ class ConversationManager {
 			conversation_uuid string,
 			model_uuid string,
 			created_at bigint,
-			role text,
+			role string,
 			message text,
 			tokens_used int,
 			intent string,
@@ -96,7 +96,6 @@ class ConversationManager {
 		$excludedIdsValue = $excludedIds ? $this->quote(json_encode($excludedIds)) : "''";
 
 		$sql = sprintf(
-		/** @lang Manticore */
 			'INSERT INTO %s (conversation_uuid, model_uuid, created_at, role, message, tokens_used, '
 			. 'intent, search_query, exclude_query, excluded_ids, ttl) '
 			. 'VALUES (%s, %s, %d, %s, %s, %d, %s, %s, %s, %s, %d)',
@@ -116,7 +115,9 @@ class ConversationManager {
 
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
-			throw ManticoreSearchClientError::create('Failed to insert into conversations table: ' . $result->getError());
+			throw ManticoreSearchClientError::create(
+				'Failed to insert into conversations table: ' . $result->getError()
+			);
 		}
 
 		Buddy::info('└─ Message saved successfully');
@@ -179,7 +180,7 @@ class ConversationManager {
 		$sql = /** @lang Manticore */ 'SELECT search_query, exclude_query, excluded_ids FROM '
 			. self::CONVERSATIONS_TABLE . ' ' .
 			"WHERE conversation_uuid = '$conversationUuid' " .
-			"AND role = 'user' AND search_query != '' " .
+			"AND role = 'user' " .
 			"AND intent != 'CONTENT_QUESTION' " .
 			'ORDER BY created_at DESC LIMIT 1';
 
@@ -187,7 +188,6 @@ class ConversationManager {
 
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
-			Buddy::error('Failed to retrieve search context: ' . $result->getError());
 			throw ManticoreSearchClientError::create('Failed to retrieve search context: ' . $result->getError());
 		}
 

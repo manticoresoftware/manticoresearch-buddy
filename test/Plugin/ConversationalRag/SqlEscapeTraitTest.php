@@ -9,24 +9,13 @@
   program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SqlEscapeTrait;
+use Manticoresearch\BuddyTest\Plugin\ConversationalRag\SqlEscapeTraitTestClass;
 use PHPUnit\Framework\TestCase;
-
-/**
- * Test class for SqlEscapeTrait
- */
-class SqlEscapeTraitTestClass {
-	use SqlEscapeTrait;
-}
 
 class SqlEscapeTraitTest extends TestCase {
 	private SqlEscapeTraitTestClass $testClass;
 
-	protected function setUp(): void {
-		$this->testClass = new SqlEscapeTraitTestClass();
-	}
-
-	public function testSqlEscape_SingleQuotes(): void {
+	public function testSqlEscapeSingleQuotes(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->testClass);
 		$method = $reflection->getMethod('sqlEscape');
@@ -36,7 +25,7 @@ class SqlEscapeTraitTest extends TestCase {
 		$this->assertEquals("Don\\'t worry", $result);
 	}
 
-	public function testSqlEscape_Backslashes(): void {
+	public function testSqlEscapeBackslashes(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->testClass);
 		$method = $reflection->getMethod('sqlEscape');
@@ -46,7 +35,7 @@ class SqlEscapeTraitTest extends TestCase {
 		$this->assertEquals('Path\\to\\file', $result); // Backslashes are not escaped in SQL
 	}
 
-	public function testSqlEscape_MultipleSpecialChars(): void {
+	public function testSqlEscapeMultipleSpecialChars(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->testClass);
 		$method = $reflection->getMethod('sqlEscape');
@@ -56,7 +45,7 @@ class SqlEscapeTraitTest extends TestCase {
 		$this->assertEquals('Test!@#$%^&*()', $result); // Only single quotes are escaped in SQL
 	}
 
-	public function testSqlEscape_NoSpecialChars(): void {
+	public function testSqlEscapeNoSpecialChars(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->testClass);
 		$method = $reflection->getMethod('sqlEscape');
@@ -66,7 +55,7 @@ class SqlEscapeTraitTest extends TestCase {
 		$this->assertEquals('NormalString123', $result);
 	}
 
-	public function testQuote_WrapsAndEscapes(): void {
+	public function testQuoteWrapsAndEscapes(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->testClass);
 		$method = $reflection->getMethod('quote');
@@ -76,7 +65,7 @@ class SqlEscapeTraitTest extends TestCase {
 		$this->assertEquals("'O\\'Reilly'", $result);
 	}
 
-	public function testQuote_EmptyString(): void {
+	public function testQuoteEmptyString(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->testClass);
 		$method = $reflection->getMethod('quote');
@@ -86,7 +75,7 @@ class SqlEscapeTraitTest extends TestCase {
 		$this->assertEquals("''", $result);
 	}
 
-	public function testQuote_NumericString(): void {
+	public function testQuoteNumericString(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->testClass);
 		$method = $reflection->getMethod('quote');
@@ -96,7 +85,7 @@ class SqlEscapeTraitTest extends TestCase {
 		$this->assertEquals("'123'", $result);
 	}
 
-	public function testQuote_SpecialCharsWithSingleQuote(): void {
+	public function testQuoteSpecialCharsWithSingleQuote(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->testClass);
 		$method = $reflection->getMethod('quote');
@@ -108,5 +97,9 @@ class SqlEscapeTraitTest extends TestCase {
 
 		$expected = "'Don\\'t escape \"double quotes\" or \$special chars'";
 		$this->assertEquals($expected, $result);
+	}
+
+	protected function setUp(): void {
+		$this->testClass = new SqlEscapeTraitTestClass();
 	}
 }

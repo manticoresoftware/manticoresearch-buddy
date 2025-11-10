@@ -10,6 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ModelManager;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Struct;
@@ -30,7 +31,7 @@ class ModelManagerTest extends TestCase {
 		putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 	}
 
-	public function testInitializeTables_CreatesModelsTable(): void {
+	public function testInitializeTablesCreatesModelsTable(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -48,7 +49,7 @@ class ModelManagerTest extends TestCase {
 		$modelManager->initializeTables($mockClient);
 	}
 
-	public function testCreateModel_Successful(): void {
+	public function testCreateModelSuccessful(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -84,7 +85,7 @@ class ModelManagerTest extends TestCase {
 		$this->assertNotEmpty($result);
 	}
 
-	public function testCreateModel_DuplicateName(): void {
+	public function testCreateModelDuplicateName(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -107,12 +108,12 @@ class ModelManagerTest extends TestCase {
 			'llm_model' => 'gpt-4',
 		];
 
-		$this->expectException(\Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError::class);
+		$this->expectException(ManticoreSearchClientError::class);
 
 		$modelManager->createModel($mockClient, $config);
 	}
 
-	public function testGetModelByUuidOrName_FoundByName(): void {
+	public function testGetModelByUuidOrNameFoundByName(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -154,7 +155,7 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals('openai', $result['llm_provider']);
 	}
 
-	public function testGetModelByUuidOrName_FoundByUuid(): void {
+	public function testGetModelByUuidOrNameFoundByUuid(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -190,7 +191,7 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals('test-uuid-123', $result['uuid']);
 	}
 
-	public function testGetModelByUuidOrName_NotFound(): void {
+	public function testGetModelByUuidOrNameNotFound(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -212,7 +213,7 @@ class ModelManagerTest extends TestCase {
 		$this->assertNull($result);
 	}
 
-	public function testDeleteModelByUuidOrName_Successful(): void {
+	public function testDeleteModelByUuidOrNameSuccessful(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -247,7 +248,7 @@ class ModelManagerTest extends TestCase {
 		$modelManager->deleteModelByUuidOrName($mockClient, 'test_model');
 	}
 
-	public function testDeleteModelByUuidOrName_ModelNotFound(): void {
+	public function testDeleteModelByUuidOrNameModelNotFound(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -264,12 +265,12 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($getModelResponse);
 
-		$this->expectException(\Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError::class);
+		$this->expectException(ManticoreSearchClientError::class);
 
 		$modelManager->deleteModelByUuidOrName($mockClient, 'nonexistent');
 	}
 
-	public function testGetAllModels_Successful(): void {
+	public function testGetAllModelsSuccessful(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -320,7 +321,7 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals('model2', $result[1]['name']);
 	}
 
-	public function testExtractSettings_FromJsonString(): void {
+	public function testExtractSettingsFromJsonString(): void {
 		$modelManager = new ModelManager();
 
 		$config = [
@@ -345,7 +346,7 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals('custom_value', $result['custom_field']);
 	}
 
-	public function testExtractSettings_FromArray(): void {
+	public function testExtractSettingsFromArray(): void {
 		$modelManager = new ModelManager();
 
 		$config = [
@@ -369,7 +370,7 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals(8, $result['k_results']);
 	}
 
-	public function testModelExists_CaseSensitivity(): void {
+	public function testModelExistsCaseSensitivity(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client

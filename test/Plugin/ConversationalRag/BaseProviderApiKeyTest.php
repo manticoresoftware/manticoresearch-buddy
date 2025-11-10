@@ -24,30 +24,11 @@ class BaseProviderApiKeyTest extends TestCase {
 	private ModelManager $modelManager;
 	private BaseProvider $baseProvider;
 
-	protected function setUp(): void {
-		$this->modelManager = new ModelManager();
-		$this->baseProvider = new OpenAIProvider();
-
-		// Set up test environment variables
-		putenv('OPENAI_API_KEY=sk-test-key-12345678901234567890123456789012');
-		putenv('ANTHROPIC_API_KEY=sk-ant-test123456789012345678901234567890');
-		putenv('EMPTY_KEY=');
-	}
-
-	protected function tearDown(): void {
-		// Clean up environment variables
-		putenv('OPENAI_API_KEY');
-		putenv('ANTHROPIC_API_KEY');
-		putenv('EMPTY_KEY');
-	}
-
-
-
 	/**
 	 * Test successful API key resolution for supported providers
 	 * This simulates what happens during CALL RAG when a valid provider and env var exist
 	 */
-	public function testApiKeyResolution_Successful(): void {
+	public function testApiKeyResolutionSuccessful(): void {
 		$reflection = new ReflectionClass($this->baseProvider);
 		$method = $reflection->getMethod('getApiKeyForProvider');
 		$method->setAccessible(true);
@@ -65,7 +46,7 @@ class BaseProviderApiKeyTest extends TestCase {
 	 * Test API key resolution fails for unsupported providers
 	 * This simulates CALL RAG failing when an invalid provider is specified
 	 */
-	public function testApiKeyResolution_UnsupportedProvider(): void {
+	public function testApiKeyResolutionUnsupportedProvider(): void {
 		$reflection = new ReflectionClass($this->baseProvider);
 		$method = $reflection->getMethod('getApiKeyForProvider');
 		$method->setAccessible(true);
@@ -81,7 +62,7 @@ class BaseProviderApiKeyTest extends TestCase {
 	 * Test API key resolution fails when environment variable is missing
 	 * This simulates CALL RAG failing when the required env var isn't set
 	 */
-	public function testApiKeyResolution_MissingEnvVar(): void {
+	public function testApiKeyResolutionMissingEnvVar(): void {
 		$reflection = new ReflectionClass($this->baseProvider);
 		$method = $reflection->getMethod('getApiKeyForProvider');
 		$method->setAccessible(true);
@@ -97,7 +78,7 @@ class BaseProviderApiKeyTest extends TestCase {
 	 * Test API key resolution fails when environment variable is empty
 	 * This simulates CALL RAG failing when the env var exists but is empty
 	 */
-	public function testApiKeyResolution_EmptyEnvVar(): void {
+	public function testApiKeyResolutionEmptyEnvVar(): void {
 		$reflection = new ReflectionClass($this->baseProvider);
 		$method = $reflection->getMethod('getApiKeyForProvider');
 		$method->setAccessible(true);
@@ -120,7 +101,7 @@ class BaseProviderApiKeyTest extends TestCase {
 	 * Test API key resolution fails when provider is not configured
 	 * This simulates CALL RAG failing when no provider is specified in the model
 	 */
-	public function testApiKeyResolution_EmptyProvider(): void {
+	public function testApiKeyResolutionEmptyProvider(): void {
 		$reflection = new ReflectionClass($this->baseProvider);
 		$method = $reflection->getMethod('getApiKeyForProvider');
 		$method->setAccessible(true);
@@ -136,7 +117,7 @@ class BaseProviderApiKeyTest extends TestCase {
 	 * Test the getApiKey method works when provider is properly configured
 	 * This simulates the normal CALL RAG flow with valid configuration
 	 */
-	public function testGetApiKey_WithValidConfig(): void {
+	public function testGetApiKeyWithValidConfig(): void {
 		$reflection = new ReflectionClass($this->baseProvider);
 		$method = $reflection->getMethod('getApiKey');
 		$method->setAccessible(true);
@@ -152,7 +133,7 @@ class BaseProviderApiKeyTest extends TestCase {
 	 * Test getApiKey fails when provider configuration is missing
 	 * This simulates CALL RAG failing when the model wasn't configured with a provider
 	 */
-	public function testGetApiKey_MissingProviderConfig(): void {
+	public function testGetApiKeyMissingProviderConfig(): void {
 		$reflection = new ReflectionClass($this->baseProvider);
 		$method = $reflection->getMethod('getApiKey');
 		$method->setAccessible(true);
@@ -164,5 +145,22 @@ class BaseProviderApiKeyTest extends TestCase {
 		$this->expectExceptionMessage('LLM provider not configured');
 
 		$method->invoke($this->baseProvider);
+	}
+
+	protected function setUp(): void {
+		$this->modelManager = new ModelManager();
+		$this->baseProvider = new OpenAIProvider();
+
+		// Set up test environment variables
+		putenv('OPENAI_API_KEY=sk-test-key-12345678901234567890123456789012');
+		putenv('ANTHROPIC_API_KEY=sk-ant-test123456789012345678901234567890');
+		putenv('EMPTY_KEY=');
+	}
+
+	protected function tearDown(): void {
+		// Clean up environment variables
+		putenv('OPENAI_API_KEY');
+		putenv('ANTHROPIC_API_KEY');
+		putenv('EMPTY_KEY');
 	}
 }
