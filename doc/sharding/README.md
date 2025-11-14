@@ -12,6 +12,10 @@ The Manticore Buddy Sharding system provides automatic distribution of data acro
 - **Data Safety**: Ensures no data loss during rebalancing operations
 - **Concurrent Operation Control**: Prevents conflicting rebalancing operations
 - **Queue-Based Processing**: Asynchronous command execution with proper ordering
+- **Automatic Rollback**: Simplified rollback system with mandatory rollback commands
+- **Graceful Stop Control**: Ability to stop/pause/resume rebalancing operations
+- **Resource Cleanup**: Automatic cleanup of orphaned resources and failed operations
+- **Health Monitoring**: Built-in health checks and auto-recovery mechanisms
 
 ### Core Problem Solved
 
@@ -40,6 +44,21 @@ if ($table->canStartRebalancing()) {
 // Check status
 $status = $table->getRebalancingStatus();
 echo "Current status: $status";
+
+// Stop rebalancing if needed
+$result = $table->stopRebalancing(true);  // Graceful stop
+$result = $table->stopRebalancing(false); // Immediate stop with rollback
+
+// Get progress information
+$progress = $table->getRebalancingProgress();
+echo "Progress: {$progress['progress_percentage']}%";
+
+// Health monitoring
+$monitor = new HealthMonitor($client, $cluster);
+$health = $monitor->performHealthCheck();
+if ($health['overall_status'] !== 'healthy') {
+    $recovery = $monitor->performAutoRecovery();
+}
 ```
 
 ## Architecture Overview
@@ -100,8 +119,27 @@ This documentation is organized into the following sections:
 
 ## Recent Enhancements
 
-The system has been significantly enhanced to handle new node addition scenarios:
+The system has been significantly enhanced to handle new node addition scenarios and provide robust error recovery:
 
+### Rollback and Recovery System
+- **Always-On Rollback**: All operations require explicit rollback commands for atomic execution
+- **Operation Groups**: Related commands grouped for atomic rollback
+- **Explicit Rollback Commands**: Callers must provide rollback SQL for each operation
+- **Queue-Based Rollback**: Leverages existing queue infrastructure for rollback execution
+
+### Rebalancing Control
+- **Stop/Pause/Resume**: Full control over rebalancing operations
+- **Graceful vs Immediate Stop**: Choose between completing current operation or immediate rollback
+- **Progress Tracking**: Real-time progress monitoring with percentage completion
+- **Stop Signal Mechanism**: Safe interruption of long-running operations
+
+### Health Monitoring and Cleanup
+- **Health Monitor**: Automatic detection of stuck or failed operations
+- **Auto-Recovery**: Automatic recovery from common failure scenarios
+- **Cleanup Manager**: Periodic cleanup of orphaned resources
+- **Resource Management**: Automatic removal of temporary clusters and expired queue items
+
+### Previous Enhancements
 - **Dual-Path Rebalancing**: Separate handling for failed nodes vs new nodes
 - **RF=1 Shard Movement**: Sophisticated intermediate cluster strategy for safe data movement
 - **RF>=2 Replica Addition**: Efficient replica distribution for load balancing
