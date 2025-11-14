@@ -64,6 +64,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$suggestions = $this->getSuggestions($phrases, $maxCount);
 			$this->sortSuggestions($suggestions, $phrases);
 
+			// Filter out suggestions with zero docs
+			$suggestions = $this->filterSuggestionsWithDocs($suggestions);
+
 			// Preparing the final result with suggestions
 			$data = [];
 			foreach ($suggestions as $suggestion) {
@@ -451,6 +454,40 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$match = "*$match";
 		}
 		return $match;
+	}
+
+	/**
+	 * Filter out suggestions that have zero document matches
+	 * @param array<string> $suggestions
+	 * @return array<string>
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 */
+	private function filterSuggestionsWithDocs(array $suggestions): array {
+		$validSuggestions = [];
+		foreach ($suggestions as $suggestion) {
+			$escapedSuggestion = addcslashes($suggestion, '*%?\'');
+			$q = "CALL KEYWORDS('{$escapedSuggestion}', '{$this->payload->table}', 1 as stats)";
+			/** @var array{0:array{data?:array<keyword>}} $result */
+			$result = $this->manticoreClient->sendRequest($q)->getResult();
+			$data = $result[0]['data'] ?? [];
+
+			// Check if any keyword has docs > 0
+			$hasDocs = false;
+			foreach ($data as $row) {
+				if (($row['docs'] ?? 0) > 0) {
+					$hasDocs = true;
+					break;
+				}
+			}
+
+			if ($hasDocs) {
+				$validSuggestions[] = $suggestion;
+			} else {
+				Buddy::debug("Autocomplete: filtering out '$suggestion' (zero docs)");
+			}
+		}
+		return $validSuggestions;
 	}
 
 	/**
