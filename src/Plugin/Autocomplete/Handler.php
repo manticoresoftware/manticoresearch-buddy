@@ -267,7 +267,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			return [];
 		}
 
-		$combinations = ['' => 0.0];
+		$combinations = new \Ds\Map(['' => 0.0]);
 		$positions = array_keys($words);
 
 		foreach ($positions as $position) {
@@ -276,41 +276,77 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$combinations = static::processCombinations($combinations, $keywords, $scoreMap, $maxCount);
 		}
 
-		arsort($combinations);
-		return array_slice(array_filter(array_keys($combinations)), 0, $maxCount);
+		$combinations->ksort(
+			function (mixed $a, mixed $b) use ($combinations): int {
+				$scoreA = $combinations->get($a);
+				$scoreB = $combinations->get($b);
+				return $scoreB <=> $scoreA;
+			}
+		);
+
+		/** @var array<string> */
+		return array_values(
+			array_slice(
+				array_filter(
+					$combinations->keys()->toArray(),
+				),
+				0,
+				$maxCount
+			)
+		);
 	}
 
 	/**
-	 * @param array<string,float> $combinations
+	 * @param \Ds\Map<string,float> $combinations
 	 * @param array<string> $positionWords
 	 * @param array<string,float> $scoreMap
 	 * @param int $maxCount
-	 * @return array<string,float>
+	 * @return \Ds\Map<string,float>
 	 */
 	private static function processCombinations(
-		array $combinations,
+		\Ds\Map $combinations,
 		array $positionWords,
 		array $scoreMap,
 		int $maxCount
-	): array {
-		$newCombinations = [];
+	): \Ds\Map {
+		$newCombinations = new \Ds\Map();
 		foreach ($combinations as $combination => $score) {
 			foreach ($positionWords as $word) {
 				$newCombination = trim($combination . ' ' . $word);
 				$newScore = $score + ($scoreMap[$word] ?? 0);
-				if (sizeof($newCombinations) >= $maxCount && $newScore <= min($newCombinations)) {
+
+				// If we already have max items and the new score is too low, skip
+				if ($newCombinations->count() >= $maxCount && $newScore <= min($newCombinations->values()->toArray())) {
 					continue;
 				}
 
-				$newCombinations[$newCombination] = $newScore;
-				if (sizeof($newCombinations) <= $maxCount) {
+				$newCombinations->put($newCombination, $newScore);
+				if ($newCombinations->count() <= $maxCount) {
 					continue;
 				}
 
-				arsort($newCombinations);
-				array_pop($newCombinations);
+				// Sort and trim the map
+				$pairs = $newCombinations->pairs()->toArray();
+				usort(
+					$pairs, static function ($a, $b): int {
+						if ($b->value > $a->value) {
+							return 1;
+						}
+						if ($b->value < $a->value) {
+							return -1;
+						}
+						return 0;
+					}
+				);
+
+				// Create a new map with only the top items
+				$newCombinations = new \Ds\Map();
+				for ($i = 0; $i < $maxCount; $i++) {
+					$newCombinations->put($pairs[$i]->key, $pairs[$i]->value);
+				}
 			}
 		}
+
 		return $newCombinations;
 	}
 
@@ -475,7 +511,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			// Check if any keyword has docs > 0
 			$hasDocs = false;
 			foreach ($data as $row) {
-				if (($row['docs'] ?? 0) > 0) {
+				if ($row['docs'] > 0) {
 					$hasDocs = true;
 					break;
 				}
