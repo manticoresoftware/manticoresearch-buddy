@@ -316,7 +316,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 				$newScore = $score + ($scoreMap[$word] ?? 0);
 
 				// If we already have max items and the new score is too low, skip
-				if ($newCombinations->count() >= $maxCount && $newScore <= min($newCombinations->values()->toArray())) {
+				if (static::shouldSkipCombination($newCombinations, $newScore, $maxCount)) {
 					continue;
 				}
 
@@ -325,29 +325,50 @@ final class Handler extends BaseHandlerWithFlagCache {
 					continue;
 				}
 
-				// Sort and trim the map
-				$pairs = $newCombinations->pairs()->toArray();
-				usort(
-					$pairs, static function ($a, $b): int {
-						if ($b->value > $a->value) {
-							return 1;
-						}
-						if ($b->value < $a->value) {
-							return -1;
-						}
-						return 0;
-					}
-				);
-
-				// Create a new map with only the top items
-				$newCombinations = new \Ds\Map();
-				for ($i = 0; $i < $maxCount; $i++) {
-					$newCombinations->put($pairs[$i]->key, $pairs[$i]->value);
-				}
+				$newCombinations = static::trimCombinationsToMaxCount($newCombinations, $maxCount);
 			}
 		}
 
 		return $newCombinations;
+	}
+
+	/**
+	 * @param \Ds\Map<string,float> $combinations
+	 * @param float $newScore
+	 * @param int $maxCount
+	 * @return bool
+	 */
+	private static function shouldSkipCombination(\Ds\Map $combinations, float $newScore, int $maxCount): bool {
+		return $combinations->count() >= $maxCount && $newScore <= min($combinations->values()->toArray());
+	}
+
+	/**
+	 * @param \Ds\Map<string,float> $combinations
+	 * @param int $maxCount
+	 * @return \Ds\Map<string,float>
+	 */
+	private static function trimCombinationsToMaxCount(\Ds\Map $combinations, int $maxCount): \Ds\Map {
+		// Sort and trim the map
+		$pairs = $combinations->pairs()->toArray();
+		usort(
+			$pairs, static function ($a, $b): int {
+				if ($b->value > $a->value) {
+					return 1;
+				}
+				if ($b->value < $a->value) {
+					return -1;
+				}
+				return 0;
+			}
+		);
+
+		// Create a new map with only the top items
+		$trimmedCombinations = new \Ds\Map();
+		for ($i = 0; $i < $maxCount; $i++) {
+			$trimmedCombinations->put($pairs[$i]->key, $pairs[$i]->value);
+		}
+
+		return $trimmedCombinations;
 	}
 
 
