@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License version 3 or any later
@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -20,8 +21,8 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
  * No pattern-based detection - relies on LLM-generated queries and exclusions
  */
 class SearchEngine {
-	private const DEFAULT_SIMILARITY_THRESHOLD = 0.8;
-	private const DEFAULT_K_RESULTS = 5;
+	private const float DEFAULT_SIMILARITY_THRESHOLD = 0.8;
+	private const int DEFAULT_K_RESULTS = 5;
 
 	/**
 	 * Perform enhanced KNN search with exclusions (based on original enhancedKNNSearch)
@@ -30,10 +31,11 @@ class SearchEngine {
 	 * @param string $table
 	 * @param string $searchQuery
 	 * @param string $excludeQuery
-	 * @param array $modelConfig
-	 * @param array $options
+	 * @param array{llm_provider: string, llm_model: string, settings?: string|array<string, mixed>,
+	 *   k_results?: string|int, similarity_threshold?: string|float} $modelConfig
 	 * @param float|null $threshold
-	 * @return array
+	 *
+	 * @return array<int, array<string, mixed>>
 	 */
 	public function performSearch(
 		HTTPClient $client,
@@ -41,7 +43,6 @@ class SearchEngine {
 		string $searchQuery,
 		string $excludeQuery,
 		array $modelConfig,
-		array $options = [],
 		?float $threshold = null
 	): array {
 		// Get excluded IDs first
@@ -54,8 +55,7 @@ class SearchEngine {
 			$searchQuery,
 			$excludedIds,
 			$modelConfig,
-			$options,
-			$threshold ?? $this->getSimilarityThreshold($modelConfig, $options)
+			$threshold ?? $this->getSimilarityThreshold($modelConfig)
 		);
 	}
 
@@ -65,8 +65,9 @@ class SearchEngine {
 	 * @param HTTPClient $client
 	 * @param string $table
 	 * @param string $excludeQuery
-	 * @param array $modelConfig
-	 * @return array
+	 *
+	 * @return array<int, string|int>
+	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
 	 */
 	public function getExcludedIds(
 		HTTPClient $client,
@@ -92,6 +93,7 @@ class SearchEngine {
 			return []; // Return empty array on error
 		}
 
+		/** @var array<int, array{data: array<int, array{id: string|int}>}> $result */
 		$result = $response->getResult();
 		$excludeResults = $result[0]['data'] ?? [];
 
@@ -103,31 +105,39 @@ class SearchEngine {
 	 *
 	 * @param HTTPClient $client
 	 * @param string $table
+	 *
 	 * @return string|null
+	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
 	 */
 	private function detectVectorField(HTTPClient $client, string $table): ?string {
 
 			$query = "DESCRIBE {$table}";
 			$response = $client->sendRequest($query);
 		if ($response->hasError()) {
-			throw ManticoreSearchResponseError::create('Schema detection failed: ' . $response->getError());
+			throw ManticoreSearchResponseError::create(
+				'Schema detection failed: ' . $response->getError()
+			);
 		}
-			$schema = $response->getResult()[0]['data'] ?? [];
 
-			// Look for FLOAT_VECTOR fields
+		/** @var array<int, array{data: array<int, array{Type: string, Field: string}>}> $result */
+		$result = $response->getResult();
+		$schema = $result[0]['data'];
+
+		// Look for FLOAT_VECTOR fields
 		foreach ($schema as $field) {
-			if (isset($field['Type']) && strpos(strtoupper($field['Type']), 'FLOAT_VECTOR') !== false) {
-				return $field['Field'] ?? null;
+			if (strpos(strtoupper($field['Type']), 'FLOAT_VECTOR') !== false) {
+				return $field['Field'];
 			}
 		}
 
 		// Common vector field names from original implementation
+		/** @var array<int, string> $commonNames */
 		$commonNames = [
 			'embedding_vector', 'embedding', 'vector', 'embeddings',
 			'content_embedding', 'text_embedding',
 		];
 		foreach ($schema as $field) {
-			$fieldName = strtolower($field['Field'] ?? '');
+			$fieldName = strtolower($field['Field']);
 			if (in_array($fieldName, $commonNames)) {
 				return $field['Field'];
 			}
@@ -152,11 +162,13 @@ class SearchEngine {
 	 * @param HTTPClient $client
 	 * @param string $table
 	 * @param string $searchQuery
-	 * @param array $excludedIds
-	 * @param array $modelConfig
-	 * @param array $options
+	 * @param array<int, string|int> $excludedIds
+	 * @param array{llm_provider: string, llm_model: string, settings?: string|array<string, mixed>,
+	 *   k_results?: string|int, similarity_threshold?: string|float} $modelConfig
 	 * @param float $threshold
-	 * @return array
+	 *
+	 * @return array<int, array<string, mixed>>
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	public function performSearchWithExcludedIds(
 		HTTPClient $client,
@@ -164,10 +176,9 @@ class SearchEngine {
 		string $searchQuery,
 		array $excludedIds,
 		array $modelConfig,
-		array $options,
 		float $threshold
 	): array {
-		$kResults = $this->getKResults($modelConfig, $options);
+		$kResults = $this->getKResults($modelConfig);
 		$vectorField = $this->detectVectorField($client, $table);
 
 		if (!$vectorField) {
@@ -207,7 +218,9 @@ class SearchEngine {
 			throw ManticoreSearchResponseError::create('Vector search failed: ' . $response->getError());
 		}
 
-		$result = $response->getResult()[0]['data'] ?? [];
+		/** @var array<int, array{data: array<int, array<string, mixed>>}> $responseResult */
+		$responseResult = $response->getResult();
+		$result = $responseResult[0]['data'] ?? [];
 		Buddy::info('└─ Results found: ' . sizeof($result));
 
 		return $this->filterVectorFields($result, $table, $client);
@@ -216,16 +229,11 @@ class SearchEngine {
 	/**
 	 * Get K results from configuration
 	 *
-	 * @param array $modelConfig
-	 * @param array $options
+	 * @param array{llm_provider: string, llm_model: string,
+	 *   settings?: string|array<string, mixed>, k_results?: string|int} $modelConfig
 	 * @return int
 	 */
-	private function getKResults(array $modelConfig, array $options): int {
-		// Check overrides first
-		if (isset($options['overrides']['k_results'])) {
-			return (int)$options['overrides']['k_results'];
-		}
-
+	private function getKResults(array $modelConfig): int {
 		// Check direct config
 		if (isset($modelConfig['k_results'])) {
 			return (int)$modelConfig['k_results'];
@@ -237,7 +245,7 @@ class SearchEngine {
 				? json_decode($modelConfig['settings'], true) ?? []
 				: $modelConfig['settings'];
 
-			if (isset($settings['k_results'])) {
+			if (is_array($settings) && isset($settings['k_results'])) {
 				return (int)$settings['k_results'];
 			}
 		}
@@ -248,10 +256,12 @@ class SearchEngine {
 	/**
 	 * Remove embedding vector fields from search results (matches original php_rag behavior)
 	 *
-	 * @param array $results
+	 * @param array<int, array<string, mixed>> $results
 	 * @param string $table
 	 * @param HTTPClient $client
-	 * @return array
+	 *
+	 * @return array<int, array<string, mixed>>
+	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
 	 */
 	private function filterVectorFields(array $results, string $table, HTTPClient $client): array {
 		if (empty($results)) {
@@ -265,7 +275,6 @@ class SearchEngine {
 			return $results;
 		}
 
-		// Remove vector fields from each result (matches php_rag.php:511)
 		return array_map(
 			function ($result) use ($vectorFields) {
 				foreach ($vectorFields as $field) {
@@ -281,23 +290,29 @@ class SearchEngine {
 	 *
 	 * @param HTTPClient $client
 	 * @param string $table
-	 * @return array
+	 *
+	 * @return array<int, string>
+	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
 	 */
 	private function getVectorFields(HTTPClient $client, string $table): array {
 
-		$query = "DESCRIBE {$table}";
+		$query = "DESCRIBE $table";
 		$response = $client->sendRequest($query);
 
 		if ($response->hasError()) {
 			throw ManticoreSearchResponseError::create('Vector fields detection failed: ' . $response->getError());
 		}
-		$schema = $response->getResult()[0]['data'] ?? [];
 
+		/** @var array<int, array{data: array<int, array{Type: string, Field: string}>}> $result */
+		$result = $response->getResult();
+		$schema = $result[0]['data'];
+
+		/** @var array<int, string> $vectorFields */
 		$vectorFields = [];
 		foreach ($schema as $field) {
-			$fieldType = strtoupper($field['Type'] ?? '');
+			$fieldType = strtoupper($field['Type']);
 			// Match any float_vector type
-			if (strpos($fieldType, 'FLOAT_VECTOR') === false) {
+			if (!str_contains($fieldType, 'FLOAT_VECTOR')) {
 				continue;
 			}
 
@@ -310,15 +325,13 @@ class SearchEngine {
 	/**
 	 * Get similarity threshold from configuration
 	 *
-	 * @param array $modelConfig
-	 * @param array $options
+	 * @param array{llm_provider: string, llm_model: string,
+	 *   settings?: string|array<string, mixed>,
+	 *   similarity_threshold?: string|float} $modelConfig
+	 *
 	 * @return float
 	 */
-	private function getSimilarityThreshold(array $modelConfig, array $options): float {
-		// Check overrides first
-		if (isset($options['overrides']['similarity_threshold'])) {
-			return (float)$options['overrides']['similarity_threshold'];
-		}
+	private function getSimilarityThreshold(array $modelConfig): float {
 
 		// Check direct config
 		if (isset($modelConfig['similarity_threshold'])) {
@@ -331,7 +344,7 @@ class SearchEngine {
 				? json_decode($modelConfig['settings'], true) ?? []
 				: $modelConfig['settings'];
 
-			if (isset($settings['similarity_threshold'])) {
+			if (is_array($settings) && isset($settings['similarity_threshold'])) {
 				return (float)$settings['similarity_threshold'];
 			}
 		}

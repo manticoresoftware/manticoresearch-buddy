@@ -100,6 +100,7 @@ class ConversationManagerSqlValidationTest extends TestCase {
 
 	/**
 	 * Parse values from SQL VALUES clause, handling quoted strings properly
+	 * @return array<int, string>
 	 */
 	private function parseValuesFromSql(string $values): array {
 		$valueArray = [];
@@ -182,8 +183,7 @@ class ConversationManagerSqlValidationTest extends TestCase {
 			'NEW_SEARCH',
 			'search query here',
 			'exclude query here',
-			[1, 2, 3],
-			3600
+			['1', '2', '3']
 		);
 	}
 

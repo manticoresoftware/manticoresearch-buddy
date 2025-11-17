@@ -69,12 +69,20 @@ class ConversationalRagSqlTest extends TestCase {
 		);
 
 		// Even if the call fails due to API issues, we should see the conversations table being used
-		if (!isset($result['error']) || !str_contains($result['error'], 'Failed to insert into conversations table')) {
+		$errorValue = $result['error'] ?? '';
+		if (is_string($errorValue)) {
+			$error = $errorValue;
+		} elseif (is_array($errorValue)) {
+			$error = $errorValue['error'];
+		} else {
+			$error = '';
+		}
+		if (!isset($result['error']) || !str_contains($error, 'Failed to insert into conversations table')) {
 			return;
 		}
 
 		// This would catch SQL syntax errors like the one we fixed
-		$this->fail('SQL syntax error in conversation insertion: ' . $result['error']);
+		$this->fail('SQL syntax error in conversation insertion: ' . $error);
 	}
 
 	/**

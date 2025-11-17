@@ -113,8 +113,9 @@ class ConversationalRagTest extends TestCase {
 
 		$result = $task->getResult();
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
-		$struct = $result->getStruct();
+		$struct = (array)$result->getStruct();
+		$this->assertIsArray($struct);
+		/** @var array<int, array{data: array<int, array{uuid: string}>}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertCount(1, $struct[0]['data']);
@@ -168,8 +169,9 @@ class ConversationalRagTest extends TestCase {
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
-		$struct = $result->getStruct();
+		$struct = (array)$result->getStruct();
+		$this->assertIsArray($struct);
+		/** @var array<int, array{data?: array<int, array<string, mixed>>}> $struct */
 		$this->assertCount(1, $struct);
 
 		// For empty results, 'data' key may not be present in TaskResult
@@ -260,13 +262,14 @@ class ConversationalRagTest extends TestCase {
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
+		/** @var array<int, array<string, mixed>> $struct */
 		$struct = $result->getStruct();
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
-		$this->assertGreaterThan(0, sizeof($struct[0]['data']));
 
+		/** @var array<int, array<string, mixed>> $data */
 		$data = $struct[0]['data'];
+		$this->assertGreaterThan(0, sizeof($data));
 
 		// Should have property-value pairs for the model description
 		$this->assertEquals('uuid', $data[0]['property']);
@@ -340,7 +343,7 @@ class ConversationalRagTest extends TestCase {
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
+		/** @var array<int, array<string, mixed>> $struct */
 		$struct = $result->getStruct();
 		$this->assertCount(1, $struct);
 		$this->assertEquals(0, $struct[0]['total']);

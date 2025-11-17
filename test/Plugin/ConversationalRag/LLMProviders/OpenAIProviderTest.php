@@ -28,14 +28,6 @@ class OpenAIProviderTest extends TestCase {
 		$this->assertEquals('openai', $this->provider->getName());
 	}
 
-	public function testGetSupportedModels(): void {
-		$models = $this->provider->getSupportedModels();
-		$this->assertIsArray($models);
-		$this->assertContains('gpt-4o', $models);
-		$this->assertContains('gpt-4o-mini', $models);
-		$this->assertContains('gpt-3.5-turbo', $models);
-	}
-
 	public function testGenerateResponseMissingApiKey(): void {
 		$this->provider->configure(['llm_provider' => 'openai']);
 		putenv('OPENAI_API_KEY'); // Remove API key
@@ -43,8 +35,9 @@ class OpenAIProviderTest extends TestCase {
 		$result = $this->provider->generateResponse('Test prompt');
 
 		$this->assertFalse($result['success']);
-		$this->assertStringContainsString('OpenAI request failed', $result['error']);
-		$this->assertStringContainsString('not found or empty', $result['details'] ?? $result['error']);
+		$this->assertStringContainsString('OpenAI request failed', is_string($result['error']) ? $result['error'] : '');
+		$details = $result['details'] ?? $result['error'];
+		$this->assertStringContainsString('not found or empty', is_string($details) ? $details : '');
 	}
 
 	public function testGenerateResponseDefaultModel(): void {
@@ -133,7 +126,7 @@ class OpenAIProviderTest extends TestCase {
 		$result = $mockProvider->generateResponse('Test prompt');
 
 		$this->assertFalse($result['success']);
-		$this->assertStringContainsString('OpenAI request failed', $result['error']);
+		$this->assertStringContainsString('OpenAI request failed', is_string($result['error']) ? $result['error'] : '');
 	}
 
 	public function testCreateClientReturnsCurlHandle(): void {

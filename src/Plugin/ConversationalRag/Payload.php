@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 3 or any later
@@ -19,11 +19,11 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
-	public const ACTION_CREATE_MODEL = 'create_model';
-	public const ACTION_SHOW_MODELS = 'show_models';
-	public const ACTION_DESCRIBE_MODEL = 'describe_model';
-	public const ACTION_DROP_MODEL = 'drop_model';
-	public const ACTION_CONVERSATION = 'conversation';
+	public const string ACTION_CREATE_MODEL = 'create_model';
+	public const string ACTION_SHOW_MODELS = 'show_models';
+	public const string ACTION_DESCRIBE_MODEL = 'describe_model';
+	public const string ACTION_DROP_MODEL = 'drop_model';
+	public const string ACTION_CONVERSATION = 'conversation';
 
 	/** @var string */
 	public string $action;
@@ -31,7 +31,7 @@ final class Payload extends BasePayload {
 	/** @var string */
 	public string $query;
 
-	/** @var array */
+	/** @var array<string, string> */
 	public array $params = [];
 
 	/**
@@ -155,7 +155,7 @@ final class Payload extends BasePayload {
 	 *
 	 * @param string $modelName
 	 * @param string $params
-	 * @return array
+	 * @return array<string, string>
 	 */
 	private function parseCreateModelParams(string $modelName, string $params): array {
 		// Parse key=value pairs from CREATE RAG MODEL syntax
@@ -170,11 +170,6 @@ final class Payload extends BasePayload {
 			}
 		}
 
-		// Handle JSON settings
-		if (isset($config['settings'])) {
-			$config['settings'] = json_decode($config['settings'], true) ?? [];
-		}
-
 		if (!isset($config['name'])) {
 			$config['name'] = $modelName;
 		}
@@ -186,7 +181,7 @@ final class Payload extends BasePayload {
 	 * Parse key=value parameters
 	 *
 	 * @param string $params
-	 * @return array
+	 * @return array<string, string>
 	 */
 	private function parseKeyValueParams(string $params): array {
 		$result = [];
@@ -238,7 +233,7 @@ final class Payload extends BasePayload {
 	 * Parse conversation parameters
 	 *
 	 * @param string $params
-	 * @return array
+	 * @return array<string, string>
 	 */
 	private function parseConversationParams(string $params): array {
 		$parts = $this->parseCommaSeparatedParams($params);
@@ -253,19 +248,15 @@ final class Payload extends BasePayload {
 			$result['conversation_uuid'] = $this->unquoteString($parts[3]);
 		}
 
-		if (isset($parts[4])) {
-			$overridesStr = $this->unquoteString($parts[4]);
-			$result['overrides'] = json_decode($overridesStr, true) ?? [];
-		}
 
 		return $result;
 	}
 
 	/**
-	 * Parse comma-separated parameters, respecting quotes and parentheses
+	 * Parse comma-separated parameters with quote handling
 	 *
 	 * @param string $params
-	 * @return array
+	 * @return array<string>
 	 */
 	private function parseCommaSeparatedParams(string $params): array {
 		$result = [];
@@ -320,7 +311,7 @@ final class Payload extends BasePayload {
 	 * @param string $current
 	 * @param string $params
 	 * @param int $i
-	 * @return array
+	 * @return array{0: bool, 1: string, 2: string, 3: int, 4: bool}
 	 */
 	private function handleCharacterInQuotes(
 		string $char,

@@ -144,7 +144,7 @@ class ConversationalPayloadTest extends TestCase {
 				[
 				'version' => Buddy::PROTOCOL_VERSION,
 				'error' => '',
-				'payload' => json_encode(
+				'payload' => (string)json_encode(
 					[
 					'id' => 'test_model',
 					'name' => 'Test Model',

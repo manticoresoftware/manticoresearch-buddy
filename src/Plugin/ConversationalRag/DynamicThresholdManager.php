@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 3 or any later
@@ -23,6 +23,7 @@ class DynamicThresholdManager {
 	private const MAX_EXPANSION_PERCENT = 0.2; // 20% maximum expansion
 	private const EXPANSION_STEPS = 4;
 
+	/** @var array<string, array{count: int, last_conversation_hash: string}> */
 	private static array $expansionState = [];
 
 	/**
@@ -30,11 +31,12 @@ class DynamicThresholdManager {
 	 * Based on original calculateDynamicThreshold and detectExpansionIntent
 	 *
 	 * @param string $userQuery
-	 * @param array $conversationHistory
+	 * @param string $conversationHistory
 	 * @param LLMProviderManager $llmProvider
-	 * @param array $modelConfig
+	 * @param array<string, mixed> $modelConfig
 	 * @param float $baseThreshold
-	 * @return array
+	 * @return array{threshold: float, expansion_level: int, is_expanded: bool, max_threshold: float,
+	 *               expansion_percent: float, expansion_limit_reached: bool}
 	 */
 	public function calculateDynamicThreshold(
 		string $userQuery,
@@ -113,6 +115,7 @@ class DynamicThresholdManager {
 				'is_expanded' => true,
 				'max_threshold' => $maxThreshold,
 				'expansion_percent' => round((($threshold - $baseThreshold) / $baseThreshold) * 100, 1),
+				'expansion_limit_reached' => $expansionCount >= 5,
 			];
 		}
 
@@ -128,13 +131,14 @@ class DynamicThresholdManager {
 			'is_expanded' => false,
 			'max_threshold' => $baseThreshold,
 			'expansion_percent' => 0,
+			'expansion_limit_reached' => false,
 		];
 	}
 
 	/**
 	 * Get conversation ID from history
 	 *
-	 * @param array $conversationHistory
+	 * @param string $conversationHistory
 	 * @return string
 	 */
 	private function getConversationId(string $conversationHistory): string {
@@ -148,7 +152,7 @@ class DynamicThresholdManager {
 	 * @param string $userQuery
 	 * @param string $conversationHistory
 	 * @param LLMProviderManager $llmProvider
-	 * @param array $modelConfig
+	 * @param array<string, mixed> $modelConfig
 	 * @return bool
 	 */
 	private function detectExpansionIntent(
@@ -197,7 +201,7 @@ Does this query request BROADENING beyond previous results?
 Answer: YES or NO";
 
 			$provider = $llmProvider->getConnection('expansion_detector', $modelConfig);
-			$response = $provider->generateResponse($expansionPrompt, [], ['temperature' => 0.1, 'max_tokens' => 10]);
+			$response = $provider->generateResponse($expansionPrompt, ['temperature' => 0.1, 'max_tokens' => 10]);
 
 			if (!$response['success']) {
 				return false;
@@ -217,14 +221,5 @@ Answer: YES or NO";
 		}
 	}
 
-	/**
-	 * Format conversation history for LLM prompt (conversationHistory is already formatted)
-	 *
-	 * @param string $conversationHistory
-	 * @return string
-	 */
-	private function formatConversationHistory(string $conversationHistory): string {
-		// Conversation history is already formatted as "role: message\nrole: message\n"
-		return $conversationHistory;
-	}
+
 }

@@ -5,7 +5,7 @@ The ConversationalRag plugin enables conversational Retrieval-Augmented Generati
 ## Features
 
 - **Conversational AI**: Maintains conversation context with automatic UUID generation
-- **Vector Search**: Uses KNN search on float_vector fields to find relevant documents  
+- **Vector Search**: Uses KNN search on float_vector fields to find relevant documents
 - **OpenAI Integration**: Uses OpenAI models (gpt-4o, gpt-4o-mini, gpt-3.5-turbo, etc.)
 - **Intent Classification**: Detects user intent (NEW_SEARCH, ALTERNATIVES, TOPIC_CHANGE, etc.)
 - **Dynamic Thresholds**: Adjusts search similarity thresholds based on conversation flow
@@ -69,13 +69,6 @@ CREATE RAG MODEL advanced_assistant (
     similarity_threshold=0.8,
     max_document_length=3000
 );
-
--- Model with JSON settings
-CREATE RAG MODEL custom_assistant (
-    llm_provider='openai',
-    llm_model='gpt-3.5-turbo',
-    settings='{"temperature": 0.5, "top_p": 0.9, "frequency_penalty": 0.1}'
-);
 ```
 
 #### Viewing Models
@@ -128,22 +121,9 @@ CALL CONVERSATIONAL_RAG(
 -- Continue same conversation
 CALL CONVERSATIONAL_RAG(
     'Can you give me a practical example?',
-    'documents', 
+    'documents',
     'my_assistant',
     'conv-12345678-1234-1234-1234-123456789abc'
-);
-```
-
-#### Runtime Parameter Overrides
-
-```sql
--- Override model settings for specific query
-CALL CONVERSATIONAL_RAG(
-    'Give me a detailed explanation',
-    'docs_table',
-    'my_assistant',
-    'conversation-uuid',
-    '{"temperature": 0.1, "max_tokens": 6000, "k_results": 15}'
 );
 ```
 
@@ -183,20 +163,6 @@ The plugin automatically detects vector fields by:
 | `max_tokens` | int | No | 4000 | Maximum response length (1-32768) |
 | `k_results` | int | No | 5 | Number of documents to retrieve (1-50) |
 | `settings` | JSON string | No | - | Additional settings as JSON |
-
-### Runtime Overrides
-
-Some parameters can be overridden per query:
-
-```sql
-CALL CONVERSATIONAL_RAG(
-    'Your question here',
-    'table_name',
-    'model_name',
-    'conversation_uuid',
-    '{"temperature": 0.9, "k_results": 20}'
-);
-```
 
 ## Advanced Features
 
@@ -276,7 +242,7 @@ CALL CONVERSATIONAL_RAG(
 export OPENAI_API_KEY="sk-proj-your-key-here"
 ```
 
-### No Vector Field  
+### No Vector Field
 ```sql
 -- Error: No vector field found in table
 -- Solution: Add float_vector field

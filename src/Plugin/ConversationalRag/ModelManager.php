@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License version 3 or any later
@@ -14,16 +14,18 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+use Random\RandomException;
 
 /**
  * Manages RAG model persistence and database operations
  */
 class ModelManager {
 	use SqlEscapeTrait;
-	public const MODELS_TABLE = 'system.rag_models';
+	public const string MODELS_TABLE = 'system.rag_models';
 
 	// Mapping of LLM providers to their environment variable names
-	public const PROVIDER_ENV_VARS = [
+	/** @var array{openai: string, anthropic: string, grok: string, mistral: string, ollama: string} */
+	public const array PROVIDER_ENV_VARS = [
 		'openai' => 'OPENAI_API_KEY',
 		'anthropic' => 'ANTHROPIC_API_KEY',
 		'grok' => 'GROK_API_KEY',
@@ -82,10 +84,13 @@ class ModelManager {
 	 * Create a new RAG model
 	 *
 	 * @param HTTPClient $client
-	 * @param array $config
+	 * @param array{name: string, llm_provider: string, llm_model: string, style_prompt?:string,
+	 *   settings?: string|array<string, mixed>, temperature?: string,
+	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
+	 *   max_document_length?: string} $config
 	 *
 	 * @return string Model ID
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError|RandomException
 	 */
 	public function createModel(HTTPClient $client, array $config): string {
 		$modelName = $config['name'];
@@ -93,7 +98,7 @@ class ModelManager {
 
 		// Check if the model already exists
 		if ($this->modelExists($client, $modelName)) {
-			 throw ManticoreSearchClientError::create("RAG model '{$modelName}' already exists");
+			 throw ManticoreSearchClientError::create("RAG model '$modelName' already exists");
 		}
 
 		// Prepare settings
@@ -110,7 +115,7 @@ class ModelManager {
 				$this->quote($config['llm_provider']),
 				$this->quote($config['llm_model']),
 				$this->quote($config['style_prompt'] ?? ''),
-				$this->quote(json_encode($settings)),
+				$this->quote($this->encodeSettings($settings)),
 				$currentTime,
 				$currentTime
 			);
@@ -127,6 +132,7 @@ class ModelManager {
 	 * Generate a UUID v4
 	 *
 	 * @return string
+	 * @throws RandomException
 	 */
 	private function generateUuid(): string {
 		$data = random_bytes(16);
@@ -140,7 +146,9 @@ class ModelManager {
 	 *
 	 * @param HTTPClient $client
 	 * @param string $modelName
+	 *
 	 * @return bool
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	private function modelExists(HTTPClient $client, string $modelName): bool {
 		$sql = sprintf(
@@ -153,7 +161,10 @@ class ModelManager {
 		if ($response->hasError()) {
 			throw ManticoreSearchClientError::create('Failed to check model existence: ' . $response->getError());
 		}
-		$data = $response->getResult()[0]['data'] ?? [];
+
+		/** @var array<int, array{data: array<int, array{count: int}>}> $result */
+		$result = $response->getResult();
+		$data = $result[0]['data'] ?? [];
 
 		return !empty($data) && ($data[0]['count'] ?? 0) > 0;
 	}
@@ -161,11 +172,13 @@ class ModelManager {
 	/**
 	 * Extract settings from config into separate array
 	 *
-	 * @param array $config
-	 * @return array
+	 * @param array<string, mixed> $config
+	 * @return array<string, mixed>
 	 */
 	private function extractSettings(array $config): array {
+		/** @var array<int, string> $coreFields */
 		$coreFields = ['id', 'name', 'llm_provider', 'llm_model', 'llm_api_key', 'style_prompt'];
+		/** @var array<string, mixed> $settings */
 		$settings = [];
 
 		foreach ($config as $key => $value) {
@@ -176,7 +189,7 @@ class ModelManager {
 			// If settings is a JSON string, parse it
 			if ($key === 'settings' && is_string($value)) {
 				$parsedSettings = json_decode($value, true);
-				if (json_last_error() === JSON_ERROR_NONE) {
+				if (json_last_error() === JSON_ERROR_NONE && is_array($parsedSettings)) {
 					$settings = array_merge($settings, $parsedSettings);
 				} else {
 					$settings[$key] = $value;
@@ -193,16 +206,33 @@ class ModelManager {
 	}
 
 	/**
+	 * Safely encode settings to JSON string
+	 *
+	 * @param array<string, mixed> $settings
+	 *
+	 * @return string
+	 * @throws ManticoreSearchClientError
+	 */
+	private function encodeSettings(array $settings): string {
+		$encoded = json_encode($settings);
+		if (json_last_error() !== JSON_ERROR_NONE || empty($encoded)) {
+			throw ManticoreSearchClientError::create('Failed to encode settings to JSON: ' . json_last_error_msg());
+		}
+		return $encoded;
+	}
+
+	/**
 	 * Get all RAG models
 	 *
 	 * @param HTTPClient $client
 	 *
-	 * @return array
+	 * @return array<int, array{id: string, uuid: string, name: string,
+	 *   llm_provider: string, llm_model: string, created_at: string}>
 	 * @throws ManticoreSearchResponseError
 	 * @throws ManticoreSearchClientError
 	 */
 	public function getAllModels(HTTPClient $client): array {
-		$sql = 'SELECT id, uuid, name, llm_provider, llm_model, created_at
+		$sql = /** @lang manticore */'SELECT id, uuid, name, llm_provider, llm_model, created_at
 				FROM ' . self::MODELS_TABLE . '
 				ORDER BY created_at DESC';
 
@@ -210,14 +240,18 @@ class ModelManager {
 		if ($response->hasError()) {
 			throw ManticoreSearchResponseError::create('Failed to get all models: ' . $response->getError());
 		}
-		return $response->getResult()[0]['data'] ?? [];
+
+		/** @var array<int, array{data: array<int, array{id: string, uuid: string, name: string,
+		 *   llm_provider: string, llm_model: string, created_at: string}>}> $result */
+		$result = $response->getResult();
+		return $result[0]['data'] ?? [];
 	}
 
 	/**
-	 * Delete RAG model by name
+	 * Delete RAG model by UUID or name
 	 *
 	 * @param HTTPClient $client
-	 * @param string $modelName
+	 * @param string $modelUuidOrName
 	 *
 	 * @return void
 	 * @throws ManticoreSearchClientError
@@ -226,9 +260,6 @@ class ModelManager {
 	public function deleteModelByUuidOrName(HTTPClient $client, string $modelUuidOrName): void {
 
 		$model = $this->getModelByUuidOrName($client, $modelUuidOrName);
-		if (empty($model)) {
-			throw ManticoreSearchClientError::create("RAG model '{$modelUuidOrName}' not found");
-		}
 
 		// Soft delete by setting is_active = false
 		$sql = sprintf(
@@ -258,10 +289,12 @@ class ModelManager {
 	 * @param HTTPClient $client
 	 * @param string $modelNameOrUuid Model name or UUID
 	 *
-	 * @return array|null
+	 * @return array{id:string, uuid:string, name:string,llm_provider:string,llm_model:string,
+	 *   style_prompt:string,settings:array{ temperature?: string, max_tokens?: string, k_results?: string,
+	 *   similarity_threshold: string, max_document_length: string},created_at:string,updated_at:string}
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
-	public function getModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): ?array {
+	public function getModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): array {
 		$sql = /** @lang Manticore */ 'SELECT * FROM ' . self::MODELS_TABLE .
 			' WHERE (name = ' . $this->quote($modelNameOrUuid) . ' OR uuid = ' . $this->quote($modelNameOrUuid) . ')';
 
@@ -269,29 +302,19 @@ class ModelManager {
 		if ($response->hasError()) {
 			throw  ManticoreSearchResponseError::create('Failed to get model by UUID/name: ' . $response->getError());
 		}
-		$data = $response->getResult()[0]['data'] ?? [];
 
-		if (empty($data)) {
-			return null;
+		$data = $response->getResult();
+		if (is_array($data[0]) && !empty($data[0]['data'])) {
+			$model = $data[0]['data'][0];
+			if (isset($model['settings']) && $model['settings'] !== 'NULL') {
+				$model['settings'] = json_decode($model['settings'], true);
+			}
+
+			return $model;
 		}
 
-		return $data[0];
+		throw ManticoreSearchClientError::create("RAG model '$modelNameOrUuid' not found");
 	}
 
-	/**
-	 * Escape special characters for strings
-	 *
-	 * @param string $value
-	 * @return string
-	 */
-	private function escape(string $value): string {
-		// ManticoreSearch MATCH special characters that need escaping
-		$specialChars = ['!', '"', '$', "'", '(', ')', '-', '/', '<', '@', '\\', '^', '|', '~'];
 
-		// Create escaped versions
-		$escapedChars = array_map(fn($char) => '\\' . $char, $specialChars);
-
-		// Replace all in one call
-		return str_replace($specialChars, $escapedChars, $value);
-	}
 }

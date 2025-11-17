@@ -129,8 +129,9 @@ class ConversationHandlerTest extends TestCase {
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
-		$struct = $result->getStruct();
+		$struct = (array)$result->getStruct();
+		$this->assertIsArray($struct);
+		/** @var array<int, array{data: array<int, array{uuid: string}>}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertArrayHasKey('uuid', $struct[0]['data'][0]);
@@ -193,8 +194,9 @@ class ConversationHandlerTest extends TestCase {
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
-		$struct = $result->getStruct();
+		$struct = (array)$result->getStruct();
+		$this->assertIsArray($struct);
+		/** @var array<int, array{data: array<int, array{uuid: string, name: string}>}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertCount(1, $struct[0]['data']);
@@ -269,8 +271,9 @@ class ConversationHandlerTest extends TestCase {
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
-		$struct = $result->getStruct();
+		$struct = (array)$result->getStruct();
+		$this->assertIsArray($struct);
+		/** @var array<int, array{data: array<int, array{property: string, value: string}>}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertGreaterThan(0, sizeof($struct[0]['data']));
@@ -352,8 +355,9 @@ class ConversationHandlerTest extends TestCase {
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
-		$struct = $result->getStruct();
+		$struct = (array)$result->getStruct();
+		$this->assertIsArray($struct);
+		/** @var array<int, array{total: int, error: string, warning: string}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertEquals(0, $struct[0]['total']);
 		$this->assertEmpty($struct[0]['error']);
@@ -583,8 +587,9 @@ class ConversationHandlerTest extends TestCase {
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
-		$struct = $result->getStruct();
+		$struct = (array)$result->getStruct();
+		$this->assertIsArray($struct);
+		/** @var array<int, array{data: array<int, array{uuid: string}>}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertCount(1, $struct[0]['data']);
@@ -660,8 +665,9 @@ class ConversationHandlerTest extends TestCase {
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		/** @var Struct<string,mixed> $struct */
-		$struct = $result->getStruct();
+		$struct = (array)$result->getStruct();
+		$this->assertIsArray($struct);
+		/** @var array<int, array{data: array<int, array<string, mixed>>}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertGreaterThan(0, sizeof($struct[0]['data']));
@@ -740,8 +746,9 @@ class ConversationHandlerTest extends TestCase {
 			}
 
 			$this->assertInstanceOf(TaskResult::class, $result);
-			/** @var Struct<string,mixed> $struct */
-			$struct = $result->getStruct();
+			$struct = (array)$result->getStruct();
+			$this->assertIsArray($struct);
+			/** @var array<int, array{data: array<int, array<string, mixed>>}> $struct */
 			$this->assertCount(1, $struct);
 			$this->assertArrayHasKey('data', $struct[0]);
 			$this->assertGreaterThan(0, sizeof($struct[0]['data']));
@@ -963,12 +970,14 @@ class ConversationHandlerTest extends TestCase {
 		$task = $handler->run();
 		if (!$task->isSucceed()) {
 			$error = $task->getError();
-			$this->fail('Task failed: ' . ($error ? $error->getMessage() : 'Unknown error'));
+			$this->fail('Task failed: ' . $error->getMessage());
 		}
 		$result = $task->getResult();
 
 		$this->assertInstanceOf(TaskResult::class, $result);
-		$struct = $result->getStruct();
+		$struct = (array)$result->getStruct();
+		$this->assertIsArray($struct);
+		/** @var array<int, array{data: array<int, array{conversation_uuid: string, sources: mixed}>}> $struct */
 
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
@@ -981,7 +990,7 @@ class ConversationHandlerTest extends TestCase {
 	/**
 	 * Create a mock LLM provider manager with predefined responses
 	 *
-	 * @param array $responses Array of LLM response arrays
+	 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
 	 * @return LLMProviderManager
 	 */
 	private function createMockLLMProviderManager(array $responses): LLMProviderManager {

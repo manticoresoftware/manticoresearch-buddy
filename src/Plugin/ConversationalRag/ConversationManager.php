@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 2 or any later
   version. You should have received a copy of the GPL license along with this
@@ -55,14 +55,18 @@ class ConversationManager {
 	}
 
 	/**
-	 * @param string $conversationId
-	 * @param int $modelId
+	 * @param string $conversationUuid
+	 * @param string $modelUuid
 	 * @param string $role
 	 * @param string $message
 	 * @param int $tokensUsed
+	 * @param string|null $intent
+	 * @param string|null $searchQuery
+	 * @param string|null $excludeQuery
+	 * @param array<int, string>|null $excludedIds
 	 *
-	 * @return bool
-	 * @throws ManticoreSearchClientError
+	 * @return void
+	 * @throws ManticoreSearchClientError|\JsonException
 	 */
 	public function saveMessage(
 		string $conversationUuid,
@@ -93,7 +97,9 @@ class ConversationManager {
 		$intentValue = $intent ? $this->quote($intent) : "''";
 		$searchQueryValue = $searchQuery ? $this->quote($searchQuery) : "''";
 		$excludeQueryValue = $excludeQuery ? $this->quote($excludeQuery) : "''";
-		$excludedIdsValue = $excludedIds ? $this->quote(json_encode($excludedIds)) : "''";
+		$excludedIdsValue = $excludedIds ? $this->quote(
+			json_encode($excludedIds, JSON_THROW_ON_ERROR)
+		) : "''";
 
 		$sql = sprintf(
 			'INSERT INTO %s (conversation_uuid, model_uuid, created_at, role, message, tokens_used, '
@@ -124,7 +130,7 @@ class ConversationManager {
 	}
 
 	/**
-	 * @param string $conversationId
+	 * @param string $conversationUuid
 	 * @param int $limit
 	 *
 	 * @return string
@@ -147,14 +153,17 @@ class ConversationManager {
 		if ($result->hasError()) {
 			throw ManticoreSearchClientError::create('Failed to retrieve conversation history: ' . $result->getError());
 		}
+
 		$data = $result->getResult();
-		$rows = $data[0]['data'] ?? [];
-
-		Buddy::info('├─ Messages found: ' . sizeof($rows));
-
 		$history = '';
-		foreach ($rows as $row) {
-			$history .= "{$row['role']}: {$row['message']}\n";
+		if (is_array($data[0])) {
+			$rows = $data[0]['data'];
+			Buddy::info('├─ Messages found: ' . $data->count());
+			foreach ($rows as $row) {
+				$role = (string)$row['role'];
+				$message = (string)$row['message'];
+				$history .= "{$role}: {$message}\n";
+			}
 		}
 
 		$historyLength = strlen($history);
@@ -169,8 +178,10 @@ class ConversationManager {
 	 * Get the latest search context that was NOT from a CONTENT_QUESTION intent
 	 *
 	 * @param string $conversationUuid
-	 * @return array|null
+	 *
+	 * @return array{search_query: string, exclude_query: string, excluded_ids: string}|null
 	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
 	 */
 	public function getLatestSearchContext(string $conversationUuid): ?array {
 		// Debug: Log search context retrieval
@@ -192,28 +203,34 @@ class ConversationManager {
 		}
 
 		$data = $result->getResult();
-		$rows = $data[0]['data'] ?? [];
 
-		if (empty($rows)) {
-			Buddy::info('└─ No search context found');
-			return null;
+		if (is_array($data[0]) && isset($data[0]['data'])) {
+			$rows = $data[0]['data'];
+
+			if (empty($rows)) {
+				Buddy::info('└─ No search context found');
+				return null;
+			}
+
+			$searchContext = [
+				'search_query' => (string)$rows[0]['search_query'],
+				'exclude_query' => (string)$rows[0]['exclude_query'],
+				'excluded_ids' => (string)$rows[0]['excluded_ids'],
+			];
+
+			/** @var array<int, mixed> $excludedIdsArray */
+			$excludedIdsArray = json_decode($searchContext['excluded_ids'], true) ?? [];
+			Buddy::info('├─ Search query: ' . substr($searchContext['search_query'], 0, 50) . '...');
+			$excludePreview = $searchContext['exclude_query']
+				? substr($searchContext['exclude_query'], 0, 50) . '...'
+				: 'none';
+			Buddy::info('├─ Exclude query: ' . $excludePreview);
+			Buddy::info('└─ Excluded IDs count: ' . sizeof($excludedIdsArray));
+
+			return $searchContext;
 		}
 
-		$searchContext = [
-			'search_query' => $rows[0]['search_query'],
-			'exclude_query' => $rows[0]['exclude_query'],
-			'excluded_ids' => $rows[0]['excluded_ids'],
-		];
-
-		$excludedIdsArray = json_decode($searchContext['excluded_ids'], true) ?? [];
-		Buddy::info('├─ Search query: ' . substr($searchContext['search_query'], 0, 50) . '...');
-		$excludePreview = $searchContext['exclude_query']
-			? substr($searchContext['exclude_query'], 0, 50) . '...'
-			: 'none';
-		Buddy::info('├─ Exclude query: ' . $excludePreview);
-		Buddy::info('└─ Excluded IDs count: ' . sizeof($excludedIdsArray));
-
-		return $searchContext;
+		throw ManticoreSearchClientError::create('Manticore returned wrong context structure');
 	}
 
 	/**
@@ -244,13 +261,18 @@ class ConversationManager {
 		}
 
 		$data = $result->getResult();
-		$rows = $data[0]['data'] ?? [];
-
-		Buddy::info('├─ Filtered messages found: ' . sizeof($rows));
 
 		$history = '';
-		foreach ($rows as $row) {
-			$history .= "{$row['role']}: {$row['message']}\n";
+
+		if (is_array($data[0])) {
+			$rows = $data[0]['data'];
+
+			Buddy::info('├─ Filtered messages found: ' . sizeof($rows));
+			foreach ($rows as $row) {
+				$role = (string)$row['role'];
+				$message = (string)$row['message'];
+				$history .= "{$role}: {$message}\n";
+			}
 		}
 
 		$historyLength = strlen($history);

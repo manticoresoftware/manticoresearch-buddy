@@ -207,7 +207,8 @@ class SearchEngineTest extends TestCase {
 				$schemaResponse
 			);
 
-		$modelConfig = ['k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-3.5-turbo',
+			'k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
 		$result = $searchEngine->performSearch(
 			$mockClient,
 			'test_table',
@@ -290,7 +291,8 @@ class SearchEngineTest extends TestCase {
 				$schemaResponse
 			);
 
-		$modelConfig = ['k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-3.5-turbo',
+			'k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
 		$result = $searchEngine->performSearch(
 			$mockClient,
 			'test_table',
@@ -329,7 +331,7 @@ class SearchEngineTest extends TestCase {
 			->with('DESCRIBE test_table')
 			->willReturn($schemaResponse);
 
-		$modelConfig = ['k_results' => 5];
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-3.5-turbo', 'k_results' => 5];
 		$result = $searchEngine->performSearch(
 			$mockClient,
 			'test_table',
@@ -489,12 +491,10 @@ class SearchEngineTest extends TestCase {
 			->method('sendRequest')
 			->willReturnOnConsecutiveCalls($schemaResponse, $exclusionResponse);
 
-		$modelConfig = ['k_results' => 5];
 		$result = $searchEngine->getExcludedIds(
 			$mockClient,
 			'test_table',
-			'exclude Star Wars',
-			$modelConfig
+			'exclude Star Wars'
 		);
 
 		$this->assertIsArray($result);
@@ -507,12 +507,10 @@ class SearchEngineTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		$modelConfig = ['k_results' => 5];
 		$result = $searchEngine->getExcludedIds(
 			$mockClient,
 			'test_table',
-			'none',
-			$modelConfig
+			'none'
 		);
 
 		$this->assertIsArray($result);
@@ -568,14 +566,14 @@ class SearchEngineTest extends TestCase {
 				$schemaResponse
 			);
 
-		$modelConfig = ['k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-3.5-turbo',
+			'k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
 		$result = $searchEngine->performSearchWithExcludedIds(
 			$mockClient,
 			'test_table',
 			'test search query',
 			[1, 2, 5], // pre-computed excluded IDs
 			$modelConfig,
-			[],
 			0.8
 		);
 
@@ -631,12 +629,10 @@ class SearchEngineTest extends TestCase {
 				}
 			);
 
-		$modelConfig = ['k_results' => 5];
 		$result = $searchEngine->getExcludedIds(
 			$mockClient,
 			'test_table',
-			'exclude query',
-			$modelConfig
+			'exclude query'
 		);
 
 		$this->assertIsArray($result);

@@ -9,6 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\BuddyTest\LLMProviders\TestableBaseProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -46,35 +47,6 @@ class BaseProviderTest extends TestCase {
 		$this->assertNotSame($client1, $client2);
 	}
 
-	public function testValidateConfigMissingFields(): void {
-		$config = ['field1' => 'value1'];
-		$required = ['field1', 'field2'];
-
-		$this->expectException(\Manticoresearch\Buddy\Core\Error\QueryParseError::class);
-		$this->expectExceptionMessage("Required configuration field 'field2' is missing");
-
-		// Use reflection to access protected method
-		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('validateConfig');
-		$method->setAccessible(true);
-
-		$method->invoke($this->provider, $config, $required);
-	}
-
-	public function testValidateConfigAllFieldsPresent(): void {
-		$config = ['field1' => 'value1', 'field2' => 'value2'];
-		$required = ['field1', 'field2'];
-
-		// Use reflection to access protected method
-		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('validateConfig');
-		$method->setAccessible(true);
-
-		// Should not throw exception
-		$method->invoke($this->provider, $config, $required);
-		$this->assertTrue(true); // If we get here, test passes
-	}
-
 	public function testGetSettingsMergesOverrides(): void {
 		$config = [
 			'settings' => ['temperature' => 0.5, 'max_tokens' => 500],
@@ -90,7 +62,7 @@ class BaseProviderTest extends TestCase {
 		$method->setAccessible(true);
 
 		$overrides = ['temperature' => 0.8, 'frequency_penalty' => 0.1];
-		$result = $method->invoke($this->provider, $overrides);
+		$result = (array)$method->invoke($this->provider, $overrides);
 
 		$this->assertEquals(0.8, $result['temperature']); // Override takes precedence
 		$this->assertEquals(500, $result['max_tokens']); // From settings
@@ -111,7 +83,7 @@ class BaseProviderTest extends TestCase {
 		$method = $reflection->getMethod('getSettings');
 		$method->setAccessible(true);
 
-		$result = $method->invoke($this->provider, []);
+		$result = (array)$method->invoke($this->provider, []);
 
 		$this->assertEquals(0.7, $result['temperature']); // Direct config overrides JSON
 		$this->assertEquals(600, $result['max_tokens']); // From JSON
@@ -131,7 +103,7 @@ class BaseProviderTest extends TestCase {
 		$method = $reflection->getMethod('convertSettingsTypes');
 		$method->setAccessible(true);
 
-		$result = $method->invoke($this->provider, $settings);
+		$result = (array)$method->invoke($this->provider, $settings);
 
 		$this->assertIsFloat($result['temperature']);
 		$this->assertEquals(0.7, $result['temperature']);
@@ -198,7 +170,7 @@ class BaseProviderTest extends TestCase {
 		$method->setAccessible(true);
 
 		$result = $method->invoke($this->provider);
-		$this->assertStringContainsString('helpful AI assistant', $result);
+		$this->assertStringContainsString('helpful AI assistant', is_string($result) ? $result : '');
 	}
 
 	public function testGetStylePromptCustom(): void {
@@ -276,7 +248,7 @@ class BaseProviderTest extends TestCase {
 		$method = $reflection->getMethod('getApiKeyForProvider');
 		$method->setAccessible(true);
 
-		$this->expectException(\Manticoresearch\Buddy\Core\Error\QueryParseError::class);
+		$this->expectException(QueryParseError::class);
 		$this->expectExceptionMessage("Unsupported LLM provider: 'unsupported'");
 
 		$method->invoke($this->provider, 'unsupported');
@@ -290,7 +262,7 @@ class BaseProviderTest extends TestCase {
 		$method = $reflection->getMethod('getApiKeyForProvider');
 		$method->setAccessible(true);
 
-		$this->expectException(\Manticoresearch\Buddy\Core\Error\QueryParseError::class);
+		$this->expectException(QueryParseError::class);
 		$this->expectExceptionMessage("Environment variable 'OPENAI_API_KEY' not found or empty");
 
 		$method->invoke($this->provider, 'openai');

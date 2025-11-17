@@ -110,7 +110,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 			'NEW_SEARCH',
 			'movies about space',
 			'Star Wars',
-			[1, 2, 3]
+			['1', '2', '3']
 		);
 
 		$this->conversationManager->saveMessage(
@@ -135,7 +135,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 			'NEW_SEARCH',
 			'documentaries about space',
 			'fiction movies',
-			[4, 5, 6]
+			['4', '5', '6']
 		);
 
 		$this->conversationManager->saveMessage(
@@ -152,9 +152,10 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 		// Test that we get the latest search context
 		$searchContext = $this->conversationManager->getLatestSearchContext('test-conversation-2');
+		$this->assertNotNull($searchContext);
 		$this->assertEquals('documentaries about space', $searchContext['search_query']);
 		$this->assertEquals('fiction movies', $searchContext['exclude_query']);
-		$this->assertEquals('[4,5,6]', $searchContext['excluded_ids']);
+		$this->assertEquals('["4","5","6"]', $searchContext['excluded_ids']);
 
 		// Test complete history
 		$history = $this->conversationManager->getConversationHistory('test-conversation-2');
@@ -238,6 +239,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 		// Test that search context is not affected by CONTENT_QUESTION
 		$searchContext = $this->conversationManager->getLatestSearchContext('test-conversation-3');
+		$this->assertNotNull($searchContext);
 		$this->assertEquals('best sci-fi movies', $searchContext['search_query']);
 	}
 
@@ -302,7 +304,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 		// Initialize the conversations table
 		$this->conversationManager->initializeTable($this->client);
 
-		$excludedIds = [10, 20, 30, 40, 50];
+		$excludedIds = ['10', '20', '30', '40', '50'];
 		$this->conversationManager->saveMessage(
 			'test-conversation-5',
 			'test-model-5',

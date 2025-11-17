@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License version 3 or any later
@@ -26,17 +26,16 @@ class IntentClassifier {
 	 *
 	 * @param string $userQuery
 	 * @param string $conversationHistory
-	 * @param array $lastSearchResults
 	 * @param LLMProviderManager $llmProvider
-	 * @param array $modelConfig
-	 * @return array
+	 * @param array<string, mixed> $modelConfig
+	 * @return string
 	 */
 	public function classifyIntent(
 		string $userQuery,
 		string $conversationHistory,
 		LLMProviderManager $llmProvider,
 		array $modelConfig
-	): array {
+	): string {
 		try {
 			// Limit history size for LLM context (conversationHistory is already a formatted string)
 			$conversationHistory = $this->limitConversationHistory($conversationHistory);
@@ -69,7 +68,7 @@ Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST,
 NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 
 			$provider = $llmProvider->getConnection('intent_classifier', $modelConfig);
-			$response = $provider->generateResponse($intentPrompt, [], ['temperature' => 0.1, 'max_tokens' => 50]);
+			$response = $provider->generateResponse($intentPrompt, ['temperature' => 0.1, 'max_tokens' => 50]);
 
 			if (!$response['success']) {
 				throw new ManticoreSearchClientError(
@@ -77,24 +76,18 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 				);
 			}
 
-			$intent = $this->validateIntent(trim(strtoupper($response['content'])));
+			$content = (string)$response['content'];
+			$intent = $this->validateIntent(trim(strtoupper($content)));
 
 			// Debug: Log intent classification
 			Buddy::info("\n[DEBUG INTENT CLASSIFICATION]");
 			Buddy::info("└─ Detected intent: {$intent}");
 
-			return [
-				'intent' => $intent,
-				'confidence' => 0.9,
-				'llm_response' => $response['content'],
-			];
+			return $intent;
 		} catch (Exception $e) {
 			// Fallback to NEW_SEARCH
-			return [
-				'intent' => 'NEW_SEARCH',
-				'confidence' => 0.5,
-				'error' => $e->getMessage(),
-			];
+			Buddy::debug("Error intent classification: {$e->getMessage()}");
+			return 'NEW_SEARCH';
 		}
 	}
 
@@ -142,14 +135,14 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 	}
 
 	/**
-	 * Generate search queries based on user intent and conversation context
+	 * Generate search and exclude queries based on intent
 	 *
 	 * @param string $userQuery
 	 * @param string $intent
 	 * @param string $conversationHistory
 	 * @param LLMProviderManager $llmProvider
-	 * @param array $modelConfig
-	 * @return array
+	 * @param array<string, mixed> $modelConfig
+	 * @return array{search_query:string, exclude_query: string, llm_response: string}
 	 */
 	public function generateQueries(
 		string $userQuery,
@@ -226,7 +219,7 @@ Examples:
 Answer ONLY in the format above.";
 
 			$provider = $llmProvider->getConnection('query_generator', $modelConfig);
-			$response = $provider->generateResponse($queryPrompt, [], ['temperature' => 0.3, 'max_tokens' => 200]);
+			$response = $provider->generateResponse($queryPrompt, ['temperature' => 0.3, 'max_tokens' => 200]);
 
 			if (!$response['success']) {
 				throw new ManticoreSearchClientError(
@@ -234,7 +227,7 @@ Answer ONLY in the format above.";
 				);
 			}
 
-			$lines = explode("\n", trim($response['content']));
+			$lines = explode("\n", trim((string)$response['content']));
 			foreach ($lines as $line) {
 				$line = trim($line);
 				if (preg_match('/^SEARCH_QUERY:\s*(.+)$/i', $line, $matches)) {
@@ -264,9 +257,7 @@ Answer ONLY in the format above.";
 			];
 		} catch (Exception $e) {
 			// Fallback to safe defaults
-			if (empty($searchQuery)) {
-				$searchQuery = $userQuery;
-			}
+			$searchQuery = $userQuery;
 
 			// Debug: Log query generation
 			Buddy::info("\n[DEBUG QUERY GENERATION]");

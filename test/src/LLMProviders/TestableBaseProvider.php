@@ -22,10 +22,6 @@ class TestableBaseProvider extends BaseProvider {
 		return ['success' => true, 'content' => 'test response'];
 	}
 
-	public function getSupportedModels(): array {
-		return ['test-model'];
-	}
-
 	protected function createClient(): object {
 		return (object)['test' => 'client'];
 	}

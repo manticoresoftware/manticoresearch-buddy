@@ -74,9 +74,9 @@ class ModelManagerTest extends TestCase {
 			'llm_provider' => 'openai',
 			'llm_model' => 'gpt-4',
 			'style_prompt' => 'You are helpful',
-			'temperature' => 0.7,
-			'max_tokens' => 1000,
-			'k_results' => 5,
+			'temperature' => '0.7',
+			'max_tokens' => '1000',
+			'k_results' => '5',
 		];
 
 		$result = $modelManager->createModel($mockClient, $config);
@@ -208,9 +208,8 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$result = $modelManager->getModelByUuidOrName($mockClient, 'nonexistent');
-
-		$this->assertNull($result);
+		$this->expectException(ManticoreSearchClientError::class);
+		$modelManager->getModelByUuidOrName($mockClient, 'nonexistent');
 	}
 
 	public function testDeleteModelByUuidOrNameSuccessful(): void {

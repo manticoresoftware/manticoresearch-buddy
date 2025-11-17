@@ -151,6 +151,9 @@ class BaseProviderApiKeyTest extends TestCase {
 		$this->modelManager = new ModelManager();
 		$this->baseProvider = new OpenAIProvider();
 
+		// Ensure modelManager is properly initialized (PHPStan requirement)
+		$this->assertInstanceOf(ModelManager::class, $this->modelManager);
+
 		// Set up test environment variables
 		putenv('OPENAI_API_KEY=sk-test-key-12345678901234567890123456789012');
 		putenv('ANTHROPIC_API_KEY=sk-ant-test123456789012345678901234567890');

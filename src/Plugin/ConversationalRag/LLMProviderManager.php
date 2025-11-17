@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License version 3 or any later
@@ -19,20 +19,29 @@ use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
  * Manages LLM providers and connections
  */
 class LLMProviderManager {
+	/**
+	 * @var array<string, BaseProvider>
+	 */
 	private array $providers = [];
+
+	/**
+	 * @var array<string, BaseProvider>
+	 */
 	private array $connections = [];
 
 	/**
 	 * Get configured connection for a model
 	 *
 	 * @param string $modelId
-	 * @param array $modelConfig
+	 * @param array<string, mixed> $modelConfig
 	 * @return BaseProvider
 	 * @throws ManticoreSearchClientError
 	 */
 	public function getConnection(string $modelId, array $modelConfig): BaseProvider {
 		if (!isset($this->connections[$modelId])) {
-			$provider = $this->createProvider($modelConfig['llm_provider']);
+			/** @var string $providerName */
+			$providerName = $modelConfig['llm_provider'];
+			$provider = $this->createProvider($providerName);
 			$provider->configure($modelConfig);
 			$this->connections[$modelId] = $provider;
 		}

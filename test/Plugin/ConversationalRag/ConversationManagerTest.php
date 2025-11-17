@@ -347,7 +347,7 @@ class ConversationManagerTest extends TestCase {
 			'NEW_SEARCH',
 			'movies about space',
 			'Star Wars',
-			[1, 2, 3]
+			['1', '2', '3']
 		);
 	}
 }

@@ -35,6 +35,7 @@ class IntentClassifierTest extends TestCase {
 		// Mock LLM provider
 		/** @var BaseProvider $mockProvider */
 		$mockProvider = $this->createMock(BaseProvider::class);
+		/** @phpstan-ignore-next-line */
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -52,15 +53,14 @@ class IntentClassifierTest extends TestCase {
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
-		$result = $intentClassifier->classifyIntent(
+		$intent = $intentClassifier->classifyIntent(
 			'I already watched that movie',
 			"user: I want to watch a comedy\nassistant: I recommend The Office\nuser: I already watched that",
 			$mockProviderManager,
 			$modelConfig
 		);
 
-		$this->assertEquals('REJECTION', $result['intent']);
-		$this->assertIsFloat($result['confidence']);
+		$this->assertEquals('REJECTION', $intent);
 	}
 
 	public function testClassifyIntentAlternatives(): void {
@@ -85,14 +85,14 @@ class IntentClassifierTest extends TestCase {
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
-		$result = $intentClassifier->classifyIntent(
+		$intent = $intentClassifier->classifyIntent(
 			'What else do you have?',
 			"user: Show me comedies\nassistant: I recommend The Office\nuser: What else do you have?",
 			$mockProviderManager,
 			$modelConfig
 		);
 
-		$this->assertEquals('ALTERNATIVES', $result['intent']);
+		$this->assertEquals('ALTERNATIVES', $intent);
 	}
 
 	public function testClassifyIntentNewSearch(): void {
@@ -117,14 +117,14 @@ class IntentClassifierTest extends TestCase {
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
-		$result = $intentClassifier->classifyIntent(
+		$intent = $intentClassifier->classifyIntent(
 			'Show me action movies',
 			'', // No conversation history
 			$mockProviderManager,
 			$modelConfig
 		);
 
-		$this->assertEquals('NEW_SEARCH', $result['intent']);
+		$this->assertEquals('NEW_SEARCH', $intent);
 	}
 
 	public function testClassifyIntentLLMFailure(): void {
@@ -149,7 +149,7 @@ class IntentClassifierTest extends TestCase {
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
-		$result = $intentClassifier->classifyIntent(
+		$intent = $intentClassifier->classifyIntent(
 			'What movies do you recommend?',
 			'',
 			$mockProviderManager,
@@ -157,8 +157,7 @@ class IntentClassifierTest extends TestCase {
 		);
 
 		// Should fallback to NEW_SEARCH on failure
-		$this->assertEquals('NEW_SEARCH', $result['intent']);
-		$this->assertArrayHasKey('error', $result);
+		$this->assertEquals('NEW_SEARCH', $intent);
 	}
 
 	public function testGenerateQueriesWithExclusions(): void {
@@ -294,10 +293,12 @@ class IntentClassifierTest extends TestCase {
 
 		$result = $method->invoke($intentClassifier, $longHistory);
 
-		$lines = explode("\n", trim($result));
+		$resultString = is_string($result) ? $result : '';
+		$lines = explode("\n", trim($resultString));
+
 		$this->assertGreaterThanOrEqual(18, sizeof($lines)); // Should be limited, at least 9 exchanges (18 lines)
 		$this->assertLessThanOrEqual(20, sizeof($lines)); // Should not exceed 10 exchanges (20 lines)
-		$this->assertStringContainsString('message', $result); // Should contain messages
+		$this->assertStringContainsString('message', $resultString); // Should contain messages
 	}
 
 	public function testValidateIntentValidIntents(): void {

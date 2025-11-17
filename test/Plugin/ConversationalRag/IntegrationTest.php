@@ -183,34 +183,6 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('test_model', $payload->params['model_uuid']);
 	}
 
-	public function testConversationalRagFlowWithOptions(): void {
-		$query = "CALL CONVERSATIONAL_RAG('What is AI?', 'docs', 'test_model', '', "
-			. "'{\"temperature\": 0.8, \"max_tokens\": 2000, \"k_results\": 10}')";
-
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
-
-		$this->assertEquals('conversation', $payload->action);
-		$this->assertEquals('What is AI?', $payload->params['query']);
-		$this->assertEquals('docs', $payload->params['table']);
-		$this->assertEquals('test_model', $payload->params['model_uuid']);
-		$this->assertEquals('', $payload->params['conversation_uuid']);
-		$this->assertEquals(
-			['temperature' => 0.8, 'max_tokens' => 2000, 'k_results' => 10],
-			$payload->params['overrides']
-		);
-	}
-
 	public function testConversationalRagFlowWithTable(): void {
 		$query = "CALL CONVERSATIONAL_RAG('Search this table', 'my_table', 'test_model')";
 

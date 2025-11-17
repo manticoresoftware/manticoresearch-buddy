@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License version 3 or any later
@@ -19,13 +19,16 @@ use Manticoresearch\Buddy\Core\Error\QueryParseError;
  * Base class for LLM providers
  */
 abstract class BaseProvider {
+	/**
+	 * @var array<string, mixed>
+	 */
 	protected array $config = [];
 	protected ?object $client = null;
 
 	/**
-	 * Configure the provider with model settings
+	 * Configure provider with model settings
 	 *
-	 * @param array $config
+	 * @param array<string, mixed> $config
 	 * @return void
 	 */
 	public function configure(array $config): void {
@@ -37,17 +40,15 @@ abstract class BaseProvider {
 	 * Generate a response from the LLM
 	 *
 	 * @param string $prompt
-	 * @param array $options
-	 * @return array
+	 * @param array{ temperature?: string|float, max_tokens?: string|int,
+	 *   k_results?: string|int, similarity_threshold?: string|int,
+	 *   max_document_length?: string|int} $options
+	 *
+	 * @return array{error?:string,success:bool,content:string,
+	 *   metadata?:array{tokens_used:integer, input_tokens:integer,
+	 *   output_tokens:integer, response_time_ms:integer, finish_reason:string}}
 	 */
 	abstract public function generateResponse(string $prompt, array $options = []): array;
-
-	/**
-	 * Get supported models for this provider
-	 *
-	 * @return array
-	 */
-	abstract public function getSupportedModels(): array;
 
 	/**
 	 * Estimate token count for a text
@@ -81,26 +82,11 @@ abstract class BaseProvider {
 	abstract protected function createClient(): object;
 
 	/**
-	 * Validate required configuration fields
+	 * Merge settings from configuration and overrides
 	 *
-	 * @param array $config
-	 * @param array $required
-	 * @return void
-	 * @throws QueryParseError
-	 */
-	protected function validateConfig(array $config, array $required): void {
-		foreach ($required as $field) {
-			if (!isset($config[$field]) || empty($config[$field])) {
-				throw new QueryParseError("Required configuration field '{$field}' is missing");
-			}
-		}
-	}
-
-	/**
-	 * Merge settings from configuration
+	 * @param array<string, mixed> $overrides
 	 *
-	 * @param array $overrides
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	protected function getSettings(array $overrides = []): array {
 		$settings = [];
@@ -108,8 +94,8 @@ abstract class BaseProvider {
 		// Extract settings from main config
 		if (isset($this->config['settings']) && is_string($this->config['settings'])) {
 			$settings = json_decode($this->config['settings'], true) ?? [];
-			// Convert string numeric values to proper types
-			$settings = $this->convertSettingsTypes($settings);
+		// Convert string numeric values to proper types
+			$settings = $this->convertSettingsTypes(is_array($settings) ? $settings : []);
 		} elseif (isset($this->config['settings']) && is_array($this->config['settings'])) {
 			$settings = $this->config['settings'];
 		}
@@ -138,6 +124,9 @@ abstract class BaseProvider {
 
 	/**
 	 * Convert settings array types from strings to proper types
+	 *
+	 * @param array<string, mixed> $settings
+	 * @return array<string, mixed>
 	 */
 	protected function convertSettingsTypes(array $settings): array {
 		$numericFields = ['temperature', 'max_tokens', 'top_p', 'frequency_penalty', 'presence_penalty', 'k_results'];
@@ -195,6 +184,7 @@ abstract class BaseProvider {
 	 * @return string
 	 */
 	protected function getStylePrompt(): string {
+		/** @var string $prompt */
 		$prompt = $this->getConfig('style_prompt', '');
 
 		if (empty($prompt)) {
@@ -209,13 +199,13 @@ abstract class BaseProvider {
 	 *
 	 * @param string $message
 	 * @param Exception|null $exception
-	 * @return array
+	 * @return array{success:bool, error:string, details: string|null, provider:string}
 	 */
 	protected function formatError(string $message, ?Exception $exception = null): array {
 		return [
 			'success' => false,
 			'error' => $message,
-			'details' => $exception ? $exception->getMessage() : null,
+			'details' => $exception?->getMessage(),
 			'provider' => $this->getName(),
 		];
 	}
@@ -231,8 +221,8 @@ abstract class BaseProvider {
 	 * Format success response
 	 *
 	 * @param string $content
-	 * @param array $metadata
-	 * @return array
+	 * @param array<string, mixed> $metadata
+	 * @return array<string, mixed>
 	 */
 	protected function formatSuccess(string $content, array $metadata = []): array {
 		return [
@@ -258,7 +248,7 @@ abstract class BaseProvider {
 		if ($provider === null || $provider === '') {
 			throw new QueryParseError('LLM provider not configured');
 		}
-		return $this->getApiKeyForProvider($provider);
+		return $this->getApiKeyForProvider(is_string($provider) ? $provider : '');
 	}
 
 	/**
@@ -277,7 +267,7 @@ abstract class BaseProvider {
 		if (!isset(ModelManager::PROVIDER_ENV_VARS[$provider])) {
 			$supportedProviders = implode(', ', array_keys(ModelManager::PROVIDER_ENV_VARS));
 			throw new QueryParseError(
-				"Unsupported LLM provider: '{$provider}'. Supported providers: {$supportedProviders}"
+				"Unsupported LLM provider: '$provider'. Supported providers: {$supportedProviders}"
 			);
 		}
 
@@ -286,7 +276,7 @@ abstract class BaseProvider {
 		$actualApiKey = getenv($envVarName);
 		if (empty($actualApiKey)) {
 			throw new QueryParseError(
-				"Environment variable '{$envVarName}' not found or empty. Please set this variable with your API key."
+				"Environment variable '$envVarName' not found or empty. Please set this variable with your API key."
 			);
 		}
 
