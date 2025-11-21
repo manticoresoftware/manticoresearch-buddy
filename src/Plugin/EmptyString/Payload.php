@@ -74,8 +74,6 @@ final class Payload extends BasePayload {
 
 		return match ($request->command) {
 			'create' => stripos($payload, 'create database') === 0,
-			'lock' => stripos($payload, 'lock tables') === 0,
-			'unlock' => stripos($payload, 'unlock tables') === 0,
 			default => false,
 		};
 	}

@@ -709,12 +709,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "1c508e670c787a2d5558533e6435bcf4c69a846a"
+                "reference": "4edcb48a456f122e1a9acdfdccec1ece5edb7d8a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/1c508e670c787a2d5558533e6435bcf4c69a846a",
-                "reference": "1c508e670c787a2d5558533e6435bcf4c69a846a",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/4edcb48a456f122e1a9acdfdccec1ece5edb7d8a",
+                "reference": "4edcb48a456f122e1a9acdfdccec1ece5edb7d8a",
                 "shasum": ""
             },
             "require": {
@@ -753,7 +753,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2025-10-21T11:56:11+00:00"
+            "time": "2025-11-14T06:37:29+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -5256,8 +5256,8 @@
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.1.0"
     },

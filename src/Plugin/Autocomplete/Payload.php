@@ -135,7 +135,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromSqlRequest(Request $request): static {
-		$pattern = '/autocomplete\(\s*\'([^\']*)\'\s*,\s*\'([^\']+)\'\s*'
+		$pattern = '/autocomplete\(\s*\'((?:\\\\\'|[^\'])*)\'\s*,\s*\'([^\']+)\'\s*'
 			. '((?:,\s*(?:(\d+)|\'([^\']*)\')\s+as\s+(\w+))*)\s*\)/ius';
 		preg_match($pattern, $request->payload, $matches);
 		if (!$matches) {
@@ -143,7 +143,7 @@ final class Payload extends BasePayload {
 		}
 
 		$self = new static();
-		$self->query = $matches[1];
+		$self->query = stripslashes($matches[1]);
 		$self->table = $matches[2];
 		if (isset($matches[3])) {
 			$self->parseOptions($matches[3]);

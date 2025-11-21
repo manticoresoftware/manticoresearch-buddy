@@ -64,6 +64,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$suggestions = $this->getSuggestions($phrases, $maxCount);
 			$this->sortSuggestions($suggestions, $phrases);
 
+			// Filter out suggestions with zero docs
+			$suggestions = $this->filterSuggestionsWithDocs($suggestions);
+
 			// Preparing the final result with suggestions
 			$data = [];
 			foreach ($suggestions as $suggestion) {
@@ -264,7 +267,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			return [];
 		}
 
-		$combinations = ['' => 0.0];
+		$combinations = new \Ds\Map(['' => 0.0]);
 		$positions = array_keys($words);
 
 		foreach ($positions as $position) {
@@ -273,42 +276,99 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$combinations = static::processCombinations($combinations, $keywords, $scoreMap, $maxCount);
 		}
 
-		arsort($combinations);
-		return array_slice(array_filter(array_keys($combinations)), 0, $maxCount);
+		$combinations->ksort(
+			function (mixed $a, mixed $b) use ($combinations): int {
+				$scoreA = $combinations->get($a);
+				$scoreB = $combinations->get($b);
+				return $scoreB <=> $scoreA;
+			}
+		);
+
+		/** @var array<string> */
+		return array_values(
+			array_slice(
+				array_filter(
+					$combinations->keys()->toArray(),
+				),
+				0,
+				$maxCount
+			)
+		);
 	}
 
 	/**
-	 * @param array<string,float> $combinations
+	 * @param \Ds\Map<string,float> $combinations
 	 * @param array<string> $positionWords
 	 * @param array<string,float> $scoreMap
 	 * @param int $maxCount
-	 * @return array<string,float>
+	 * @return \Ds\Map<string,float>
 	 */
 	private static function processCombinations(
-		array $combinations,
+		\Ds\Map $combinations,
 		array $positionWords,
 		array $scoreMap,
 		int $maxCount
-	): array {
-		$newCombinations = [];
+	): \Ds\Map {
+		$newCombinations = new \Ds\Map();
 		foreach ($combinations as $combination => $score) {
 			foreach ($positionWords as $word) {
 				$newCombination = trim($combination . ' ' . $word);
 				$newScore = $score + ($scoreMap[$word] ?? 0);
-				if (sizeof($newCombinations) >= $maxCount && $newScore <= min($newCombinations)) {
+
+				// If we already have max items and the new score is too low, skip
+				if (static::shouldSkipCombination($newCombinations, $newScore, $maxCount)) {
 					continue;
 				}
 
-				$newCombinations[$newCombination] = $newScore;
-				if (sizeof($newCombinations) <= $maxCount) {
+				$newCombinations->put($newCombination, $newScore);
+				if ($newCombinations->count() <= $maxCount) {
 					continue;
 				}
 
-				arsort($newCombinations);
-				array_pop($newCombinations);
+				$newCombinations = static::trimCombinationsToMaxCount($newCombinations, $maxCount);
 			}
 		}
+
 		return $newCombinations;
+	}
+
+	/**
+	 * @param \Ds\Map<string,float> $combinations
+	 * @param float $newScore
+	 * @param int $maxCount
+	 * @return bool
+	 */
+	private static function shouldSkipCombination(\Ds\Map $combinations, float $newScore, int $maxCount): bool {
+		return $combinations->count() >= $maxCount && $newScore <= min($combinations->values()->toArray());
+	}
+
+	/**
+	 * @param \Ds\Map<string,float> $combinations
+	 * @param int $maxCount
+	 * @return \Ds\Map<string,float>
+	 */
+	private static function trimCombinationsToMaxCount(\Ds\Map $combinations, int $maxCount): \Ds\Map {
+		// Sort and trim the map
+		$pairs = $combinations->pairs()->toArray();
+		usort(
+			$pairs, static function ($a, $b): int {
+				if ($b->value > $a->value) {
+					return 1;
+				}
+				if ($b->value < $a->value) {
+					return -1;
+				}
+				return 0;
+			}
+		);
+
+		// Create a new map with only the top items
+		$trimmedCombinations = new \Ds\Map();
+		for ($i = 0; $i < $maxCount; $i++) {
+			$trimmedCombinations->put($pairs[$i]->key, $pairs[$i]->value);
+		}
+
+		return $trimmedCombinations;
 	}
 
 
@@ -451,6 +511,40 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$match = "*$match";
 		}
 		return $match;
+	}
+
+	/**
+	 * Filter out suggestions that have zero document matches
+	 * @param array<string> $suggestions
+	 * @return array<string>
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 */
+	private function filterSuggestionsWithDocs(array $suggestions): array {
+		$validSuggestions = [];
+		foreach ($suggestions as $suggestion) {
+			$escapedSuggestion = addcslashes($suggestion, '*%?\'');
+			$q = "CALL KEYWORDS('{$escapedSuggestion}', '{$this->payload->table}', 1 as stats)";
+			/** @var array{0:array{data?:array<keyword>}} $result */
+			$result = $this->manticoreClient->sendRequest($q)->getResult();
+			$data = $result[0]['data'] ?? [];
+
+			// Check if any keyword has docs > 0
+			$hasDocs = false;
+			foreach ($data as $row) {
+				if ($row['docs'] > 0) {
+					$hasDocs = true;
+					break;
+				}
+			}
+
+			if ($hasDocs) {
+				$validSuggestions[] = $suggestion;
+			} else {
+				Buddy::debug("Autocomplete: filtering out '$suggestion' (zero docs)");
+			}
+		}
+		return $validSuggestions;
 	}
 
 	/**
