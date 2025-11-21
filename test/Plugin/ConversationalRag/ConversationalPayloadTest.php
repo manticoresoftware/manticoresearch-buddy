@@ -182,7 +182,7 @@ class ConversationalPayloadTest extends TestCase {
 
 	public function testEscapedQuotesInConversationParams(): void {
 		$query = "CALL CONVERSATIONAL_RAG('I\\'m like programming, ".
-			"lets talk about it', 'docs', 'test_model', 'conversation_1')";
+			"lets talk about it', 'docs', 'test_model', 'content', 'conversation_1')";
 
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
@@ -201,7 +201,107 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals("I'm like programming, lets talk about it", $payload->params['query']);
 		$this->assertEquals('docs', $payload->params['table']);
 		$this->assertEquals('test_model', $payload->params['model_uuid']);
+		$this->assertEquals('content', $payload->params['content_fields']);
 		$this->assertEquals('conversation_1', $payload->params['conversation_uuid']);
+	}
+
+	public function testConversationParsingWithContentFields(): void {
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'title,content')";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$this->assertEquals('conversation', $payload->action);
+		$this->assertEquals('test query', $payload->params['query']);
+		$this->assertEquals('docs', $payload->params['table']);
+		$this->assertEquals('model123', $payload->params['model_uuid']);
+		$this->assertEquals('title,content', $payload->params['content_fields']);
+	}
+
+	public function testConversationParsingWithSingleCustomField(): void {
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'summary')";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$this->assertEquals('summary', $payload->params['content_fields']);
+	}
+
+	public function testMissingContentFieldsThrowsException(): void {
+		$this->expectException(QueryParseError::class);
+
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123')";
+
+		RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+	}
+
+	public function testEmptyContentFieldsThrowsException(): void {
+		$this->expectException(QueryParseError::class);
+
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', '')";
+
+		RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+	}
+
+	public function testWhitespaceContentFieldsThrowsException(): void {
+		$this->expectException(QueryParseError::class);
+
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', '   ')";
+
+		RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
 	}
 
 

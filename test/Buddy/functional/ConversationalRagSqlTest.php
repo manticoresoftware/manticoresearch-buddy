@@ -64,9 +64,9 @@ class ConversationalRagSqlTest extends TestCase {
 
 		// Test conversation call (this should insert into conversations table)
 		// Note: This might fail due to missing API keys, but we can check SQL structure
-		$result = $this->runHttpQuery(
-			"CALL CONVERSATIONAL_RAG('What is machine learning?', '{$tableName}', '{$modelName}', 'test-conv-1')"
-		);
+		$query = "CALL CONVERSATIONAL_RAG('What is machine learning?', '{$tableName}', '{$modelName}',";
+		$query .= " 'content', 'test-conv-1')";
+		$result = $this->runHttpQuery($query);
 
 		// Even if the call fails due to API issues, we should see the conversations table being used
 		$errorValue = $result['error'] ?? '';
@@ -176,7 +176,7 @@ class ConversationalRagSqlTest extends TestCase {
 			// Try to insert dangerous input
 			$this->runHttpQuery(
 				"CALL CONVERSATIONAL_RAG('" . addslashes($input) . "', '{$tableName}', "
-				. "'{$modelName}', 'security-conv-" . uniqid() . "')"
+				. "'{$modelName}', 'content', 'security-conv-" . uniqid() . "')"
 			);
 
 			// Check if any SQL injection succeeded (table should still exist)

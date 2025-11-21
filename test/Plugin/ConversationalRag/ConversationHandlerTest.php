@@ -761,7 +761,7 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testHandleConversationNewQuestionGeneratesNewContext(): void {
-		$query = "CALL CONVERSATIONAL_RAG('Show me action movies', 'movies', 'model-uuid', 'conv-uuid')";
+		$query = "CALL CONVERSATIONAL_RAG('Show me action movies', 'movies', 'model-uuid', 'content', 'conv-uuid')";
 
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
@@ -776,6 +776,8 @@ class ConversationHandlerTest extends TestCase {
 				]
 			)
 		);
+
+		$this->assertEquals('content', $payload->params['content_fields']);
 
 		$handler = new RagHandler(
 			$payload, $this->createMockLLMProviderManager(

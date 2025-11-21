@@ -38,10 +38,20 @@ CREATE RAG MODEL my_assistant (
 ### 4. Start a Conversation
 
 ```sql
+-- Basic usage with single content field
 CALL CONVERSATIONAL_RAG(
     'What is vector search?',
     'documents_table',
-    'my_assistant'
+    'my_assistant',
+    'content'
+);
+
+-- With multiple content fields
+CALL CONVERSATIONAL_RAG(
+    'What is vector search?',
+    'documents_table',
+    'my_assistant',
+    'title,content,summary'
 );
 ```
 
@@ -96,14 +106,16 @@ DROP RAG MODEL my_assistant;
 CALL CONVERSATIONAL_RAG(
     'Explain full-text search in ManticoreSearch',
     'knowledge_base',
-    'my_assistant'
+    'my_assistant',
+    'content'
 );
 
 -- Continue conversation (generates new UUID if not provided)
 CALL CONVERSATIONAL_RAG(
     'How does it compare to vector search?',
     'knowledge_base',
-    'my_assistant'
+    'my_assistant',
+    'content'
 );
 ```
 
@@ -115,6 +127,7 @@ CALL CONVERSATIONAL_RAG(
     'What are the best indexing strategies?',
     'documents',
     'my_assistant',
+    'content',
     'conv-12345678-1234-1234-1234-123456789abc'
 );
 
@@ -123,9 +136,60 @@ CALL CONVERSATIONAL_RAG(
     'Can you give me a practical example?',
     'documents',
     'my_assistant',
+    'content',
     'conv-12345678-1234-1234-1234-123456789abc'
 );
 ```
+
+#### Content Fields Specification
+
+You must specify which fields to use for document context. You can specify single or multiple fields:
+
+```sql
+-- Use a single field
+CALL CONVERSATIONAL_RAG(
+    'What are the latest updates?',
+    'news',
+    'my_assistant',
+    'summary'
+);
+
+-- Use multiple fields (comma-separated in output)
+CALL CONVERSATIONAL_RAG(
+    'Explain this topic',
+    'articles',
+    'my_assistant',
+    'title,content,conclusion'
+);
+
+-- With specific conversation UUID
+CALL CONVERSATIONAL_RAG(
+    'Continue our discussion',
+    'articles',
+    'my_assistant',
+    'content',
+    'conversation-uuid-12345'
+);
+```
+
+#### Parameter Reference
+
+| Position | Parameter | Required | Default | Description |
+|----------|-----------|----------|---------|-------------|
+| 1 | query | Yes | - | User's question |
+| 2 | table | Yes | - | Table to search |
+| 3 | model_uuid | Yes | - | RAG model UUID or name |
+| 4 | content_fields | **Yes** | - | Comma-separated field names |
+| 5 | conversation_uuid | No | auto-generated | Conversation UUID |
+
+#### Content Field Behavior
+
+- **Single field**: `'content'` - Uses only the content field
+- **Multiple fields**: `'title,content,summary'` - Concatenates all specified fields with comma + space
+- **Missing fields**: Automatically skipped with warning logged
+- **Empty fields**: Fields with empty or whitespace-only content are excluded
+- **Output format**: Multiple fields joined as: "field1, field2, field3"
+- **Required**: content_fields parameter is mandatory - queries without it will throw an exception
 
 ## Data Preparation
 
@@ -222,7 +286,8 @@ CREATE RAG MODEL assistant (
 CALL CONVERSATIONAL_RAG(
     'What is vector search?',
     'docs',
-    'assistant'
+    'assistant',
+    'content'
 );
 
 -- Continue conversation
@@ -230,7 +295,48 @@ CALL CONVERSATIONAL_RAG(
     'How does it work?',
     'docs',
     'assistant',
+    'content',
     'returned-conversation-uuid'
+);
+```
+
+### Content Field Examples
+
+```sql
+-- E-commerce product search with multiple fields
+CALL CONVERSATIONAL_RAG(
+    'Show me gaming laptops under $2000',
+    'products',
+    'shopping_assistant',
+    'name,description,specifications'
+);
+-- Output format: "Gaming Laptop XYZ, High-performance laptop for gaming, Intel i7, 16GB RAM, RTX 4060"
+
+-- News articles with title and summary
+CALL CONVERSATIONAL_RAG(
+    'What happened in tech news today?',
+    'news_articles',
+    'news_assistant',
+    'headline,summary'
+);
+-- Output format: "Tech Company Announces New AI Model, Revolutionary breakthrough in natural language processing"
+
+-- Documentation search with structured content
+CALL CONVERSATIONAL_RAG(
+    'How do I configure clustering?',
+    'documentation',
+    'help_assistant',
+    'section_title,content,code_examples'
+);
+-- Output format: "Clustering Setup, Follow these steps to configure..., CREATE TABLE cluster_table..."
+
+-- Continue a specific conversation with multiple fields
+CALL CONVERSATIONAL_RAG(
+    'Show me more options',
+    'products',
+    'shopping_assistant',
+    'name,price,rating',
+    'conv-shopping-session-123'
 );
 ```
 

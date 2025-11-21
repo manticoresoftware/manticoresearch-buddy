@@ -364,7 +364,7 @@ final class Handler extends BaseHandlerWithClient {
 		Client $client
 	): TaskResult {
 		/** @var array{query:string, table: string, model_uuid: string,
-		 *   conversation_uuid: string} $params */
+		 *   conversation_uuid: string, content_fields: string} $params */
 		$params = self::parseCallRagParams($payload);
 		$conversationUuid = self::ensureConversationUuid($params);
 		$model = self::getModel($modelManager, $client, $params['model_uuid']);
@@ -384,7 +384,7 @@ final class Handler extends BaseHandlerWithClient {
 		);
 
 		self::logPreprocessingResults($params, $intent, $queries);
-		$context = self::buildContext($searchResults, $settings);
+		$context = self::buildContext($searchResults, $settings, $params['content_fields']);
 		self::logContextBuilding($searchResults, $context, $settings);
 		$response = self::generateResponse(
 			$model, $params['query'], $context, $conversationHistory, $settings, $providerManager
@@ -416,7 +416,7 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * @param Payload $payload
 	 *
-	 * @return array{query:string, table: string, model_uuid: string, conversation_uuid: string}
+	 * @return array{query:string, table: string, model_uuid: string, conversation_uuid: string, content_fields: string}
 	 */
 	private static function parseCallRagParams(Payload $payload): array {
 		// Parse CALL CONVERSATIONAL_RAG parameters from payload
@@ -424,6 +424,7 @@ final class Handler extends BaseHandlerWithClient {
 			'query' => $payload->params['query'] ?? '',
 			'table' => $payload->params['table'] ?? '',
 			'model_uuid' => $payload->params['model_uuid'] ?? '',
+			'content_fields' => $payload->params['content_fields'],
 			'conversation_uuid' => $payload->params['conversation_uuid'] ?? '',
 		];
 	}
@@ -525,7 +526,7 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @param string $intent
 	 * @param array{query:string, table: string, model_uuid: string,
-	 *   conversation_uuid: string} $params
+	 *   conversation_uuid: string, content_fields: string} $params
 	 * @param string $conversationHistory
 	 * @param ConversationManager $conversationManager
 	 * @param string $conversationUuid
@@ -567,7 +568,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * Handle CONTENT_QUESTION intent
 	 *
 	 * @param array{query:string, table: string, model_uuid: string,
-	 *   conversation_uuid: string} $params
+	 *   conversation_uuid: string, content_fields: string} $params
 	 * @param string $conversationHistory
 	 * @param ConversationManager $conversationManager
 	 * @param string $conversationUuid
@@ -635,7 +636,7 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @param string $intent
 	 * @param array{query:string, table: string, model_uuid: string,
-	 *   conversation_uuid: string} $params
+	 *   conversation_uuid: string, content_fields: string} $params
 	 * @param string $conversationHistory
 	 * @param ConversationManager $conversationManager
 	 * @param string $conversationUuid
@@ -696,7 +697,8 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Log preprocessing results
 	 *
-	 * @param array{query:string, table: string, model_uuid: string, conversation_uuid: string} $params
+	 * @param array{query:string, table: string, model_uuid: string,
+	 *   conversation_uuid: string, content_fields: string} $params
 	 * @param string $intent
 	 * @param array{search_query:string, exclude_query:string} $queries
 	 * @return void
@@ -713,18 +715,45 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param array<int, array<string, mixed>> $searchResults
 	 * @param array{ temperature?: string, max_tokens?: string, k_results?: string,
 	 *   similarity_threshold?: string, max_document_length?: string} $settings
+	 * @param string $contentFields
 	 *
 	 * @return string
 	 */
-	private static function buildContext(array $searchResults, array $settings): string {
+	private static function buildContext(
+		array $searchResults,
+		array $settings,
+		string $contentFields
+	): string {
 		if (empty($searchResults)) {
 			return '';
 		}
 
+		// Parse content fields (comma-separated)
+		$fields = array_map('trim', explode(',', $contentFields));
 		$maxDocLength = $settings['max_document_length'] ?? 2000;
+
+		// Validate fields exist in first result (for warning)
+		if (isset($searchResults[0])) {
+			$availableFields = array_keys($searchResults[0]);
+			$missingFields = array_diff($fields, $availableFields);
+			if (!empty($missingFields)) {
+				Buddy::warning('Content fields not found in search results: ' . implode(', ', $missingFields));
+			}
+		}
+
 		$truncatedDocs = array_map(
-			function ($doc) use ($maxDocLength) {
-				$content = isset($doc['content']) && is_string($doc['content']) ? $doc['content'] : '';
+			function ($doc) use ($fields, $maxDocLength) {
+				$contentParts = [];
+				foreach ($fields as $field) {
+					if (!isset($doc[$field]) || !is_string($doc[$field]) || empty(trim($doc[$field]))) {
+						continue;
+					}
+
+					$contentParts[] = $doc[$field];
+				}
+
+				// Use comma + space as separator between fields
+				$content = implode(', ', $contentParts);
 				$maxLength = (int)$maxDocLength;
 				return strlen($content) > $maxLength ? substr($content, 0, $maxLength) . '...' : $content;
 			}, $searchResults
@@ -809,7 +838,8 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param string $conversationUuid
 	 * @param string $modelUuid
 	 * @param string $intent
-	 * @param array{query:string, table: string, model_uuid: string, conversation_uuid: string} $params
+	 * @param array{query:string, table: string, model_uuid: string,
+	 *   conversation_uuid: string, content_fields: string} $params
 	 * @param array{search_query:string, exclude_query:string} $queries
 	 * @param array<int, string|int> $excludedIds
 	 * @param string $responseText
