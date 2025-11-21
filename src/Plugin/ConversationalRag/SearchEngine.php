@@ -84,12 +84,20 @@ class SearchEngine {
 		}
 
 		$excludeEscaped = $this->escapeString($excludeQuery);
-		$sql = "SELECT id FROM {$table}
+		$sql = "SELECT id, knn_dist() as knn_dist FROM {$table}
 				WHERE knn({$vectorField}, 15, '{$excludeEscaped}')
 				AND knn_dist < 0.75";
 
+		Buddy::info("\n[DEBUG EXCLUSION QUERY]");
+		Buddy::info("├─ Exclude query: '{$excludeQuery}'");
+		Buddy::info("├─ Table: {$table}");
+		Buddy::info("├─ Vector field: {$vectorField}");
+		Buddy::info('├─ Threshold: 0.75');
+		Buddy::info("├─ Final SQL: {$sql}");
+
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
+			Buddy::info('└─ Error: ' . $response->getError());
 			return []; // Return empty array on error
 		}
 
@@ -97,7 +105,11 @@ class SearchEngine {
 		$result = $response->getResult();
 		$excludeResults = $result[0]['data'] ?? [];
 
-		return array_column($excludeResults, 'id');
+		$excludedIds = array_column($excludeResults, 'id');
+		Buddy::info('├─ Raw results count: ' . sizeof($excludeResults));
+		Buddy::info('└─ Excluded IDs found: [' . implode(', ', $excludedIds) . ']');
+
+		return $excludedIds;
 	}
 
 	/**
@@ -111,8 +123,8 @@ class SearchEngine {
 	 */
 	private function detectVectorField(HTTPClient $client, string $table): ?string {
 
-			$query = "DESCRIBE {$table}";
-			$response = $client->sendRequest($query);
+		$query = "DESCRIBE {$table}";
+		$response = $client->sendRequest($query);
 		if ($response->hasError()) {
 			throw ManticoreSearchResponseError::create(
 				'Schema detection failed: ' . $response->getError()
@@ -125,25 +137,11 @@ class SearchEngine {
 
 		// Look for FLOAT_VECTOR fields
 		foreach ($schema as $field) {
-			if (strpos(strtoupper($field['Type']), 'FLOAT_VECTOR') !== false) {
+			if (str_contains(strtoupper($field['Type']), 'FLOAT_VECTOR')) {
 				return $field['Field'];
 			}
 		}
-
-		// Common vector field names from original implementation
-		/** @var array<int, string> $commonNames */
-		$commonNames = [
-			'embedding_vector', 'embedding', 'vector', 'embeddings',
-			'content_embedding', 'text_embedding',
-		];
-		foreach ($schema as $field) {
-			$fieldName = strtolower($field['Field']);
-			if (in_array($fieldName, $commonNames)) {
-				return $field['Field'];
-			}
-		}
-
-			return null;
+		return null;
 	}
 
 	/**

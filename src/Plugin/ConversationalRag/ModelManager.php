@@ -306,8 +306,15 @@ class ModelManager {
 		$data = $response->getResult();
 		if (is_array($data[0]) && !empty($data[0]['data'])) {
 			$model = $data[0]['data'][0];
-			if (isset($model['settings']) && $model['settings'] !== 'NULL') {
-				$model['settings'] = json_decode($model['settings'], true);
+			if (!empty($model['settings'])) {
+				$decoded = json_decode($model['settings'], true);
+				if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+					$model['settings'] = $decoded;
+				} else {
+					$model['settings'] = [];
+				}
+			} else {
+				$model['settings'] = [];
 			}
 
 			return $model;

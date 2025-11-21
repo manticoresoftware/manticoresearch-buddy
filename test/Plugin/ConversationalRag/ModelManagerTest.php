@@ -11,6 +11,7 @@
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ModelManager;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Struct;
@@ -113,6 +114,10 @@ class ModelManagerTest extends TestCase {
 		$modelManager->createModel($mockClient, $config);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetModelByUuidOrNameFoundByName(): void {
 		$modelManager = new ModelManager();
 
@@ -147,12 +152,21 @@ class ModelManagerTest extends TestCase {
 			->with($this->stringContains('WHERE (name = \'test_model\' OR uuid = \'test_model\')'))
 			->willReturn($mockResponse);
 
+		/** @var array{id:string, uuid:string, name:string,llm_provider:string,llm_model:string,
+		 * style_prompt:string,settings:array{ temperature: string, max_tokens: string, k_results?: string,
+		 * similarity_threshold: string, max_document_length: string},created_at:string,updated_at:string} $result */
 		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
 
 		$this->assertIsArray($result);
 		$this->assertEquals('test-uuid-123', $result['uuid']);
 		$this->assertEquals('test_model', $result['name']);
 		$this->assertEquals('openai', $result['llm_provider']);
+		// Verify settings were properly parsed from JSON
+		$this->assertIsArray($result['settings']);
+		$this->assertNotEmpty($result['settings']['temperature']);
+		$this->assertNotEmpty($result['settings']['max_tokens']);
+		$this->assertEquals(0.7, $result['settings']['temperature']);
+		$this->assertEquals(1000, $result['settings']['max_tokens']);
 	}
 
 	public function testGetModelByUuidOrNameFoundByUuid(): void {
@@ -395,5 +409,162 @@ class ModelManagerTest extends TestCase {
 		$result = $method->invoke($modelManager, $mockClient, 'TestModel');
 
 		$this->assertTrue($result);
+	}
+
+	public function testGetModelByUuidOrNameWithNullSettings(): void {
+		$modelManager = new ModelManager();
+
+		// Mock HTTP client
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		// Mock response with null settings
+		$mockResponse = $this->createMock(Response::class);
+		$mockResponse->method('hasError')->willReturn(false);
+		$mockResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'data' => [
+						[
+							'uuid' => 'test-uuid-123',
+							'name' => 'test_model',
+							'llm_provider' => 'openai',
+							'llm_model' => 'gpt-4',
+							'style_prompt' => 'You are helpful',
+							'settings' => null,
+							'created_at' => 1234567890,
+						],
+					],
+				],
+				]
+			)
+		);
+
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->willReturn($mockResponse);
+
+		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
+
+		// Should be empty array due to empty() check
+		$this->assertIsArray($result['settings']);
+		$this->assertEmpty($result['settings']);
+	}
+
+	public function testGetModelByUuidOrNameWithEmptyStringSettings(): void {
+		$modelManager = new ModelManager();
+
+		// Mock HTTP client
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		// Mock response with empty string settings
+		$mockResponse = $this->createMock(Response::class);
+		$mockResponse->method('hasError')->willReturn(false);
+		$mockResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'data' => [
+						[
+							'uuid' => 'test-uuid-123',
+							'name' => 'test_model',
+							'llm_provider' => 'openai',
+							'llm_model' => 'gpt-4',
+							'settings' => '',
+							'created_at' => 1234567890,
+						],
+					],
+				],
+				]
+			)
+		);
+
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->willReturn($mockResponse);
+
+		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
+
+		// Should be empty array due to empty() check
+		$this->assertIsArray($result['settings']);
+		$this->assertEmpty($result['settings']);
+	}
+
+	public function testGetModelByUuidOrNameWithInvalidJsonSettings(): void {
+		$modelManager = new ModelManager();
+
+		// Mock HTTP client
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		// Mock response with invalid JSON settings
+		$mockResponse = $this->createMock(Response::class);
+		$mockResponse->method('hasError')->willReturn(false);
+		$mockResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'data' => [
+						[
+							'uuid' => 'test-uuid-123',
+							'name' => 'test_model',
+							'llm_provider' => 'openai',
+							'llm_model' => 'gpt-4',
+							'settings' => '{invalid json',
+							'created_at' => 1234567890,
+						],
+					],
+				],
+				]
+			)
+		);
+
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->willReturn($mockResponse);
+
+		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
+
+		// Should be empty array due to JSON decode failure
+		$this->assertIsArray($result['settings']);
+		$this->assertEmpty($result['settings']);
+	}
+
+	public function testGetModelByUuidOrNameWithStringNullSettings(): void {
+		$modelManager = new ModelManager();
+
+		// Mock HTTP client
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		// Mock response with string 'NULL' settings
+		$mockResponse = $this->createMock(Response::class);
+		$mockResponse->method('hasError')->willReturn(false);
+		$mockResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+				[
+					'data' => [
+						[
+							'uuid' => 'test-uuid-123',
+							'name' => 'test_model',
+							'llm_provider' => 'openai',
+							'llm_model' => 'gpt-4',
+							'settings' => 'NULL',
+							'created_at' => 1234567890,
+						],
+					],
+				],
+				]
+			)
+		);
+
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->willReturn($mockResponse);
+
+		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
+
+		// Should be empty array - 'NULL' is not empty but JSON decode fails
+		$this->assertIsArray($result['settings']);
+		$this->assertEmpty($result['settings']);
 	}
 }
