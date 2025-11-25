@@ -47,6 +47,9 @@ final class Payload extends BasePayload {
 	/** @var bool */
 	public bool $preserve = false;
 
+	/** @var bool */
+	public bool $forceBigrams = false;
+
 	public function __construct() {
 	}
 
@@ -84,7 +87,8 @@ final class Payload extends BasePayload {
 					prepend?: int,
 					expansion_len?: int,
 					layouts?: string,
-					preserve?: int
+					preserve?: int,
+					force_bigrams?: int
 			}
 		} $payload */
 		$payload = simdjson_decode($request->payload, true);
@@ -105,6 +109,7 @@ final class Payload extends BasePayload {
 		$self->expansionLen = (int)($payload['options']['expansion_len'] ?? 10);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
 		$self->preserve = !!($payload['options']['preserve'] ?? false);
+		$self->forceBigrams = !!($payload['options']['force_bigrams'] ?? false);
 		$self->validate();
 		return $self;
 	}
@@ -130,7 +135,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	protected static function fromSqlRequest(Request $request): static {
-		$pattern = '/autocomplete\(\s*\'([^\']*)\'\s*,\s*\'([^\']+)\'\s*'
+		$pattern = '/autocomplete\(\s*\'((?:\\\\\'|[^\'])*)\'\s*,\s*\'([^\']+)\'\s*'
 			. '((?:,\s*(?:(\d+)|\'([^\']*)\')\s+as\s+(\w+))*)\s*\)/ius';
 		preg_match($pattern, $request->payload, $matches);
 		if (!$matches) {
@@ -138,7 +143,7 @@ final class Payload extends BasePayload {
 		}
 
 		$self = new static();
-		$self->query = $matches[1];
+		$self->query = stripslashes($matches[1]);
 		$self->table = $matches[2];
 		if (isset($matches[3])) {
 			$self->parseOptions($matches[3]);
@@ -160,7 +165,7 @@ final class Payload extends BasePayload {
 			return;
 		}
 
-		preg_match_all('/,\s*((\d+|\'[^\']*\')\s+as\s+(\w+))/ius', $optionString, $optionMatches, PREG_SET_ORDER);
+		preg_match_all('/,\s*((\d+|\'[^\']*\')\s+as\s+([\w_]+))/ius', $optionString, $optionMatches, PREG_SET_ORDER);
 		foreach ($optionMatches as $optionMatch) {
 			$value = trim($optionMatch[2]);
 			$key = $optionMatch[3];
@@ -195,7 +200,7 @@ final class Payload extends BasePayload {
 			$value = (int)$value;
 		}
 
-		if ($key === 'prepend' || $key === 'append' || $key === 'preserve') {
+		if ($key === 'prepend' || $key === 'append' || $key === 'preserve' || $key === 'forceBigrams') {
 			$value = (bool)$value;
 		}
 

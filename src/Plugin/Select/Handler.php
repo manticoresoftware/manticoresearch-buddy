@@ -25,6 +25,7 @@ final class Handler extends BaseHandler {
 		'engine' => ['field', 'engine'],
 		'table_type' => ['static', 'BASE TABLE'],
 		'table_name' => ['table', ''],
+		'table_schema' => ['static', 'Manticore'],
 	];
 
 	const COLUMNS_FIELD_MAP = [
@@ -192,11 +193,26 @@ final class Handler extends BaseHandler {
 	 * @param Payload $payload
 	 * @return TaskResult
 	 */
+	protected static function handleTableCount(Client $manticoreClient, Payload $payload): TaskResult {
+		$query = 'SHOW TABLES';
+		/** @var array{0:array{data:array<mixed>}} */
+		$descResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+		$count = sizeof($descResult[0]['data']);
+		return TaskResult::withRow(['COUNT(*)' => $count])
+			->column('COUNT(*)', Column::String);
+	}
+
+	/**
+	 * @param Client $manticoreClient
+	 * @param Payload $payload
+	 * @return TaskResult
+	 */
 	protected static function handleSelectFromTables(Client $manticoreClient, Payload $payload): TaskResult {
 		if (sizeof($payload->fields) === 1 && stripos($payload->fields[0], 'count(*)') === 0) {
-			return static::handleFieldCount($manticoreClient, $payload);
+			return empty($payload->where)
+				? static::handleTableCount($manticoreClient, $payload)
+				: static::handleFieldCount($manticoreClient, $payload);
 		}
-
 		$table = $payload->where['table_name']['value'] ?? $payload->where['TABLE_NAME']['value'] ?? null;
 		$data = [];
 		if ($table) {
@@ -204,33 +220,73 @@ final class Handler extends BaseHandler {
 			/** @var array<array{data:array<array<string,string>>}> */
 			$schemaResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
 			$createTable = $schemaResult[0]['data'][0]['Create Table'] ?? '';
+			if (!$createTable) {
+				$result = $payload->getTaskResult();
+				return $result->data($data);
+			}
 
-			if ($createTable) {
-				$createTables = [$createTable];
-				$i = 0;
-				foreach ($createTables as $createTable) {
-					$row = static::parseTableSchema($createTable);
-					$data[$i] = [];
-					self::unifyFieldNames($payload->fields);
-					foreach ($payload->fields as $field) {
-						[$type, $value] = static::TABLES_FIELD_MAP[$field]
-							?? static::TABLES_FIELD_MAP[strtolower($field)] ?? ['field', strtolower($field)];
-						$data[$i][$field] = match ($type) {
-							'field' => $row[$value] ?? (static::DEFAULT_FIELD_VALUES[$field] ?? null),
-							'table' => $table,
-							'static' => $value,
-							// default => $row[$field] ?? null,
-						};
-					}
-					++$i;
+			$createTables = [$createTable];
+			$i = 0;
+			foreach ($createTables as $createTable) {
+				$row = static::parseTableSchema($createTable);
+				$data[$i] = [];
+				self::unifyFieldNames($payload->fields);
+				foreach ($payload->fields as $field) {
+					[$type, $value] = static::TABLES_FIELD_MAP[$field]
+						?? static::TABLES_FIELD_MAP[strtolower($field)] ?? ['field', strtolower($field)];
+					$data[$i][$field] = match ($type) {
+						'field' => $row[$value] ?? (static::DEFAULT_FIELD_VALUES[$field] ?? null),
+						'table' => $table,
+						'static' => $value,
+						// default => $row[$field] ?? null,
+					};
 				}
+				++$i;
 			}
 		} else {
 			$data = static::processSelectOtherFromTables($manticoreClient, $payload);
 		}
-
 		$result = $payload->getTaskResult();
 		return $result->data($data);
+	}
+
+	/**
+	 *
+	 * @param bool $isWildcardSelect
+	 * @param Client $manticoreClient
+	 * @param Payload $payload
+	 * @return array<array<string,mixed>>
+	 */
+	protected static function processSelectFromInfoSchema(
+		bool $isWildcardSelect,
+		Client $manticoreClient,
+		Payload $payload
+	): array {
+		$data = [];
+		self::unifyFieldNames($payload->fields);
+		$query = 'SHOW TABLES';
+		/** @var array<array{data:array<array<string,string>>}> */
+		$tablesResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
+		if ($isWildcardSelect) {
+			$payload->fields = [];
+			foreach (self::TABLES_FIELD_MAP as $field => $fieldInfo) {
+				if ($fieldInfo[0] !== 'static' && $fieldInfo[0] !== 'table') {
+					continue;
+				}
+				$payload->fields[] = $field;
+			}
+		}
+		foreach ($tablesResult[0]['data'] as $row) {
+			$dataRow = [];
+			foreach ($payload->fields as $f) {
+				$dataRow[$f] = isset(self::TABLES_FIELD_MAP[$f]) && self::TABLES_FIELD_MAP[$f][1]
+				? self::TABLES_FIELD_MAP[$f][1]
+				: self::getFieldValue($f, $row);
+			}
+			$data[] = $dataRow;
+		}
+
+		return $data;
 	}
 
 	/**
@@ -242,23 +298,16 @@ final class Handler extends BaseHandler {
 		$data = [];
 		// grafana: SELECT DISTINCT TABLE_SCHEMA from information_schema.TABLES
 		// where TABLE_TYPE != 'SYSTEM VIEW' ORDER BY TABLE_SCHEMA
-		if (sizeof($payload->fields) === 1
-			&& stripos($payload->fields[0], 'table_schema') !== false
-		) {
+		$isSingleFieldSelect = sizeof($payload->fields) === 1;
+		$isWildcardSelect = $isSingleFieldSelect
+			&& stripos($payload->fields[0], '*') !== false
+			&& $payload->table === 'information_schema.tables';
+		if ($isSingleFieldSelect && stripos($payload->fields[0], 'table_schema') !== false) {
 			$data[] = [
 				'TABLE_SCHEMA' => 'Manticore',
 			];
-		} elseif (stripos($payload->fields[0], 'table_name') !== false) {
-			self::unifyFieldNames($payload->fields);
-			$query = 'SHOW TABLES';
-			/** @var array<array{data:array<array<string,string>>}> */
-			$tablesResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
-			$row = $tablesResult[0]['data'][0];
-			$dataRow = [];
-			foreach ($payload->fields as $f) {
-				$dataRow[$f] = self::getFieldValue($f, $row);
-			}
-			$data[] = $dataRow;
+		} elseif ($isWildcardSelect || stripos($payload->fields[0], 'table_name') !== false) {
+			$data = self::processSelectFromInfoSchema($isWildcardSelect, $manticoreClient, $payload);
 		}
 
 		return $data;
@@ -444,7 +493,7 @@ final class Handler extends BaseHandler {
 	 * @return mixed
 	 */
 	protected static function getFieldValue(string $field, array $row, ?string $table = null): mixed {
-		if ($field === 'TABLE_NAME') {
+		if (strtolower($field) === 'table_name') {
 			return $table ?? ($row['Table'] ?? null);
 		}
 		return static::DEFAULT_FIELD_VALUES[$field] ?? null;
@@ -593,7 +642,7 @@ final class Handler extends BaseHandler {
 			return;
 		}
 		$payload->originalQuery = (string)preg_replace(
-			"/{$payload->originalTable}\s+$alias\s+/is",
+			"/{$payload->originalTable}(\s+AS)?\s+$alias\s*/is",
 			$payload->originalTable . ' ',
 			$payload->originalQuery
 		);
@@ -824,7 +873,6 @@ final class Handler extends BaseHandler {
 				$allVars[$field] = $value;
 			}
 		}
-
 		foreach ($fieldNames as $i => $fieldName) {
 			$fieldNames[$i] = $aliasFields[$fieldName] ?? $fieldName;
 		}
