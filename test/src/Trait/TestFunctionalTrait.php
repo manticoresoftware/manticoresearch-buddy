@@ -297,18 +297,20 @@ trait TestFunctionalTrait {
 	}
 
 	/**
-	 * Run sql query by using cli endpoint
+	 * Run HTTP query to manticore search
 	 *
 	 * @param string $query
 	 * @param bool $redirectOutput
 	 * @param string $path
-	 * @return array{error:string}|array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}>
+	 * @param bool $includeHeaders Include HTTP response headers in result
+	 * @return array{error:string}|array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string,headers?:string}>
 	 * @throws Exception
 	 */
 	protected static function runHttpQuery(
 		string $query,
 		bool $redirectOutput = true,
-		string $path = 'sql?mode=raw'
+		string $path = 'sql?mode=raw',
+		bool $includeHeaders = false
 	): array {
 		$port = static::getListenHttpPort();
 		$isSql = str_starts_with(ltrim($path, '/'), 'sql');
@@ -323,22 +325,50 @@ trait TestFunctionalTrait {
 				: 'Content-type: application/json'
 			);
 
-		$command = "curl -s 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect";
+		$curlFlags = $includeHeaders ? '-i' : '-s';
+		$command = "curl $curlFlags 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect";
 		echo 'Commmand: ' . $command . PHP_EOL;
 		exec($command, $output);
 
-		/** @var array{error:string}|array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $result */
+		$headers = '';
+		$statusCode = 200;
+		if ($includeHeaders) {
+			$response = implode("\n", $output);
+			$parts = explode("\n\n", $response, 2);
+			$headers = $parts[0] ?? '';
+			$output = explode("\n", $parts[1] ?? '');
+
+			// Extract status code from first line of headers
+			$headerLines = explode("\n", $headers);
+			if (preg_match('/HTTP\/\d+\.\d+\s+(\d+)/', $headerLines[0] ?? '', $matches)) {
+				$statusCode = (int)$matches[1];
+			}
+		}
+
+		/** @var array{error:string}|array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string,headers?:string}> $result */
 		$result = match ($path) {
-			'cli_json', 'sql', 'sql?mode=raw' => (array)simdjson_decode(implode(PHP_EOL, $output), true),
+			'cli_json', 'sql', 'sql?mode=raw' => (array)json_decode(implode(PHP_EOL, $output), true),
 			'cli' => [
 				['columns' => implode(PHP_EOL, $output), 'data' => [], 'error' => ''],
 			],
+			'metrics' => [
+				['data' => implode(PHP_EOL, $output), 'error' => ''],
+			],
 			// assuming Elastic-like endpoint is passed
 			default => [
-				['data' => [(array)simdjson_decode($output[0] ?? '{}', true)], 'error' => ''],
+				['data' => [(array)json_decode($output[0] ?? '{}', true)], 'error' => ''],
 			],
 		};
+
+		if ($includeHeaders && isset($result[0])) {
+			/** @phpstan-ignore-next-line */
+			$result[0]['headers'] = $headers;
+			/** @phpstan-ignore-next-line */
+			$result[0]['status_code'] = $statusCode;
+		}
+
 		print_r($output);
+		unlink($payloadFile);
 		return $result;
 	}
 
@@ -372,7 +402,7 @@ trait TestFunctionalTrait {
 		$redirect = $redirectOutput ? '2>&1' : '';
 		exec("curl -s 127.0.0.1:$port -H 'Content-type: application/json' -d @$payloadFile $redirect", $output);
 		/** @var array{version:int,type:string,message:array<int,array{columns:array<string>,data:array<int,array<string,string>>}>} $result */
-		$result = (array)simdjson_decode($output[0] ?? '{}', true);
+		$result = (array)json_decode($output[0] ?? '{}', true);
 		return $result;
 	}
 
