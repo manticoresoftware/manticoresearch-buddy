@@ -325,7 +325,7 @@ trait TestFunctionalTrait {
 				: 'Content-type: application/json'
 			);
 
-		$curlFlags = $includeHeaders ? '-i' : '-s';
+		$curlFlags = $includeHeaders ? '-is' : '-s';
 		$command = "curl $curlFlags 127.0.0.1:$port/$path -H '$header' --data-binary @$payloadFile $redirect";
 		echo 'Commmand: ' . $command . PHP_EOL;
 		exec($command, $output);
