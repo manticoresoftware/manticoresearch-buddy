@@ -216,6 +216,7 @@ The response JSON structure:
 | `error_code` | An integer representing the HTTP error code which will be a part of the HTTP response to the user making a JSON over HTTP request. For SQL over HTTP/mysql communications, this field is ignored. |
 | `version` | Indicates the current protocol version being used. Current version is 3. |
 | `content_type` | Optional string that defines the Content-Type header value for the reply to the client. |
+| `auth_log_severity` | Optional string. Defines the severity level at which the message (from the message property) should be logged in the dedicated authentication log [searchd.log.auth](https://github.com/manticoresoftware/manticoresearch/blob/wip_auth/src/auth/spec.md#logging). This flag is used when the error is related to authentication or permission enforcement. The value must be one of the daemon's supported log levels: INFO, WARN, ERROR, or CRITICAL. If this key is omitted, no entry will be added to the authentication log.
 
 
 Example of HTTP Response:
