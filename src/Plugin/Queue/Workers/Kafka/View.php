@@ -59,7 +59,12 @@ class View {
 	 */
 	private function read(): array {
 		$sql = "$this->query";
-		$readBuffer = $this->client->sendRequest($sql);
+		$readBuffer = $this->client->sendRequest(
+			$sql,
+			'sql?mode=raw',
+			false,
+			true
+		);
 
 		if ($readBuffer->hasError()) {
 			throw GenericError::create("Can't read from buffer. " . $readBuffer->getError());
