@@ -278,6 +278,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 		$combinations->ksort(
 			function (mixed $a, mixed $b) use ($combinations): int {
+        if (!$combinations->hasKey($a) || !$combinations->hasKey($b)) {
+					return 0; // Equal if either key doesn't exist
+        }
 				$scoreA = $combinations->get($a);
 				$scoreB = $combinations->get($b);
 				return $scoreB <=> $scoreA;
