@@ -218,6 +218,23 @@ final class Handler extends BaseHandlerWithFlagCache {
 				$this->payload->forceBigrams,
 				$distance
 			);
+
+			// Normalize bigram separators in keywords from fuzzy variations
+			foreach ($words as &$word) {
+				$word['keywords'] = array_map(
+					fn($kw) => static::normalizeBigramSeparator($kw),
+					$word['keywords']
+				);
+			}
+			unset($word);
+
+			// Normalize bigram separators in score map keys
+			$normalizedScoreMap = [];
+			foreach ($scoreMap as $key => $value) {
+				$normalizedKey = static::normalizeBigramSeparator($key);
+				$normalizedScoreMap[$normalizedKey] = $value;
+			}
+			$scoreMap = $normalizedScoreMap;
 		}
 
 		// If no words found, we just add the original phrase
@@ -278,9 +295,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 
 		$combinations->ksort(
 			function (mixed $a, mixed $b) use ($combinations): int {
-        if (!$combinations->hasKey($a) || !$combinations->hasKey($b)) {
+				if (!$combinations->hasKey($a) || !$combinations->hasKey($b)) {
 					return 0; // Equal if either key doesn't exist
-        }
+				}
 				$scoreA = $combinations->get($a);
 				$scoreB = $combinations->get($b);
 				return $scoreB <=> $scoreA;
@@ -315,7 +332,19 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$newCombinations = new \Ds\Map();
 		foreach ($combinations as $combination => $score) {
 			foreach ($positionWords as $word) {
-				$newCombination = trim($combination . ' ' . $word);
+				// Normalize bigram separator before building combination
+				$normalizedWord = static::normalizeBigramSeparator($word);
+				$normalizedCombination = static::normalizeBigramSeparator($combination);
+
+				$newCombination = trim($normalizedCombination . ' ' . $normalizedWord);
+
+				// Skip if the new combination has duplicate consecutive words
+				// This happens when expanded keywords contain multi-word phrases
+				// Example: "how do buy" + "iphone buy" = "how do buy iphone buy" (bad)
+				if (static::hasDuplicateWords($newCombination)) {
+					continue;
+				}
+
 				$newScore = $score + ($scoreMap[$word] ?? 0);
 
 				// If we already have max items and the new score is too low, skip
@@ -333,6 +362,41 @@ final class Handler extends BaseHandlerWithFlagCache {
 		}
 
 		return $newCombinations;
+	}
+
+	/**
+	 * Normalize bigram separator (ASCII 3) to space
+	 * Manticore stores bigrams with \u0003 separator which needs to be converted
+	 * @param string $text
+	 * @return string
+	 */
+	private static function normalizeBigramSeparator(string $text): string {
+		return str_replace("\u{0003}", ' ', $text);
+	}
+
+	/**
+	 * Check if a phrase contains duplicate consecutive or nearby words
+	 * @param string $phrase
+	 * @return bool
+	 */
+	private static function hasDuplicateWords(string $phrase): bool {
+		$words = preg_split('/\s+/', trim($phrase), -1, PREG_SPLIT_NO_EMPTY);
+		if (!$words) {
+			return false;
+		}
+
+		$wordCount = sizeof($words);
+		for ($i = 0; $i < $wordCount; $i++) {
+			// Check for consecutive duplicates or duplicates within 2 positions
+			// This catches patterns like "buy iphone buy" or "buy x buy"
+			for ($j = $i + 1; $j < min($i + 3, $wordCount); $j++) {
+				if ($words[$i] === $words[$j]) {
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -417,7 +481,10 @@ final class Handler extends BaseHandlerWithFlagCache {
 		/** @var array<keyword> */
 		$data = static::applyThreshold($data, 0.5);
 		/** @var array<string> */
-		$keywords = array_map(fn($row) => ltrim($row['normalized'], '='), $data);
+		$keywords = array_map(
+			fn($row) => static::normalizeBigramSeparator(ltrim($row['normalized'], '=')),
+			$data
+		);
 		// Filter out keywords that are too long to given config
 		$maxLen = strlen($word) + $this->payload->expansionLen;
 		$keywords = array_filter($keywords, fn ($keyword) => strlen($keyword) <= $maxLen);
@@ -449,6 +516,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$rawSuggestionsCount = sizeof($data);
 		/** @var array<string> */
 		$suggestions = array_column(static::applyThreshold($data, 0.5, 20), 'suggest');
+		// Normalize bigram separators in suggestions
+		$suggestions = array_map(fn($s) => static::normalizeBigramSeparator($s), $suggestions);
 		$thresholdSuggestionsCount = sizeof($suggestions);
 		$filterFn = function (string $suggestion) use ($lastWord, $lastWordLen, $distance) {
 			$suggestionLen = strlen($suggestion);
