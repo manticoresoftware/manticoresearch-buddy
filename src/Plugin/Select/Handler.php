@@ -868,7 +868,7 @@ final class Handler extends BaseHandler {
 		if ($requeryFields) {
 			$requery = 'SELECT ' . implode(',', $requeryFields);
 			/** @var array<array{data:array<array<string,string>>}> $requeryResult */
-			$requeryResult = $manticoreClient->sendRequest($requery, 'sql', false)->getResult();
+			$requeryResult = $manticoreClient->sendRequest($requery, $payload->path, false)->getResult();
 			foreach ($requeryResult[0]['data'][0] as $field => $value) {
 				$allVars[$field] = $value;
 			}

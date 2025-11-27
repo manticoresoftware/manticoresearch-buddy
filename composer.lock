@@ -712,12 +712,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "370e0898fb76012994e153e3eb8c7bf03547a92d"
+                "reference": "66975b8aa5d4c515559fe6d6b038c76c270c095b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/370e0898fb76012994e153e3eb8c7bf03547a92d",
-                "reference": "370e0898fb76012994e153e3eb8c7bf03547a92d",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/66975b8aa5d4c515559fe6d6b038c76c270c095b",
+                "reference": "66975b8aa5d4c515559fe6d6b038c76c270c095b",
                 "shasum": ""
             },
             "require": {
@@ -755,7 +755,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/fuzzy-via-http-sql"
             },
-            "time": "2025-11-26T04:32:06+00:00"
+            "time": "2025-11-27T04:42:14+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
