@@ -216,8 +216,15 @@ The response JSON structure:
 | `error_code` | An integer representing the HTTP error code which will be a part of the HTTP response to the user making a JSON over HTTP request. For SQL over HTTP/mysql communications, this field is ignored. |
 | `version` | Indicates the current protocol version being used. Current version is 3. |
 | `content_type` | Optional string that defines the Content-Type header value for the reply to the client. |
-| `auth_log_severity` | Optional string. Defines the severity level at which the message (from the message property) should be logged in the dedicated authentication log [searchd.log.auth](https://github.com/manticoresoftware/manticoresearch/blob/wip_auth/src/auth/spec.md#logging). This flag is used when the error is related to authentication or permission enforcement. The value must be one of the daemon's supported log levels: INFO, WARN, ERROR, or CRITICAL. If this key is omitted, no entry will be added to the authentication log.
+| `log` | Optional array of log objects. Used to instruct the Manticore daemon to write specific events to its internal logs. If omitted, no special logging occurs.
 
+##### Log Array Structure Details
+
+| Key | Value | Description |
+|-|-|-|
+| `type` | `auth` | Specifies which log file/system the event should be written to. `auth` directs the event to the dedicated authentication `searchd.log.auth`.
+| `severity` | `INFO`, `WARN`, `ERROR`, `CRITICAL` | The severity level at which the message should be logged. Must be one of the daemon's supported log levels.
+| `message` | String | The detailed, human-readable log message to be written. This message is distinct from the end-user error in the main `message` property.
 
 Example of HTTP Response:
 
