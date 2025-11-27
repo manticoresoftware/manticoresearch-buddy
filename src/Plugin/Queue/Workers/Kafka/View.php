@@ -63,7 +63,6 @@ class View {
 			$sql,
 			'sql?mode=raw',
 			false,
-			true
 		);
 
 		if ($readBuffer->hasError()) {
