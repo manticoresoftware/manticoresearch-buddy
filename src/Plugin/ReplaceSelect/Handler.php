@@ -78,7 +78,7 @@ final class Handler extends BaseHandlerWithClient {
 			$resultRow = [
 				'total' => $totalProcessed,
 				'batches' => $processor->getBatchesProcessed(),
-				'batch_size' => $this->payload->batchSize,
+				'batch_size' => Config::getBatchSize(),
 				'duration_seconds' => round($operationDuration, 3),
 				'records_per_second' => $operationDuration > 0 ? round($totalProcessed / $operationDuration, 2) : 0,
 			];

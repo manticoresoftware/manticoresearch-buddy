@@ -27,6 +27,7 @@ final class BatchProcessor {
 	private Payload $payload;
 	/** @var array<string,array<string,mixed>> */
 	private array $targetFields;
+	private int $batchSize;
 	private int $totalProcessed = 0;
 	private int $batchesProcessed = 0;
 	private float $processingStartTime;
@@ -44,6 +45,7 @@ final class BatchProcessor {
 		$this->client = $client;
 		$this->payload = $payload;
 		$this->targetFields = $targetFields;
+		$this->batchSize = Config::getBatchSize();
 		$this->processingStartTime = microtime(true);
 		$this->getFields($client, $payload->targetTable);
 	}
@@ -55,7 +57,7 @@ final class BatchProcessor {
 	 * @throws ManticoreSearchClientError
 	 */
 	public function execute(): int {
-		$batchSize = $this->payload->batchSize;
+		$batchSize = $this->batchSize;
 		$consecutiveEmptyBatches = 0;
 		$maxEmptyBatches = 3;
 		$userLimit = $this->payload->selectLimit;

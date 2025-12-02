@@ -23,7 +23,6 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 final class Payload extends BasePayload {
 	public string $targetTable;
 	public string $selectQuery;
-	public int $batchSize;
 	public ?string $cluster = null;
 	public string $originalQuery;
 	public ?int $selectLimit = null;
@@ -63,7 +62,6 @@ final class Payload extends BasePayload {
 	public static function fromRequest(Request $request): static {
 		$self = new static();
 		$self->originalQuery = $request->payload;
-		$self->batchSize = Config::getBatchSize();
 
 		Buddy::debug('Parsing REPLACE SELECT query: ' . $request->payload);
 
@@ -72,11 +70,6 @@ final class Payload extends BasePayload {
 			Buddy::debug('Starting regex parsing');
 			$self->parseWithRegex($request->payload);
 			Buddy::debug('Regex parsing successful. Target table: ' . $self->targetTable);
-
-			// Parse batch size from comment syntax /* BATCH_SIZE 500 */
-			Buddy::debug('Parsing batch size');
-			$self->parseBatchSize($request->payload);
-			Buddy::debug('Batch size: ' . $self->batchSize);
 		} catch (\Exception $e) {
 			Buddy::debug('Payload parsing failed: ' . $e->getMessage());
 			throw GenericError::create('Failed to parse REPLACE SELECT query: ' . $e->getMessage());
@@ -188,33 +181,7 @@ final class Payload extends BasePayload {
 		return null;
 	}
 
-	/**
-	 * Parse batch size from SQL comment
-	 *
-	 * @param string $sql
-	 * @return void
-	 */
-	private function parseBatchSize(string $sql): void {
-		// Parse comment-style batch size: /* BATCH_SIZE 500 */
-		if (preg_match('/\/\*\s*BATCH_SIZE\s+(\d+)\s*\*\//i', $sql, $matches)) {
-			$requestedSize = (int)$matches[1];
-			$maxSize = Config::getMaxBatchSize();
-			$this->batchSize = max(1, min($requestedSize, $maxSize));
-			Buddy::debug("Batch size from comment: requested=$requestedSize, max=$maxSize, final={$this->batchSize}");
-			return;
-		}
 
-		// Legacy support for space-separated BATCH_SIZE (deprecated)
-		if (!preg_match('/\s+BATCH_SIZE\s+(\d+)\s*$/i', $sql, $matches)) {
-			Buddy::debug('No custom batch size found, using default: ' . $this->batchSize);
-			return;
-		}
-
-		$requestedSize = (int)$matches[1];
-		$maxSize = Config::getMaxBatchSize();
-		$this->batchSize = max(1, min($requestedSize, $maxSize));
-		Buddy::debug("Batch size from legacy syntax: requested=$requestedSize, max=$maxSize, final={$this->batchSize}");
-	}
 
 	/**
 	 * Get target table name with cluster prefix if present
