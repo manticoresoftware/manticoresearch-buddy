@@ -99,6 +99,8 @@ final class Handler extends BaseHandlerWithClient {
 					'batch_size' => $this->payload->batchSize,
 					'transaction_started' => $this->transactionStarted,
 					'operation_duration' => microtime(true) - $this->operationStartTime,
+					'exception_class' => $e::class,
+					'exception_code' => $e->getCode(),
 				];
 
 				if ($processor) {
@@ -106,15 +108,17 @@ final class Handler extends BaseHandlerWithClient {
 					$errorContext['batches_processed'] = $processor->getBatchesProcessed();
 				}
 
+				$contextJson = json_encode($errorContext, JSON_PRETTY_PRINT);
 				Buddy::debug(
 					'REPLACE SELECT operation failed: ' . $e->getMessage() .
-					"\nContext: " . json_encode($errorContext)
+					"\nContext: " . $contextJson .
+					"\nTrace: " . $e->getTraceAsString()
 				);
 
 				// Rollback transaction if it was started
 				$this->rollbackTransaction();
 
-				// Re-throw with enhanced context
+				// Re-throw with enhanced context including exception type
 				throw new ManticoreSearchClientError(
 					$e->getMessage() . ' (processed ' . ($processor?->getTotalProcessed() ?? 0) . ' records)',
 					$e->getCode(),
