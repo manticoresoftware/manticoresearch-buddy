@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\ReplaceSelect;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Field compatibility validator for REPLACE SELECT operations
@@ -44,17 +45,38 @@ final class FieldValidator {
 	 */
 	public function validateCompatibility(string $selectQuery, string $targetTable): void {
 		// 1. Load target table schema first
+		Buddy::debug("Loading schema for target table: $targetTable");
 		$this->loadTargetFields($targetTable);
+		Buddy::debug('Target table schema loaded. Fields: ' . implode(', ', array_keys($this->targetFields)));
 
 		// 2. Test SELECT query and get sample data
-		$testQuery = "($selectQuery) LIMIT 1";
-		$result = $this->client->sendRequest($testQuery);
-		$rawResult = $result->getResult();
-		if ($result->hasError()) {
-			throw ManticoreSearchClientError::create(
-				'Invalid SELECT query: ' . $result->getError()
-			);
+		Buddy::debug("Testing SELECT query: $selectQuery");
+
+		// Strip existing LIMIT clause to avoid syntax errors
+		$baseQuery = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $selectQuery);
+		if ($baseQuery !== $selectQuery) {
+			Buddy::debug('Original query had LIMIT clause, removing it');
+			Buddy::debug("Base query without LIMIT: $baseQuery");
 		}
+
+		// Append LIMIT 1 to get sample data
+		$testQuery = "$baseQuery LIMIT 1";
+		Buddy::debug("Test query with LIMIT 1: $testQuery");
+
+		$result = $this->client->sendRequest($testQuery);
+
+		$rawResult = $result->getResult();
+
+		$jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
+		Buddy::debug('SELECT result full structure: ' . json_encode($rawResult, $jsonFlags));
+
+		if ($result->hasError()) {
+			$errorMsg = 'Invalid SELECT query: ' . $result->getError();
+			Buddy::debug("SELECT query validation failed: $errorMsg");
+			throw ManticoreSearchClientError::create($errorMsg);
+		}
+
+		Buddy::debug('SELECT query validation successful');
 
 		$resultData = $this->validateAndExtractResultData($rawResult);
 		if ($resultData === null) {
@@ -66,18 +88,23 @@ final class FieldValidator {
 		[$selectFields, $sampleData] = $resultData;
 
 		// 3. Validate mandatory ID field
+		Buddy::debug('Validating mandatory ID field');
 		$this->validateMandatoryId($selectFields);
+		Buddy::debug('Mandatory ID field validation passed');
 
 		// 4. Validate field existence and type compatibility
+		Buddy::debug('Validating field existence');
 		$this->validateFieldExistence($selectFields);
+		Buddy::debug('Field existence validation passed');
+
+		Buddy::debug('Validating field type compatibility');
 		$this->validateFieldTypes($selectFields, $sampleData);
+		Buddy::debug('Field type validation passed');
 
 		// 5. Validate stored properties for text fields
+		Buddy::debug('Validating stored properties for text fields');
 		$this->validateStoredFields($selectFields);
-
-		if (!Config::isDebugEnabled()) {
-			return;
-		}
+		Buddy::debug('Stored properties validation passed');
 
 		$this->logValidationResults($selectFields, $sampleData);
 	}
@@ -97,24 +124,34 @@ final class FieldValidator {
 		$extractedFields = $this->extractFieldsFromSelectClause($selectQuery);
 
 		if (!empty($extractedFields)) {
+			Buddy::debug('Extracted fields from SELECT clause: ' . implode(', ', $extractedFields));
 			$this->validateMandatoryId($extractedFields);
 			$this->validateFieldExistence($extractedFields);
 			$this->validateStoredFields($extractedFields);
 			return;
 		}
 
+		Buddy::debug('Could not extract fields from SELECT clause, trying alternative methods');
+
 		// Option 2: Use DESCRIBE or EXPLAIN if available
 		$describeQuery = "DESCRIBE ($selectQuery)";
+		Buddy::debug("Attempting DESCRIBE query: $describeQuery");
 		$descResult = $this->client->sendRequest($describeQuery);
 
 		if (!$descResult->hasError()) {
+			Buddy::debug('DESCRIBE query succeeded, validating from results');
 			// Parse DESCRIBE result to get field information
 			$this->validateFromDescribeResult($descResult->getResult());
 			return;
 		}
 
+		Buddy::debug('DESCRIBE failed, trying LIMIT 0 approach');
+
 		// Option 3: Execute query with LIMIT 0 to get structure without data
-		$structureQuery = "($selectQuery) LIMIT 0";
+		// Strip existing LIMIT clause to avoid syntax errors
+		$baseQuery = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $selectQuery);
+		$structureQuery = "$baseQuery LIMIT 0";
+		Buddy::debug("Testing query structure: $structureQuery");
 		$structResult = $this->client->sendRequest($structureQuery);
 
 		if ($structResult->hasError()) {
@@ -163,6 +200,12 @@ final class FieldValidator {
 		$cleanFields = [];
 
 		foreach ($fields as $field) {
+			// Ensure field is a string
+			if (!is_string($field)) {
+				Buddy::debug('Skipping non-string field: ' . json_encode($field));
+				continue;
+			}
+
 			// Remove aliases: "field AS alias" -> "field"
 			if (preg_match('/(.+?)\s+AS\s+/i', $field, $matches)) {
 				$field = trim($matches[1]);
@@ -214,6 +257,7 @@ final class FieldValidator {
 	private function validateFieldTypes(array $selectFields, array $sampleData): void {
 		foreach ($selectFields as $fieldName) {
 			if (!isset($this->targetFields[$fieldName]) || !isset($sampleData[$fieldName])) {
+				Buddy::debug("Skipping type check for field '$fieldName' (not in sample data)");
 				continue;
 			}
 
@@ -222,12 +266,14 @@ final class FieldValidator {
 			$fieldInfo = $this->targetFields[$fieldName];
 			$targetType = $fieldInfo['type'];
 
+			Buddy::debug("Type check for '$fieldName': " . gettype($sourceValue) . " -> $targetType");
+
 			// Check type compatibility
 			if (!$this->isTypeCompatible($sourceValue, $targetType)) {
-				throw ManticoreSearchClientError::create(
-					"Field '$fieldName' type incompatible: cannot convert " .
-					gettype($sourceValue) . " to $targetType"
-				);
+				$errorMsg = "Field '$fieldName' type incompatible: cannot convert " .
+					gettype($sourceValue) . " to $targetType";
+				Buddy::debug("Type validation failed: $errorMsg");
+				throw ManticoreSearchClientError::create($errorMsg);
 			}
 		}
 	}
@@ -239,18 +285,117 @@ final class FieldValidator {
 	 * @return array{0: array<int,string>, 1: array<string,mixed>}|null
 	 */
 	private function validateAndExtractResultData(mixed $result): ?array {
-		if (!is_array($result) || !isset($result[0]['data']) || empty($result[0]['data'])) {
+		Buddy::debug('=== validateAndExtractResultData called ===');
+		Buddy::debug('Input $result type: ' . gettype($result));
+
+		if (!is_array($result) || !isset($result[0]) || !is_array($result[0])) {
+			Buddy::debug('CHECK FAILED: $result is not valid array structure');
 			return null;
 		}
 
-		$firstRow = $result[0]['data'][0];
-		if (!is_array($firstRow)) {
-			throw ManticoreSearchClientError::create('Invalid SELECT query result structure');
+		// Try wrapped format first (standard Manticore response)
+		$wrappedResult = $this->extractFromWrappedFormat($result[0]);
+		if ($wrappedResult !== null) {
+			return $wrappedResult;
 		}
 
-		/** @var array<int,string> $selectFields */
-		$selectFields = array_keys($firstRow);
+		// Fallback to unwrapped format
+		$unwrappedResult = $this->extractFromUnwrappedFormat($result[0]);
+		if ($unwrappedResult !== null) {
+			return $unwrappedResult;
+		}
+
+		Buddy::debug('No data found in response - no wrapped or unwrapped data');
+		Buddy::debug('result[0] keys: ' . json_encode(array_keys($result[0])));
+		return null;
+	}
+
+	/**
+	 * Extract result from wrapped format (has 'data' key)
+	 *
+	 * @param array<mixed> $resultWrapper
+	 * @return array{0: array<int,string>, 1: array<string,mixed>}|null
+	 */
+	private function extractFromWrappedFormat(array $resultWrapper): ?array {
+		if (!isset($resultWrapper['data'])
+			|| !is_array($resultWrapper['data'])
+			|| empty($resultWrapper['data'])) {
+			return null;
+		}
+
+		Buddy::debug('Using wrapped format with "data" key');
+
+		$firstRow = $resultWrapper['data'][0];
+		if (!is_array($firstRow)) {
+			$errorMsg = 'Invalid SELECT result: data row is not array, got ' . gettype($firstRow);
+			Buddy::debug("CHECK FAILED: $errorMsg");
+			throw ManticoreSearchClientError::create($errorMsg);
+		}
+
+		$selectFields = $this->extractFieldNamesFromResult($firstRow);
+		$this->validateFieldNamesAreStrings($selectFields);
+
+		Buddy::debug('Extracted ' . sizeof($selectFields) . ' fields from wrapped format');
 		return [$selectFields, $firstRow];
+	}
+
+	/**
+	 * Extract result from unwrapped format (result[0] is a data row)
+	 *
+	 * @param array<mixed> $firstRow
+	 * @return array{0: array<int,string>, 1: array<string,mixed>}|null
+	 */
+	private function extractFromUnwrappedFormat(array $firstRow): ?array {
+		// Detect unwrapped format: no wrapper indicator keys
+		if (isset($firstRow['error']) || isset($firstRow['data']) || isset($firstRow['columns'])) {
+			return null;
+		}
+
+		if (empty($firstRow)) {
+			return null;
+		}
+
+		Buddy::debug('Using unwrapped format - result[0] is a direct data row');
+
+		$selectFields = $this->extractFieldNamesFromResult($firstRow);
+		$this->validateFieldNamesAreStrings($selectFields);
+
+		Buddy::debug('Extracted ' . sizeof($selectFields) . ' fields from unwrapped format');
+		return [$selectFields, $firstRow];
+	}
+
+	/**
+	 * Extract field names from first row data keys
+	 *
+	 * @param array<mixed> $firstRow
+	 * @return array<int,mixed>
+	 */
+	private function extractFieldNamesFromResult(array $firstRow): array {
+		Buddy::debug('Extracting field names from first row data keys');
+		$selectFields = array_keys($firstRow);
+
+		Buddy::debug('Extracted field names: ' . json_encode($selectFields, JSON_PRETTY_PRINT));
+		return $selectFields;
+	}
+
+	/**
+	 * Validate that all field names are strings
+	 *
+	 * @param array<int,mixed> $selectFields
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 */
+	private function validateFieldNamesAreStrings(array $selectFields): void {
+		foreach ($selectFields as $idx => $field) {
+			if (!is_string($field)) {
+				$type = gettype($field);
+				$encoded = json_encode($field);
+				$errorMsg = "Field name at index $idx is not a string: $encoded (type: $type)";
+				Buddy::debug("Field extraction error: $errorMsg");
+				throw ManticoreSearchClientError::create($errorMsg);
+			}
+			Buddy::debug("Field[$idx]: type=" . gettype($field) . ', value=' . json_encode($field));
+		}
 	}
 
 	/**
@@ -300,7 +445,7 @@ final class FieldValidator {
 			),
 		];
 
-		error_log('ReplaceSelect validation: ' . json_encode($logData));
+		Buddy::debug('ReplaceSelect validation results: ' . json_encode($logData));
 	}
 
 	/**
@@ -311,11 +456,31 @@ final class FieldValidator {
 	 * @throws ManticoreSearchClientError
 	 */
 	private function validateMandatoryId(array $fields): void {
-		$lowerFields = array_map(fn($fieldName) => strtolower($fieldName), $fields);
+		Buddy::debug('Fields in SELECT: ' . implode(', ', $fields));
+
+		// Ensure all fields are strings
+		$stringFields = [];
+		foreach ($fields as $field) {
+			if (!is_string($field)) {
+				$type = gettype($field);
+				$encoded = json_encode($field);
+				Buddy::debug("Warning: Field is not a string: $encoded (type: $type)");
+				continue;
+			}
+			$stringFields[] = $field;
+		}
+
+		if (empty($stringFields)) {
+			$errorMsg = 'No valid string field names found';
+			Buddy::debug("ID field validation failed: $errorMsg");
+			throw ManticoreSearchClientError::create($errorMsg);
+		}
+
+		$lowerFields = array_map(fn($fieldName) => strtolower($fieldName), $stringFields);
 		if (!in_array('id', $lowerFields, true)) {
-			throw ManticoreSearchClientError::create(
-				"SELECT query must include 'id' field"
-			);
+			$errorMsg = "SELECT query must include 'id' field. Found: " . implode(', ', $stringFields);
+			Buddy::debug("ID field validation failed: $errorMsg");
+			throw ManticoreSearchClientError::create($errorMsg);
 		}
 	}
 
@@ -329,10 +494,12 @@ final class FieldValidator {
 	private function validateFieldExistence(array $selectFields): void {
 		foreach ($selectFields as $fieldName) {
 			if (!isset($this->targetFields[$fieldName])) {
-				throw ManticoreSearchClientError::create(
-					"Field '$fieldName' does not exist in target table"
-				);
+				$errorMsg = "Field '$fieldName' does not exist in target table. Available: "
+					. implode(', ', array_keys($this->targetFields));
+				Buddy::debug("Field existence validation failed: $errorMsg");
+				throw ManticoreSearchClientError::create($errorMsg);
 			}
+			Buddy::debug("Field exists in target: $fieldName");
 		}
 	}
 
@@ -348,14 +515,20 @@ final class FieldValidator {
 			/** @var array{type?: string, properties?: string} $fieldInfo */
 			$fieldInfo = $this->targetFields[$fieldName];
 			if (!isset($fieldInfo['type'], $fieldInfo['properties'])) {
+				Buddy::debug("Skipping stored check for field '$fieldName' (no type/properties info)");
 				continue;
 			}
 
-			if ($fieldInfo['type'] === 'text'
-				&& !str_contains($fieldInfo['properties'], 'stored')) {
-				throw ManticoreSearchClientError::create(
-					"Text field '$fieldName' must have 'stored' property for REPLACE operations"
-				);
+			if ($fieldInfo['type'] !== 'text') {
+				continue;
+			}
+
+			$props = $fieldInfo['properties'];
+			Buddy::debug("Checking stored property for TEXT field: $fieldName (properties: $props)");
+			if (!str_contains($fieldInfo['properties'], 'stored')) {
+				$errorMsg = "Text field '$fieldName' must have 'stored' property for REPLACE operations";
+				Buddy::debug("Stored property validation failed: $errorMsg");
+				throw ManticoreSearchClientError::create($errorMsg);
 			}
 		}
 	}
@@ -369,30 +542,41 @@ final class FieldValidator {
 	 * @throws ManticoreSearchClientError| ManticoreSearchResponseError
 	 */
 	private function loadTargetFields(string $tableName): void {
+		Buddy::debug("Executing DESC $tableName");
 		$descResult = $this->client->sendRequest("DESC $tableName");
 
 		if ($descResult->hasError()) {
-			throw ManticoreSearchClientError::create(
-				"Cannot describe target table '$tableName': " . $descResult->getError()
-			);
+			$errorMsg = "Cannot describe target table '$tableName': " . $descResult->getError();
+			Buddy::debug("DESC command failed: $errorMsg");
+			throw ManticoreSearchClientError::create($errorMsg);
 		}
 
 		$this->targetFields = [];
 		$result = $descResult->getResult();
+
+		Buddy::debug('DESC result full structure: ' . json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
 		if (!is_array($result[0]) || !isset($result[0]['data'])) {
+			Buddy::debug('DESC result has no data');
 			return;
 		}
 
 		foreach ($result[0]['data'] as $field) {
 			if (!is_array($field) || !isset($field['Field'], $field['Type'], $field['Properties'])) {
+				Buddy::debug('Skipping field with invalid structure: ' . json_encode($field));
 				continue;
 			}
 
-			$this->targetFields[(string)$field['Field']] = [
-				'type' => (string)$field['Type'],
+			$fieldName = (string)$field['Field'];
+			$fieldType = (string)$field['Type'];
+			$this->targetFields[$fieldName] = [
+				'type' => $fieldType,
 				'properties' => (string)$field['Properties'],
 			];
+			Buddy::debug("Loaded field: $fieldName ($fieldType)");
 		}
+
+		Buddy::debug('Total fields loaded: ' . sizeof($this->targetFields));
 	}
 
 	/**

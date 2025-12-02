@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\ReplaceSelect;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * REPLACE INTO ... SELECT ... FROM payload parser and validator
@@ -62,18 +63,20 @@ final class Payload extends BasePayload {
 		$self->originalQuery = $request->payload;
 		$self->batchSize = Config::getBatchSize();
 
+		Buddy::debug('Parsing REPLACE SELECT query: ' . $request->payload);
+
 		try {
-			// Try to parse with SQL parser first
-			if (isset(static::$sqlQueryParser)) {
-				$self->parseWithSqlParser();
-			} else {
-				// Fallback to regex parsing
-				$self->parseWithRegex($request->payload);
-			}
+			// Use regex parsing for REPLACE INTO ... SELECT
+			Buddy::debug('Starting regex parsing');
+			$self->parseWithRegex($request->payload);
+			Buddy::debug('Regex parsing successful. Target table: ' . $self->targetTable);
 
 			// Parse batch size from comment syntax /* BATCH_SIZE 500 */
+			Buddy::debug('Parsing batch size');
 			$self->parseBatchSize($request->payload);
+			Buddy::debug('Batch size: ' . $self->batchSize);
 		} catch (\Exception $e) {
+			Buddy::debug('Payload parsing failed: ' . $e->getMessage());
 			throw GenericError::create('Failed to parse REPLACE SELECT query: ' . $e->getMessage());
 		}
 
@@ -81,68 +84,39 @@ final class Payload extends BasePayload {
 	}
 
 	/**
-	 * Parse using SQL parser
-	 *
-	 * @return void
-	 * @throws \InvalidArgumentException
-	 */
-	private function parseWithSqlParser(): void {
-		$payload = static::$sqlQueryParser::getParsedPayload();
-
-		if (!isset($payload['REPLACE'])) {
-			throw new \InvalidArgumentException('Invalid REPLACE statement structure');
-		}
-
-		$this->parseTargetTable($payload['REPLACE']);
-		$this->selectQuery = $this->reconstructSelectFromParsed($payload);
-	}
-
-	/**
 	 * Parse using regex fallback
 	 *
 	 * @param string $sql
 	 * @return void
-	 * @throws \InvalidArgumentException
+	 * @throws GenericError
 	 */
 	private function parseWithRegex(string $sql): void {
 		// Extract target table: REPLACE INTO [cluster:]table
+		Buddy::debug('Extracting target table from SQL');
 		if (!preg_match('/REPLACE\s+INTO\s+([^\s]+)/i', $sql, $matches)) {
-			throw new \InvalidArgumentException('Cannot extract target table');
+			$errorMsg = 'Cannot extract target table from SQL. Pattern did not match';
+			Buddy::debug("Target table extraction failed: $errorMsg");
+			throw GenericError::create($errorMsg);
 		}
 
-		$this->parseTargetTableFromString($matches[1]);
+		$tableSpec = $matches[1];
+		Buddy::debug("Extracted table specification: $tableSpec");
+		$this->parseTargetTableFromString($tableSpec);
 
 		// Extract SELECT query
-		if (!preg_match('/REPLACE\s+INTO\s+\S+\s+(SELECT\s+.*?)(?:\s*\/\*.*?\*\/\s*)?(?:;?\s*)$/i', $sql, $matches)) {
-			throw new \InvalidArgumentException('Cannot extract SELECT query');
+		Buddy::debug('Extracting SELECT query from SQL');
+		if (!preg_match(
+			'/REPLACE\s+INTO\s+\S+\s+(SELECT\s+.*?)(?:\s*\/\*.*?\*\/\s*)?(?:;?\s*)$/i',
+			$sql,
+			$matches
+		)) {
+			$errorMsg = 'Cannot extract SELECT query from SQL. Pattern did not match';
+			Buddy::debug("SELECT query extraction failed: $errorMsg");
+			throw GenericError::create($errorMsg);
 		}
 
 		$this->selectQuery = trim($matches[1]);
-	}
-
-	/**
-	 * Parse target table from SQL parser array
-	 *
-	 * @param array<int,array<string,mixed>> $replaceClause
-	 * @return void
-	 * @throws \InvalidArgumentException
-	 */
-	private function parseTargetTable(array $replaceClause): void {
-		foreach ($replaceClause as $item) {
-			if (!is_array($item) || !isset($item['expr_type']) || $item['expr_type'] !== 'table') {
-				continue;
-			}
-
-			$tableName = '';
-			if (isset($item['no_quotes']) && is_array($item['no_quotes']) && isset($item['no_quotes']['parts'][0])) {
-				$tableName = (string)$item['no_quotes']['parts'][0];
-			} elseif (isset($item['table'])) {
-				$tableName = (string)($item['table'] ?? '');
-			}
-			$this->parseTargetTableFromString($tableName);
-			return;
-		}
-		throw new \InvalidArgumentException('Cannot parse target table name');
+		Buddy::debug('Extracted SELECT query: ' . substr($this->selectQuery, 0, 100));
 	}
 
 	/**
@@ -150,87 +124,27 @@ final class Payload extends BasePayload {
 	 *
 	 * @param string $tableName
 	 * @return void
-	 * @throws \InvalidArgumentException
+	 * @throws GenericError
 	 */
 	private function parseTargetTableFromString(string $tableName): void {
+		Buddy::debug("Parsing target table specification: $tableName");
+
 		if (str_contains($tableName, ':')) {
+			Buddy::debug('Table specification contains cluster prefix');
 			[$this->cluster, $this->targetTable] = explode(':', $tableName, 2);
 			$this->cluster = trim($this->cluster, '`"\'');
 			$this->targetTable = trim($this->targetTable, '`"\'');
+			Buddy::debug("Parsed cluster: {$this->cluster}, table: {$this->targetTable}");
 		} else {
 			$this->targetTable = trim($tableName, '`"\'');
+			Buddy::debug("Parsed table: {$this->targetTable} (no cluster)");
 		}
 
 		if (empty($this->targetTable)) {
-			throw new \InvalidArgumentException('Empty target table name');
+			$errorMsg = 'Empty target table name after parsing';
+			Buddy::debug("Target table validation failed: $errorMsg");
+			throw GenericError::create($errorMsg);
 		}
-	}
-
-	/**
-	 * Reconstruct SELECT query from parsed payload
-	 *
-	 * @param array<string,mixed> $payload
-	 * @return string
-	 */
-	private function reconstructSelectFromParsed(array $payload): string {
-		// This is a simplified reconstruction - for complex queries,
-		// we might need to use PHPSQLCreator or fallback to regex parsing
-		$selectParts = [];
-
-		if (isset($payload['SELECT']) && is_array($payload['SELECT'])) {
-			$fields = [];
-			foreach ($payload['SELECT'] as $field) {
-				if (!is_array($field) || !isset($field['base_expr'])) {
-					continue;
-				}
-
-				$fields[] = (string)$field['base_expr'];
-			}
-			$selectParts[] = 'SELECT ' . implode(', ', $fields);
-		}
-
-		if (isset($payload['FROM']) && is_array($payload['FROM'])) {
-			$tables = [];
-			foreach ($payload['FROM'] as $table) {
-				if (!is_array($table) || !isset($table['base_expr'])) {
-					continue;
-				}
-
-				$tables[] = (string)$table['base_expr'];
-			}
-			$selectParts[] = 'FROM ' . implode(', ', $tables);
-		}
-
-		if (isset($payload['WHERE']) && is_array($payload['WHERE'])) {
-			$conditions = [];
-			foreach ($payload['WHERE'] as $condition) {
-				if (!is_array($condition) || !isset($condition['base_expr'])) {
-					continue;
-				}
-
-				$conditions[] = (string)$condition['base_expr'];
-			}
-			$selectParts[] = 'WHERE ' . implode(' ', $conditions);
-		}
-
-		// Add other clauses as needed (ORDER BY, GROUP BY, HAVING, etc.)
-		foreach (['ORDER', 'GROUP', 'HAVING', 'LIMIT'] as $clause) {
-			if (!isset($payload[$clause]) || !is_array($payload[$clause])) {
-				continue;
-			}
-
-			$parts = [];
-			foreach ($payload[$clause] as $part) {
-				if (!is_array($part) || !isset($part['base_expr'])) {
-					continue;
-				}
-
-				$parts[] = (string)$part['base_expr'];
-			}
-			$selectParts[] = $clause . ' ' . implode(' ', $parts);
-		}
-
-		return implode(' ', $selectParts);
 	}
 
 	/**
@@ -243,16 +157,22 @@ final class Payload extends BasePayload {
 		// Parse comment-style batch size: /* BATCH_SIZE 500 */
 		if (preg_match('/\/\*\s*BATCH_SIZE\s+(\d+)\s*\*\//i', $sql, $matches)) {
 			$requestedSize = (int)$matches[1];
-			$this->batchSize = max(1, min($requestedSize, Config::getMaxBatchSize()));
+			$maxSize = Config::getMaxBatchSize();
+			$this->batchSize = max(1, min($requestedSize, $maxSize));
+			Buddy::debug("Batch size from comment: requested=$requestedSize, max=$maxSize, final={$this->batchSize}");
+			return;
 		}
 
 		// Legacy support for space-separated BATCH_SIZE (deprecated)
 		if (!preg_match('/\s+BATCH_SIZE\s+(\d+)\s*$/i', $sql, $matches)) {
+			Buddy::debug('No custom batch size found, using default: ' . $this->batchSize);
 			return;
 		}
 
 		$requestedSize = (int)$matches[1];
-		$this->batchSize = max(1, min($requestedSize, Config::getMaxBatchSize()));
+		$maxSize = Config::getMaxBatchSize();
+		$this->batchSize = max(1, min($requestedSize, $maxSize));
+		Buddy::debug("Batch size from legacy syntax: requested=$requestedSize, max=$maxSize, final={$this->batchSize}");
 	}
 
 	/**
@@ -274,31 +194,64 @@ final class Payload extends BasePayload {
 	 * @throws GenericError
 	 */
 	public function validate(): void {
+		Buddy::debug('Starting payload validation');
+
+		// Check target table
+		Buddy::debug('Validating target table name');
 		if (empty($this->targetTable)) {
-			throw GenericError::create('Target table name cannot be empty');
+			$errorMsg = 'Target table name cannot be empty';
+			Buddy::debug("Validation failed: $errorMsg");
+			throw GenericError::create($errorMsg);
 		}
+		Buddy::debug('Target table validation passed: ' . $this->targetTable);
 
+		// Check SELECT query exists
+		Buddy::debug('Validating SELECT query existence');
 		if (empty($this->selectQuery)) {
-			throw GenericError::create('SELECT query cannot be empty');
+			$errorMsg = 'SELECT query cannot be empty';
+			Buddy::debug("Validation failed: $errorMsg");
+			throw GenericError::create($errorMsg);
 		}
+		Buddy::debug('SELECT query exists');
 
-		if ($this->batchSize < 1 || $this->batchSize > Config::getMaxBatchSize()) {
-			throw GenericError::create(
-				sprintf(
-					'Batch size must be between 1 and %d, got %d',
-					Config::getMaxBatchSize(),
-					$this->batchSize
-				)
+		// Check batch size
+		Buddy::debug("Validating batch size: {$this->batchSize}");
+		$maxBatchSize = Config::getMaxBatchSize();
+		if ($this->batchSize < 1 || $this->batchSize > $maxBatchSize) {
+			$errorMsg = sprintf(
+				'Batch size must be between 1 and %d, got %d',
+				$maxBatchSize,
+				$this->batchSize
 			);
+			Buddy::debug("Batch size validation failed: $errorMsg");
+			throw GenericError::create($errorMsg);
 		}
+		Buddy::debug('Batch size validation passed');
 
-		// Basic SELECT query validation
+		// Basic SELECT query validation - starts with SELECT
+		Buddy::debug('Validating SELECT query format');
 		if (!preg_match('/^\s*SELECT\s+/i', $this->selectQuery)) {
-			throw GenericError::create('Query must start with SELECT');
+			$errorMsg = 'Query must start with SELECT';
+			Buddy::debug("SELECT format validation failed: $errorMsg. Query: " . substr($this->selectQuery, 0, 50));
+			throw GenericError::create($errorMsg);
 		}
+		Buddy::debug('SELECT keyword found');
 
+		// Check for FROM clause
+		Buddy::debug('Validating FROM clause presence');
 		if (!preg_match('/\s+FROM\s+/i', $this->selectQuery)) {
-			throw GenericError::create('SELECT query must contain FROM clause');
+			$errorMsg = 'SELECT query must contain FROM clause';
+			Buddy::debug("FROM clause validation failed: $errorMsg. Query: " . substr($this->selectQuery, 0, 50));
+			throw GenericError::create($errorMsg);
 		}
+		Buddy::debug('FROM clause found');
+
+		Buddy::debug('Payload validation completed successfully');
+		Buddy::debug(
+			'Final payload state: targetTable=' . $this->targetTable .
+			', cluster=' . ($this->cluster ?? 'none') .
+			', batchSize=' . $this->batchSize .
+			', selectQuery=' . substr($this->selectQuery, 0, 50)
+		);
 	}
 }

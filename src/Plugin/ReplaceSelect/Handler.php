@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Main execution orchestrator for REPLACE SELECT operations
@@ -42,29 +43,23 @@ final class Handler extends BaseHandlerWithClient {
 			// Pre-validate payload
 			$this->payload->validate();
 
-			$lockManager = new LockManager($this->manticoreClient, $this->payload->targetTable);
 			$validator = null;
 			$processor = null;
 
-			if (Config::isDebugEnabled()) {
-				error_log('Starting REPLACE SELECT operation for table: ' . $this->payload->targetTable);
-			}
+			Buddy::debug('Starting REPLACE SELECT operation for table: ' . $this->payload->targetTable);
 
 			try {
-				// 1. Acquire exclusive lock (this may retry)
-				$lockManager->acquireLock();
-
-				// 2. Begin transaction
+				// 1. Begin transaction
 				$this->beginTransaction();
 
-				// 3. Validate schema compatibility
+				// 2. Validate schema compatibility
 				$validator = new FieldValidator($this->manticoreClient);
 				$validator->validateCompatibility(
 					$this->payload->selectQuery,
 					$this->payload->targetTable
 				);
 
-				// 4. Execute batch processing
+				// 3. Execute batch processing
 				$processor = new BatchProcessor(
 					$this->manticoreClient,
 					$this->payload,
@@ -73,21 +68,19 @@ final class Handler extends BaseHandlerWithClient {
 
 				$totalProcessed = $processor->execute();
 
-				// 5. Commit transaction
+				// 4. Commit transaction
 				$this->commitTransaction();
 
 				$operationDuration = microtime(true) - $this->operationStartTime;
-				$lockDuration = $lockManager->getLockDuration();
 
 				$result = [
 					'total' => $totalProcessed,
 					'batches' => $processor->getBatchesProcessed(),
 					'batch_size' => $this->payload->batchSize,
 					'duration_seconds' => round($operationDuration, 3),
-					'lock_duration_seconds' => round($lockDuration, 3),
-				'records_per_second' => $operationDuration > 0 ? round($totalProcessed / $operationDuration, 2) : 0,
-				'message' => "Successfully processed $totalProcessed records in "
-					. $processor->getBatchesProcessed() . ' batches',
+					'records_per_second' => $operationDuration > 0 ? round($totalProcessed / $operationDuration, 2) : 0,
+					'message' => "Successfully processed $totalProcessed records in "
+						. $processor->getBatchesProcessed() . ' batches',
 				];
 
 				if (Config::isDebugEnabled()) {
@@ -105,7 +98,6 @@ final class Handler extends BaseHandlerWithClient {
 					'select_query' => $this->payload->selectQuery,
 					'batch_size' => $this->payload->batchSize,
 					'transaction_started' => $this->transactionStarted,
-					'lock_held' => $lockManager->hasLock(),
 					'operation_duration' => microtime(true) - $this->operationStartTime,
 				];
 
@@ -114,7 +106,7 @@ final class Handler extends BaseHandlerWithClient {
 					$errorContext['batches_processed'] = $processor->getBatchesProcessed();
 				}
 
-				error_log(
+				Buddy::debug(
 					'REPLACE SELECT operation failed: ' . $e->getMessage() .
 					"\nContext: " . json_encode($errorContext)
 				);
@@ -129,15 +121,10 @@ final class Handler extends BaseHandlerWithClient {
 					$e
 				);
 			} finally {
-				// Always release lock
-				$lockManager->releaseLock();
-
-				if (Config::isDebugEnabled()) {
-					error_log(
-						'REPLACE SELECT operation completed. Total duration: ' .
-						round(microtime(true) - $this->operationStartTime, 3) . 's'
-					);
-				}
+				Buddy::debug(
+					'REPLACE SELECT operation completed. Total duration: ' .
+					round(microtime(true) - $this->operationStartTime, 3) . 's'
+				);
 			}
 		};
 
@@ -152,9 +139,11 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private function beginTransaction(): void {
 		if ($this->transactionStarted) {
+			Buddy::debug('Transaction already started, skipping BEGIN');
 			return; // Transaction already started
 		}
 
+		Buddy::debug('Starting transaction for REPLACE SELECT operation');
 		$result = $this->manticoreClient->sendRequest('BEGIN');
 		if ($result->hasError()) {
 			throw ManticoreSearchClientError::create(
@@ -163,12 +152,7 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$this->transactionStarted = true;
-
-		if (!Config::isDebugEnabled()) {
-			return;
-		}
-
-		error_log('Transaction started for REPLACE SELECT operation');
+		Buddy::debug('Transaction started successfully');
 	}
 
 	/**
@@ -179,9 +163,11 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private function commitTransaction(): void {
 		if (!$this->transactionStarted) {
+			Buddy::debug('No transaction to commit, skipping COMMIT');
 			return; // No transaction to commit
 		}
 
+		Buddy::debug('Committing transaction');
 		$result = $this->manticoreClient->sendRequest('COMMIT');
 		if ($result->hasError()) {
 			throw ManticoreSearchClientError::create(
@@ -190,12 +176,7 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$this->transactionStarted = false;
-
-		if (!Config::isDebugEnabled()) {
-			return;
-		}
-
-		error_log('Transaction committed successfully');
+		Buddy::debug('Transaction committed successfully');
 	}
 
 	/**
@@ -205,14 +186,16 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private function rollbackTransaction(): void {
 		if (!$this->transactionStarted) {
+			Buddy::debug('No transaction to rollback, skipping ROLLBACK');
 			return; // No transaction to rollback
 		}
 
+		Buddy::debug('Rolling back transaction due to error');
 		$result = $this->manticoreClient->sendRequest('ROLLBACK');
 		if ($result->hasError()) {
-			error_log('Warning: Failed to rollback transaction: ' . $result->getError());
-		} elseif (Config::isDebugEnabled()) {
-			error_log('Transaction rolled back due to error');
+			Buddy::debug('Warning: Failed to rollback transaction: ' . $result->getError());
+		} else {
+			Buddy::debug('Transaction rolled back successfully');
 		}
 
 		$this->transactionStarted = false;
