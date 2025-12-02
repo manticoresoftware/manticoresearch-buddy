@@ -237,7 +237,12 @@ Example of HTTP Response:
   },
   "error_code": 0,
   "version": 3,
-  "content_type": "text/html"
+  "content_type": "text/html",
+  "log": {
+    "type": "auth",
+    "severity": "ERROR",    
+    "message": "user already exists"
+  }
 }
 ```
 
