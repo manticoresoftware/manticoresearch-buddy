@@ -98,17 +98,17 @@ final class Handler extends BaseHandlerWithClient {
 				->column('duration_seconds', Column::String)
 				->column('records_per_second', Column::String);
 		} catch (\Exception $e) {
-				// Enhanced error information
-				$errorContext = [
-					'operation' => 'REPLACE SELECT',
-					'target_table' => $this->payload->targetTable,
-					'select_query' => $this->payload->selectQuery,
-					'batch_size' => $this->payload->batchSize,
-					'transaction_started' => $this->transactionStarted,
-					'operation_duration' => microtime(true) - $this->operationStartTime,
-					'exception_class' => $e::class,
-					'exception_code' => $e->getCode(),
-				];
+			// Enhanced error information
+			$errorContext = [
+				'operation' => 'REPLACE SELECT',
+				'target_table' => $this->payload->targetTable,
+				'select_query' => $this->payload->selectQuery,
+				'batch_size' => Config::getBatchSize(),
+				'transaction_started' => $this->transactionStarted,
+				'operation_duration' => microtime(true) - $this->operationStartTime,
+				'exception_class' => $e::class,
+				'exception_code' => $e->getCode(),
+			];
 
 				if ($processor) {
 					$errorContext['records_processed'] = $processor->getTotalProcessed();
