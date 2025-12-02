@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\ReplaceSelect;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
+use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -66,31 +67,37 @@ final class Handler extends BaseHandlerWithClient {
 					$validator->getTargetFields()
 				);
 
-				$totalProcessed = $processor->execute();
+			$totalProcessed = $processor->execute();
 
-				// 4. Commit transaction
-				$this->commitTransaction();
+			// 4. Commit transaction
+			$this->commitTransaction();
 
-				$operationDuration = microtime(true) - $this->operationStartTime;
+			$operationDuration = microtime(true) - $this->operationStartTime;
 
-				$result = [
-					'total' => $totalProcessed,
-					'batches' => $processor->getBatchesProcessed(),
-					'batch_size' => $this->payload->batchSize,
-					'duration_seconds' => round($operationDuration, 3),
-					'records_per_second' => $operationDuration > 0 ? round($totalProcessed / $operationDuration, 2) : 0,
-					'message' => "Successfully processed $totalProcessed records in "
-						. $processor->getBatchesProcessed() . ' batches',
-				];
+			// Build result row with metrics
+			$resultRow = [
+				'total' => $totalProcessed,
+				'batches' => $processor->getBatchesProcessed(),
+				'batch_size' => $this->payload->batchSize,
+				'duration_seconds' => round($operationDuration, 3),
+				'records_per_second' => $operationDuration > 0 ? round($totalProcessed / $operationDuration, 2) : 0,
+			];
 
-				if (Config::isDebugEnabled()) {
-					$result['statistics'] = $processor->getProcessingStatistics();
-					$result['query'] = $this->payload->selectQuery;
-					$result['target_table'] = $this->payload->getTargetTableWithCluster();
-				}
+			// Log detailed debug information if enabled
+			if (Config::isDebugEnabled()) {
+				Buddy::debug('Processing statistics: ' . json_encode($processor->getProcessingStatistics()));
+				Buddy::debug('Source query: ' . $this->payload->selectQuery);
+				Buddy::debug('Target table: ' . $this->payload->getTargetTableWithCluster());
+			}
 
-				return TaskResult::raw($result);
-			} catch (\Exception $e) {
+			// Return result as a formatted table with proper column types
+			return TaskResult::withData([$resultRow])
+				->column('total', Column::Long)
+				->column('batches', Column::Long)
+				->column('batch_size', Column::Long)
+				->column('duration_seconds', Column::String)
+				->column('records_per_second', Column::String);
+		} catch (\Exception $e) {
 				// Enhanced error information
 				$errorContext = [
 					'operation' => 'REPLACE SELECT',
