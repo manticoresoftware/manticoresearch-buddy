@@ -55,15 +55,19 @@ final class BatchProcessor {
 	 * @throws ManticoreSearchClientError
 	 */
 	public function execute(): int {
-		$offset = 0;
 		$batchSize = $this->payload->batchSize;
 		$consecutiveEmptyBatches = 0;
 		$maxEmptyBatches = 3;
 		$userLimit = $this->payload->selectLimit;
+		$userOffset = $this->payload->selectOffset ?? 0;
+		$offset = $userOffset;
 
 		Buddy::debug("Starting batch processing with size: $batchSize");
 		if ($userLimit !== null) {
 			Buddy::debug("SELECT LIMIT detected: processing max {$userLimit} records");
+		}
+		if ($userOffset > 0) {
+			Buddy::debug("SELECT OFFSET detected: starting from offset {$userOffset}");
 		}
 
 		do {

@@ -27,6 +27,7 @@ final class Payload extends BasePayload {
 	public ?string $cluster = null;
 	public string $originalQuery;
 	public ?int $selectLimit = null;
+	public ?int $selectOffset = null;
 
 	/**
 	 * Get description for this plugin
@@ -120,10 +121,14 @@ final class Payload extends BasePayload {
 		$this->selectQuery = trim($matches[1]);
 		Buddy::debug('Extracted SELECT query: ' . substr($this->selectQuery, 0, 100));
 
-		// Extract SELECT limit if present
+		// Extract SELECT limit and offset if present
 		$this->selectLimit = $this->extractSelectLimit($this->selectQuery);
+		$this->selectOffset = $this->extractSelectOffset($this->selectQuery);
 		if ($this->selectLimit !== null) {
 			Buddy::debug("Extracted SELECT LIMIT: {$this->selectLimit}");
+		}
+		if ($this->selectOffset !== null) {
+			Buddy::debug("Extracted SELECT OFFSET: {$this->selectOffset}");
 		}
 	}
 
@@ -164,6 +169,20 @@ final class Payload extends BasePayload {
 	private function extractSelectLimit(string $selectQuery): ?int {
 		// Match LIMIT followed by number, with optional OFFSET clause
 		if (preg_match('/\s+LIMIT\s+(\d+)(?:\s+OFFSET\s+\d+)?\s*$/i', $selectQuery, $matches)) {
+			return (int)$matches[1];
+		}
+		return null;
+	}
+
+	/**
+	 * Extract OFFSET value from SELECT query if present
+	 *
+	 * @param string $selectQuery
+	 * @return int|null The OFFSET value or null if not present
+	 */
+	private function extractSelectOffset(string $selectQuery): ?int {
+		// Match OFFSET after LIMIT
+		if (preg_match('/\s+LIMIT\s+\d+\s+OFFSET\s+(\d+)\s*$/i', $selectQuery, $matches)) {
 			return (int)$matches[1];
 		}
 		return null;
