@@ -59,17 +59,36 @@ final class BatchProcessor {
 		$batchSize = $this->payload->batchSize;
 		$consecutiveEmptyBatches = 0;
 		$maxEmptyBatches = 3;
+		$userLimit = $this->payload->selectLimit;
 
 		Buddy::debug("Starting batch processing with size: $batchSize");
+		if ($userLimit !== null) {
+			Buddy::debug("SELECT LIMIT detected: processing max {$userLimit} records");
+		}
 
 		do {
 			$batchStartTime = microtime(true);
 			$baseQuery = $this->payload->selectQuery;
 			// Remove any existing LIMIT clause to avoid conflicts
 			$baseQuery = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $baseQuery);
-			$batchQuery = "{$baseQuery} LIMIT {$batchSize} OFFSET {$offset}";
 
-			Buddy::debug("Fetching batch at offset $offset with limit $batchSize");
+			// Calculate batch size for this iteration
+			// If user specified a LIMIT, respect it as an upper bound
+			$currentBatchSize = $batchSize;
+			if ($userLimit !== null && ($this->totalProcessed + $currentBatchSize) > $userLimit) {
+				$currentBatchSize = max(0, $userLimit - $this->totalProcessed);
+				Buddy::debug("Adjusting batch size to {$currentBatchSize} to respect user LIMIT");
+			}
+
+			// Stop if we've reached the user's limit
+			if ($userLimit !== null && $this->totalProcessed >= $userLimit) {
+				Buddy::debug("User LIMIT reached ({$userLimit}), stopping batch processing");
+				break;
+			}
+
+			$batchQuery = "{$baseQuery} LIMIT {$currentBatchSize} OFFSET {$offset}";
+
+			Buddy::debug("Fetching batch at offset $offset with limit $currentBatchSize");
 			Buddy::debug("Batch query: $batchQuery");
 
 			try {
@@ -87,9 +106,15 @@ final class BatchProcessor {
 					$consecutiveEmptyBatches = 0;
 					$this->processBatch($batch);
 					$this->recordBatchStatistics($batch, $batchStartTime);
+
+					// Check if we've reached the user's limit
+					if ($userLimit !== null && $this->totalProcessed >= $userLimit) {
+						Buddy::debug("User LIMIT reached ({$userLimit}), stopping batch processing");
+						break;
+					}
 				}
 
-				$offset += $batchSize;
+				$offset += $currentBatchSize;
 			} catch (\Exception $e) {
 				$errorMsg = "Batch processing failed at offset $offset: " . $e->getMessage();
 				Buddy::debug($errorMsg);
