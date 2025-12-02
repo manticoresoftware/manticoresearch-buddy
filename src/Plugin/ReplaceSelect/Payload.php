@@ -104,9 +104,10 @@ final class Payload extends BasePayload {
 		$this->parseTargetTableFromString($tableSpec);
 
 		// Extract SELECT query
+		// Use 's' flag (DOTALL) to make '.' match newline characters for multi-line queries
 		Buddy::debug('Extracting SELECT query from SQL');
 		if (!preg_match(
-			'/REPLACE\s+INTO\s+\S+\s+(SELECT\s+.*?)(?:\s*\/\*.*?\*\/\s*)?(?:;?\s*)$/i',
+			'/REPLACE\s+INTO\s+\S+\s+(SELECT\s+.+?)(?:\s*\/\*.*?\*\/\s*)?(?:;?\s*)$/is',
 			$sql,
 			$matches
 		)) {
