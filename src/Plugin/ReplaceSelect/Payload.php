@@ -222,14 +222,15 @@ final class Payload extends BasePayload {
 		}
 		Buddy::debug('SELECT query exists');
 
-		// Check batch size
-		Buddy::debug("Validating batch size: {$this->batchSize}");
+		// Check batch size (from environment config)
+		$batchSize = Config::getBatchSize();
+		Buddy::debug("Validating batch size: {$batchSize}");
 		$maxBatchSize = Config::getMaxBatchSize();
-		if ($this->batchSize < 1 || $this->batchSize > $maxBatchSize) {
+		if ($batchSize < 1 || $batchSize > $maxBatchSize) {
 			$errorMsg = sprintf(
 				'Batch size must be between 1 and %d, got %d',
 				$maxBatchSize,
-				$this->batchSize
+				$batchSize
 			);
 			Buddy::debug("Batch size validation failed: $errorMsg");
 			throw GenericError::create($errorMsg);
@@ -258,7 +259,7 @@ final class Payload extends BasePayload {
 		Buddy::debug(
 			'Final payload state: targetTable=' . $this->targetTable .
 			', cluster=' . ($this->cluster ?? 'none') .
-			', batchSize=' . $this->batchSize .
+			', batchSize=' . Config::getBatchSize() .
 			', selectQuery=' . substr($this->selectQuery, 0, 50)
 		);
 	}
