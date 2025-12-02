@@ -65,16 +65,16 @@ final class FieldValidator {
 
 		$result = $this->client->sendRequest($testQuery);
 
-		$rawResult = $result->getResult();
-
-		$jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
-		Buddy::debug('SELECT result full structure: ' . json_encode($rawResult, $jsonFlags));
-
 		if ($result->hasError()) {
 			$errorMsg = 'Invalid SELECT query: ' . $result->getError();
 			Buddy::debug("SELECT query validation failed: $errorMsg");
 			throw ManticoreSearchClientError::create($errorMsg);
 		}
+
+		$rawResult = $result->getResult()->toArray();
+
+		$jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
+		Buddy::debug('SELECT result full structure: ' . json_encode($rawResult, $jsonFlags));
 
 		Buddy::debug('SELECT query validation successful');
 
@@ -141,7 +141,7 @@ final class FieldValidator {
 		if (!$descResult->hasError()) {
 			Buddy::debug('DESCRIBE query succeeded, validating from results');
 			// Parse DESCRIBE result to get field information
-			$this->validateFromDescribeResult($descResult->getResult());
+			$this->validateFromDescribeResult($descResult->getResult()->toArray());
 			return;
 		}
 
@@ -161,7 +161,7 @@ final class FieldValidator {
 		}
 
 		// Even with LIMIT 0, we should get column information
-		$resultMeta = $structResult->getResult();
+		$resultMeta = $structResult->getResult()->toArray();
 		if (!is_array($resultMeta[0]) || !isset($resultMeta[0]['columns'])) {
 			throw ManticoreSearchClientError::create(
 				'Cannot determine SELECT query field structure - no sample data available'
@@ -552,7 +552,7 @@ final class FieldValidator {
 		}
 
 		$this->targetFields = [];
-		$result = $descResult->getResult();
+		$result = $descResult->getResult()->toArray();
 
 		Buddy::debug('DESC result full structure: ' . json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 

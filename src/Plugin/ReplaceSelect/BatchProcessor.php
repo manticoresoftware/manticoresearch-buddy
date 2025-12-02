@@ -67,7 +67,7 @@ final class BatchProcessor {
 			$baseQuery = $this->payload->selectQuery;
 			// Remove any existing LIMIT clause to avoid conflicts
 			$baseQuery = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $baseQuery);
-			$batchQuery = "SELECT * FROM ({$baseQuery}) AS batch_subquery LIMIT $batchSize OFFSET $offset";
+			$batchQuery = "{$baseQuery} LIMIT {$batchSize} OFFSET {$offset}";
 
 			Buddy::debug("Fetching batch at offset $offset with limit $batchSize");
 			Buddy::debug("Batch query: $batchQuery");
@@ -197,7 +197,7 @@ final class BatchProcessor {
 		}
 
 		/** @var array<int,array<string,mixed>> $data */
-		$data = $result->getResult();
+		$data = $result->getResult()->toArray();
 
 		// Validate data structure
 		if (!is_array($data) || !isset($data[0])) {
