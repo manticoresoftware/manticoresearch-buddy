@@ -12,7 +12,7 @@
 use Manticoresearch\Buddy\Base\Plugin\ReplaceSelect\Config;
 use PHPUnit\Framework\TestCase;
 
-class ConfigTest extends TestCase {
+class ReplaceSelectConfigTest extends TestCase {
 
 	protected function setUp(): void {
 		// Clear environment variables before each test

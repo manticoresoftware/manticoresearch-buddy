@@ -120,9 +120,11 @@ final class Payload extends BasePayload {
 		if ($this->selectLimit !== null) {
 			Buddy::debug("Extracted SELECT LIMIT: {$this->selectLimit}");
 		}
-		if ($this->selectOffset !== null) {
-			Buddy::debug("Extracted SELECT OFFSET: {$this->selectOffset}");
+		if ($this->selectOffset === null) {
+			return;
 		}
+
+		Buddy::debug("Extracted SELECT OFFSET: {$this->selectOffset}");
 	}
 
 	/**

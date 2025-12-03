@@ -67,39 +67,39 @@ final class Handler extends BaseHandlerWithClient {
 					$validator->getTargetFields()
 				);
 
-			$totalProcessed = $processor->execute();
+				$totalProcessed = $processor->execute();
 
 			// 4. Commit transaction
-			$this->commitTransaction();
+				$this->commitTransaction();
 
-			$operationDuration = microtime(true) - $this->operationStartTime;
+				$operationDuration = microtime(true) - $this->operationStartTime;
 
 			// Build result row with metrics
-			$resultRow = [
+				$resultRow = [
 				'total' => $totalProcessed,
 				'batches' => $processor->getBatchesProcessed(),
 				'batch_size' => Config::getBatchSize(),
 				'duration_seconds' => round($operationDuration, 3),
 				'records_per_second' => $operationDuration > 0 ? round($totalProcessed / $operationDuration, 2) : 0,
-			];
+				];
 
 			// Log detailed debug information if enabled
-			if (Config::isDebugEnabled()) {
-				Buddy::debug('Processing statistics: ' . json_encode($processor->getProcessingStatistics()));
-				Buddy::debug('Source query: ' . $this->payload->selectQuery);
-				Buddy::debug('Target table: ' . $this->payload->getTargetTableWithCluster());
-			}
+				if (Config::isDebugEnabled()) {
+					Buddy::debug('Processing statistics: ' . json_encode($processor->getProcessingStatistics()));
+					Buddy::debug('Source query: ' . $this->payload->selectQuery);
+					Buddy::debug('Target table: ' . $this->payload->getTargetTableWithCluster());
+				}
 
 			// Return result as a formatted table with proper column types
-			return TaskResult::withData([$resultRow])
+				return TaskResult::withData([$resultRow])
 				->column('total', Column::Long)
 				->column('batches', Column::Long)
 				->column('batch_size', Column::Long)
 				->column('duration_seconds', Column::String)
 				->column('records_per_second', Column::String);
-		} catch (\Exception $e) {
-			// Enhanced error information
-			$errorContext = [
+			} catch (\Exception $e) {
+				// Enhanced error information
+				$errorContext = [
 				'operation' => 'REPLACE SELECT',
 				'target_table' => $this->payload->targetTable,
 				'select_query' => $this->payload->selectQuery,
@@ -108,7 +108,7 @@ final class Handler extends BaseHandlerWithClient {
 				'operation_duration' => microtime(true) - $this->operationStartTime,
 				'exception_class' => $e::class,
 				'exception_code' => $e->getCode(),
-			];
+				];
 
 				if ($processor) {
 					$errorContext['records_processed'] = $processor->getTotalProcessed();

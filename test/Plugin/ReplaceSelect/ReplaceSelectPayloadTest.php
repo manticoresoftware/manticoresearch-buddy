@@ -17,7 +17,7 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use PHPUnit\Framework\TestCase;
 
-class PayloadTest extends TestCase {
+class ReplaceSelectPayloadTest extends TestCase {
 
 	public function testHasMatch(): void {
 		echo "\nTesting REPLACE SELECT payload matching\n";
