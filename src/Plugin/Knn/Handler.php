@@ -69,7 +69,6 @@ final class Handler extends BaseHandlerWithClient {
 				' WHERE id = ' . $payload->docId,
 				'sql?mode=raw',
 				false,
-				true
 			);
 
 		if ($request->hasError()) {
