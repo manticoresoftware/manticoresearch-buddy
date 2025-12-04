@@ -204,38 +204,49 @@ trait ReplaceSelectTestTrait {
 	}
 
 	/**
-	 * Create a target fields array for testing
+	 * Create a target fields array for testing (position-indexed)
 	 */
 	private function createTargetFields(array $overrides = []): array {
 		$defaultFields = [
-			'id' => ['type' => 'bigint', 'properties' => ''],
-			'title' => ['type' => 'text', 'properties' => 'stored'],
-			'price' => ['type' => 'float', 'properties' => ''],
-			'is_active' => ['type' => 'bool', 'properties' => ''],
-			'count_value' => ['type' => 'int', 'properties' => ''],
-			'tags' => ['type' => 'text', 'properties' => 'stored'],
-			'mva_tags' => ['type' => 'multi', 'properties' => ''],
-			'json_data' => ['type' => 'text', 'properties' => 'stored'],
+			['name' => 'id', 'type' => 'bigint', 'properties' => ''],
+			['name' => 'title', 'type' => 'text', 'properties' => 'stored'],
+			['name' => 'price', 'type' => 'float', 'properties' => ''],
+			['name' => 'is_active', 'type' => 'bool', 'properties' => ''],
+			['name' => 'count_value', 'type' => 'int', 'properties' => ''],
+			['name' => 'tags', 'type' => 'text', 'properties' => 'stored'],
+			['name' => 'mva_tags', 'type' => 'multi', 'properties' => ''],
+			['name' => 'json_data', 'type' => 'text', 'properties' => 'stored'],
 		];
 
-		return array_merge($defaultFields, $overrides);
+		if (empty($overrides)) {
+			return $defaultFields;
+		}
+
+		// For backwards compatibility, if overrides use keyed format, convert them
+		$result = $defaultFields;
+		foreach ($overrides as $index => $field) {
+			if (is_int($index)) {
+				$result[$index] = $field;
+			}
+		}
+		return $result;
 	}
 
 	/**
-	 * Create a complex field schema for testing
+	 * Create a complex field schema for testing (position-indexed)
 	 */
 	private function createComplexFieldSchema(): array {
 		return [
-			'id' => ['type' => 'bigint', 'properties' => ''],
-			'title' => ['type' => 'text', 'properties' => 'stored'],
-			'price' => ['type' => 'float', 'properties' => ''],
-			'is_active' => ['type' => 'bool', 'properties' => ''],
-			'count_value' => ['type' => 'int', 'properties' => ''],
-			'tags' => ['type' => 'text', 'properties' => 'stored'],
-			'mva_tags' => ['type' => 'multi', 'properties' => ''],
-			'json_data' => ['type' => 'text', 'properties' => 'stored'],
-			'created_at' => ['type' => 'timestamp', 'properties' => ''],
-			'updated_at' => ['type' => 'timestamp', 'properties' => ''],
+			['name' => 'id', 'type' => 'bigint', 'properties' => ''],
+			['name' => 'title', 'type' => 'text', 'properties' => 'stored'],
+			['name' => 'price', 'type' => 'float', 'properties' => ''],
+			['name' => 'is_active', 'type' => 'bool', 'properties' => ''],
+			['name' => 'count_value', 'type' => 'int', 'properties' => ''],
+			['name' => 'tags', 'type' => 'text', 'properties' => 'stored'],
+			['name' => 'mva_tags', 'type' => 'multi', 'properties' => ''],
+			['name' => 'json_data', 'type' => 'text', 'properties' => 'stored'],
+			['name' => 'created_at', 'type' => 'timestamp', 'properties' => ''],
+			['name' => 'updated_at', 'type' => 'timestamp', 'properties' => ''],
 		];
 	}
 

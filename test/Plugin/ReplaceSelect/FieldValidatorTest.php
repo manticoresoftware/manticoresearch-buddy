@@ -49,7 +49,6 @@ class FieldValidatorTest extends TestCase {
 
 
 
-
 	// ========================================================================
 	// Successful Validation Tests
 	// ========================================================================
@@ -59,6 +58,13 @@ class FieldValidatorTest extends TestCase {
 
 		$mockClient = $this->createMockClient();
 
+		// Schema with only 3 fields to match SELECT query
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
 		// Set up call expectations and responses
 		$mockClient->expects($this->exactly(2))
 			->method('sendRequest')
@@ -67,7 +73,7 @@ class FieldValidatorTest extends TestCase {
 				['SELECT id, title, price FROM source_table LIMIT 1']
 			)
 			->willReturnOnConsecutiveCalls(
-				$this->createTableSchemaResponse(),
+				$this->createTableSchemaResponse($schemaFields),
 				$this->createSelectResponse(
 					[
 					['id' => 1, 'title' => 'Product A', 'price' => 99.99],
@@ -83,12 +89,16 @@ class FieldValidatorTest extends TestCase {
 			'target_table'
 		);
 
-		// Verify target fields were loaded correctly
+		// Verify target fields were loaded correctly (indexed by position)
 		$targetFields = $validator->getTargetFields();
-		$this->assertArrayHasKey('id', $targetFields);
-		$this->assertArrayHasKey('title', $targetFields);
-		$this->assertEquals('text', $targetFields['title']['type']);
-		$this->assertEquals('stored', $targetFields['title']['properties']);
+		$this->assertCount(3, $targetFields); // 3 target fields selected
+		$this->assertEquals('id', $targetFields[0]['name']);
+		$this->assertEquals('bigint', $targetFields[0]['type']);
+		$this->assertEquals('title', $targetFields[1]['name']);
+		$this->assertEquals('text', $targetFields[1]['type']);
+		$this->assertEquals('stored', $targetFields[1]['properties']);
+		$this->assertEquals('price', $targetFields[2]['name']);
+		$this->assertEquals('float', $targetFields[2]['type']);
 	}
 
 	public function testValidateCompatibilityWithAllFieldTypes(): void {
@@ -171,11 +181,17 @@ class FieldValidatorTest extends TestCase {
 
 		$mockClient = $this->createMockClient();
 
+		// Schema with only 2 fields to match SELECT query: id, title
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+		];
+
 		$mockClient->method('sendRequest')
 			->willReturnCallback(
-				function (string $query) {
+				function (string $query) use ($schemaFields) {
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createTableSchemaResponse();
+						return $this->createTableSchemaResponse($schemaFields);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
 						return $this->createSelectResponse(
@@ -204,20 +220,27 @@ class FieldValidatorTest extends TestCase {
 	// ========================================================================
 
 	public function testNonexistentFieldThrowsError(): void {
-		echo "\nTesting validation failure when field doesn't exist in target\n";
+		echo "\nTesting validation failure when field count doesn't match\n";
 
 		$mockClient = $this->createMockClient();
 
+		// Schema with 2 fields: id, title
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+		];
+
 		$mockClient->method('sendRequest')
 			->willReturnCallback(
-				function (string $query) {
+				function (string $query) use ($schemaFields) {
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createTableSchemaResponse();
+						return $this->createTableSchemaResponse($schemaFields);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
+						// SELECT returns 3 fields but schema only has 2
 						return $this->createSelectResponse(
 							[
-								['id' => 1, 'nonexistent_field' => 'some value'],
+								['id' => 1, 'title' => 'Product', 'price' => 99.99],
 							]
 						);
 					}
@@ -229,8 +252,9 @@ class FieldValidatorTest extends TestCase {
 
 		$this->expectException(ManticoreSearchClientError::class);
 
+		// SELECT returns 3 fields but target schema only has 2
 		$validator->validateCompatibility(
-			'SELECT id, nonexistent_field FROM source_table',
+			'SELECT id, title, price FROM source_table',
 			'target_table'
 		);
 	}
@@ -239,22 +263,22 @@ class FieldValidatorTest extends TestCase {
 	// Text Field STORED Property Tests
 	// ========================================================================
 
-	public function testTextFieldWithoutStoredPropertyThrowsError(): void {
-		echo "\nTesting validation failure for text field without stored property\n";
+	public function testTextFieldTypeCompatibility(): void {
+		echo "\nTesting text field type compatibility validation\n";
 
 		$mockClient = $this->createMockClient();
 
-		// Create schema with text field that lacks 'stored' property
-		$fieldsWithoutStored = [
+		// Create schema with text field (stored property is now optional in position-based validation)
+		$fieldsSchema = [
 			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
-			['Field' => 'title', 'Type' => 'text', 'Properties' => ''], // Missing 'stored'
+			['Field' => 'title', 'Type' => 'text', 'Properties' => ''],
 		];
 
 		$mockClient->method('sendRequest')
 			->willReturnCallback(
-				function (string $query) use ($fieldsWithoutStored) {
+				function (string $query) use ($fieldsSchema) {
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createTableSchemaResponse($fieldsWithoutStored);
+						return $this->createTableSchemaResponse($fieldsSchema);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
 						return $this->createSelectResponse(
@@ -269,12 +293,13 @@ class FieldValidatorTest extends TestCase {
 
 		$validator = new FieldValidator($mockClient);
 
-		$this->expectException(ManticoreSearchClientError::class);
-
+		// Should pass - text fields accept string values
 		$validator->validateCompatibility(
 			'SELECT id, title FROM source_table',
 			'target_table'
 		);
+
+		$this->assertTrue(true);
 	}
 
 	public function testTextFieldWithStoredPropertySuccess(): void {
@@ -282,11 +307,17 @@ class FieldValidatorTest extends TestCase {
 
 		$mockClient = $this->createMockClient();
 
+		// Schema with only 2 fields to match SELECT query: id, title
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+		];
+
 		$mockClient->method('sendRequest')
 			->willReturnCallback(
-				function (string $query) {
+				function (string $query) use ($schemaFields) {
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createTableSchemaResponse(); // Has stored
+						return $this->createTableSchemaResponse($schemaFields);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
 						return $this->createSelectResponse(
@@ -402,8 +433,44 @@ class FieldValidatorTest extends TestCase {
 	// Empty Result Handling Tests
 	// ========================================================================
 
-	public function testValidateEmptyResultWithExtractedFields(): void {
-		echo "\nTesting validation with empty result using field extraction\n";
+	public function testValidateEmptyResultThrowsError(): void {
+		echo "\nTesting validation failure with empty result (no sample data)\n";
+
+		$mockClient = $this->createMockClient();
+
+		// Schema with only 3 fields to match SELECT query: id, title, price
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) use ($schemaFields) {
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createTableSchemaResponse($schemaFields);
+					}
+					if (str_contains($query, 'LIMIT 1')) {
+						return $this->createSelectResponse([]); // Empty result - no sample data
+					}
+					return $this->createErrorResponse('Unexpected query: ' . $query);
+				}
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		$this->expectException(ManticoreSearchClientError::class);
+
+		// Empty result means no sample data for type validation
+		$validator->validateCompatibility(
+			'SELECT id, title, price FROM source_table WHERE 1=0',
+			'target_table'
+		);
+	}
+
+	public function testValidateSelectStarThrowsError(): void {
+		echo "\nTesting validation failure with SELECT * (cannot determine field count)\n";
 
 		$mockClient = $this->createMockClient();
 
@@ -414,7 +481,7 @@ class FieldValidatorTest extends TestCase {
 						return $this->createTableSchemaResponse();
 					}
 					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createSelectResponse([]); // Empty result
+						return $this->createSelectResponse([]); // Empty result for SELECT *
 					}
 					return $this->createErrorResponse('Unexpected query: ' . $query);
 				}
@@ -422,33 +489,168 @@ class FieldValidatorTest extends TestCase {
 
 		$validator = new FieldValidator($mockClient);
 
-		// Should not throw exception - can extract fields from SELECT clause
+		$this->expectException(ManticoreSearchClientError::class);
+
+		// SELECT * with empty result - cannot determine field count
 		$validator->validateCompatibility(
-			'SELECT id, title, price FROM source_table WHERE 1=0',
+			'SELECT * FROM complex_join',
+			'target_table'
+		);
+	}
+
+
+
+	// ========================================================================
+	// MATCH() Clause Support Tests
+	// ========================================================================
+
+	public function testValidateCompatibilityWithMatchInWhere(): void {
+		echo "\nTesting schema validation with MATCH() in WHERE clause\n";
+
+		$mockClient = $this->createMockClient();
+
+		// Schema with 3 fields to match SELECT query: id, title, price
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) use ($schemaFields) {
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createTableSchemaResponse($schemaFields);
+					}
+					if (str_contains($query, 'MATCH(title') && str_contains($query, 'LIMIT 1')) {
+						return $this->createSelectResponse(
+							[
+								['id' => 1, 'title' => 'Keyword Product', 'price' => 99.99],
+							]
+						);
+					}
+					return $this->createErrorResponse('Unexpected query: ' . $query);
+				}
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		// Should not throw exception - MATCH() in WHERE is valid
+		$validator->validateCompatibility(
+			'SELECT id, title, price FROM source_table WHERE MATCH(title, \'@keyword\')',
+			'target_table'
+		);
+
+		$this->assertTrue(true); // Test passes if no exception thrown
+	}
+
+	public function testValidateCompatibilityWithMatchAndAndCondition(): void {
+		echo "\nTesting schema validation with MATCH() and AND condition\n";
+
+		$mockClient = $this->createMockClient();
+
+		// Schema with 3 fields to match SELECT query: id, title, price
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) use ($schemaFields) {
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createTableSchemaResponse($schemaFields);
+					}
+					$hasMatch = str_contains($query, 'MATCH(title');
+					$hasAnd = str_contains($query, 'AND');
+					$hasLimit = str_contains($query, 'LIMIT 1');
+					if ($hasMatch && $hasAnd && $hasLimit) {
+						return $this->createSelectResponse(
+							[
+								['id' => 1, 'title' => 'Keyword Product', 'price' => 149.99],
+							]
+						);
+					}
+					return $this->createErrorResponse('Unexpected query: ' . $query);
+				}
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		$validator->validateCompatibility(
+			'SELECT id, title, price FROM source_table WHERE MATCH(title, \'@keyword\') AND price > 100',
 			'target_table'
 		);
 
 		$this->assertTrue(true);
 	}
 
-	public function testValidateEmptyResultCannotExtractFields(): void {
-		echo "\nTesting validation with empty result and complex SELECT\n";
+	public function testValidateCompatibilityWithMatchAndMultipleFields(): void {
+		echo "\nTesting schema validation with MATCH() on multiple fields\n";
 
 		$mockClient = $this->createMockClient();
 
-		$mockClient->expects($this->exactly(4))
-			->method('sendRequest')
-			->withConsecutive(
-				['DESC target_table'],
-				['SELECT * FROM complex_join LIMIT 1'],
-				['DESCRIBE (SELECT * FROM complex_join)'], // Fallback to DESCRIBE
-				['SELECT * FROM complex_join LIMIT 0'] // Final fallback
-			)
-			->willReturnOnConsecutiveCalls(
-				$this->createTableSchemaResponse(),
-				$this->createSelectResponse([]), // Empty result
-				$this->createErrorResponse('DESCRIBE not supported'), // DESCRIBE fails
-				$this->createErrorResponse('Cannot determine structure') // LIMIT 0 fails
+		// Schema with 3 fields to match SELECT query: id, title, price
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) use ($schemaFields) {
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createTableSchemaResponse($schemaFields);
+					}
+					$hasMatch = str_contains($query, 'MATCH(');
+					$hasTitle = str_contains($query, 'title');
+					$hasLimit = str_contains($query, 'LIMIT 1');
+					if ($hasMatch && $hasTitle && $hasLimit) {
+						return $this->createSelectResponse(
+							[
+								['id' => 1, 'title' => 'Keyword Product', 'price' => 99.99],
+							]
+						);
+					}
+					return $this->createErrorResponse('Unexpected query: ' . $query);
+				}
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		$validator->validateCompatibility(
+			'SELECT id, title, price FROM source_table WHERE MATCH(\'title\', \'@search_term\')',
+			'target_table'
+		);
+
+		$this->assertTrue(true);
+	}
+
+	public function testValidateCompatibilityWithInvalidMatchSyntax(): void {
+		echo "\nTesting validation failure with invalid MATCH() syntax\n";
+
+		$mockClient = $this->createMockClient();
+
+		// Schema with 2 fields to match SELECT query: id, title
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+		];
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) use ($schemaFields) {
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createTableSchemaResponse($schemaFields);
+					}
+					if (str_contains($query, 'MATCH(title)') && str_contains($query, 'LIMIT 1')) {
+						// Invalid MATCH syntax - missing query parameter
+						return $this->createErrorResponse('ERROR 1064: Syntax error in MATCH expression');
+					}
+					return $this->createErrorResponse('Unexpected query: ' . $query);
+				}
 			);
 
 		$validator = new FieldValidator($mockClient);
@@ -456,83 +658,9 @@ class FieldValidatorTest extends TestCase {
 		$this->expectException(ManticoreSearchClientError::class);
 
 		$validator->validateCompatibility(
-			'SELECT * FROM complex_join',
+			'SELECT id, title FROM source_table WHERE MATCH(title)',
 			'target_table'
 		);
-	}
-
-	// ========================================================================
-	// Field Extraction Tests
-	// ========================================================================
-
-	public function testExtractFieldsFromSelectClauseBasic(): void {
-		echo "\nTesting field extraction from basic SELECT clause\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		$fields = self::invokeMethod(
-			$validator,
-			'extractFieldsFromSelectClause',
-			['SELECT id, title, price FROM source_table']
-		);
-
-		$this->assertEquals(['id', 'title', 'price'], $fields);
-	}
-
-	public function testExtractFieldsFromSelectClauseWithAliases(): void {
-		echo "\nTesting field extraction with aliases\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		$fields = self::invokeMethod(
-			$validator,
-			'extractFieldsFromSelectClause',
-			['SELECT id, title AS product_title, price FROM source_table']
-		);
-
-		$this->assertEquals(['id', 'title', 'price'], $fields);
-	}
-
-	public function testExtractFieldsFromSelectClauseWithTablePrefix(): void {
-		echo "\nTesting field extraction with table prefixes\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		$fields = self::invokeMethod(
-			$validator,
-			'extractFieldsFromSelectClause',
-			['SELECT s.id, s.title, s.price FROM source_table s']
-		);
-
-		$this->assertEquals(['id', 'title', 'price'], $fields);
-	}
-
-	public function testExtractFieldsFromSelectClauseStar(): void {
-		echo "\nTesting field extraction with SELECT *\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		$fields = self::invokeMethod(
-			$validator,
-			'extractFieldsFromSelectClause',
-			['SELECT * FROM source_table']
-		);
-
-		$this->assertEquals([], $fields); // Cannot determine fields from *
-	}
-
-	public function testExtractFieldsFromSelectClauseWithFunctions(): void {
-		echo "\nTesting field extraction filters out functions\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		$fields = self::invokeMethod(
-			$validator,
-			'extractFieldsFromSelectClause',
-			['SELECT id, title, COUNT(*), MAX(price) FROM source_table']
-		);
-
-		$this->assertEquals(['id', 'title'], $fields); // Functions filtered out
 	}
 
 	// ========================================================================
@@ -596,11 +724,19 @@ class FieldValidatorTest extends TestCase {
 
 		$mockClient = $this->createMockClient();
 
+		// Schema with only 4 fields to match SELECT query: id, title, price, is_active
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+			['Field' => 'is_active', 'Type' => 'bool', 'Properties' => ''],
+		];
+
 		$mockClient->method('sendRequest')
 			->willReturnCallback(
-				function (string $query) {
+				function (string $query) use ($schemaFields) {
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createTableSchemaResponse();
+						return $this->createTableSchemaResponse($schemaFields);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
 						return $this->createSelectResponse(
@@ -625,11 +761,17 @@ class FieldValidatorTest extends TestCase {
 			'target_table'
 		);
 
-		// Verify all target fields were correctly loaded
+		// Verify all target fields were correctly loaded (position-indexed)
 		$targetFields = $validator->getTargetFields();
-		$this->assertCount(6, $targetFields); // Should have all 6 fields from schema
-		$this->assertEquals('bigint', $targetFields['id']['type']);
-		$this->assertEquals('text', $targetFields['title']['type']);
-		$this->assertEquals('stored', $targetFields['title']['properties']);
+		$this->assertCount(4, $targetFields); // 4 selected target fields
+		$this->assertEquals('id', $targetFields[0]['name']);
+		$this->assertEquals('bigint', $targetFields[0]['type']);
+		$this->assertEquals('title', $targetFields[1]['name']);
+		$this->assertEquals('text', $targetFields[1]['type']);
+		$this->assertEquals('stored', $targetFields[1]['properties']);
+		$this->assertEquals('price', $targetFields[2]['name']);
+		$this->assertEquals('float', $targetFields[2]['type']);
+		$this->assertEquals('is_active', $targetFields[3]['name']);
+		$this->assertEquals('bool', $targetFields[3]['type']);
 	}
 }

@@ -19,14 +19,20 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Batch processing engine for REPLACE SELECT operations
+ * 
+ * Uses position-based field mapping:
+ * - Maps row values to target table fields by position
+ * - Row values are indexed arrays (from SELECT result)
+ * - Target fields are indexed by position (from DESC)
+ * - No field name matching needed
  */
 final class BatchProcessor {
 	use StringFunctionsTrait;
 
 	private Client $client;
 	private Payload $payload;
-	/** @var array<string,array<string,mixed>> */
-	private array $targetFields;
+	/** @var array<int,array<string,mixed>> Target fields ordered by position from DESC */
+	private array $targetFieldsOrdered;
 	private int $batchSize;
 	private int $totalProcessed = 0;
 	private int $batchesProcessed = 0;
@@ -39,12 +45,12 @@ final class BatchProcessor {
 	 *
 	 * @param Client $client
 	 * @param Payload $payload
-	 * @param array<string,array<string,mixed>> $targetFields
+	 * @param array<int,array<string,mixed>> $targetFieldsOrdered Position-based fields from DESC
 	 */
-	public function __construct(Client $client, Payload $payload, array $targetFields) {
+	public function __construct(Client $client, Payload $payload, array $targetFieldsOrdered) {
 		$this->client = $client;
 		$this->payload = $payload;
-		$this->targetFields = $targetFields;
+		$this->targetFieldsOrdered = $targetFieldsOrdered;
 		$this->batchSize = Config::getBatchSize();
 		$this->processingStartTime = microtime(true);
 		$this->getFields($client, $payload->targetTable);
@@ -280,40 +286,59 @@ final class BatchProcessor {
 
 	/**
 	 * Process a single row for field type compatibility
+	 * 
+	 * Position-based processing:
+	 * - Convert row to indexed values array
+	 * - Match each value to target field by position
+	 * - Apply type conversion
+	 * - Return indexed array (no field names)
 	 *
-	 * @param array<string,mixed> $row
-	 * @return array<string,mixed>
+	 * @param array<string,mixed> $row Associative array from SELECT result
+	 * @return array<int,mixed> Indexed array of converted values
 	 * @throws ManticoreSearchClientError
 	 */
 	private function processRow(array $row): array {
+		// Convert row to indexed values array
+		$values = array_values($row);
 		$processed = [];
 
-		foreach ($row as $fieldName => $value) {
-			if (!isset($this->targetFields[$fieldName])) {
-				Buddy::debug("Skipping unknown field: $fieldName");
-				continue; // Skip unknown fields (shouldn't happen after validation)
-			}
+		// Validate count matches
+		if (count($values) !== count($this->targetFieldsOrdered)) {
+			$errorMsg = "Row field count (" . count($values) . ") does not match target field count ("
+				. count($this->targetFieldsOrdered) . ")";
+			Buddy::debug("Row validation error: $errorMsg");
+			throw new ManticoreSearchClientError($errorMsg);
+		}
 
+		// Process each value by position
+		foreach ($values as $index => $value) {
 			try {
-				$fieldType = $this->targetFields[$fieldName]['type'];
+				$fieldInfo = $this->targetFieldsOrdered[$index];
+				$fieldName = $fieldInfo['name'];
+				$fieldType = $fieldInfo['type'];
+
 				if (!is_string($fieldType)) {
-					$errorMsg = "Invalid field type for '$fieldName': expected string, got " . gettype($fieldType);
+					$errorMsg = "Invalid field type for position $index ('$fieldName'): expected string, got "
+						. gettype($fieldType);
 					Buddy::debug("Field type error: $errorMsg");
 					throw new ManticoreSearchClientError($errorMsg);
 				}
-				Buddy::debug("Processing field '$fieldName' with type '$fieldType'");
-				$processed[$fieldName] = $this->morphValuesByFieldType($value, $fieldType);
+
+				Buddy::debug("Processing position $index ('$fieldName') with type '$fieldType'");
+				$processed[$index] = $this->morphValuesByFieldType($value, $fieldType);
 			} catch (\Exception $e) {
 				$valuePrev = json_encode($value);
-				$errorMsg = "Failed to process field '$fieldName' with value '$valuePrev': " . $e->getMessage();
+				$fieldName = $this->targetFieldsOrdered[$index]['name'] ?? "position_$index";
+				$errorMsg = "Failed to process field '$fieldName' at position $index with value '$valuePrev': "
+					. $e->getMessage();
 				Buddy::debug("Field processing error: $errorMsg");
 				throw new ManticoreSearchClientError($errorMsg);
 			}
 		}
 
-		// Ensure ID field is present
-		if (!isset($processed['id'])) {
-			$errorMsg = "Row missing required 'id' field. Available fields: " . implode(', ', array_keys($processed));
+		// Ensure ID field is present (must be at position 0)
+		if (!isset($processed[0])) {
+			$errorMsg = "Row missing required 'id' field at position 0";
 			Buddy::debug("Row validation error: $errorMsg");
 			throw new ManticoreSearchClientError($errorMsg);
 		}
@@ -323,8 +348,13 @@ final class BatchProcessor {
 
 	/**
 	 * Execute REPLACE query for a batch of processed records
+	 * 
+	 * Position-based REPLACE building:
+	 * - Column list from targetFieldsOrdered in guaranteed order
+	 * - Values from indexed row arrays
+	 * - Preserves target DESC field order
 	 *
-	 * @param array<int,array<string,mixed>> $batch
+	 * @param array<int,array<int,mixed>> $batch Indexed array of indexed row arrays
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
@@ -334,15 +364,27 @@ final class BatchProcessor {
 			return;
 		}
 
-		$fields = array_keys($batch[0]);
+		// Build column list from targetFieldsOrdered (guaranteed order)
+		$columnNames = array_map(
+			fn($f) => $f['name'],
+			$this->targetFieldsOrdered
+		);
+		$fields = implode(',', $columnNames);
+
 		$values = [];
 		$valueCount = 0;
 
-		Buddy::debug('Building REPLACE statement with ' . sizeof($batch) . ' rows and ' . sizeof($fields) . ' fields');
+		Buddy::debug('Building REPLACE statement with ' . sizeof($batch) . ' rows and '
+			. count($this->targetFieldsOrdered) . ' fields');
 
 		foreach ($batch as $rowIndex => $row) {
 			try {
-				$rowValues = array_values($row);
+				// Row values are already indexed, just convert to SQL format
+				$rowValues = [];
+				foreach ($row as $value) {
+					// Value is already type-converted by processRow
+					$rowValues[] = is_string($value) ? "'$value'" : ($value === null ? 'NULL' : $value);
+				}
 				$values[] = '(' . implode(',', $rowValues) . ')';
 				$valueCount++;
 			} catch (\Exception $e) {
@@ -357,7 +399,7 @@ final class BatchProcessor {
 		$sql = sprintf(
 			'REPLACE INTO %s (%s) VALUES %s',
 			$targetTable,
-			implode(',', $fields),
+			$fields,
 			implode(',', $values)
 		);
 
