@@ -11,18 +11,16 @@ namespace Manticoresearch\BuddyTest\Trait;
   program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Core\Network\Request;
-use Manticoresearch\Buddy\Core\Network\Struct;
+use Manticoresearch\Buddy\Base\Plugin\ReplaceSelect\Handler;
+use Manticoresearch\Buddy\Base\Plugin\ReplaceSelect\Payload;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Manticoresearch\Buddy\Base\Plugin\ReplaceSelect\Payload;
-use Manticoresearch\Buddy\Base\Plugin\ReplaceSelect\Handler;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use ReflectionClass;
-
-
 
 /**
  * Common utilities for ReplaceSelect testing
@@ -187,20 +185,18 @@ trait ReplaceSelectTestTrait {
 	 * Create a payload with LIMIT for testing
 	 */
 	private function createPayloadWithLimit(int $limit, ?int $offset = null): Payload {
-		$payload = $this->createValidPayload(['limit' => $limit, 'offset' => $offset]);
-		return $payload;
+		return $this->createValidPayload(['limit' => $limit, 'offset' => $offset]);
 	}
 
 	/**
 	 * Create a payload with complex SELECT query
 	 */
 	private function createPayloadWithComplexQuery(): Payload {
-		$payload = $this->createValidPayload(
+		return $this->createValidPayload(
 			[
 			'query' => 'SELECT id, title, price FROM source WHERE active = 1 AND price > 50',
 			]
 		);
-		return $payload;
 	}
 
 	/**
@@ -225,9 +221,11 @@ trait ReplaceSelectTestTrait {
 		// For backwards compatibility, if overrides use keyed format, convert them
 		$result = $defaultFields;
 		foreach ($overrides as $index => $field) {
-			if (is_int($index)) {
-				$result[$index] = $field;
+			if (!is_int($index)) {
+				continue;
 			}
+
+			$result[$index] = $field;
 		}
 		return $result;
 	}

@@ -19,7 +19,7 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Batch processing engine for REPLACE SELECT operations
- * 
+ *
  * Uses position-based field mapping:
  * - Maps row values to target table fields by position
  * - Row values are indexed arrays (from SELECT result)
@@ -53,7 +53,6 @@ final class BatchProcessor {
 		$this->targetFieldsOrdered = $targetFieldsOrdered;
 		$this->batchSize = Config::getBatchSize();
 		$this->processingStartTime = microtime(true);
-		$this->getFields($client, $payload->targetTable);
 	}
 
 	/**
@@ -286,7 +285,7 @@ final class BatchProcessor {
 
 	/**
 	 * Process a single row for field type compatibility
-	 * 
+	 *
 	 * Position-based processing:
 	 * - Convert row to indexed values array
 	 * - Match each value to target field by position
@@ -304,8 +303,8 @@ final class BatchProcessor {
 
 		// Validate count matches
 		if (count($values) !== count($this->targetFieldsOrdered)) {
-			$errorMsg = "Row field count (" . count($values) . ") does not match target field count ("
-				. count($this->targetFieldsOrdered) . ")";
+			$errorMsg = 'Row field count (' . count($values) . ') does not match target field count ('
+				. count($this->targetFieldsOrdered) . ')';
 			Buddy::debug("Row validation error: $errorMsg");
 			throw new ManticoreSearchClientError($errorMsg);
 		}
@@ -348,7 +347,7 @@ final class BatchProcessor {
 
 	/**
 	 * Execute REPLACE query for a batch of processed records
-	 * 
+	 *
 	 * Position-based REPLACE building:
 	 * - Column list from targetFieldsOrdered in guaranteed order
 	 * - Values from indexed row arrays
@@ -374,8 +373,10 @@ final class BatchProcessor {
 		$values = [];
 		$valueCount = 0;
 
-		Buddy::debug('Building REPLACE statement with ' . sizeof($batch) . ' rows and '
-			. count($this->targetFieldsOrdered) . ' fields');
+		Buddy::debug(
+			'Building REPLACE statement with ' . sizeof($batch) . ' rows and '
+			. count($this->targetFieldsOrdered) . ' fields'
+		);
 
 		foreach ($batch as $rowIndex => $row) {
 			try {

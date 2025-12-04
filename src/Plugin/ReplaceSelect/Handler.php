@@ -20,7 +20,7 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Main execution orchestrator for REPLACE SELECT operations
- * 
+ *
  * Uses position-based field mapping:
  * - Validator returns targetFieldsOrdered (indexed by position)
  * - BatchProcessor processes rows by position, not by field name

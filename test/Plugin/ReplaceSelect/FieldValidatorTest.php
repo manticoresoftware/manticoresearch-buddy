@@ -11,7 +11,6 @@
 
 use Manticoresearch\Buddy\Base\Plugin\ReplaceSelect\FieldValidator;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\CoreTest\Trait\TestProtectedTrait;
 use Manticoresearch\BuddyTest\Trait\ReplaceSelectTestTrait;

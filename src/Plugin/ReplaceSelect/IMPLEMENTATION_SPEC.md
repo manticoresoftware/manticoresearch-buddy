@@ -652,12 +652,43 @@ $targetFieldsOrdered[0]['type']
 - BatchProcessor.php: 414 → 455 lines (+10%)
 - Handler.php: 215 → 217 lines (+1 comment)
 
-**Remaining**:
-- Phase 4: Test Refactoring (major)
+## SESSION PROGRESS UPDATE (Dec 4, 2025)
+
+### ✅ COMPLETED
+- **Phase 1**: FieldValidator refactored (326 lines, 45% reduction)
+- **Phase 2**: BatchProcessor refactored for position-based processing (455 lines)
+- **Phase 3**: Handler verified (217 lines, compatible)
+- **Phase 4.1**: FieldValidatorTest refactored (21 tests, 52 assertions - ALL PASSING ✓)
+- **Phase 4.1.1**: ReplaceSelectTestTrait helpers updated (position-indexed arrays)
+
+### ✅ TEST STATUS
+- FieldValidatorTest.php: 21/21 tests ✓✓✓
+- ReplaceSelectPayloadTest.php: New MATCH() tests added
+- HandlerTest.php: New MATCH() clause tests added
+- FieldValidator tests include: 7 MATCH() clause tests (all passing)
+
+### ⏳ REMAINING
+- Phase 4.2-4.4: Refactor remaining test files (60+ tests)
+  - BatchProcessorTest.php: 15 tests with test data refactoring needed
+  - HandlerTest.php: 19 tests (verify existing tests work with new helpers)
+  - ReplaceSelectPayloadTest.php: 10 tests (minimal changes needed)
 - Phase 5: Integration & Verification
-- Phase 6: Documentation
+- Phase 6: Documentation & Code Comments
 
-**Next**: Proceed with Phase 4 (Test Refactoring)
+### KEY CHANGES IMPLEMENTED
+1. Position-indexed field arrays: `array<int,array<string,mixed>>`
+2. Field name now included as 'name' key in field info
+3. GROUP BY queries explicitly rejected
+4. Functions/expressions now supported automatically
+5. MATCH() clause tests integrated throughout
 
-Note: Phase 4 will be substantial as all 76 existing tests use keyed array assertions.
+### FILES MODIFIED IN THIS SESSION
+- src/Plugin/ReplaceSelect/FieldValidator.php (refactored)
+- src/Plugin/ReplaceSelect/BatchProcessor.php (refactored)
+- src/Plugin/ReplaceSelect/Handler.php (documented)
+- test/Plugin/ReplaceSelect/FieldValidatorTest.php (fully refactored)
+- test/src/Trait/ReplaceSelectTestTrait.php (updated helpers)
+
+**Overall Progress**: 60% complete (Implementation 100%, Tests 30%)
+**Git Commit**: e63b943 - "Refactor ReplaceSelect to position-based field mapping (Phases 1-3)"
 

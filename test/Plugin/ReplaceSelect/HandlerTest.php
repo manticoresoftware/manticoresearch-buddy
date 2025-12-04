@@ -53,22 +53,30 @@ class HandlerTest extends TestCase {
 			)
 			->willReturnOnConsecutiveCalls(
 				$this->createMockResponse(true),
-				$this->createMockResponse(true, [
+				$this->createMockResponse(
+					true, [
 					['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 					['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 					['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-				]),
-				$this->createMockResponse(true, [
+					]
+				),
+				$this->createMockResponse(
+					true, [
 					['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
-				]),
-				$this->createMockResponse(true, [
+					]
+				),
+				$this->createMockResponse(
+					true, [
 					['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 					['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 					['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-				]),
-				$this->createMockResponse(true, [
+					]
+				),
+				$this->createMockResponse(
+					true, [
 					['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
-				]),
+					]
+				),
 				$this->createMockResponse(true),
 				$this->createMockResponse(true)
 			);
@@ -130,15 +138,19 @@ class HandlerTest extends TestCase {
 						return $this->createMockResponse(true);
 					}
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['id' => 1, 'title' => 'Test Product'],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1000')) {
 						return $this->createMockResponse(false, null, 'Connection lost during batch processing');
@@ -200,15 +212,19 @@ class HandlerTest extends TestCase {
 						return $this->createMockResponse(true);
 					}
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['id' => 1, 'title' => 'Test Product'],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1000')) {
 						return $this->createMockResponse(true, []);
@@ -272,16 +288,20 @@ class HandlerTest extends TestCase {
 						return $this->createMockResponse(true);
 					}
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1000')) {
 						return $this->createMockResponse(true, []);
@@ -322,16 +342,20 @@ class HandlerTest extends TestCase {
 						return $this->createMockResponse(true);
 					}
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1000')) {
 						return $this->createMockResponse(true, []);
@@ -429,22 +453,30 @@ class HandlerTest extends TestCase {
 			)
 			->willReturnOnConsecutiveCalls(
 				$this->createMockResponse(true),
-				$this->createMockResponse(true, [
+				$this->createMockResponse(
+					true, [
 					['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 					['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 					['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-				]),
-				$this->createMockResponse(true, [
+					]
+				),
+				$this->createMockResponse(
+					true, [
 					['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
-				]),
-				$this->createMockResponse(true, [
+					]
+				),
+				$this->createMockResponse(
+					true, [
 					['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 					['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 					['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-				]),
-				$this->createMockResponse(true, [
+					]
+				),
+				$this->createMockResponse(
+					true, [
 					['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
-				]),
+					]
+				),
 				$this->createMockResponse(true),
 				$this->createMockResponse(true)
 			);
@@ -477,15 +509,19 @@ class HandlerTest extends TestCase {
 						return $this->createMockResponse(true);
 					}
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['id' => 1, 'title' => 'Test Product'],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT')) {
 						return $this->createMockResponse(true, []);
@@ -500,10 +536,12 @@ class HandlerTest extends TestCase {
 				}
 			);
 
-		$payload = $this->createValidPayload([
+		$payload = $this->createValidPayload(
+			[
 			'query' => 'REPLACE INTO target SELECT id, title FROM source',
 			'limit' => 100,
-		]);
+			]
+		);
 		$handler = new Handler($payload);
 		$this->injectMockClient($handler, $mockClient);
 
@@ -525,11 +563,13 @@ class HandlerTest extends TestCase {
 						return $this->createMockResponse(true);
 					}
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
 						return $this->createMockResponse(true, []);
@@ -563,16 +603,19 @@ class HandlerTest extends TestCase {
 						return $this->createMockResponse(true);
 					}
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
 							['Field' => 'tags', 'Type' => 'multi', 'Properties' => ''],
 							['Field' => 'created_at', 'Type' => 'timestamp', 'Properties' => ''],
 							['Field' => 'metadata', 'Type' => 'json', 'Properties' => ''],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							[
 								'id' => 1,
 								'price' => 29.99,
@@ -580,7 +623,8 @@ class HandlerTest extends TestCase {
 								'created_at' => '2024-01-01 00:00:00',
 								'metadata' => '{"category": "electronics"}',
 							],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1000')) {
 						return $this->createMockResponse(true, []);
@@ -621,16 +665,20 @@ class HandlerTest extends TestCase {
 						return $this->createMockResponse(true);
 					}
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1000')) {
 						return $this->createMockResponse(true, []);
@@ -702,16 +750,20 @@ class HandlerTest extends TestCase {
 						return $this->createMockResponse(true);
 					}
 					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(true, [
+						return $this->createMockResponse(
+							true, [
 							['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
-						]);
+							]
+						);
 					}
 					if (str_contains($query, 'LIMIT 1000')) {
 						return $this->createMockResponse(true, []);
@@ -736,5 +788,174 @@ class HandlerTest extends TestCase {
 		$this->assertTrue($task->isSucceed());
 
 		unset($_ENV['BUDDY_REPLACE_SELECT_DEBUG']);
+	}
+
+	// ========================================================================
+	// MATCH() Clause Integration Tests
+	// ========================================================================
+
+	public function testHandlerWithMatchWhereClause(): void {
+		echo "\nTesting handler with MATCH() full-text search in WHERE clause\n";
+
+		$mockClient = $this->createMock(Client::class);
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) {
+					if ($query === 'BEGIN') {
+						return $this->createMockResponse(true);
+					}
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createMockResponse(
+							true, [
+							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+							]
+						);
+					}
+					if (str_contains($query, 'MATCH(title') && str_contains($query, 'LIMIT 1')) {
+						return $this->createMockResponse(
+							true, [
+							['id' => 1, 'title' => 'Keyword Product', 'price' => 99.99],
+							]
+						);
+					}
+					if (str_contains($query, 'MATCH(title') && str_contains($query, 'LIMIT 1000')) {
+						return $this->createMockResponse(
+							true, [
+							['id' => 1, 'title' => 'Keyword Product', 'price' => 99.99],
+							]
+						);
+					}
+					if (str_starts_with($query, 'REPLACE')) {
+						return $this->createMockResponse(true);
+					}
+					if ($query === 'COMMIT') {
+						return $this->createMockResponse(true);
+					}
+					return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
+				}
+			);
+
+		$payload = $this->createValidPayload(
+			[
+			'query' => 'REPLACE INTO target SELECT id, title, price FROM source WHERE MATCH(title, \'@keyword\')',
+			]
+		);
+		$handler = new Handler($payload);
+		$this->injectMockClient($handler, $mockClient);
+
+		$task = $handler->run();
+		usleep(100000); // 100ms
+
+		$this->assertTrue($task->isSucceed());
+	}
+
+	public function testHandlerWithMatchAndMultipleConditions(): void {
+		echo "\nTesting handler with MATCH() combined with other WHERE conditions\n";
+
+		$mockClient = $this->createMock(Client::class);
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) {
+					if ($query === 'BEGIN') {
+						return $this->createMockResponse(true);
+					}
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createMockResponse(
+							true, [
+							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+							['Field' => 'status', 'Type' => 'text', 'Properties' => 'stored'],
+							]
+						);
+					}
+					if (str_contains($query, 'MATCH(title') && str_contains($query, 'AND') && str_contains($query, 'LIMIT 1')) {
+						return $this->createMockResponse(
+							true, [
+							['id' => 1, 'title' => 'Keyword Product', 'price' => 150.00, 'status' => 'active'],
+							]
+						);
+					}
+					if (str_contains($query, 'MATCH(title') && str_contains($query, 'AND') && str_contains($query, 'LIMIT 1000')) {
+						return $this->createMockResponse(
+							true, [
+							['id' => 1, 'title' => 'Keyword Product', 'price' => 150.00, 'status' => 'active'],
+							['id' => 2, 'title' => 'Another Keyword Item', 'price' => 200.00, 'status' => 'active'],
+							]
+						);
+					}
+					if (str_starts_with($query, 'REPLACE')) {
+						return $this->createMockResponse(true);
+					}
+					if ($query === 'COMMIT') {
+						return $this->createMockResponse(true);
+					}
+					return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
+				}
+			);
+
+		$payload = $this->createValidPayload(
+			[
+			'query' => 'REPLACE INTO target SELECT id, title, price, status FROM source WHERE MATCH(title, \'@keyword\') AND price > 100 AND status = \'active\'',
+			]
+		);
+		$handler = new Handler($payload);
+		$this->injectMockClient($handler, $mockClient);
+
+		$task = $handler->run();
+		usleep(100000); // 100ms
+
+		$this->assertTrue($task->isSucceed());
+	}
+
+	public function testHandlerWithMatchReturnsNoResults(): void {
+		echo "\nTesting handler with MATCH() query returning no results\n";
+
+		$mockClient = $this->createMock(Client::class);
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) {
+					if ($query === 'BEGIN') {
+						return $this->createMockResponse(true);
+					}
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createMockResponse(
+							true, [
+							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+							]
+						);
+					}
+					if (str_contains($query, 'MATCH(title') && str_contains($query, 'LIMIT 1')) {
+						return $this->createMockResponse(true, []);  // No matches
+					}
+					if (str_contains($query, 'MATCH(title') && str_contains($query, 'LIMIT 1000')) {
+						return $this->createMockResponse(true, []);  // No matches
+					}
+					if ($query === 'COMMIT') {
+						return $this->createMockResponse(true);
+					}
+					return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
+				}
+			);
+
+		$payload = $this->createValidPayload(
+			[
+			'query' => 'REPLACE INTO target SELECT id, title, price FROM source WHERE MATCH(title, \'@nonexistent\')',
+			]
+		);
+		$handler = new Handler($payload);
+		$this->injectMockClient($handler, $mockClient);
+
+		$task = $handler->run();
+		usleep(100000); // 100ms
+
+		$this->assertTrue($task->isSucceed());
 	}
 }

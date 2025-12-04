@@ -44,6 +44,32 @@ class ReplaceSelectPayloadTest extends TestCase {
 
 			$this->assertTrue(Payload::hasMatch($request), "Should match: $sql");
 		}
+	}
+
+	public function testHasMatchWithMatchClause(): void {
+		echo "\nTesting REPLACE SELECT payload matching with MATCH() clauses\n";
+
+		$validRequests = [
+			'REPLACE INTO target SELECT id, title FROM source WHERE MATCH(title, \'@keyword\')',
+			'REPLACE INTO target SELECT * FROM source WHERE MATCH(\'title, description\', \'@search\')',
+			'REPLACE INTO cluster1:target SELECT id FROM source WHERE MATCH(title, \'@query\')',
+			'REPLACE INTO target SELECT id, name, price FROM source WHERE MATCH(name, \'@product\') AND price > 100',
+		];
+
+		foreach ($validRequests as $sql) {
+			$request = Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'payload' => $sql,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
+				'error' => '',
+				]
+			);
+
+			$this->assertTrue(Payload::hasMatch($request), "Should match MATCH() query: $sql");
+		}
 
 		// Test invalid patterns
 		$invalidRequests = [
@@ -127,6 +153,47 @@ class ReplaceSelectPayloadTest extends TestCase {
 		$payload = Payload::fromRequest($request);
 		$this->assertEquals('target', $payload->targetTable);
 		$this->assertEquals('SELECT * FROM source', $payload->selectQuery);
+	}
+
+	public function testFromRequestWithMatchClause(): void {
+		echo "\nTesting REPLACE SELECT with MATCH() clause parsing\n";
+
+		$request = Request::fromArray(
+			[
+			'version' => Buddy::PROTOCOL_VERSION,
+			'payload' => 'REPLACE INTO target SELECT id, title FROM source WHERE MATCH(title, \'@keyword\')',
+			'format' => RequestFormat::SQL,
+			'endpointBundle' => ManticoreEndpoint::Sql,
+			'path' => 'sql?mode=raw',
+			'error' => '',
+			]
+		);
+
+		$payload = Payload::fromRequest($request);
+		$this->assertEquals('target', $payload->targetTable);
+		$this->assertEquals('SELECT id, title FROM source WHERE MATCH(title, \'@keyword\')', $payload->selectQuery);
+		$this->assertNull($payload->cluster);
+	}
+
+	public function testFromRequestWithMatchAndLimit(): void {
+		echo "\nTesting REPLACE SELECT with MATCH() and LIMIT/OFFSET parsing\n";
+
+		$request = Request::fromArray(
+			[
+			'version' => Buddy::PROTOCOL_VERSION,
+			'payload' => 'REPLACE INTO target SELECT id, title FROM source WHERE MATCH(title, \'@keyword\') LIMIT 100 OFFSET 50',
+			'format' => RequestFormat::SQL,
+			'endpointBundle' => ManticoreEndpoint::Sql,
+			'path' => 'sql?mode=raw',
+			'error' => '',
+			]
+		);
+
+		$payload = Payload::fromRequest($request);
+		$this->assertEquals('target', $payload->targetTable);
+		$this->assertEquals('SELECT id, title FROM source WHERE MATCH(title, \'@keyword\') LIMIT 100 OFFSET 50', $payload->selectQuery);
+		$this->assertEquals(100, $payload->selectLimit);
+		$this->assertEquals(50, $payload->selectOffset);
 	}
 
 	public function testGetTargetTableWithCluster(): void {

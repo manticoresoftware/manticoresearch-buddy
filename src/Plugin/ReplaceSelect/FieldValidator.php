@@ -18,7 +18,7 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Field compatibility validator for REPLACE SELECT operations
- * 
+ *
  * Uses position-based field mapping:
  * - Validates SELECT field count matches target table field count
  * - Maps SELECT result fields to target by position, not by name
@@ -42,7 +42,7 @@ final class FieldValidator {
 
 	/**
 	 * Validate schema compatibility between source and target
-	 * 
+	 *
 	 * Position-based validation:
 	 * 1. Rejects GROUP BY queries
 	 * 2. Loads target fields in DESC order
@@ -219,7 +219,7 @@ final class FieldValidator {
 				$fieldName = $this->targetFieldsOrdered[$index]['name'];
 				throw ManticoreSearchClientError::create(
 					"Field '$fieldName' at position $index: "
-					. "cannot convert " . gettype($value) . " to $targetType"
+					. 'cannot convert ' . gettype($value) . " to $targetType"
 				);
 			}
 		}
