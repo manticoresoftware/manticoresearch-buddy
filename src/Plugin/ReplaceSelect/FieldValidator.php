@@ -220,6 +220,11 @@ final class FieldValidator {
 			// Remove quotes and backticks
 			$field = trim($field, '`"\' ');
 
+			// Skip functions (contain parentheses)
+			if (str_contains($field, '(') && str_contains($field, ')')) {
+				continue;
+			}
+
 			if (empty($field) || in_array(strtolower($field), ['count', 'sum', 'avg', 'min', 'max'])) {
 				continue;
 			}

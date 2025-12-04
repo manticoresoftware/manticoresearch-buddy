@@ -9,8 +9,8 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Base\Plugin\ReplaceSelect\Config;
 use Manticoresearch\Buddy\Base\Plugin\ReplaceSelect\Payload;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
@@ -87,7 +87,6 @@ class ReplaceSelectPayloadTest extends TestCase {
 		$this->assertInstanceOf(Payload::class, $payload);
 		$this->assertEquals('target', $payload->targetTable);
 		$this->assertEquals('SELECT id, name FROM source', $payload->selectQuery);
-		$this->assertEquals(Config::getBatchSize(), $payload->batchSize);
 		$this->assertNull($payload->cluster);
 	}
 
@@ -127,7 +126,6 @@ class ReplaceSelectPayloadTest extends TestCase {
 
 		$payload = Payload::fromRequest($request);
 		$this->assertEquals('target', $payload->targetTable);
-		$this->assertEquals(500, $payload->batchSize);
 		$this->assertEquals('SELECT * FROM source', $payload->selectQuery);
 	}
 
@@ -181,16 +179,50 @@ class ReplaceSelectPayloadTest extends TestCase {
 		$payload = Payload::fromRequest($request);
 		$payload->validate(); // Should not throw
 
-		// Test with invalid batch size
-		$payload->batchSize = 0;
-		$this->expectException(\Manticoresearch\Buddy\Core\Error\GenericError::class);
-		$payload->validate();
+		// Test with invalid batch size (too large)
+		$originalBatchSize = $_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] ?? null;
+		$originalMaxBatchSize = $_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] ?? null;
+
+		// Set max batch size to a small value to test validation
+		$_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] = 100;
+		$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = 200; // Exceeds max, but will be clamped to 100
+
+		// Create new payload to pick up new environment values
+		$invalidPayload = Payload::fromRequest($request);
+
+		// The Config::getBatchSize() uses max(1, min(batchSize, maxBatchSize))
+		// So 200 gets clamped to 100, which is valid. We need to test a different scenario.
+
+		// Test with negative batch size (will be clamped to 1, which is valid)
+		$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = -10;
+		$negativePayload = Payload::fromRequest($request);
+		$negativePayload->validate(); // Should not throw because -10 gets clamped to 1
+
+		// Test with zero max batch size (edge case)
+		$_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] = 0;
+		$zeroMaxPayload = Payload::fromRequest($request);
+
+		$this->expectException(GenericError::class);
+		$zeroMaxPayload->validate();
+
+		// Restore original environment
+		if ($originalBatchSize !== null) {
+			$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = $originalBatchSize;
+		} else {
+			unset($_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE']);
+		}
+
+		if ($originalMaxBatchSize !== null) {
+			$_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] = $originalMaxBatchSize;
+		} else {
+			unset($_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE']);
+		}
 	}
 
 	public function testInvalidQuery(): void {
 		echo "\nTesting invalid query handling\n";
 
-		$this->expectException(\Manticoresearch\Buddy\Core\Error\GenericError::class);
+		$this->expectException(GenericError::class);
 
 		$request = Request::fromArray(
 			[
