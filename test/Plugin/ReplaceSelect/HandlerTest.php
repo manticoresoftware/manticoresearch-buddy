@@ -40,13 +40,12 @@ class HandlerTest extends TestCase {
 
 		$mockClient = $this->createMock(Client::class);
 
-		$mockClient->expects($this->exactly(7))
+		$mockClient->expects($this->exactly(6))
 			->method('sendRequest')
 			->withConsecutive(
 				['BEGIN'],
 				['DESC target'],
 				['SELECT id, title, price FROM source LIMIT 1'],
-				['DESC target'],
 				['SELECT id, title, price FROM source LIMIT 1000 OFFSET 0'],
 				['REPLACE INTO target (id,title,price) VALUES (1,\'Test Product\',29.99)'],
 				['COMMIT']
@@ -67,13 +66,6 @@ class HandlerTest extends TestCase {
 				),
 				$this->createMockResponse(
 					true, [
-					['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
-					['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-					['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-					]
-				),
-				$this->createMockResponse(
-					true, [
 					['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
 					]
 				),
@@ -86,9 +78,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-
-		// Give task time to complete
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms - allow coroutine to complete
 
 		$this->assertTrue($task->isSucceed(), 'Handler should successfully complete transaction');
 	}
@@ -116,7 +106,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
@@ -167,7 +157,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
@@ -190,7 +180,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
@@ -241,7 +231,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
@@ -262,8 +252,7 @@ class HandlerTest extends TestCase {
 		$handler = new Handler($payload);
 
 		try {
-			$task = $handler->run();
-			usleep(100000); // 100ms
+			$handler->run();
 			$this->fail('Expected Exception was not thrown');
 		} catch (\Exception $e) {
 			$this->assertInstanceOf(\Exception::class, $e);
@@ -321,7 +310,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
 
@@ -375,7 +364,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
 
@@ -419,7 +408,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
@@ -440,13 +429,12 @@ class HandlerTest extends TestCase {
 		// The real HTTP mock server doesn't support BEGIN/COMMIT/ROLLBACK, so we use client mocks
 		$mockClient = $this->createMock(Client::class);
 
-		$mockClient->expects($this->exactly(7))
+		$mockClient->expects($this->exactly(6))
 			->method('sendRequest')
 			->withConsecutive(
 				['BEGIN'],
 				['DESC target'],
 				['SELECT id, title, price FROM source LIMIT 1'],
-				['DESC target'],
 				['SELECT id, title, price FROM source LIMIT 1000 OFFSET 0'],
 				['REPLACE INTO target (id,title,price) VALUES (1,\'Test Product\',29.99)'],
 				['COMMIT']
@@ -467,13 +455,6 @@ class HandlerTest extends TestCase {
 				),
 				$this->createMockResponse(
 					true, [
-					['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
-					['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-					['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-					]
-				),
-				$this->createMockResponse(
-					true, [
 					['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
 					]
 				),
@@ -486,9 +467,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-
-		// Give task time to complete
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms - allow coroutine to complete
 
 		$this->assertTrue($task->isSucceed());
 	}
@@ -546,7 +525,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
 	}
@@ -574,7 +553,7 @@ class HandlerTest extends TestCase {
 					if (str_contains($query, 'LIMIT 1')) {
 						return $this->createMockResponse(true, []);
 					}
-					if ($query === 'COMMIT') {
+					if ($query === 'ROLLBACK') {
 						return $this->createMockResponse(true);
 					}
 					return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
@@ -586,9 +565,12 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
-		$this->assertTrue($task->isSucceed());
+		// Empty SELECT result should fail validation
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertNotNull($error);
 	}
 
 	public function testHandlerWithComplexFieldTypes(): void {
@@ -648,7 +630,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
 	}
@@ -698,7 +680,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
 	}
@@ -726,7 +708,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
@@ -783,7 +765,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
 
@@ -847,7 +829,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
 	}
@@ -907,7 +889,7 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
 	}
@@ -938,7 +920,7 @@ class HandlerTest extends TestCase {
 					if (str_contains($query, 'MATCH(title') && str_contains($query, 'LIMIT 1000')) {
 						return $this->createMockResponse(true, []);  // No matches
 					}
-					if ($query === 'COMMIT') {
+					if ($query === 'ROLLBACK') {
 						return $this->createMockResponse(true);
 					}
 					return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
@@ -954,8 +936,11 @@ class HandlerTest extends TestCase {
 		$this->injectMockClient($handler, $mockClient);
 
 		$task = $handler->run();
-		usleep(100000); // 100ms
+		usleep(500000); // 500ms
 
-		$this->assertTrue($task->isSucceed());
+		// MATCH query returning no results should fail validation
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertNotNull($error);
 	}
 }

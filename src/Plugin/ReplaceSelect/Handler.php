@@ -29,6 +29,7 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 final class Handler extends BaseHandlerWithClient {
 	private bool $transactionStarted = false;
 	private float $operationStartTime;
+	private int $recordsProcessedBeforeError = 0;
 
 	/**
 	 * Constructor
@@ -74,69 +75,44 @@ final class Handler extends BaseHandlerWithClient {
 
 				$totalProcessed = $processor->execute();
 
-			// 4. Commit transaction
+				// 4. Commit transaction
 				$this->commitTransaction();
 
 				$operationDuration = microtime(true) - $this->operationStartTime;
 
-			// Build result row with metrics
+				// Build result row with metrics
 				$resultRow = [
-				'total' => $totalProcessed,
-				'batches' => $processor->getBatchesProcessed(),
-				'batch_size' => Config::getBatchSize(),
-				'duration_seconds' => round($operationDuration, 3),
-				'records_per_second' => $operationDuration > 0 ? round($totalProcessed / $operationDuration, 2) : 0,
+					'total' => $totalProcessed,
+					'batches' => $processor->getBatchesProcessed(),
+					'batch_size' => Config::getBatchSize(),
+					'duration_seconds' => round($operationDuration, 3),
+					'records_per_second' => $operationDuration > 0 ? round($totalProcessed / $operationDuration, 2) : 0,
 				];
 
-			// Log detailed debug information if enabled
+				// Log detailed debug information if enabled
 				if (Config::isDebugEnabled()) {
 					Buddy::debug('Processing statistics: ' . json_encode($processor->getProcessingStatistics()));
 					Buddy::debug('Source query: ' . $this->payload->selectQuery);
 					Buddy::debug('Target table: ' . $this->payload->getTargetTableWithCluster());
 				}
 
-			// Return result as a formatted table with proper column types
+				// Return result as a formatted table with proper column types
 				return TaskResult::withData([$resultRow])
-				->column('total', Column::Long)
-				->column('batches', Column::Long)
-				->column('batch_size', Column::Long)
-				->column('duration_seconds', Column::String)
-				->column('records_per_second', Column::String);
-			} catch (\Exception $e) {
-				// Enhanced error information
-				$errorContext = [
-				'operation' => 'REPLACE SELECT',
-				'target_table' => $this->payload->targetTable,
-				'select_query' => $this->payload->selectQuery,
-				'batch_size' => Config::getBatchSize(),
-				'transaction_started' => $this->transactionStarted,
-				'operation_duration' => microtime(true) - $this->operationStartTime,
-				'exception_class' => $e::class,
-				'exception_code' => $e->getCode(),
-				];
-
-				if ($processor) {
-					$errorContext['records_processed'] = $processor->getTotalProcessed();
-					$errorContext['batches_processed'] = $processor->getBatchesProcessed();
+					->column('total', Column::Long)
+					->column('batches', Column::Long)
+					->column('batch_size', Column::Long)
+					->column('duration_seconds', Column::String)
+					->column('records_per_second', Column::String);
+			} catch (ManticoreSearchClientError $e) {
+				throw $this->enhanceError($e);
+			} finally {
+				// Ensure transaction is rolled back if it was started
+				// This allows any exception to propagate naturally to EventHandler
+				// with its original, detailed error message
+				if ($this->transactionStarted) {
+					$this->rollbackTransaction();
 				}
 
-				$contextJson = json_encode($errorContext, JSON_PRETTY_PRINT);
-				Buddy::debug(
-					'REPLACE SELECT operation failed: ' . $e->getMessage() .
-					"\nContext: " . $contextJson .
-					"\nTrace: " . $e->getTraceAsString()
-				);
-
-				// Rollback transaction if it was started
-				$this->rollbackTransaction();
-
-				// Re-throw with enhanced context including exception type
-				throw new ManticoreSearchClientError(
-					$e->getMessage() . ' (processed ' . ($processor?->getTotalProcessed() ?? 0) . ' records)',
-					$e->getCode(),
-					$e
-				);
-			} finally {
 				Buddy::debug(
 					'REPLACE SELECT operation completed. Total duration: ' .
 					round(microtime(true) - $this->operationStartTime, 3) . 's'
@@ -162,9 +138,13 @@ final class Handler extends BaseHandlerWithClient {
 		Buddy::debug('Starting transaction for REPLACE SELECT operation');
 		$result = $this->manticoreClient->sendRequest('BEGIN');
 		if ($result->hasError()) {
-			throw ManticoreSearchClientError::create(
-				'Failed to begin transaction: ' . $result->getError()
+			$errorMessage = $this->buildErrorContext(
+				'Failed to begin transaction: ' . $result->getError(),
+				$this->recordsProcessedBeforeError
 			);
+			$error = new ManticoreSearchClientError($errorMessage);
+			$error->setResponseError($errorMessage);
+			throw $error;
 		}
 
 		$this->transactionStarted = true;
@@ -186,9 +166,13 @@ final class Handler extends BaseHandlerWithClient {
 		Buddy::debug('Committing transaction');
 		$result = $this->manticoreClient->sendRequest('COMMIT');
 		if ($result->hasError()) {
-			throw ManticoreSearchClientError::create(
-				'Failed to commit transaction: ' . $result->getError()
+			$errorMessage = $this->buildErrorContext(
+				'Failed to commit transaction: ' . $result->getError(),
+				$this->recordsProcessedBeforeError
 			);
+			$error = new ManticoreSearchClientError($errorMessage);
+			$error->setResponseError($errorMessage);
+			throw $error;
 		}
 
 		$this->transactionStarted = false;
@@ -215,5 +199,39 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$this->transactionStarted = false;
+	}
+
+	/**
+	 * Build error message with operation context
+	 *
+	 * @param string $originalError
+	 * @param int $recordsProcessed
+	 * @return string
+	 */
+	private function buildErrorContext(string $originalError, int $recordsProcessed = 0): string {
+		return sprintf(
+			'Operation error (processed %d records): %s',
+			$recordsProcessed,
+			$originalError
+		);
+	}
+
+	/**
+	 * Enhance error with operation context if not already enhanced
+	 *
+	 * @param ManticoreSearchClientError $e
+	 * @return ManticoreSearchClientError
+	 */
+	private function enhanceError(ManticoreSearchClientError $e): ManticoreSearchClientError {
+		if (stripos($e->getMessage(), 'processed') !== false) {
+			return $e;
+		}
+
+		$errorMsg = $e->getMessage() ?: $e->getResponseError();
+		$contextualError = new ManticoreSearchClientError(
+			$this->buildErrorContext($errorMsg, $this->recordsProcessedBeforeError)
+		);
+		$contextualError->setResponseError($contextualError->getMessage());
+		return $contextualError;
 	}
 }

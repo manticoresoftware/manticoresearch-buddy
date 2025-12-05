@@ -380,11 +380,15 @@ final class BatchProcessor {
 
 		foreach ($batch as $rowIndex => $row) {
 			try {
-				// Row values are already indexed, just convert to SQL format
+				// Row values are already processed by morphValuesByFieldType:
+				// - String/text fields already include surrounding quotes and proper escaping
+				// - Numeric fields are plain numbers
+				// - NULL values are 'NULL' string
+				// - MVA fields include parentheses like (1,2,3)
+				// Use values directly without additional wrapping
 				$rowValues = [];
 				foreach ($row as $value) {
-					// Value is already type-converted by processRow
-					$rowValues[] = is_string($value) ? "'$value'" : ($value === null ? 'NULL' : $value);
+					$rowValues[] = ($value === null ? 'NULL' : $value);
 				}
 				$values[] = '(' . implode(',', $rowValues) . ')';
 				$valueCount++;
