@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ReplaceSelect;
 
+use Exception;
 use Manticoresearch\Buddy\Base\Plugin\Queue\StringFunctionsTrait;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
@@ -41,6 +42,8 @@ final class BatchProcessor {
 	private float $processingStartTime;
 	/** @var array<int,array<string,mixed>> */
 	private array $statistics = [];
+	/** Base query template with LIMIT/OFFSET removed, parsed once during construction */
+	private string $baseQueryTemplate;
 
 	/**
 	 * Constructor
@@ -48,13 +51,21 @@ final class BatchProcessor {
 	 * @param Client $client
 	 * @param Payload $payload
 	 * @param array<int,FieldInfo> $targetFieldsOrdered Position-based fields from DESC
+	 * @param int $batchSize
+	 * @throws ManticoreSearchClientError
 	 */
-	public function __construct(Client $client, Payload $payload, array $targetFieldsOrdered) {
+	public function __construct(
+		Client $client,
+		Payload $payload,
+		array $targetFieldsOrdered,
+		int $batchSize
+	) {
 		$this->client = $client;
 		$this->payload = $payload;
 		$this->targetFieldsOrdered = $targetFieldsOrdered;
-		$this->batchSize = Config::getBatchSize();
 		$this->processingStartTime = microtime(true);
+		$this->batchSize = $batchSize;
+		$this->baseQueryTemplate = $this->prepareBaseQueryTemplate();
 	}
 
 	/**
@@ -62,10 +73,9 @@ final class BatchProcessor {
 	 *
 	 * @return int Total number of records processed
 	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
 	 */
 	public function execute(): int {
-		$this->logBatchStart();
-
 		$batchSize = $this->batchSize;
 		$consecutiveEmptyBatches = 0;
 		$maxEmptyBatches = 3;
@@ -78,65 +88,33 @@ final class BatchProcessor {
 			}
 
 			$batchStartTime = microtime(true);
-			$baseQuery = $this->prepareBaseQuery();
 			$currentBatchSize = $this->calculateCurrentBatchSize(
 				$batchSize,
 				$this->totalProcessed,
 				$userLimit
 			);
 
-			$batchQuery = "{$baseQuery} LIMIT {$currentBatchSize} OFFSET {$offset}";
-			Buddy::debug("Fetching batch at offset $offset with limit $currentBatchSize");
-			Buddy::debug("Batch query: $batchQuery");
+			$batchQuery = "{$this->baseQueryTemplate} LIMIT $currentBatchSize OFFSET $offset";
 
-			try {
-				$batch = $this->fetchBatch($batchQuery);
+			$batch = $this->fetchBatch($batchQuery);
 
-				if (empty($batch)) {
-					if ($this->handleEmptyBatch($consecutiveEmptyBatches, $maxEmptyBatches)) {
-						break;
-					}
-				} else {
-					$this->handleNonEmptyBatch($batch, $batchStartTime, $consecutiveEmptyBatches);
-
-					if ($this->hasReachedUserLimit($userLimit)) {
-						break;
-					}
+			if (empty($batch)) {
+				if ($this->handleEmptyBatch($consecutiveEmptyBatches, $maxEmptyBatches)) {
+					break;
 				}
+			} else {
+				$this->handleNonEmptyBatch($batch, $batchStartTime, $consecutiveEmptyBatches);
 
-				$offset += $currentBatchSize;
-			} catch (\Exception $e) {
-				$errorMsg = 'Batch processing failed: ' . $e->getMessage();
-				Buddy::debug("Batch processing error: $errorMsg");
-				throw new ManticoreSearchClientError($errorMsg);
+				if ($this->hasReachedUserLimit($userLimit)) {
+					break;
+				}
 			}
+
+			$offset += $currentBatchSize;
 		} while (sizeof($batch) === $batchSize);
 
 		$this->logProcessingStatistics();
 		return $this->totalProcessed;
-	}
-
-	/**
-	 * Log batch processing initialization info
-	 *
-	 * @return void
-	 */
-	private function logBatchStart(): void {
-		$batchSize = $this->batchSize;
-		$userLimit = $this->payload->selectLimit;
-		$userOffset = $this->payload->selectOffset ?? 0;
-
-		Buddy::debug("Starting batch processing with size: $batchSize");
-
-		if ($userLimit !== null) {
-			Buddy::debug("SELECT LIMIT detected: processing max {$userLimit} records");
-		}
-
-		if ($userOffset <= 0) {
-			return;
-		}
-
-		Buddy::debug("SELECT OFFSET detected: starting from offset {$userOffset}");
 	}
 
 	/**
@@ -151,7 +129,7 @@ final class BatchProcessor {
 		}
 
 		if ($this->totalProcessed >= $userLimit) {
-			Buddy::debug("User LIMIT reached ({$userLimit}), stopping batch processing");
+			Buddy::debug("User LIMIT reached ($userLimit), stopping batch processing");
 			return true;
 		}
 
@@ -159,12 +137,13 @@ final class BatchProcessor {
 	}
 
 	/**
-	 * Prepare base query by removing existing LIMIT/OFFSET clauses
+	 * Prepare base query template by removing existing LIMIT/OFFSET clauses
+	 * This is called once during construction to avoid repeated regex parsing
 	 *
-	 * @return string Clean base query
+	 * @return string Clean base query template
 	 * @throws ManticoreSearchClientError
 	 */
-	private function prepareBaseQuery(): string {
+	private function prepareBaseQueryTemplate(): string {
 		$baseQuery = $this->payload->selectQuery;
 		$result = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $baseQuery);
 
@@ -196,9 +175,7 @@ final class BatchProcessor {
 			return $currentBatchSize;
 		}
 
-		$adjustedSize = max(0, $userLimit - $processed);
-		Buddy::debug("Adjusting batch size to {$adjustedSize} to respect user LIMIT");
-		return $adjustedSize;
+		return max(0, $userLimit - $processed);
 	}
 
 	/**
@@ -211,12 +188,10 @@ final class BatchProcessor {
 	 * @throws ManticoreSearchResponseError
 	 */
 	private function fetchBatch(string $query): array {
-		Buddy::debug('Executing batch SELECT query');
 		$result = $this->client->sendRequest($query);
 
 		if ($result->hasError()) {
 			$errorMsg = 'SELECT query failed: ' . $result->getError();
-			Buddy::debug("Batch SELECT error: $errorMsg");
 			throw ManticoreSearchClientError::create($errorMsg);
 		}
 
@@ -224,9 +199,8 @@ final class BatchProcessor {
 		$data = $result->getResult()->toArray();
 
 		// Validate data structure
-		if (!is_array($data) || !isset($data[0])) {
+		if (!isset($data[0])) {
 			$errorMsg = 'Invalid query response format';
-			Buddy::debug("Batch SELECT error: $errorMsg");
 			throw ManticoreSearchClientError::create($errorMsg);
 		}
 
@@ -235,20 +209,16 @@ final class BatchProcessor {
 
 		// Try wrapped format first (standard Manticore response)
 		if (isset($firstElement['data']) && is_array($firstElement['data'])) {
-			$batchData = $firstElement['data'];
-			Buddy::debug('Batch SELECT returned ' . sizeof($batchData) . ' records (wrapped format)');
-			return $batchData;
+			return $firstElement['data'];
 		}
 
 		// Try unwrapped format (data rows directly)
 		if (!isset($firstElement['error']) && !isset($firstElement['data'])
 			&& !isset($firstElement['columns'])) {
-			Buddy::debug('Batch SELECT returned ' . sizeof($data) . ' records (unwrapped format)');
 			return $data;
 		}
 
 		$errorMsg = 'Invalid query response structure';
-		Buddy::debug("Batch SELECT error: $errorMsg. Response: " . json_encode($data));
 		throw ManticoreSearchClientError::create($errorMsg);
 	}
 
@@ -261,14 +231,7 @@ final class BatchProcessor {
 	 */
 	private function handleEmptyBatch(int &$consecutiveEmptyBatches, int $maxEmptyBatches): bool {
 		$consecutiveEmptyBatches++;
-		Buddy::debug("Batch is empty. Consecutive empty batches: $consecutiveEmptyBatches");
-
-		if ($this->shouldStopProcessing($consecutiveEmptyBatches, $maxEmptyBatches)) {
-			Buddy::debug('Stopping batch processing due to empty batches');
-			return true;
-		}
-
-		return false;
+		return $this->shouldStopProcessing($consecutiveEmptyBatches, $maxEmptyBatches);
 	}
 
 	/**
@@ -280,7 +243,6 @@ final class BatchProcessor {
 	 */
 	private function shouldStopProcessing(int $consecutiveEmptyBatches, int $maxEmptyBatches): bool {
 		if ($consecutiveEmptyBatches >= $maxEmptyBatches) {
-			Buddy::debug("Stopping after $consecutiveEmptyBatches consecutive empty batches");
 			return true;
 		}
 		return false;
@@ -300,7 +262,6 @@ final class BatchProcessor {
 		float $batchStartTime,
 		int &$consecutiveEmptyBatches
 	): void {
-		Buddy::debug('Batch has ' . sizeof($batch) . ' records');
 		$consecutiveEmptyBatches = 0;
 		$this->processBatch($batch);
 		$this->recordBatchStatistics($batch, $batchStartTime);
@@ -372,7 +333,7 @@ final class BatchProcessor {
 
 		$expectedCount = sizeof($columnList);
 		if (sizeof($values) !== $expectedCount) {
-			throw new ManticoreSearchClientError(
+			throw ManticoreSearchClientError::create(
 				'Column count mismatch: row has ' . sizeof($values) . ' values but expected ' . $expectedCount
 			);
 		}
@@ -427,7 +388,7 @@ final class BatchProcessor {
 		array &$processed
 	): void {
 		if (!isset($columnToFieldMap[$columnName])) {
-			throw new ManticoreSearchClientError(
+			throw ManticoreSearchClientError::create(
 				"Column '$columnName' does not exist in target table"
 			);
 		}
@@ -447,11 +408,8 @@ final class BatchProcessor {
 		$this->validateFieldType($fieldType);
 
 		try {
-			Buddy::debug(
-				"Processing column '$columnName' at position $targetPosition with type '$fieldType'"
-			);
 			$processed[$targetPosition] = $this->morphValuesByFieldType($value, $fieldType);
-		} catch (\Exception $e) {
+		} catch (Exception $e) {
 			$this->throwFieldProcessingError($columnName, $e);
 		}
 	}
@@ -460,18 +418,25 @@ final class BatchProcessor {
 	 * Validate that field type is a string
 	 *
 	 * @param mixed $fieldType
-	 * @param string $fieldName
-	 * @param int $position
+	 * @param string|null $fieldName
+	 * @param int|null $position
+	 *
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	private function validateFieldType(mixed $fieldType): void {
+	private function validateFieldType(mixed $fieldType, ?string $fieldName = null, ?int $position = null): void {
 		if (is_string($fieldType)) {
 			return;
 		}
 
-		throw new ManticoreSearchClientError(
-			'Invalid target table structure'
+		$errorContext = $fieldName !== null
+			? ($position !== null
+				? "at column '$fieldName' (position $position)"
+				: "for column '$fieldName'")
+			: '';
+
+		throw ManticoreSearchClientError::create(
+			"Invalid target table structure $errorContext"
 		);
 	}
 
@@ -479,19 +444,16 @@ final class BatchProcessor {
 	 * Throw field processing error with context
 	 *
 	 * @param string $fieldName
-	 * @param int $position
-	 * @param mixed $value
-	 * @param \Exception $e
+	 * @param Exception $e
 	 * @return never
 	 * @throws ManticoreSearchClientError
 	 */
 	private function throwFieldProcessingError(
 		string $fieldName,
-		\Exception $e
+		Exception $e
 	): never {
 		$errorMsg = "Invalid data in column '$fieldName': " . $e->getMessage();
-		Buddy::debug("Field processing error: $errorMsg");
-		throw new ManticoreSearchClientError($errorMsg);
+		throw ManticoreSearchClientError::create($errorMsg);
 	}
 
 	/**
@@ -505,7 +467,7 @@ final class BatchProcessor {
 		// Validate field count
 		if (sizeof($values) !== sizeof($this->targetFieldsOrdered)) {
 			$targetCount = sizeof($this->targetFieldsOrdered);
-			throw new ManticoreSearchClientError(
+			throw ManticoreSearchClientError::create(
 				'Column count mismatch: row has ' . sizeof($values) . " values but target has $targetCount"
 			);
 		}
@@ -518,7 +480,7 @@ final class BatchProcessor {
 
 		// Ensure ID field is present (must be at position 0)
 		if (!isset($processed[0])) {
-			throw new ManticoreSearchClientError(
+			throw ManticoreSearchClientError::create(
 				"Missing 'id' column in data"
 			);
 		}
@@ -547,9 +509,8 @@ final class BatchProcessor {
 
 			$this->validateFieldType($fieldType, $fieldName, $index);
 
-			Buddy::debug("Processing position $index ('$fieldName') with type '$fieldType'");
 			$processed[$index] = $this->morphValuesByFieldType($value, $fieldType);
-		} catch (\Exception $e) {
+		} catch (Exception $e) {
 			$fieldInfo = $this->targetFieldsOrdered[$index] ?? [];
 			$fieldName = is_string($fieldInfo['name'] ?? null) ? $fieldInfo['name'] : "position_$index";
 			$this->throwFieldProcessingError($fieldName, $e);
@@ -571,13 +532,11 @@ final class BatchProcessor {
 	 */
 	private function executeReplaceBatch(array $batch): void {
 		if (empty($batch)) {
-			Buddy::debug('Empty batch, skipping REPLACE execution');
 			return;
 		}
 
 		// Determine columns for REPLACE statement
 		$columns = $this->determineReplaceColumns();
-		Buddy::debug('Building REPLACE for ' . sizeof($batch) . ' rows');
 
 		// Build VALUES clause
 		$valuesData = $this->buildValuesClause($batch, $columns['columnPositions']);
@@ -585,19 +544,20 @@ final class BatchProcessor {
 		// Build and execute SQL
 		$targetTable = $this->payload->getTargetTableWithCluster();
 		$sql = sprintf(
-			'REPLACE INTO %s (%s) VALUES %s',
+			/** @lang manticore*/            'REPLACE INTO %s (%s) VALUES %s',
 			$targetTable,
 			implode(',', $columns['columnNames']),
 			implode(',', $valuesData['values'])
 		);
 
-		$this->executeReplaceQuery($sql, $valuesData['count']);
+		$this->executeReplaceQuery($sql);
 	}
 
 	/**
 	 * Determine columns and positions for REPLACE statement
 	 *
 	 * @return array{columnNames: array<int,string>, columnPositions: array<int,int>|null}
+	 * @throws ManticoreSearchClientError
 	 */
 	private function determineReplaceColumns(): array {
 		if ($this->payload->replaceColumnList !== null) {
@@ -639,10 +599,6 @@ final class BatchProcessor {
 			$columnList
 		);
 
-		Buddy::debug(
-			'Building REPLACE statement with column list: ' . implode(',', $columnList)
-		);
-
 		return [
 			'columnNames' => $columnList,
 			'columnPositions' => $columnPositions,
@@ -665,10 +621,6 @@ final class BatchProcessor {
 			}
 			$columnNames[] = $fieldInfo['name'];
 		}
-
-		Buddy::debug(
-			'Building REPLACE statement with ' . sizeof($columnNames) . ' fields'
-		);
 
 		return [
 			'columnNames' => $columnNames,
@@ -693,8 +645,8 @@ final class BatchProcessor {
 				$rowValues = $this->extractRowValues($row, $columnPositions);
 				$values[] = '(' . implode(',', $rowValues) . ')';
 				$valueCount++;
-			} catch (\Exception $e) {
-				throw new ManticoreSearchClientError(
+			} catch (Exception $e) {
+				throw ManticoreSearchClientError::create(
 					'Failed to format data for REPLACE: ' . $e->getMessage()
 				);
 			}
@@ -779,25 +731,17 @@ final class BatchProcessor {
 	 * Execute REPLACE query and handle errors
 	 *
 	 * @param string $sql
-	 * @param int $valueCount
+	 *
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	private function executeReplaceQuery(string $sql, int $valueCount): void {
-		Buddy::debug(
-			"Executing REPLACE with $valueCount rows. SQL preview: "
-			. substr($sql, 0, 200) . '...'
-		);
-
+	private function executeReplaceQuery(string $sql): void {
 		$result = $this->client->sendRequest($sql);
 
 		if ($result->hasError()) {
 			$errorMsg = 'Data insert failed: ' . $result->getError();
-			Buddy::debug("REPLACE execution error: $errorMsg");
 			throw ManticoreSearchClientError::create($errorMsg);
 		}
-
-		Buddy::debug("REPLACE batch execution successful for $valueCount rows");
 	}
 
 	/**
@@ -837,7 +781,6 @@ final class BatchProcessor {
 	 */
 	private function logProcessingStatistics(): void {
 		if (empty($this->statistics)) {
-			Buddy::debug('No batches processed - no statistics to log');
 			return;
 		}
 

@@ -261,19 +261,15 @@ class ReplaceSelectPayloadTest extends TestCase {
 		// Create new payload to pick up new environment values
 		Payload::fromRequest($request);
 
-		// The Config::getBatchSize() uses max(1, min(batchSize, maxBatchSize))
-		// So 200 gets clamped to 100, which is valid. We need to test a different scenario.
-
-		// Test with negative batch size (will be clamped to 1, which is valid)
-		$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = -10;
-		$negativePayload = Payload::fromRequest($request);
-		$negativePayload->validate(); // Should not throw because -10 gets clamped to 1
-
-		// Test with zero max batch size (edge case)
-		$_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] = 0;
-		$zeroMaxPayload = Payload::fromRequest($request);
 
 		$this->expectException(GenericError::class);
+
+		$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = -10;
+		$negativePayload = Payload::fromRequest($request);
+		$negativePayload->validate();
+
+		$_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] = 0;
+		$zeroMaxPayload = Payload::fromRequest($request);
 		$zeroMaxPayload->validate();
 
 		// Restore original environment

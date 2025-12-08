@@ -20,6 +20,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use PHPUnit\Framework\MockObject\MockObject;
 use ReflectionClass;
 
 /**
@@ -30,36 +31,11 @@ trait ReplaceSelectTestTrait {
 	/**
 	 * Create a mock ManticoreSearch client
 	 *
-	 * @return Client&\PHPUnit\Framework\MockObject\MockObject
+	 * @return Client&MockObject
 	 */
 	private function createMockClient(): Client {
 		return $this->createMock(Client::class);
 	}
-
-	/**
-	 * Create a mock response
-	 *
-	 * @param array<int,array<string,mixed>>|null $data
-	 * @return Response&\PHPUnit\Framework\MockObject\MockObject
-	 */
-	private function createMockResponse(bool $success = true, ?array $data = null, ?string $error = null): Response {
-		$response = $this->createMock(Response::class);
-		$response->method('hasError')->willReturn(!$success);
-
-		if ($error) {
-			$response->method('getError')->willReturn($error);
-			$response->method('getResult')->willReturn(Struct::fromData([]));
-		}
-
-		if ($data !== null) {
-			$response->method('getResult')->willReturn(
-				Struct::fromData([['data' => $data]])
-			);
-		}
-
-		return $response;
-	}
-
 
 	/**
 	 * Create a mock response for table operations (DESC, SHOW, etc.)
@@ -80,6 +56,30 @@ trait ReplaceSelectTestTrait {
 		return $response;
 	}
 
+	/**
+	 * Create a mock response
+	 *
+	 * @param array<int,array<string,mixed>>|null $data
+	 *
+	 * @return Response&MockObject
+	 */
+	private function createMockResponse(bool $success = true, ?array $data = null, ?string $error = null): Response {
+		$response = $this->createMock(Response::class);
+		$response->method('hasError')->willReturn(!$success);
+
+		if ($error) {
+			$response->method('getError')->willReturn($error);
+			$response->method('getResult')->willReturn(Struct::fromData([]));
+		}
+
+		if ($data !== null) {
+			$response->method('getResult')->willReturn(
+				Struct::fromData([['data' => $data]])
+			);
+		}
+
+		return $response;
+	}
 
 	/**
 	 * Create an error response
@@ -159,7 +159,7 @@ trait ReplaceSelectTestTrait {
 			['name' => 'title', 'type' => 'text', 'properties' => 'stored'],
 			['name' => 'price', 'type' => 'float', 'properties' => ''],
 			['name' => 'is_active', 'type' => 'bool', 'properties' => ''],
-			['name' => 'count_value', 'type' => 'int', 'properties' => ''],
+			['name' => 'count_value', 'type' => 'uint', 'properties' => ''],
 			['name' => 'tags', 'type' => 'text', 'properties' => 'stored'],
 			['name' => 'mva_tags', 'type' => 'multi', 'properties' => ''],
 			['name' => 'json_data', 'type' => 'text', 'properties' => 'stored'],

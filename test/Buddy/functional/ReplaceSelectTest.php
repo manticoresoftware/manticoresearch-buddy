@@ -17,6 +17,28 @@ class ReplaceSelectTest extends TestCase {
 
 	use TestFunctionalTrait;
 
+	public function testBasicReplaceSelectAll(): void {
+		echo "\n=== TEST: Basic REPLACE SELECT (SELECT *) ===\n";
+		$this->setupTestTables();
+
+		try {
+			// Execute REPLACE SELECT
+			static::runSqlQuery('REPLACE INTO test_replace_tgt SELECT * FROM test_replace_src');
+
+			// Verify all 10 records copied
+			$count = static::runSqlQuery('SELECT COUNT(*) as cnt FROM test_replace_tgt');
+			$this->assertStringContainsString('10', implode($count));
+
+			// Verify data integrity
+			$data = static::runSqlQuery('SELECT id, title FROM test_replace_tgt WHERE id = 1');
+			$this->assertStringContainsString('Product A', implode($data));
+
+			echo "✓ All 10 records successfully copied\n";
+		} finally {
+			$this->cleanupTestTables();
+		}
+	}
+
 	/**
 	 * Setup test tables with comprehensive data
 	 */
@@ -99,35 +121,13 @@ class ReplaceSelectTest extends TestCase {
 		);
 	}
 
-	private function cleanupTestTables(): void {
-		static::runSqlQuery('DROP TABLE IF EXISTS test_replace_src');
-		static::runSqlQuery('DROP TABLE IF EXISTS test_replace_tgt');
-	}
-
 	// ========================================================================
 	// Category 1: Basic Operations
 	// ========================================================================
 
-	public function testBasicReplaceSelectAll(): void {
-		echo "\n=== TEST: Basic REPLACE SELECT (SELECT *) ===\n";
-		$this->setupTestTables();
-
-		try {
-			// Execute REPLACE SELECT
-			static::runSqlQuery('REPLACE INTO test_replace_tgt SELECT * FROM test_replace_src');
-
-			// Verify all 10 records copied
-			$count = static::runSqlQuery('SELECT COUNT(*) as cnt FROM test_replace_tgt');
-			$this->assertStringContainsString('10', implode($count));
-
-			// Verify data integrity
-			$data = static::runSqlQuery('SELECT id, title FROM test_replace_tgt WHERE id = 1');
-			$this->assertStringContainsString('Product A', implode($data));
-
-			echo "✓ All 10 records successfully copied\n";
-		} finally {
-			$this->cleanupTestTables();
-		}
+	private function cleanupTestTables(): void {
+		static::runSqlQuery('DROP TABLE IF EXISTS test_replace_src');
+		static::runSqlQuery('DROP TABLE IF EXISTS test_replace_tgt');
 	}
 
 	public function testReplaceSelectWithColumnList(): void {

@@ -83,6 +83,12 @@ trait StringFunctionsTrait {
 			throw BuddyRequestError::create("Error or JSON parsing for attr $fieldType");
 		}
 
+		// Handle empty strings for unsigned integer types
+		// UINT cannot safely convert empty strings, so return empty string
+		if ($fieldValue === '' && $fieldType === 'uint') {
+			return '';
+		}
+
 		return match ($fieldType) {
 			Fields::TYPE_INT, Fields::TYPE_BIGINT => (int)$fieldValue,
 			Fields::TYPE_TIMESTAMP => is_numeric($fieldValue)
@@ -94,6 +100,7 @@ trait StringFunctionsTrait {
 				"'" . $this->escapeSting($fieldValue) . "'",
 			Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
 				'(' . $this->prepareMvaField($fieldValue) . ')',
+			'uint' => (int)$fieldValue,
 			default => $this->escapeSting($fieldValue)
 		};
 	}

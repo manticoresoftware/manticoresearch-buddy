@@ -21,44 +21,6 @@ class FieldValidatorTest extends TestCase {
 	use TestProtectedTrait;
 	use ReplaceSelectTestTrait;
 
-	/**
-	 * Create a mock response for table schema (DESC command)
-	 *
-	 * @param array<int,array{Field: string, Type: string, Properties: string}>|null $fields
-	 */
-	private function createTableSchemaResponse(array $fields = null): Response {
-		$defaultFields = [
-			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
-			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-			['Field' => 'is_active', 'Type' => 'bool', 'Properties' => ''],
-			['Field' => 'tags', 'Type' => 'text', 'Properties' => 'stored'],
-			['Field' => 'mva_tags', 'Type' => 'multi', 'Properties' => ''],
-		];
-
-		return $this->createMockResponse(true, $fields ?? $defaultFields);
-	}
-
-	/**
-	 * Create a mock response for SELECT queries
-	 *
-	 * @param array<int,array<string,mixed>> $rows
-	 */
-	private function createSelectResponse(array $rows): Response {
-		return $this->createMockResponse(true, $rows);
-	}
-
-	private function createErrorResponse(string $errorMessage): Response {
-		return $this->createMockResponse(false, null, $errorMessage);
-	}
-
-
-
-
-	// ========================================================================
-	// Successful Validation Tests
-	// ========================================================================
-
 	public function testValidateCompatibilitySuccess(): void {
 		echo "\nTesting successful schema compatibility validation\n";
 
@@ -107,6 +69,40 @@ class FieldValidatorTest extends TestCase {
 		$this->assertEquals('float', $targetFields[2]['type']);
 	}
 
+	/**
+	 * Create a mock response for table schema (DESC command)
+	 *
+	 * @param array<int,array{Field: string, Type: string, Properties: string}>|null $fields
+	 */
+	private function createTableSchemaResponse(array $fields = null): Response {
+		$defaultFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+			['Field' => 'is_active', 'Type' => 'bool', 'Properties' => ''],
+			['Field' => 'tags', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'mva_tags', 'Type' => 'multi', 'Properties' => ''],
+		];
+
+		return $this->createMockResponse(true, $fields ?? $defaultFields);
+	}
+
+	/**
+	 * Create a mock response for SELECT queries
+	 *
+	 * @param array<int,array<string,mixed>> $rows
+	 */
+	private function createSelectResponse(array $rows): Response {
+		return $this->createMockResponse(true, $rows);
+	}
+
+
+
+
+	// ========================================================================
+	// Successful Validation Tests
+	// ========================================================================
+
 	public function testValidateCompatibilityWithAllFieldTypes(): void {
 		echo "\nTesting schema validation with all supported field types\n";
 
@@ -144,6 +140,10 @@ class FieldValidatorTest extends TestCase {
 		);
 
 		$this->assertTrue(true); // Test passes if no exception thrown
+	}
+
+	private function createErrorResponse(string $errorMessage): Response {
+		return $this->createMockResponse(false, null, $errorMessage);
 	}
 
 	// ========================================================================
@@ -344,95 +344,6 @@ class FieldValidatorTest extends TestCase {
 		);
 
 		$this->assertTrue(true);
-	}
-
-	// ========================================================================
-	// Type Compatibility Tests
-	// ========================================================================
-
-	public function testIsTypeCompatibleIntegerTypes(): void {
-		echo "\nTesting type compatibility for integer types\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		// Use reflection to test protected method
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [42, 'int']);
-		$this->assertTrue($isCompatible);
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [42, 'bigint']);
-		$this->assertTrue($isCompatible);
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', ['42', 'int']);
-		$this->assertTrue($isCompatible); // String numeric should work
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', ['not_a_number', 'int']);
-		$this->assertFalse($isCompatible);
-	}
-
-	public function testIsTypeCompatibleFloatTypes(): void {
-		echo "\nTesting type compatibility for float types\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [99.99, 'float']);
-		$this->assertTrue($isCompatible);
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [42, 'float']);
-		$this->assertTrue($isCompatible); // Integer to float should work
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', ['99.99', 'float']);
-		$this->assertTrue($isCompatible); // String numeric should work
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', ['not_a_number', 'float']);
-		$this->assertFalse($isCompatible);
-	}
-
-	public function testIsTypeCompatibleTextTypes(): void {
-		echo "\nTesting type compatibility for text types\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', ['hello', 'text']);
-		$this->assertTrue($isCompatible);
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [123, 'text']);
-		$this->assertTrue($isCompatible); // Most types can be converted to text
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [true, 'string']);
-		$this->assertTrue($isCompatible);
-	}
-
-	public function testIsTypeCompatibleBoolTypes(): void {
-		echo "\nTesting type compatibility for boolean types\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [true, 'bool']);
-		$this->assertTrue($isCompatible);
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [1, 'bool']);
-		$this->assertTrue($isCompatible);
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', ['true', 'bool']);
-		$this->assertTrue($isCompatible);
-	}
-
-	public function testIsTypeCompatibleMvaTypes(): void {
-		echo "\nTesting type compatibility for multi-value array types\n";
-
-		$validator = new FieldValidator($this->createMockClient());
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [[1, 2, 3], 'mva']);
-		$this->assertTrue($isCompatible);
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', ['1,2,3', 'mva']);
-		$this->assertTrue($isCompatible); // Comma-separated string should work
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', [[1, 2, 3], 'mva64']);
-		$this->assertTrue($isCompatible);
-
-		$isCompatible = self::invokeMethod($validator, 'isTypeCompatible', ['no_commas', 'mva']);
-		$this->assertFalse($isCompatible);
 	}
 
 	// ========================================================================

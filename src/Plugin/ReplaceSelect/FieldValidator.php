@@ -14,7 +14,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\ReplaceSelect;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Field compatibility validator for REPLACE SELECT operations
@@ -65,7 +64,6 @@ final class FieldValidator {
 		?array $replaceColumnList = null
 	): void {
 		// 1. Check GROUP BY clause - not supported
-		Buddy::debug('Checking for GROUP BY clause');
 		if ($this->hasGroupByClause($selectQuery)) {
 			throw ManticoreSearchClientError::create(
 				'GROUP BY is not supported in REPLACE SELECT'
@@ -73,19 +71,14 @@ final class FieldValidator {
 		}
 
 		// 2. Validate source and target tables are different
-		Buddy::debug('Validating source and target tables are different');
 		$this->validateSourceAndTargetAreDifferent($selectQuery, $targetTable);
-		Buddy::debug('Validation passed: source and target tables are different');
 
 		// 3. Load target table schema in DESC order
-		Buddy::debug("Loading schema for target table: $targetTable");
 		$this->loadTargetFieldsOrdered($targetTable);
 		$targetCount = sizeof($this->targetFieldsOrdered);
-		Buddy::debug("Target table schema loaded. Fields count: $targetCount");
 
 		// 4. Handle column list if provided
-		if ($replaceColumnList !== null && !empty($replaceColumnList)) {
-			Buddy::debug('Column list specified: ' . implode(', ', $replaceColumnList));
+		if (!empty($replaceColumnList)) {
 			$this->validateReplaceColumnList($replaceColumnList);
 			// When column list is provided, we only need to match those columns
 			// The validation will happen per column
@@ -96,15 +89,21 @@ final class FieldValidator {
 
 		if ($isSelectStar) {
 			// SELECT * - use name-based matching
-			Buddy::debug('Detected SELECT * - using name-based field matching');
 			$this->validateSelectStarQuery($selectQuery, $replaceColumnList);
 		} else {
 			// Explicit field list - use position-based matching
-			Buddy::debug('Detected explicit field list - using position-based field matching');
 			$this->validateExplicitSelectQuery($selectQuery, $targetCount, $replaceColumnList);
 		}
+	}
 
-		$this->logValidationResults([]);
+	/**
+	 * Check if SELECT query contains GROUP BY clause
+	 *
+	 * @param string $selectQuery
+	 * @return bool
+	 */
+	private function hasGroupByClause(string $selectQuery): bool {
+		return (bool)preg_match('/\s+GROUP\s+BY\s+/i', $selectQuery);
 	}
 
 	/**
@@ -127,11 +126,6 @@ final class FieldValidator {
 		$sourceTableNormalized = $this->stripClusterPrefix($sourceTable);
 		$targetTableNormalized = $this->stripClusterPrefix($targetTable);
 
-		Buddy::debug(
-			"Source table normalized: $sourceTableNormalized, "
-			. "Target table normalized: $targetTableNormalized"
-		);
-
 		// Validate source and target are different
 		if ($sourceTableNormalized !== $targetTableNormalized) {
 			return;
@@ -140,20 +134,6 @@ final class FieldValidator {
 		throw ManticoreSearchClientError::create(
 			'Source and target tables must be different'
 		);
-	}
-
-	/**
-	 * Strip cluster prefix from table name
-	 * Converts "cluster:table" to "table", or returns "table" unchanged
-	 *
-	 * @param string $tableName
-	 * @return string Table name without cluster prefix
-	 */
-	private function stripClusterPrefix(string $tableName): string {
-		if (preg_match('/^[\w]+:([\w]+)$/', $tableName, $matches)) {
-			return $matches[1];
-		}
-		return $tableName;
 	}
 
 	/**
@@ -170,6 +150,64 @@ final class FieldValidator {
 			);
 		}
 		return $matches[1];
+	}
+
+	/**
+	 * Strip cluster prefix from table name
+	 * Converts "cluster:table" to "table", or returns "table" unchanged
+	 *
+	 * @param string $tableName
+	 * @return string Table name without cluster prefix
+	 */
+	private function stripClusterPrefix(string $tableName): string {
+		if (preg_match('/^\w+:(\w+)$/', $tableName, $matches)) {
+			return $matches[1];
+		}
+		return $tableName;
+	}
+
+	/**
+	 * Load target table field information in DESC order
+	 *
+	 * Loads and structures field information into FieldInfo array format
+	 * for type-safe access throughout the validator.
+	 *
+	 * @param string $tableName
+	 *
+	 * @return void
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
+	 */
+	private function loadTargetFieldsOrdered(string $tableName): void {
+		$descResult = $this->client->sendRequest("DESC $tableName");
+
+		if ($descResult->hasError()) {
+			throw ManticoreSearchClientError::create(
+				"Target table '$tableName' does not exist"
+			);
+		}
+
+		$this->targetFieldsOrdered = [];
+		$result = $descResult->getResult()->toArray();
+
+		if (!is_array($result[0]) || !isset($result[0]['data'])) {
+			throw ManticoreSearchClientError::create("Failed to read target table '$tableName' structure");
+		}
+
+		$position = 0;
+		foreach ($result[0]['data'] as $field) {
+			if (!is_array($field) || !isset($field['Field'], $field['Type'], $field['Properties'])) {
+				continue;
+			}
+
+			$fieldName = (string)$field['Field'];
+			$fieldType = (string)$field['Type'];
+			$this->targetFieldsOrdered[$position] = [
+				'name' => $fieldName,
+				'type' => $fieldType,
+				'properties' => (string)$field['Properties'],
+			];
+			$position++;
+		}
 	}
 
 	/**
@@ -191,8 +229,6 @@ final class FieldValidator {
 				);
 			}
 		}
-
-		Buddy::debug('Column list validation passed');
 	}
 
 	/**
@@ -211,8 +247,9 @@ final class FieldValidator {
 	 *
 	 * @param string $selectQuery
 	 * @param array<int,string>|null $replaceColumnList Optional column list from REPLACE INTO
+	 *
 	 * @return void
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	private function validateSelectStarQuery(
 		string $selectQuery,
@@ -220,7 +257,6 @@ final class FieldValidator {
 	): void {
 		// Extract source table name from query
 		$sourceTable = $this->extractSourceTableName($selectQuery);
-		Buddy::debug("Source table detected: $sourceTable");
 
 		// Load source table fields
 		$sourceFields = $this->loadSourceTableFields($sourceTable);
@@ -248,11 +284,11 @@ final class FieldValidator {
 	 * Load source table field information
 	 *
 	 * @param string $sourceTable
+	 *
 	 * @return array<string,array<string,mixed>> Source fields keyed by name
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	private function loadSourceTableFields(string $sourceTable): array {
-		Buddy::debug("Loading schema for source table: $sourceTable");
 		$sourceFields = [];
 		$descResult = $this->client->sendRequest("DESC $sourceTable");
 
@@ -263,7 +299,7 @@ final class FieldValidator {
 		}
 
 		$result = $descResult->getResult()->toArray();
-		if (!is_array($result) || empty($result) || !is_array($result[0])) {
+		if (empty($result) || !is_array($result[0])) {
 			throw ManticoreSearchClientError::create(
 				"Failed to read source table '$sourceTable' structure"
 			);
@@ -303,7 +339,6 @@ final class FieldValidator {
 		?array $replaceColumnList
 	): void {
 		$targetCount = sizeof($this->targetFieldsOrdered);
-		Buddy::debug("Source table has $sourceCount fields, target has $targetCount fields");
 
 		if ($replaceColumnList !== null) {
 			return;
@@ -330,8 +365,6 @@ final class FieldValidator {
 			return $this->targetFieldsOrdered;
 		}
 
-		// When column list is specified, validate only those columns
-		Buddy::debug('Validating only specified columns: ' . implode(', ', $replaceColumnList));
 		$fieldsToValidate = [];
 		foreach ($replaceColumnList as $colName) {
 			// Find the target field with this name
@@ -347,11 +380,35 @@ final class FieldValidator {
 	}
 
 	/**
+	 * Validate 'id' field exists at position 0 in target table
+	 *
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 */
+	private function validateIdFieldAtPosition(): void {
+		if (empty($this->targetFieldsOrdered)) {
+			throw ManticoreSearchClientError::create('Target table has no columns');
+		}
+
+		$firstField = $this->targetFieldsOrdered[0];
+		if (!is_string($firstField['name'])) {
+			throw ManticoreSearchClientError::create(
+				'Invalid target table structure'
+			);
+		}
+
+		if ($firstField['name'] !== 'id') {
+			throw ManticoreSearchClientError::create(
+				"Target table must have 'id' as first column"
+			);
+		}
+	}
+
+	/**
 	 * Validate field types by name matching
 	 *
 	 * @param array<int,FieldInfo> $fieldsToValidate
 	 * @param array<string,array<string,mixed>> $sourceFields
-	 * @param string $sourceTable
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
@@ -359,7 +416,6 @@ final class FieldValidator {
 		array $fieldsToValidate,
 		array $sourceFields
 	): void {
-		Buddy::debug('Matching source fields to target by name');
 		foreach ($fieldsToValidate as $targetField) {
 			if (!is_string($targetField['name'])) {
 				throw ManticoreSearchClientError::create(
@@ -390,14 +446,12 @@ final class FieldValidator {
 				);
 			}
 
-			Buddy::debug(
-				"Field '$targetFieldName': source type=$sourceType, target type=$targetFieldType"
-			);
-
 			// Type mismatch check (both must have same type for SELECT *)
-			if ($sourceType !== $targetFieldType) {
+			if (!$this->areTypesEquivalent($sourceType, $targetFieldType)) {
+				$displaySourceType = $this->normalizeTypeForDisplay($sourceType);
+				$displayTargetType = $this->normalizeTypeForDisplay($targetFieldType);
 				throw ManticoreSearchClientError::create(
-					"Column type mismatch: '$targetFieldName' is $sourceType but target expects $targetFieldType"
+					"Column type mismatch: '$targetFieldName' is $displaySourceType but target expects $displayTargetType"
 				);
 			}
 		}
@@ -407,11 +461,11 @@ final class FieldValidator {
 	 * Verify SELECT query is valid and returns data
 	 *
 	 * @param string $selectQuery
+	 *
 	 * @return void
-	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	private function verifySelectQueryReturnsData(string $selectQuery): void {
-		Buddy::debug('Verifying SELECT * query is valid');
 		$baseQuery = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $selectQuery);
 		$testQuery = "$baseQuery LIMIT 1";
 		$result = $this->client->sendRequest($testQuery);
@@ -424,79 +478,11 @@ final class FieldValidator {
 
 		// Verify SELECT returns some data
 		$sampleData = $this->extractSampleData($result->getResult()->toArray());
-		if ($sampleData === null || empty($sampleData)) {
+		if (empty($sampleData)) {
 			throw ManticoreSearchClientError::create(
 				'Source table has no data. Add test data or use a table with existing records.'
 			);
 		}
-
-		Buddy::debug('SELECT * validation passed');
-	}
-
-	/**
-	 * Validate explicit SELECT field list with position-based matching
-	 *
-	 * @param string $selectQuery
-	 * @param int $targetCount
-	 * @param array<int,string>|null $replaceColumnList Optional column list from REPLACE INTO
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function validateExplicitSelectQuery(
-		string $selectQuery,
-		int $targetCount,
-		?array $replaceColumnList = null
-	): void {
-		// Extract field names from SELECT clause
-		$selectFieldNames = $this->extractSelectFieldNames($selectQuery);
-		$selectCount = sizeof($selectFieldNames);
-		Buddy::debug("SELECT returns $selectCount fields: " . implode(', ', $selectFieldNames));
-
-		// Validate field count matches
-		if ($replaceColumnList !== null) {
-			// When column list is specified, SELECT field count must match column list count
-			$expectedCount = sizeof($replaceColumnList);
-			if ($selectCount !== $expectedCount) {
-				throw ManticoreSearchClientError::create(
-					"Column count mismatch: SELECT returns $selectCount fields but column list has $expectedCount"
-				);
-			}
-			Buddy::debug("Field count matches column list specification: $expectedCount");
-		} else {
-			// When no column list, SELECT field count must match target table field count
-			$this->validateFieldCountMatches($selectCount, $targetCount);
-		}
-
-		// Validate 'id' field is at position 0 in target (only if not using column list)
-		if ($replaceColumnList === null) {
-			$this->validateIdFieldAtPosition();
-		}
-
-		// Execute SELECT LIMIT 1 to verify the query is valid and get sample data
-		Buddy::debug('Verifying SELECT query is valid');
-		$baseQuery = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $selectQuery);
-		$testQuery = "$baseQuery LIMIT 1";
-		$result = $this->client->sendRequest($testQuery);
-
-		if ($result->hasError()) {
-			throw ManticoreSearchClientError::create(
-				'Invalid SELECT query: ' . $result->getError()
-			);
-		}
-
-		// Verify SELECT returns some data for type validation
-		$sampleData = $this->extractSampleData($result->getResult()->toArray());
-		if ($sampleData === null || empty($sampleData)) {
-			throw ManticoreSearchClientError::create(
-				'SELECT query returns no data. Use a query that returns at least one row.'
-			);
-		}
-		Buddy::debug('SELECT query validation passed with sample data');
-
-		// Validate field type compatibility (position-based with function handling)
-		Buddy::debug('Validating field type compatibility');
-		$this->validateSelectFieldTypes($selectFieldNames);
-		Buddy::debug('Field type validation passed');
 	}
 
 	/**
@@ -534,6 +520,64 @@ final class FieldValidator {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Validate explicit SELECT field list with position-based matching
+	 *
+	 * @param string $selectQuery
+	 * @param int $targetCount
+	 * @param array<int,string>|null $replaceColumnList Optional column list from REPLACE INTO
+	 *
+	 * @return void
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
+	 */
+	private function validateExplicitSelectQuery(
+		string $selectQuery,
+		int $targetCount,
+		?array $replaceColumnList = null
+	): void {
+		// Extract field names from SELECT clause
+		$selectFieldNames = $this->extractSelectFieldNames($selectQuery);
+		$selectCount = sizeof($selectFieldNames);
+
+		// Validate field count matches
+		if ($replaceColumnList !== null) {
+			// When column list is specified, SELECT field count must match column list count
+			$expectedCount = sizeof($replaceColumnList);
+			if ($selectCount !== $expectedCount) {
+				throw ManticoreSearchClientError::create(
+					"Column count mismatch: SELECT returns $selectCount fields but column list has $expectedCount"
+				);
+			}
+		} else {
+			// When no column list, SELECT field count must match target table field count
+			$this->validateFieldCountMatches($selectCount, $targetCount);
+		}
+
+		// Validate 'id' field is at position 0 in target (only if not using column list)
+		if ($replaceColumnList === null) {
+			$this->validateIdFieldAtPosition();
+		}
+
+		// Execute SELECT LIMIT 1 to verify the query is valid and get sample data
+		$baseQuery = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $selectQuery);
+		$testQuery = "$baseQuery LIMIT 1";
+		$result = $this->client->sendRequest($testQuery);
+
+		if ($result->hasError()) {
+			throw ManticoreSearchClientError::create(
+				'Invalid SELECT query: ' . $result->getError()
+			);
+		}
+
+		// Verify SELECT returns some data for type validation
+		$sampleData = $this->extractSampleData($result->getResult()->toArray());
+		if (empty($sampleData)) {
+			throw ManticoreSearchClientError::create(
+				'SELECT query returns no data. Use a query that returns at least one row.'
+			);
+		}
 	}
 
 	/**
@@ -616,90 +660,7 @@ final class FieldValidator {
 			return $matches[1];
 		}
 
-		// For simple field names
-		if (preg_match('/^\w+$/', $field)) {
-			return $field;
-		}
-
-		// For functions or expressions - return the whole expression
-		// This will be handled specially during type checking
 		return $field;
-	}
-
-	/**
-	 * Validate SELECT field types against target types
-	 * Handles both regular fields and functions
-	 *
-	 * @param array<int,string> $selectFieldNames
-	 *
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function validateSelectFieldTypes(array $selectFieldNames): void {
-		foreach ($selectFieldNames as $index => $fieldName) {
-			$targetField = $this->targetFieldsOrdered[$index] ?? null;
-			if ($targetField === null) {
-				throw ManticoreSearchClientError::create(
-					'Target table has insufficient columns for SELECT query'
-				);
-			}
-
-			if (!is_string($targetField['type'])) {
-				throw ManticoreSearchClientError::create(
-					'Invalid target table structure'
-				);
-			}
-			$targetType = $targetField['type'];
-
-			// Check if this is a function call (e.g., UPPER(name), COUNT(*), YEAR(date))
-			if (preg_match('/^\w+\s*\(.*\)$/i', $fieldName)) {
-				// It's a function - we'll use target type for casting at insert time
-				Buddy::debug(
-					"Field '$fieldName' at position $index is a function. "
-					. "Will cast to target type: $targetType"
-				);
-			} else {
-				// It's a regular field reference
-				Buddy::debug(
-					"Field '$fieldName' at position $index "
-					. "will be cast to target type: $targetType"
-				);
-			}
-		}
-	}
-
-	/**
-	 * Check if source value is compatible with target type
-	 * Used by tests and type validation
-	 *
-	 * @param mixed $sourceValue
-	 * @param string $targetType
-	 * @return bool
-	 */
-	public function isTypeCompatible(mixed $sourceValue, string $targetType): bool {
-		$sourceType = gettype($sourceValue);
-
-		return match ($targetType) {
-			'int', 'bigint' => in_array($sourceType, ['integer', 'string']) && is_numeric($sourceValue),
-			'float' => in_array($sourceType, ['double', 'integer', 'string']) && is_numeric($sourceValue),
-			'bool' => in_array($sourceType, ['boolean', 'integer', 'string']),
-			'text', 'string', 'json' => true,
-			'mva', 'mva64' => $sourceType === 'array' || (is_string($sourceValue) && str_contains($sourceValue, ',')),
-			'float_vector' => $sourceType === 'array' || (is_string($sourceValue) && str_contains($sourceValue, ',')),
-			'timestamp' => in_array($sourceType, ['integer', 'string'])
-				&& ($sourceType === 'integer' || (is_string($sourceValue) && strtotime($sourceValue) !== false)),
-			default => true
-		};
-	}
-
-	/**
-	 * Check if SELECT query contains GROUP BY clause
-	 *
-	 * @param string $selectQuery
-	 * @return bool
-	 */
-	private function hasGroupByClause(string $selectQuery): bool {
-		return (bool)preg_match('/\s+GROUP\s+BY\s+/i', $selectQuery);
 	}
 
 	/**
@@ -719,103 +680,63 @@ final class FieldValidator {
 	}
 
 	/**
-	 * Validate 'id' field exists at position 0 in target table
-	 *
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function validateIdFieldAtPosition(): void {
-		if (empty($this->targetFieldsOrdered)) {
-			throw ManticoreSearchClientError::create('Target table has no columns');
-		}
-
-		$firstField = $this->targetFieldsOrdered[0];
-		if (!is_string($firstField['name'])) {
-			throw ManticoreSearchClientError::create(
-				'Invalid target table structure'
-			);
-		}
-
-		if ($firstField['name'] !== 'id') {
-			throw ManticoreSearchClientError::create(
-				"Target table must have 'id' as first column"
-			);
-		}
-	}
-
-	/**
-	 * Log validation results for debugging
-	 *
-	 * @param array<int,string> $selectFieldNames
-	 * @return void
-	 */
-	private function logValidationResults(array $selectFieldNames): void {
-		$logData = [
-			'select_fields' => $selectFieldNames,
-			'target_fields' => array_map(
-				fn($f) => $f['name'] . '(' . $f['type'] . ')',
-				$this->targetFieldsOrdered
-			),
-		];
-
-		Buddy::debug('ReplaceSelect validation results: ' . json_encode($logData));
-	}
-
-	/**
-	 * Load target table field information in DESC order
-	 *
-	 * Loads and structures field information into FieldInfo array format
-	 * for type-safe access throughout the validator.
-	 *
-	 * @param string $tableName
-	 *
-	 * @return void
-	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
-	 */
-	private function loadTargetFieldsOrdered(string $tableName): void {
-		Buddy::debug("Executing DESC $tableName");
-		$descResult = $this->client->sendRequest("DESC $tableName");
-
-		if ($descResult->hasError()) {
-			throw ManticoreSearchClientError::create(
-				"Target table '$tableName' does not exist"
-			);
-		}
-
-		$this->targetFieldsOrdered = [];
-		$result = $descResult->getResult()->toArray();
-
-		if (!is_array($result[0]) || !isset($result[0]['data'])) {
-			throw ManticoreSearchClientError::create("Failed to read target table '$tableName' structure");
-		}
-
-		$position = 0;
-		foreach ($result[0]['data'] as $field) {
-			if (!is_array($field) || !isset($field['Field'], $field['Type'], $field['Properties'])) {
-				Buddy::debug('Skipping field with invalid structure: ' . json_encode($field));
-				continue;
-			}
-
-			$fieldName = (string)$field['Field'];
-			$fieldType = (string)$field['Type'];
-			$this->targetFieldsOrdered[$position] = [
-				'name' => $fieldName,
-				'type' => $fieldType,
-				'properties' => (string)$field['Properties'],
-			];
-			Buddy::debug("Loaded field at position $position: $fieldName ($fieldType)");
-			$position++;
-		}
-
-		Buddy::debug('Total fields loaded: ' . sizeof($this->targetFieldsOrdered));
-	}
-
-	/**
 	 * Get target fields information (ordered by position from DESC)
 	 *
 	 * @return array<int,FieldInfo>
 	 */
 	public function getTargetFields(): array {
 		return $this->targetFieldsOrdered;
+	}
+
+	/**
+	 * Normalize Manticore internal type names to user-friendly display names
+	 *
+	 * Manticore internally uses 'uint' for integer types, but users expect
+	 * familiar SQL type names like 'int' in error messages.
+	 *
+	 * @param string $type Manticore internal type name
+	 * @return string User-friendly type name for display
+	 */
+	private function normalizeTypeForDisplay(string $type): string {
+		return match ($type) {
+			'uint' => 'int',
+			default => $type
+		};
+	}
+
+	/**
+	 * Check if two types are equivalent for validation purposes
+	 *
+	 * Supports the following equivalences:
+	 * - 'int' and 'uint' (same logical type, different contexts)
+	 * - 'string' and 'text' (text field variants)
+	 * - 'int'/'uint' to 'bigint' (safe widening conversions)
+	 *
+	 * This improved version uses a mapping for better scalability and readability,
+	 * handles case insensitivity by normalizing to lowercase, and trims whitespace
+	 * for robustness.
+	 *
+	 * @param string $sourceType Source field type
+	 * @param string $targetType Target field type
+	 * @return bool True if types are compatible
+	 */
+	private function areTypesEquivalent(string $sourceType, string $targetType): bool {
+		// Normalize inputs: trim and convert to lowercase for case-insensitivity
+		$sourceType = strtolower(trim($sourceType));
+		$targetType = strtolower(trim($targetType));
+
+		// Define equivalence groups (source => allowed targets)
+		$equivalences = [
+			'int' => ['int', 'uint', 'bigint'],
+			'uint' => ['int', 'uint', 'bigint'],
+			'string' => ['string', 'text'],
+			'text' => ['string', 'text'],
+			'bigint' => ['bigint'], // No widening from bigint assumed
+		];
+
+		// If source type not in map, only direct match allowed
+		$allowedTargets = $equivalences[$sourceType] ?? [$sourceType];
+
+		return in_array($targetType, $allowedTargets, true);
 	}
 }

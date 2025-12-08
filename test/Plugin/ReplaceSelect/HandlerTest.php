@@ -25,129 +25,6 @@ class HandlerTest extends TestCase {
 	// Helper Methods for MATCH with Multiple Conditions Test
 	// ========================================================================
 
-	/**
-	 * Create mock callback for MATCH with multiple conditions test
-	 *
-	 * @return callable Callback function for mock sendRequest
-	 */
-	private function createMatchMultiConditionsCallback(): callable {
-		return function (string $query) {
-			// Handle transaction BEGIN
-			if ($query === 'BEGIN') {
-				return $this->createMockResponse(true);
-			}
-
-			// Handle DESC queries
-			if (str_starts_with($query, 'DESC')) {
-				return $this->createMatchDescResponse();
-			}
-
-			// Handle MATCH queries with conditions
-			if ($this->isMatchQueryWithConditions($query)) {
-				return $this->createMatchResultsResponse($query);
-			}
-
-			// Handle REPLACE queries
-			if (str_starts_with($query, 'REPLACE')) {
-				return $this->createMockResponse(true);
-			}
-
-			// Handle transaction COMMIT
-			if ($query === 'COMMIT') {
-				return $this->createMockResponse(true);
-			}
-
-			// Unexpected query
-			return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
-		};
-	}
-
-	/**
-	 * Create DESC response for MATCH test with multiple fields
-	 *
-	 * @return mixed Mock response with field schema
-	 */
-	private function createMatchDescResponse() {
-		return $this->createMockResponse(
-			true,
-			[
-				['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
-				['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-				['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-				['Field' => 'status', 'Type' => 'text', 'Properties' => 'stored'],
-			]
-		);
-	}
-
-	/**
-	 * Check if query is a MATCH query with AND conditions
-	 *
-	 * @param string $query SQL query string
-	 * @return bool True if query matches pattern
-	 */
-	private function isMatchQueryWithConditions(string $query): bool {
-		if (!str_contains($query, 'MATCH(title')) {
-			return false;
-		}
-
-		if (!str_contains($query, 'AND')) {
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
-	 * Create MATCH query results based on LIMIT value
-	 *
-	 * @param string $query SQL query string
-	 * @return mixed Mock response with matching results
-	 */
-	private function createMatchResultsResponse(string $query) {
-		// Return single result for LIMIT 1 (validation query)
-		if (str_contains($query, 'LIMIT 1') && !str_contains($query, 'LIMIT 1000')) {
-			return $this->createMockResponse(
-				true,
-				[
-					[
-						'id' => 1,
-						'title' => 'Keyword Product',
-						'price' => 150.00,
-						'status' => 'active',
-					],
-				]
-			);
-		}
-
-		// Return multiple results for LIMIT 1000 (batch processing)
-		if (str_contains($query, 'LIMIT 1000')) {
-			return $this->createMockResponse(
-				true,
-				[
-					[
-						'id' => 1,
-						'title' => 'Keyword Product',
-						'price' => 150.00,
-						'status' => 'active',
-					],
-					[
-						'id' => 2,
-						'title' => 'Another Keyword Item',
-						'price' => 200.00,
-						'status' => 'active',
-					],
-				]
-			);
-		}
-
-		// Default: no results
-		return $this->createMockResponse(true, []);
-	}
-
-	// ========================================================================
-	// Transaction Management Tests
-	// ========================================================================
-
 	public function testSuccessfulTransactionFlow(): void {
 		echo "\nTesting successful transaction flow (BEGIN → operations → COMMIT)\n";
 
@@ -303,6 +180,10 @@ class HandlerTest extends TestCase {
 		$this->assertStringNotContainsString('processed 0 records', $message);
 	}
 
+	// ========================================================================
+	// Transaction Management Tests
+	// ========================================================================
+
 	public function testCommitTransactionFailure(): void {
 		echo "\nTesting COMMIT transaction failure\n";
 
@@ -354,10 +235,6 @@ class HandlerTest extends TestCase {
 		$this->assertStringNotContainsString('processed 0 records', $message);
 	}
 
-	// ========================================================================
-	// Payload Validation Tests
-	// ========================================================================
-
 	public function testInvalidPayloadValidation(): void {
 		echo "\nTesting invalid payload validation\n";
 
@@ -367,73 +244,14 @@ class HandlerTest extends TestCase {
 		try {
 			$handler->run();
 			$this->fail('Expected Exception was not thrown');
-		} catch (\Exception $e) {
-			$this->assertInstanceOf(\Exception::class, $e);
+		} catch (Exception $e) {
+			$this->assertInstanceOf(Exception::class, $e);
 		}
-	}
-
-	// ========================================================================
-	// Result Formatting Tests
-	// ========================================================================
-
-	public function testResultFormattingWithStatistics(): void {
-		echo "\nTesting result formatting with statistics\n";
-
-		$_ENV['BUDDY_REPLACE_SELECT_DEBUG'] = 'true';
-
-		$mockClient = $this->createMock(Client::class);
-
-		$mockClient->method('sendRequest')
-			->willReturnCallback(
-				function (string $query) {
-					if ($query === 'BEGIN') {
-						return $this->createMockResponse(true);
-					}
-					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(
-							true, [
-							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
-							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-							]
-						);
-					}
-					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(
-							true, [
-							['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
-							]
-						);
-					}
-					if (str_contains($query, 'LIMIT 1000')) {
-						return $this->createMockResponse(true, []);
-					}
-					if (str_starts_with($query, 'REPLACE')) {
-						return $this->createMockResponse(true);
-					}
-					if ($query === 'COMMIT') {
-						return $this->createMockResponse(true);
-					}
-					return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
-				}
-			);
-
-		$payload = $this->createValidPayload();
-		$handler = new Handler($payload);
-		$this->injectMockClient($handler, $mockClient);
-
-		$task = $handler->run();
-		usleep(500000); // 500ms
-
-		$this->assertTrue($task->isSucceed());
-
-		unset($_ENV['BUDDY_REPLACE_SELECT_DEBUG']);
 	}
 
 	public function testResultFormattingWithoutDebug(): void {
 		echo "\nTesting result formatting without debug mode\n";
 
-		$_ENV['BUDDY_REPLACE_SELECT_DEBUG'] = 'false';
 
 		$mockClient = $this->createMock(Client::class);
 
@@ -480,13 +298,7 @@ class HandlerTest extends TestCase {
 		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
-
-		unset($_ENV['BUDDY_REPLACE_SELECT_DEBUG']);
 	}
-
-	// ========================================================================
-	// Error Context Testing
-	// ========================================================================
 
 	public function testErrorContextBuilding(): void {
 		echo "\nTesting comprehensive error context building\n";
@@ -532,7 +344,7 @@ class HandlerTest extends TestCase {
 	}
 
 	// ========================================================================
-	// Integration Tests
+	// Payload Validation Tests
 	// ========================================================================
 
 	public function testHandlerWithRealMockServer(): void {
@@ -586,7 +398,7 @@ class HandlerTest extends TestCase {
 	}
 
 	// ========================================================================
-	// Additional Handler Tests (Enhanced Coverage)
+	// Result Formatting Tests
 	// ========================================================================
 
 	public function testHandlerWithUserSpecifiedLimit(): void {
@@ -686,6 +498,10 @@ class HandlerTest extends TestCase {
 		$this->assertNotNull($error);
 	}
 
+	// ========================================================================
+	// Error Context Testing
+	// ========================================================================
+
 	public function testHandlerWithComplexFieldTypes(): void {
 		echo "\nTesting handler with complex field types\n";
 
@@ -748,6 +564,10 @@ class HandlerTest extends TestCase {
 		$this->assertTrue($task->isSucceed());
 	}
 
+	// ========================================================================
+	// Integration Tests
+	// ========================================================================
+
 	public function testHandlerWithWrappedResponse(): void {
 		echo "\nTesting handler with wrapped response format\n";
 
@@ -798,6 +618,10 @@ class HandlerTest extends TestCase {
 		$this->assertTrue($task->isSucceed());
 	}
 
+	// ========================================================================
+	// Additional Handler Tests (Enhanced Coverage)
+	// ========================================================================
+
 	public function testHandlerWithRollbackFailure(): void {
 		echo "\nTesting handler with rollback failure\n";
 
@@ -833,9 +657,6 @@ class HandlerTest extends TestCase {
 
 	public function testHandlerWithStatisticsTracking(): void {
 		echo "\nTesting handler with detailed statistics tracking\n";
-
-		$_ENV['BUDDY_REPLACE_SELECT_DEBUG'] = 'true';
-
 		$mockClient = $this->createMock(Client::class);
 
 		$mockClient->method('sendRequest')
@@ -881,13 +702,7 @@ class HandlerTest extends TestCase {
 		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
-
-		unset($_ENV['BUDDY_REPLACE_SELECT_DEBUG']);
 	}
-
-	// ========================================================================
-	// MATCH() Clause Integration Tests
-	// ========================================================================
 
 	public function testHandlerWithMatchWhereClause(): void {
 		echo "\nTesting handler with MATCH() full-text search in WHERE clause\n";
@@ -969,6 +784,129 @@ class HandlerTest extends TestCase {
 		usleep(500000); // 500ms
 
 		$this->assertTrue($task->isSucceed());
+	}
+
+	/**
+	 * Create mock callback for MATCH with multiple conditions test
+	 *
+	 * @return callable Callback function for mock sendRequest
+	 */
+	private function createMatchMultiConditionsCallback(): callable {
+		return function (string $query) {
+			// Handle transaction BEGIN
+			if ($query === 'BEGIN') {
+				return $this->createMockResponse(true);
+			}
+
+			// Handle DESC queries
+			if (str_starts_with($query, 'DESC')) {
+				return $this->createMatchDescResponse();
+			}
+
+			// Handle MATCH queries with conditions
+			if ($this->isMatchQueryWithConditions($query)) {
+				return $this->createMatchResultsResponse($query);
+			}
+
+			// Handle REPLACE queries
+			if (str_starts_with($query, 'REPLACE')) {
+				return $this->createMockResponse(true);
+			}
+
+			// Handle transaction COMMIT
+			if ($query === 'COMMIT') {
+				return $this->createMockResponse(true);
+			}
+
+			// Unexpected query
+			return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
+		};
+	}
+
+	/**
+	 * Create DESC response for MATCH test with multiple fields
+	 *
+	 * @return mixed Mock response with field schema
+	 */
+	private function createMatchDescResponse() {
+		return $this->createMockResponse(
+			true,
+			[
+				['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+				['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+				['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+				['Field' => 'status', 'Type' => 'text', 'Properties' => 'stored'],
+			]
+		);
+	}
+
+	// ========================================================================
+	// MATCH() Clause Integration Tests
+	// ========================================================================
+
+	/**
+	 * Check if query is a MATCH query with AND conditions
+	 *
+	 * @param string $query SQL query string
+	 * @return bool True if query matches pattern
+	 */
+	private function isMatchQueryWithConditions(string $query): bool {
+		if (!str_contains($query, 'MATCH(title')) {
+			return false;
+		}
+
+		if (!str_contains($query, 'AND')) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Create MATCH query results based on LIMIT value
+	 *
+	 * @param string $query SQL query string
+	 * @return mixed Mock response with matching results
+	 */
+	private function createMatchResultsResponse(string $query) {
+		// Return single result for LIMIT 1 (validation query)
+		if (str_contains($query, 'LIMIT 1') && !str_contains($query, 'LIMIT 1000')) {
+			return $this->createMockResponse(
+				true,
+				[
+					[
+						'id' => 1,
+						'title' => 'Keyword Product',
+						'price' => 150.00,
+						'status' => 'active',
+					],
+				]
+			);
+		}
+
+		// Return multiple results for LIMIT 1000 (batch processing)
+		if (str_contains($query, 'LIMIT 1000')) {
+			return $this->createMockResponse(
+				true,
+				[
+					[
+						'id' => 1,
+						'title' => 'Keyword Product',
+						'price' => 150.00,
+						'status' => 'active',
+					],
+					[
+						'id' => 2,
+						'title' => 'Another Keyword Item',
+						'price' => 200.00,
+						'status' => 'active',
+					],
+				]
+			);
+		}
+
+		// Default: no results
+		return $this->createMockResponse(true, []);
 	}
 
 	public function testHandlerWithMatchReturnsNoResults(): void {
