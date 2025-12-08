@@ -773,4 +773,272 @@ class FieldValidatorTest extends TestCase {
 		$this->assertEquals('is_active', $targetFields[3]['name']);
 		$this->assertEquals('bool', $targetFields[3]['type']);
 	}
+
+	// ========================================================================
+	// Column List Support Tests
+	// ========================================================================
+
+	public function testValidateCompatibilityWithColumnList(): void {
+		echo "\nTesting REPLACE INTO with column list: REPLACE INTO target (col1, col2) SELECT ...\n";
+
+		$mockClient = $this->createMockClient();
+
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->withConsecutive(
+				['DESC target_table'],
+				['SELECT title, price FROM source_table LIMIT 1']
+			)
+			->willReturnOnConsecutiveCalls(
+				$this->createTableSchemaResponse($schemaFields),
+				$this->createSelectResponse(
+					[
+						['title' => 'Product A', 'price' => 99.99],
+					]
+				)
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		// Column list with only 2 columns (not all target fields)
+		$validator->validateCompatibility(
+			'SELECT title, price FROM source_table',
+			'target_table',
+			['title', 'price']
+		);
+
+		$this->assertTrue(true); // Test passes if no exception thrown
+	}
+
+	public function testValidateCompatibilityWithColumnListPartialFields(): void {
+		echo "\nTesting REPLACE INTO with column list selecting subset of fields\n";
+
+		$mockClient = $this->createMockClient();
+
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+			['Field' => 'description', 'Type' => 'text', 'Properties' => ''],
+		];
+
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->withConsecutive(
+				['DESC target_table'],
+				['SELECT id, title FROM source_table LIMIT 1']
+			)
+			->willReturnOnConsecutiveCalls(
+				$this->createTableSchemaResponse($schemaFields),
+				$this->createSelectResponse(
+					[
+						['id' => 1, 'title' => 'Product A'],
+					]
+				)
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		// Column list specifies only 2 of 4 target fields
+		$validator->validateCompatibility(
+			'SELECT id, title FROM source_table',
+			'target_table',
+			['id', 'title']
+		);
+
+		$this->assertTrue(true); // Test passes if no exception thrown
+	}
+
+	public function testValidateColumnListWithNonexistentColumn(): void {
+		echo "\nTesting REPLACE INTO column list with non-existent column\n";
+
+		$mockClient = $this->createMockClient();
+
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+		];
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) use ($schemaFields) {
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createTableSchemaResponse($schemaFields);
+					}
+					return $this->createErrorResponse('Unexpected query: ' . $query);
+				}
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		$this->expectException(ManticoreSearchClientError::class);
+
+		// Column list contains a column that doesn't exist in target
+		$validator->validateCompatibility(
+			'SELECT id, title FROM source_table',
+			'target_table',
+			['id', 'invalid_col']
+		);
+	}
+
+	public function testValidateColumnListFieldCountMismatch(): void {
+		echo "\nTesting REPLACE INTO column list with field count mismatch\n";
+
+		$mockClient = $this->createMockClient();
+
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) use ($schemaFields) {
+					if (str_starts_with($query, 'DESC')) {
+						return $this->createTableSchemaResponse($schemaFields);
+					}
+					return $this->createErrorResponse('Unexpected query: ' . $query);
+				}
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		$this->expectException(ManticoreSearchClientError::class);
+
+		// SELECT returns 2 fields but column list expects 3
+		$validator->validateCompatibility(
+			'SELECT id, title FROM source_table',
+			'target_table',
+			['id', 'title', 'price']
+		);
+	}
+
+	public function testValidateColumnListWithFunctionFields(): void {
+		echo "\nTesting REPLACE INTO column list with function expressions\n";
+
+		$mockClient = $this->createMockClient();
+
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->withConsecutive(
+				['DESC target_table'],
+				['SELECT id, title, price * 1.1 AS adjusted_price FROM source_table LIMIT 1']
+			)
+			->willReturnOnConsecutiveCalls(
+				$this->createTableSchemaResponse($schemaFields),
+				$this->createSelectResponse(
+					[
+						['id' => 1, 'title' => 'Product A', 'adjusted_price' => 109.99],
+					]
+				)
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		// Column list with functions (adjusted_price is price * 1.1)
+		$validator->validateCompatibility(
+			'SELECT id, title, price * 1.1 AS adjusted_price FROM source_table',
+			'target_table',
+			['id', 'title', 'price']
+		);
+
+		$this->assertTrue(true); // Test passes if no exception thrown
+	}
+
+	public function testValidateColumnListReorderedColumns(): void {
+		echo "\nTesting REPLACE INTO column list with reordered columns\n";
+
+		$mockClient = $this->createMockClient();
+
+		$schemaFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->withConsecutive(
+				['DESC target_table'],
+				['SELECT price, title, id FROM source_table LIMIT 1']
+			)
+			->willReturnOnConsecutiveCalls(
+				$this->createTableSchemaResponse($schemaFields),
+				$this->createSelectResponse(
+					[
+						['price' => 99.99, 'title' => 'Product A', 'id' => 1],
+					]
+				)
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		// Column list with reordered columns: price, title, id (not default order)
+		$validator->validateCompatibility(
+			'SELECT price, title, id FROM source_table',
+			'target_table',
+			['price', 'title', 'id']
+		);
+
+		$this->assertTrue(true); // Test passes if no exception thrown
+	}
+
+	public function testValidateSelectStarWithColumnList(): void {
+		echo "\nTesting REPLACE INTO column list with SELECT *\n";
+
+		$mockClient = $this->createMockClient();
+
+		$targetFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$sourceFields = [
+			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+			['Field' => 'title', 'Type' => 'text', 'Properties' => ''],
+			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+		];
+
+		$mockClient->expects($this->exactly(3))
+			->method('sendRequest')
+			->withConsecutive(
+				['DESC target_table'],
+				['DESC source_table'],
+				['SELECT * FROM source_table LIMIT 1']
+			)
+			->willReturnOnConsecutiveCalls(
+				$this->createTableSchemaResponse($targetFields),
+				$this->createTableSchemaResponse($sourceFields),
+				$this->createSelectResponse(
+					[
+						['id' => 1, 'title' => 'Product A', 'price' => 99.99],
+					]
+				)
+			);
+
+		$validator = new FieldValidator($mockClient);
+
+		// SELECT * with column list should match column list field names to source fields
+		$validator->validateCompatibility(
+			'SELECT * FROM source_table',
+			'target_table',
+			['id', 'title', 'price']
+		);
+
+		$this->assertTrue(true); // Test passes if no exception thrown
+	}
 }

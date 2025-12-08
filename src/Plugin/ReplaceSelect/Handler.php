@@ -63,7 +63,8 @@ final class Handler extends BaseHandlerWithClient {
 				$validator = new FieldValidator($this->manticoreClient);
 				$validator->validateCompatibility(
 					$this->payload->selectQuery,
-					$this->payload->targetTable
+					$this->payload->targetTable,
+					$this->payload->replaceColumnList
 				);
 
 				// 3. Execute batch processing

@@ -21,15 +21,128 @@ class HandlerTest extends TestCase {
 	use TestHTTPServerTrait;
 	use ReplaceSelectTestTrait;
 
-	protected function tearDown(): void {
-		// Only finish mock server if it was actually started (by testHandlerWithRealMockServer)
-		// Other tests use mock clients and don't need server cleanup
-		// self::finishMockManticoreServer();
+	// ========================================================================
+	// Helper Methods for MATCH with Multiple Conditions Test
+	// ========================================================================
+
+	/**
+	 * Create mock callback for MATCH with multiple conditions test
+	 *
+	 * @return callable Callback function for mock sendRequest
+	 */
+	private function createMatchMultiConditionsCallback(): callable {
+		return function (string $query) {
+			// Handle transaction BEGIN
+			if ($query === 'BEGIN') {
+				return $this->createMockResponse(true);
+			}
+
+			// Handle DESC queries
+			if (str_starts_with($query, 'DESC')) {
+				return $this->createMatchDescResponse();
+			}
+
+			// Handle MATCH queries with conditions
+			if ($this->isMatchQueryWithConditions($query)) {
+				return $this->createMatchResultsResponse($query);
+			}
+
+			// Handle REPLACE queries
+			if (str_starts_with($query, 'REPLACE')) {
+				return $this->createMockResponse(true);
+			}
+
+			// Handle transaction COMMIT
+			if ($query === 'COMMIT') {
+				return $this->createMockResponse(true);
+			}
+
+			// Unexpected query
+			return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
+		};
 	}
 
+	/**
+	 * Create DESC response for MATCH test with multiple fields
+	 *
+	 * @return mixed Mock response with field schema
+	 */
+	private function createMatchDescResponse() {
+		return $this->createMockResponse(
+			true,
+			[
+				['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
+				['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+				['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
+				['Field' => 'status', 'Type' => 'text', 'Properties' => 'stored'],
+			]
+		);
+	}
 
+	/**
+	 * Check if query is a MATCH query with AND conditions
+	 *
+	 * @param string $query SQL query string
+	 * @return bool True if query matches pattern
+	 */
+	private function isMatchQueryWithConditions(string $query): bool {
+		if (!str_contains($query, 'MATCH(title')) {
+			return false;
+		}
 
+		if (!str_contains($query, 'AND')) {
+			return false;
+		}
 
+		return true;
+	}
+
+	/**
+	 * Create MATCH query results based on LIMIT value
+	 *
+	 * @param string $query SQL query string
+	 * @return mixed Mock response with matching results
+	 */
+	private function createMatchResultsResponse(string $query) {
+		// Return single result for LIMIT 1 (validation query)
+		if (str_contains($query, 'LIMIT 1') && !str_contains($query, 'LIMIT 1000')) {
+			return $this->createMockResponse(
+				true,
+				[
+					[
+						'id' => 1,
+						'title' => 'Keyword Product',
+						'price' => 150.00,
+						'status' => 'active',
+					],
+				]
+			);
+		}
+
+		// Return multiple results for LIMIT 1000 (batch processing)
+		if (str_contains($query, 'LIMIT 1000')) {
+			return $this->createMockResponse(
+				true,
+				[
+					[
+						'id' => 1,
+						'title' => 'Keyword Product',
+						'price' => 150.00,
+						'status' => 'active',
+					],
+					[
+						'id' => 2,
+						'title' => 'Another Keyword Item',
+						'price' => 200.00,
+						'status' => 'active',
+					],
+				]
+			);
+		}
+
+		// Default: no results
+		return $this->createMockResponse(true, []);
+	}
 
 	// ========================================================================
 	// Transaction Management Tests
@@ -839,50 +952,14 @@ class HandlerTest extends TestCase {
 
 		$mockClient = $this->createMock(Client::class);
 
+		// Extract complex callback to helper method for reduced cognitive complexity
 		$mockClient->method('sendRequest')
-			->willReturnCallback(
-				function (string $query) {
-					if ($query === 'BEGIN') {
-						return $this->createMockResponse(true);
-					}
-					if (str_starts_with($query, 'DESC')) {
-						return $this->createMockResponse(
-							true, [
-							['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
-							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-							['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-							['Field' => 'status', 'Type' => 'text', 'Properties' => 'stored'],
-							]
-						);
-					}
-					if (str_contains($query, 'MATCH(title') && str_contains($query, 'AND') && str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(
-							true, [
-							['id' => 1, 'title' => 'Keyword Product', 'price' => 150.00, 'status' => 'active'],
-							]
-						);
-					}
-					if (str_contains($query, 'MATCH(title') && str_contains($query, 'AND') && str_contains($query, 'LIMIT 1000')) {
-						return $this->createMockResponse(
-							true, [
-							['id' => 1, 'title' => 'Keyword Product', 'price' => 150.00, 'status' => 'active'],
-							['id' => 2, 'title' => 'Another Keyword Item', 'price' => 200.00, 'status' => 'active'],
-							]
-						);
-					}
-					if (str_starts_with($query, 'REPLACE')) {
-						return $this->createMockResponse(true);
-					}
-					if ($query === 'COMMIT') {
-						return $this->createMockResponse(true);
-					}
-					return $this->createMockResponse(false, null, 'Unexpected query: ' . $query);
-				}
-			);
+			->willReturnCallback($this->createMatchMultiConditionsCallback());
 
 		$payload = $this->createValidPayload(
 			[
-			'query' => 'REPLACE INTO target SELECT id, title, price, status FROM source WHERE MATCH(title, \'@keyword\') AND price > 100 AND status = \'active\'',
+				'query' => 'REPLACE INTO target SELECT id, title, price, status FROM source '
+					. 'WHERE MATCH(title, \'@keyword\') AND price > 100 AND status = \'active\'',
 			]
 		);
 		$handler = new Handler($payload);

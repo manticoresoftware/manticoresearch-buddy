@@ -18,6 +18,11 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * REPLACE INTO ... SELECT ... FROM payload parser and validator
+ *
+ * Supports two syntaxes:
+ * 1. REPLACE INTO table SELECT ... FROM source
+ * 2. REPLACE INTO table (col1, col2, col3) SELECT ... FROM source
+ *
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
@@ -27,6 +32,8 @@ final class Payload extends BasePayload {
 	public string $originalQuery;
 	public ?int $selectLimit = null;
 	public ?int $selectOffset = null;
+	/** @var array<int,string>|null Column list for REPLACE INTO table (col1, col2, col3) syntax */
+	public ?array $replaceColumnList = null;
 
 	/**
 	 * Get description for this plugin
@@ -44,10 +51,13 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		// Match pattern: REPLACE INTO table SELECT ... FROM source
-		// Support both regular and comment-style batch size syntax
+		// Match pattern: REPLACE INTO table [(...)] SELECT ... FROM source
+		// Supports both syntaxes:
+		// 1. REPLACE INTO table SELECT ... FROM source
+		// 2. REPLACE INTO table (col1, col2) SELECT ... FROM source
+		// Uses word characters for table name to prevent greedy matching of parentheses
 		return preg_match(
-			'/^\s*REPLACE\s+INTO\s+\S+\s+SELECT\s+.*?\s+FROM\s+\S+/i',
+			'/^\s*REPLACE\s+INTO\s+[\w]+(?::[\w]+)?\s*(?:\([^)]+\))?\s+SELECT\s+.*?\s+FROM\s+\S+/i',
 			$request->payload
 		) === 1;
 	}
@@ -86,9 +96,9 @@ final class Payload extends BasePayload {
 	 * @throws GenericError
 	 */
 	private function parseWithRegex(string $sql): void {
-		// Extract target table: REPLACE INTO [cluster:]table
-		Buddy::debug('Extracting target table from SQL');
-		if (!preg_match('/REPLACE\s+INTO\s+([^\s]+)/i', $sql, $matches)) {
+		// Extract target table and optional column list: REPLACE INTO [cluster:]table [(col1, col2, col3)]
+		Buddy::debug('Extracting target table and column list from SQL');
+		if (!preg_match('/REPLACE\s+INTO\s+([\w]+(?::[\w]+)?)\s*(?:\(([^)]+)\))?/i', $sql, $matches)) {
 			$errorMsg = 'Cannot extract target table from SQL. Pattern did not match';
 			Buddy::debug("Target table extraction failed: $errorMsg");
 			throw GenericError::create($errorMsg);
@@ -98,11 +108,21 @@ final class Payload extends BasePayload {
 		Buddy::debug("Extracted table specification: $tableSpec");
 		$this->parseTargetTableFromString($tableSpec);
 
+		// Extract column list if present
+		if (isset($matches[2]) && !empty($matches[2])) {
+			Buddy::debug("Extracting column list: {$matches[2]}");
+			$this->replaceColumnList = $this->parseColumnList($matches[2]);
+			Buddy::debug('Parsed column list: ' . implode(', ', $this->replaceColumnList));
+		} else {
+			Buddy::debug('No column list specified in REPLACE INTO');
+			$this->replaceColumnList = null;
+		}
+
 		// Extract SELECT query
 		// Use 's' flag (DOTALL) to make '.' match newline characters for multi-line queries
 		Buddy::debug('Extracting SELECT query from SQL');
 		if (!preg_match(
-			'/REPLACE\s+INTO\s+\S+\s+(SELECT\s+.+?)(?:\s*\/\*.*?\*\/\s*)?(?:;?\s*)$/is',
+			'/REPLACE\s+INTO\s+[\w]+(?::[\w]+)?\s*(?:\([^)]+\))?\s+(SELECT\s+.+?)(?:\s*\/\*.*?\*\/\s*)?(?:;?\s*)$/is',
 			$sql,
 			$matches
 		)) {
@@ -125,6 +145,39 @@ final class Payload extends BasePayload {
 		}
 
 		Buddy::debug("Extracted SELECT OFFSET: {$this->selectOffset}");
+	}
+
+	/**
+	 * Parse column list from REPLACE INTO table (col1, col2, col3) syntax
+	 *
+	 * @param string $columnListStr Column list string like "col1, col2, col3"
+	 * @return array<int,string> Array of column names
+	 * @throws GenericError
+	 */
+	private function parseColumnList(string $columnListStr): array {
+		$columnListStr = trim($columnListStr);
+		if (empty($columnListStr)) {
+			throw GenericError::create('Empty column list in REPLACE INTO');
+		}
+
+		// Split by comma, handling whitespace
+		$columns = array_map('trim', explode(',', $columnListStr));
+
+		// Validate and clean column names (remove quotes)
+		$cleanedColumns = [];
+		foreach ($columns as $col) {
+			if (empty($col)) {
+				throw GenericError::create('Empty column name in column list');
+			}
+			// Remove quotes (backticks, single, double)
+			$cleanedCol = trim($col, '`"\'');
+			if (empty($cleanedCol)) {
+				throw GenericError::create('Column name contains only quotes');
+			}
+			$cleanedColumns[] = $cleanedCol;
+		}
+
+		return $cleanedColumns;
 	}
 
 	/**

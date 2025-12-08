@@ -700,7 +700,7 @@ class BatchProcessorTest extends TestCase {
 		];
 
 		$processor = new BatchProcessor($mockClient, $payload, $targetFields);
-		$result = $processor->execute();
+		$processor->execute();
 
 		$statistics = $processor->getProcessingStatistics();
 

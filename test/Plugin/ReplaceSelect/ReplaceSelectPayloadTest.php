@@ -181,7 +181,8 @@ class ReplaceSelectPayloadTest extends TestCase {
 		$request = Request::fromArray(
 			[
 			'version' => Buddy::PROTOCOL_VERSION,
-			'payload' => 'REPLACE INTO target SELECT id, title FROM source WHERE MATCH(title, \'@keyword\') LIMIT 100 OFFSET 50',
+			'payload' => 'REPLACE INTO target SELECT id, title FROM source '.
+				'WHERE MATCH(title, \'@keyword\') LIMIT 100 OFFSET 50',
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
 			'path' => 'sql?mode=raw',
@@ -191,7 +192,10 @@ class ReplaceSelectPayloadTest extends TestCase {
 
 		$payload = Payload::fromRequest($request);
 		$this->assertEquals('target', $payload->targetTable);
-		$this->assertEquals('SELECT id, title FROM source WHERE MATCH(title, \'@keyword\') LIMIT 100 OFFSET 50', $payload->selectQuery);
+		$this->assertEquals(
+			'SELECT id, title FROM source '.
+			'WHERE MATCH(title, \'@keyword\') LIMIT 100 OFFSET 50', $payload->selectQuery
+		);
 		$this->assertEquals(100, $payload->selectLimit);
 		$this->assertEquals(50, $payload->selectOffset);
 	}
@@ -255,7 +259,7 @@ class ReplaceSelectPayloadTest extends TestCase {
 		$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = 200; // Exceeds max, but will be clamped to 100
 
 		// Create new payload to pick up new environment values
-		$invalidPayload = Payload::fromRequest($request);
+		Payload::fromRequest($request);
 
 		// The Config::getBatchSize() uses max(1, min(batchSize, maxBatchSize))
 		// So 200 gets clamped to 100, which is valid. We need to test a different scenario.
@@ -303,5 +307,149 @@ class ReplaceSelectPayloadTest extends TestCase {
 		);
 
 		Payload::fromRequest($request);
+	}
+
+	// ========================================================================
+	// Column List Support Tests
+	// ========================================================================
+
+	public function testHasMatchWithColumnList(): void {
+		echo "\nTesting REPLACE INTO with column list syntax matching\n";
+
+		$validRequests = [
+			'REPLACE INTO target (id, title, price) SELECT * FROM source',
+			'REPLACE INTO target (title, price) SELECT id, name, cost FROM source',
+			'REPLACE INTO target (id, title, price, is_active) SELECT id, name, cost, active FROM source',
+			'REPLACE INTO target (price, title, id) SELECT cost, name, id FROM source',
+			'REPLACE INTO cluster1:target (id, name) SELECT id, name FROM cluster2:source',
+			'REPLACE INTO target (id, title) SELECT * FROM source WHERE active = 1',
+		];
+
+		foreach ($validRequests as $sql) {
+			$request = Request::fromArray(
+				[
+					'version' => Buddy::PROTOCOL_VERSION,
+					'payload' => $sql,
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => 'sql?mode=raw',
+					'error' => '',
+				]
+			);
+
+			$this->assertTrue(Payload::hasMatch($request), "Should match column list query: $sql");
+		}
+	}
+
+	public function testFromRequestWithColumnList(): void {
+		echo "\nTesting REPLACE SELECT payload creation with column list\n";
+
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'payload' => 'REPLACE INTO target (id, title, price) SELECT id, name, cost FROM source',
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
+				'error' => '',
+			]
+		);
+
+		$payload = Payload::fromRequest($request);
+		$this->assertInstanceOf(Payload::class, $payload);
+		$this->assertEquals('target', $payload->targetTable);
+		$this->assertEquals('SELECT id, name, cost FROM source', $payload->selectQuery);
+		$this->assertNotNull($payload->replaceColumnList);
+		$this->assertCount(3, $payload->replaceColumnList);
+		$this->assertEquals(['id', 'title', 'price'], $payload->replaceColumnList);
+	}
+
+	public function testFromRequestWithColumnListReordered(): void {
+		echo "\nTesting REPLACE SELECT with reordered column list\n";
+
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'payload' => 'REPLACE INTO target (price, title, id) SELECT cost, name, id FROM source',
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
+				'error' => '',
+			]
+		);
+
+		$payload = Payload::fromRequest($request);
+		$this->assertEquals('target', $payload->targetTable);
+		$this->assertEquals('SELECT cost, name, id FROM source', $payload->selectQuery);
+		$this->assertNotNull($payload->replaceColumnList);
+		$this->assertEquals(['price', 'title', 'id'], $payload->replaceColumnList);
+	}
+
+	public function testFromRequestWithColumnListAndCluster(): void {
+		echo "\nTesting REPLACE SELECT with column list and cluster syntax\n";
+
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'payload' => 'REPLACE INTO cluster1:target (id, title) SELECT id, name FROM cluster2:source',
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
+				'error' => '',
+			]
+		);
+
+		$payload = Payload::fromRequest($request);
+		$this->assertEquals('target', $payload->targetTable);
+		$this->assertEquals('cluster1', $payload->cluster);
+		$this->assertEquals('SELECT id, name FROM cluster2:source', $payload->selectQuery);
+		$this->assertNotNull($payload->replaceColumnList);
+		$this->assertEquals(['id', 'title'], $payload->replaceColumnList);
+	}
+
+	public function testFromRequestWithColumnListAndSelectStar(): void {
+		echo "\nTesting REPLACE SELECT with column list and SELECT *\n";
+
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'payload' => 'REPLACE INTO target (id, title, price) SELECT * FROM source',
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
+				'error' => '',
+			]
+		);
+
+		$payload = Payload::fromRequest($request);
+		$this->assertEquals('target', $payload->targetTable);
+		$this->assertEquals('SELECT * FROM source', $payload->selectQuery);
+		$this->assertNotNull($payload->replaceColumnList);
+		$this->assertEquals(['id', 'title', 'price'], $payload->replaceColumnList);
+	}
+
+	public function testFromRequestWithColumnListNoSpace(): void {
+		echo "\nTesting REPLACE SELECT with column list without space before parenthesis\n";
+
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'payload' => 'REPLACE INTO replace_select_target(id, title, created_at, updated_at) '.
+					'SELECT id, title, created_at, updated_at FROM replace_select_source',
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
+				'error' => '',
+			]
+		);
+
+		$payload = Payload::fromRequest($request);
+		$this->assertEquals('replace_select_target', $payload->targetTable);
+		$this->assertEquals(
+			'SELECT id, title, created_at, updated_at FROM replace_select_source',
+			$payload->selectQuery
+		);
+		$this->assertNotNull($payload->replaceColumnList);
+		$this->assertEquals(['id', 'title', 'created_at', 'updated_at'], $payload->replaceColumnList);
 	}
 }
