@@ -23,6 +23,8 @@ class FieldValidatorTest extends TestCase {
 
 	/**
 	 * Create a mock response for table schema (DESC command)
+	 *
+	 * @param array<int,array{Field: string, Type: string, Properties: string}>|null $fields
 	 */
 	private function createTableSchemaResponse(array $fields = null): Response {
 		$defaultFields = [
@@ -37,6 +39,11 @@ class FieldValidatorTest extends TestCase {
 		return $this->createMockResponse(true, $fields ?? $defaultFields);
 	}
 
+	/**
+	 * Create a mock response for SELECT queries
+	 *
+	 * @param array<int,array<string,mixed>> $rows
+	 */
 	private function createSelectResponse(array $rows): Response {
 		return $this->createMockResponse(true, $rows);
 	}

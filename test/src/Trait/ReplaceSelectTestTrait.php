@@ -29,6 +29,8 @@ trait ReplaceSelectTestTrait {
 
 	/**
 	 * Create a mock ManticoreSearch client
+	 *
+	 * @return Client&\PHPUnit\Framework\MockObject\MockObject
 	 */
 	private function createMockClient(): Client {
 		return $this->createMock(Client::class);
@@ -36,6 +38,9 @@ trait ReplaceSelectTestTrait {
 
 	/**
 	 * Create a mock response
+	 *
+	 * @param array<int,array<string,mixed>>|null $data
+	 * @return Response&\PHPUnit\Framework\MockObject\MockObject
 	 */
 	private function createMockResponse(bool $success = true, ?array $data = null, ?string $error = null): Response {
 		$response = $this->createMock(Response::class);
@@ -58,6 +63,8 @@ trait ReplaceSelectTestTrait {
 
 	/**
 	 * Create a mock response for table operations (DESC, SHOW, etc.)
+	 *
+	 * @param array<int,array{Field: string, Type: string, Properties: string}>|null $fields
 	 */
 	private function createTableSchemaResponse(array $fields = null): Response {
 		$response = $this->createMockResponse();
@@ -106,12 +113,19 @@ trait ReplaceSelectTestTrait {
 
 	/**
 	 * Create a valid payload for testing
+	 *
+	 * @param array<string,mixed> $overrides
 	 */
 	private function createValidPayload(array $overrides = []): Payload {
+		$query = $overrides['query'] ?? 'REPLACE INTO target SELECT id, title, price FROM source';
+		// Type narrowing for PHPStan
+		assert(is_string($query));
+		/** @var string $query */
+
 		$request = Request::fromArray(
 			[
 			'version' => Buddy::PROTOCOL_VERSION,
-			'payload' => $overrides['query'] ?? 'REPLACE INTO target SELECT id, title, price FROM source',
+			'payload' => $query,
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
 			'path' => 'sql?mode=raw',
@@ -136,9 +150,11 @@ trait ReplaceSelectTestTrait {
 
 	/**
 	 * Create a target fields array for testing (position-indexed)
+	 *
+	 * @return array<int,array{name: string, type: string, properties: string}>
 	 */
-	private function createTargetFields(array $overrides = []): array {
-		$defaultFields = [
+	private function createTargetFields(): array {
+		return [
 			['name' => 'id', 'type' => 'bigint', 'properties' => ''],
 			['name' => 'title', 'type' => 'text', 'properties' => 'stored'],
 			['name' => 'price', 'type' => 'float', 'properties' => ''],
@@ -148,21 +164,5 @@ trait ReplaceSelectTestTrait {
 			['name' => 'mva_tags', 'type' => 'multi', 'properties' => ''],
 			['name' => 'json_data', 'type' => 'text', 'properties' => 'stored'],
 		];
-
-		if (empty($overrides)) {
-			return $defaultFields;
-		}
-
-		// For backwards compatibility, if overrides use keyed format, convert them
-		$result = $defaultFields;
-		foreach ($overrides as $index => $field) {
-			if (!is_int($index)) {
-				continue;
-			}
-
-			$result[$index] = $field;
-		}
-		return $result;
 	}
-
 }

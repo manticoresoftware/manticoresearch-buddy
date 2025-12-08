@@ -140,7 +140,7 @@ final class Handler extends BaseHandlerWithClient {
 		$result = $this->manticoreClient->sendRequest('BEGIN');
 		if ($result->hasError()) {
 			$errorMessage = $this->buildErrorContext(
-				'Failed to begin transaction: ' . $result->getError(),
+				'Database transaction failed',
 				$this->recordsProcessedBeforeError
 			);
 			$error = new ManticoreSearchClientError($errorMessage);
@@ -168,7 +168,7 @@ final class Handler extends BaseHandlerWithClient {
 		$result = $this->manticoreClient->sendRequest('COMMIT');
 		if ($result->hasError()) {
 			$errorMessage = $this->buildErrorContext(
-				'Failed to commit transaction: ' . $result->getError(),
+				'Failed to commit transaction',
 				$this->recordsProcessedBeforeError
 			);
 			$error = new ManticoreSearchClientError($errorMessage);
@@ -210,11 +210,17 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return string
 	 */
 	private function buildErrorContext(string $originalError, int $recordsProcessed = 0): string {
-		return sprintf(
-			'Operation error (processed %d records): %s',
-			$recordsProcessed,
-			$originalError
-		);
+		// Only add record context for actual processing errors, not validation errors
+		if ($recordsProcessed > 0) {
+			return sprintf(
+				'Operation error (processed %d records): %s',
+				$recordsProcessed,
+				$originalError
+			);
+		}
+
+		// For validation errors (0 records), return the original error directly
+		return $originalError;
 	}
 
 	/**

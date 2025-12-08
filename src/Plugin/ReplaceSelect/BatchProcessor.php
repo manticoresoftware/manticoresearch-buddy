@@ -25,13 +25,15 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
  * - Row values are indexed arrays (from SELECT result)
  * - Target fields are indexed by position (from DESC)
  * - No field name matching needed
+ *
+ * @phpstan-type FieldInfo array{name: string, type: string, properties: string}
  */
 final class BatchProcessor {
 	use StringFunctionsTrait;
 
 	private Client $client;
 	private Payload $payload;
-	/** @var array<int,array<string,mixed>> Target fields ordered by position from DESC */
+	/** @var array<int,FieldInfo> Target fields ordered by position from DESC */
 	private array $targetFieldsOrdered;
 	private int $batchSize;
 	private int $totalProcessed = 0;
@@ -45,7 +47,7 @@ final class BatchProcessor {
 	 *
 	 * @param Client $client
 	 * @param Payload $payload
-	 * @param array<int,array<string,mixed>> $targetFieldsOrdered Position-based fields from DESC
+	 * @param array<int,FieldInfo> $targetFieldsOrdered Position-based fields from DESC
 	 */
 	public function __construct(Client $client, Payload $payload, array $targetFieldsOrdered) {
 		$this->client = $client;
@@ -104,9 +106,9 @@ final class BatchProcessor {
 
 				$offset += $currentBatchSize;
 			} catch (\Exception $e) {
-				$errorMsg = "Batch processing failed at offset $offset: " . $e->getMessage();
-				Buddy::debug($errorMsg);
-				throw $e;
+				$errorMsg = 'Batch processing failed: ' . $e->getMessage();
+				Buddy::debug("Batch processing error: $errorMsg");
+				throw new ManticoreSearchClientError($errorMsg);
 			}
 		} while (sizeof($batch) === $batchSize);
 
@@ -138,13 +140,41 @@ final class BatchProcessor {
 	}
 
 	/**
+	 * Check if processing should stop due to user LIMIT
+	 *
+	 * @param int|null $userLimit User-specified limit
+	 * @return bool True if limit reached
+	 */
+	private function hasReachedUserLimit(?int $userLimit): bool {
+		if ($userLimit === null) {
+			return false;
+		}
+
+		if ($this->totalProcessed >= $userLimit) {
+			Buddy::debug("User LIMIT reached ({$userLimit}), stopping batch processing");
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
 	 * Prepare base query by removing existing LIMIT/OFFSET clauses
 	 *
 	 * @return string Clean base query
+	 * @throws ManticoreSearchClientError
 	 */
 	private function prepareBaseQuery(): string {
 		$baseQuery = $this->payload->selectQuery;
-		return preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $baseQuery);
+		$result = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $baseQuery);
+
+		if ($result === null) {
+			throw ManticoreSearchClientError::create(
+				'Invalid SELECT query format'
+			);
+		}
+
+		return $result;
 	}
 
 	/**
@@ -172,22 +202,54 @@ final class BatchProcessor {
 	}
 
 	/**
-	 * Check if processing should stop due to user LIMIT
+	 * Fetch a single batch of data
 	 *
-	 * @param int|null $userLimit User-specified limit
-	 * @return bool True if limit reached
+	 * @param string $query
+	 *
+	 * @return array<int,array<string,mixed>>
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
 	 */
-	private function hasReachedUserLimit(?int $userLimit): bool {
-		if ($userLimit === null) {
-			return false;
+	private function fetchBatch(string $query): array {
+		Buddy::debug('Executing batch SELECT query');
+		$result = $this->client->sendRequest($query);
+
+		if ($result->hasError()) {
+			$errorMsg = 'SELECT query failed: ' . $result->getError();
+			Buddy::debug("Batch SELECT error: $errorMsg");
+			throw ManticoreSearchClientError::create($errorMsg);
 		}
 
-		if ($this->totalProcessed >= $userLimit) {
-			Buddy::debug("User LIMIT reached ({$userLimit}), stopping batch processing");
-			return true;
+		/** @var array<int,array<string,mixed>> $data */
+		$data = $result->getResult()->toArray();
+
+		// Validate data structure
+		if (!is_array($data) || !isset($data[0])) {
+			$errorMsg = 'Invalid query response format';
+			Buddy::debug("Batch SELECT error: $errorMsg");
+			throw ManticoreSearchClientError::create($errorMsg);
 		}
 
-		return false;
+		// Data is guaranteed to be array and have [0] at this point
+		$firstElement = $data[0];
+
+		// Try wrapped format first (standard Manticore response)
+		if (isset($firstElement['data']) && is_array($firstElement['data'])) {
+			$batchData = $firstElement['data'];
+			Buddy::debug('Batch SELECT returned ' . sizeof($batchData) . ' records (wrapped format)');
+			return $batchData;
+		}
+
+		// Try unwrapped format (data rows directly)
+		if (!isset($firstElement['error']) && !isset($firstElement['data'])
+			&& !isset($firstElement['columns'])) {
+			Buddy::debug('Batch SELECT returned ' . sizeof($data) . ' records (unwrapped format)');
+			return $data;
+		}
+
+		$errorMsg = 'Invalid query response structure';
+		Buddy::debug("Batch SELECT error: $errorMsg. Response: " . json_encode($data));
+		throw ManticoreSearchClientError::create($errorMsg);
 	}
 
 	/**
@@ -206,6 +268,21 @@ final class BatchProcessor {
 			return true;
 		}
 
+		return false;
+	}
+
+	/**
+	 * Check if we should stop processing due to empty batches
+	 *
+	 * @param int $consecutiveEmptyBatches
+	 * @param int $maxEmptyBatches
+	 * @return bool
+	 */
+	private function shouldStopProcessing(int $consecutiveEmptyBatches, int $maxEmptyBatches): bool {
+		if ($consecutiveEmptyBatches >= $maxEmptyBatches) {
+			Buddy::debug("Stopping after $consecutiveEmptyBatches consecutive empty batches");
+			return true;
+		}
 		return false;
 	}
 
@@ -230,18 +307,497 @@ final class BatchProcessor {
 	}
 
 	/**
-	 * Check if we should stop processing due to empty batches
+	 * Process a single batch of records
 	 *
-	 * @param int $consecutiveEmptyBatches
-	 * @param int $maxEmptyBatches
-	 * @return bool
+	 * @param array<int,array<string,mixed>> $batch
+	 * @return void
+	 * @throws ManticoreSearchClientError
 	 */
-	private function shouldStopProcessing(int $consecutiveEmptyBatches, int $maxEmptyBatches): bool {
-		if ($consecutiveEmptyBatches >= $maxEmptyBatches) {
-			Buddy::debug("Stopping after $consecutiveEmptyBatches consecutive empty batches");
-			return true;
+	private function processBatch(array $batch): void {
+		if (empty($batch)) {
+			return;
 		}
-		return false;
+
+		// Process each row for field type compatibility
+		$processedBatch = [];
+		foreach ($batch as $row) {
+			$processedBatch[] = $this->processRow($row);
+		}
+
+		// Build and execute REPLACE query
+		$this->executeReplaceBatch($processedBatch);
+	}
+
+	/**
+	 * Process a single row for field type compatibility
+	 *
+	 * Position-based processing:
+	 * - Convert row to indexed values array
+	 * - Match each value to target field by position
+	 * - Apply type conversion
+	 * - When column list is specified, process only those columns
+	 * - Return indexed array (no field names)
+	 *
+	 * @param array<string,mixed> $row Associative array from SELECT result
+	 * @return array<int,mixed> Indexed array of converted values
+	 * @throws ManticoreSearchClientError
+	 */
+	private function processRow(array $row): array {
+		// Convert row to indexed values array
+		$values = array_values($row);
+
+		// Route to appropriate processing method based on column list presence
+		if ($this->payload->replaceColumnList !== null) {
+			return $this->processRowWithColumnList($values);
+		}
+
+		return $this->processRowWithoutColumnList($values);
+	}
+
+	/**
+	 * Process row with specified column list
+	 *
+	 * @param array<int,mixed> $values Indexed values array from row
+	 * @return array<int,mixed> Processed values indexed by target position
+	 * @throws ManticoreSearchClientError
+	 */
+	private function processRowWithColumnList(array $values): array {
+		$columnList = $this->payload->replaceColumnList;
+
+		if ($columnList === null) {
+			throw ManticoreSearchClientError::create(
+				'Missing column list for REPLACE operation'
+			);
+		}
+
+		$expectedCount = sizeof($columnList);
+		if (sizeof($values) !== $expectedCount) {
+			throw new ManticoreSearchClientError(
+				'Column count mismatch: row has ' . sizeof($values) . ' values but expected ' . $expectedCount
+			);
+		}
+
+		// Build column name to position map
+		$columnToFieldMap = $this->buildColumnToFieldMap();
+
+		// Process each column
+		$processed = [];
+		foreach ($columnList as $selectIndex => $columnName) {
+			$this->processColumn(
+				$columnName,
+				$selectIndex,
+				$values,
+				$columnToFieldMap,
+				$processed
+			);
+		}
+
+		return $processed;
+	}
+
+	/**
+	 * Build map from column name to target field position
+	 *
+	 * @return array<string,int> Column name to position map
+	 */
+	private function buildColumnToFieldMap(): array {
+		$columnToFieldMap = [];
+		foreach ($this->targetFieldsOrdered as $position => $fieldInfo) {
+			$columnToFieldMap[$fieldInfo['name']] = $position;
+		}
+		return $columnToFieldMap;
+	}
+
+	/**
+	 * Process single column value with type conversion
+	 *
+	 * @param string $columnName
+	 * @param int $selectIndex
+	 * @param array<int,mixed> $values
+	 * @param array<string,int> $columnToFieldMap
+	 * @param array<int,mixed> $processed Output array (by reference)
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 */
+	private function processColumn(
+		string $columnName,
+		int $selectIndex,
+		array $values,
+		array $columnToFieldMap,
+		array &$processed
+	): void {
+		if (!isset($columnToFieldMap[$columnName])) {
+			throw new ManticoreSearchClientError(
+				"Column '$columnName' does not exist in target table"
+			);
+		}
+
+		$targetPosition = $columnToFieldMap[$columnName];
+		$fieldInfo = $this->targetFieldsOrdered[$targetPosition];
+
+		if (!is_string($fieldInfo['type'])) {
+			throw ManticoreSearchClientError::create(
+				'Invalid target table structure'
+			);
+		}
+
+		$fieldType = $fieldInfo['type'];
+		$value = $values[$selectIndex] ?? null;
+
+		$this->validateFieldType($fieldType);
+
+		try {
+			Buddy::debug(
+				"Processing column '$columnName' at position $targetPosition with type '$fieldType'"
+			);
+			$processed[$targetPosition] = $this->morphValuesByFieldType($value, $fieldType);
+		} catch (\Exception $e) {
+			$this->throwFieldProcessingError($columnName, $e);
+		}
+	}
+
+	/**
+	 * Validate that field type is a string
+	 *
+	 * @param mixed $fieldType
+	 * @param string $fieldName
+	 * @param int $position
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 */
+	private function validateFieldType(mixed $fieldType): void {
+		if (is_string($fieldType)) {
+			return;
+		}
+
+		throw new ManticoreSearchClientError(
+			'Invalid target table structure'
+		);
+	}
+
+	/**
+	 * Throw field processing error with context
+	 *
+	 * @param string $fieldName
+	 * @param int $position
+	 * @param mixed $value
+	 * @param \Exception $e
+	 * @return never
+	 * @throws ManticoreSearchClientError
+	 */
+	private function throwFieldProcessingError(
+		string $fieldName,
+		\Exception $e
+	): never {
+		$errorMsg = "Invalid data in column '$fieldName': " . $e->getMessage();
+		Buddy::debug("Field processing error: $errorMsg");
+		throw new ManticoreSearchClientError($errorMsg);
+	}
+
+	/**
+	 * Process row without column list (all target fields)
+	 *
+	 * @param array<int,mixed> $values Indexed values array from row
+	 * @return array<int,mixed> Processed values indexed by position
+	 * @throws ManticoreSearchClientError
+	 */
+	private function processRowWithoutColumnList(array $values): array {
+		// Validate field count
+		if (sizeof($values) !== sizeof($this->targetFieldsOrdered)) {
+			$targetCount = sizeof($this->targetFieldsOrdered);
+			throw new ManticoreSearchClientError(
+				'Column count mismatch: row has ' . sizeof($values) . " values but target has $targetCount"
+			);
+		}
+
+		// Process each value by position
+		$processed = [];
+		foreach ($values as $index => $value) {
+			$this->processFieldAtPosition($index, $value, $processed);
+		}
+
+		// Ensure ID field is present (must be at position 0)
+		if (!isset($processed[0])) {
+			throw new ManticoreSearchClientError(
+				"Missing 'id' column in data"
+			);
+		}
+
+		return $processed;
+	}
+
+	/**
+	 * Process field at specific position with type conversion
+	 *
+	 * @param int $index Field position
+	 * @param mixed $value Field value
+	 * @param array<int,mixed> $processed Output array (by reference)
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 */
+	private function processFieldAtPosition(int $index, mixed $value, array &$processed): void {
+		try {
+			$fieldInfo = $this->targetFieldsOrdered[$index];
+
+			// Type alias guarantees name and type are strings, but adding defensive check for safety
+			/** @var string $fieldName */
+			$fieldName = $fieldInfo['name'];
+			/** @var string $fieldType */
+			$fieldType = $fieldInfo['type'];
+
+			$this->validateFieldType($fieldType, $fieldName, $index);
+
+			Buddy::debug("Processing position $index ('$fieldName') with type '$fieldType'");
+			$processed[$index] = $this->morphValuesByFieldType($value, $fieldType);
+		} catch (\Exception $e) {
+			$fieldInfo = $this->targetFieldsOrdered[$index] ?? [];
+			$fieldName = is_string($fieldInfo['name'] ?? null) ? $fieldInfo['name'] : "position_$index";
+			$this->throwFieldProcessingError($fieldName, $e);
+		}
+	}
+
+	/**
+	 * Execute REPLACE query for a batch of processed records
+	 *
+	 * Position-based REPLACE building:
+	 * - When column list specified: use only those columns in REPLACE INTO (col1, col2)
+	 * - When no column list: use all fields from targetFieldsOrdered
+	 * - Values from indexed row arrays (extracted by position)
+	 * - Preserves target DESC field order
+	 *
+	 * @param array<int,array<int,mixed>> $batch Indexed array of indexed row arrays
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 */
+	private function executeReplaceBatch(array $batch): void {
+		if (empty($batch)) {
+			Buddy::debug('Empty batch, skipping REPLACE execution');
+			return;
+		}
+
+		// Determine columns for REPLACE statement
+		$columns = $this->determineReplaceColumns();
+		Buddy::debug('Building REPLACE for ' . sizeof($batch) . ' rows');
+
+		// Build VALUES clause
+		$valuesData = $this->buildValuesClause($batch, $columns['columnPositions']);
+
+		// Build and execute SQL
+		$targetTable = $this->payload->getTargetTableWithCluster();
+		$sql = sprintf(
+			'REPLACE INTO %s (%s) VALUES %s',
+			$targetTable,
+			implode(',', $columns['columnNames']),
+			implode(',', $valuesData['values'])
+		);
+
+		$this->executeReplaceQuery($sql, $valuesData['count']);
+	}
+
+	/**
+	 * Determine columns and positions for REPLACE statement
+	 *
+	 * @return array{columnNames: array<int,string>, columnPositions: array<int,int>|null}
+	 */
+	private function determineReplaceColumns(): array {
+		if ($this->payload->replaceColumnList !== null) {
+			return $this->determineColumnsFromList();
+		}
+
+		return $this->determineColumnsFromTargetFields();
+	}
+
+	/**
+	 * Determine columns from explicit column list
+	 *
+	 * @return array{columnNames: array<int,string>, columnPositions: array<int,int>}
+	 * @throws ManticoreSearchClientError
+	 */
+	private function determineColumnsFromList(): array {
+		$columnList = $this->payload->replaceColumnList;
+
+		if ($columnList === null) {
+			throw ManticoreSearchClientError::create(
+				'Internal error: missing column list'
+			);
+		}
+
+		// Build map from column name to target field position
+		$columnToPositionMap = [];
+		foreach ($this->targetFieldsOrdered as $position => $fieldInfo) {
+			if (!is_string($fieldInfo['name'])) {
+				throw ManticoreSearchClientError::create(
+					'Invalid target table structure'
+				);
+			}
+			$columnToPositionMap[$fieldInfo['name']] = $position;
+		}
+
+		// Use only the specified columns in the order they were specified
+		$columnPositions = array_map(
+			fn($colName) => $columnToPositionMap[$colName],
+			$columnList
+		);
+
+		Buddy::debug(
+			'Building REPLACE statement with column list: ' . implode(',', $columnList)
+		);
+
+		return [
+			'columnNames' => $columnList,
+			'columnPositions' => $columnPositions,
+		];
+	}
+
+	/**
+	 * Determine columns from target fields (all fields)
+	 *
+	 * @return array{columnNames: array<int,string>, columnPositions: null}
+	 * @throws ManticoreSearchClientError
+	 */
+	private function determineColumnsFromTargetFields(): array {
+		$columnNames = [];
+		foreach ($this->targetFieldsOrdered as $fieldInfo) {
+			if (!is_string($fieldInfo['name'])) {
+				throw ManticoreSearchClientError::create(
+					'Invalid target table structure'
+				);
+			}
+			$columnNames[] = $fieldInfo['name'];
+		}
+
+		Buddy::debug(
+			'Building REPLACE statement with ' . sizeof($columnNames) . ' fields'
+		);
+
+		return [
+			'columnNames' => $columnNames,
+			'columnPositions' => null,
+		];
+	}
+
+	/**
+	 * Build VALUES clause for REPLACE statement
+	 *
+	 * @param array<int,array<int,mixed>> $batch
+	 * @param array<int,int>|null $columnPositions
+	 * @return array{values: array<int,string>, count: int}
+	 * @throws ManticoreSearchClientError
+	 */
+	private function buildValuesClause(array $batch, ?array $columnPositions): array {
+		$values = [];
+		$valueCount = 0;
+
+		foreach ($batch as $row) {
+			try {
+				$rowValues = $this->extractRowValues($row, $columnPositions);
+				$values[] = '(' . implode(',', $rowValues) . ')';
+				$valueCount++;
+			} catch (\Exception $e) {
+				throw new ManticoreSearchClientError(
+					'Failed to format data for REPLACE: ' . $e->getMessage()
+				);
+			}
+		}
+
+		return [
+		'values' => $values,
+		'count' => $valueCount,
+		];
+	}
+
+	/**
+	 * Extract row values for REPLACE statement
+	 *
+	 * @param array<int,mixed> $row
+	 * @param array<int,int>|null $columnPositions
+	 * @return array<int,string> Values ready for SQL insertion
+	 */
+	private function extractRowValues(array $row, ?array $columnPositions): array {
+		$rowValues = [];
+
+		if ($columnPositions !== null) {
+			// Extract only specified columns by position
+			foreach ($columnPositions as $position) {
+				$value = $row[$position] ?? null;
+				$rowValues[] = $this->convertValueToString($value);
+			}
+		} else {
+			// Extract all values in order
+			foreach ($row as $value) {
+				$rowValues[] = $this->convertValueToString($value);
+			}
+		}
+
+		return $rowValues;
+	}
+
+	/**
+	 * Convert a mixed value to string for SQL insertion
+	 *
+	 * Handles various types:
+	 * - Scalar types (int, float, bool, string): cast to string
+	 * - Arrays: encode as JSON
+	 * - Objects: encode as JSON or use __toString()
+	 * - NULL: convert to 'NULL' string
+	 *
+	 * @param mixed $value The value to convert
+	 * @return string 'NULL' for null values, otherwise string representation
+	 */
+	private function convertValueToString(mixed $value): string {
+		if ($value === null) {
+			return 'NULL';
+		}
+
+		// Scalar types: int, float, bool, string - safely cast to string
+		if (is_scalar($value)) {
+			return (string)$value;
+		}
+
+		// Handle arrays - encode as JSON
+		if (is_array($value)) {
+			$encoded = json_encode($value);
+			return $encoded !== false ? $encoded : 'NULL';
+		}
+
+		// Handle objects
+		if (is_object($value)) {
+			// Try __toString() method if available
+			if (method_exists($value, '__toString')) {
+				return $value->__toString();
+			}
+			// Fallback to JSON encoding
+			$encoded = json_encode($value);
+			return $encoded !== false ? $encoded : 'NULL';
+		}
+
+		// Fallback for any unexpected type
+		return 'NULL';
+	}
+
+	/**
+	 * Execute REPLACE query and handle errors
+	 *
+	 * @param string $sql
+	 * @param int $valueCount
+	 * @return void
+	 * @throws ManticoreSearchClientError
+	 */
+	private function executeReplaceQuery(string $sql, int $valueCount): void {
+		Buddy::debug(
+			"Executing REPLACE with $valueCount rows. SQL preview: "
+			. substr($sql, 0, 200) . '...'
+		);
+
+		$result = $this->client->sendRequest($sql);
+
+		if ($result->hasError()) {
+			$errorMsg = 'Data insert failed: ' . $result->getError();
+			Buddy::debug("REPLACE execution error: $errorMsg");
+			throw ManticoreSearchClientError::create($errorMsg);
+		}
+
+		Buddy::debug("REPLACE batch execution successful for $valueCount rows");
 	}
 
 	/**
@@ -304,473 +860,6 @@ final class BatchProcessor {
 	}
 
 	/**
-	 * Fetch a single batch of data
-	 *
-	 * @param string $query
-	 *
-	 * @return array<int,array<string,mixed>>
-	 * @throws ManticoreSearchClientError
-	 * @throws ManticoreSearchResponseError
-	 */
-	private function fetchBatch(string $query): array {
-		Buddy::debug('Executing batch SELECT query');
-		$result = $this->client->sendRequest($query);
-
-		if ($result->hasError()) {
-			$errorMsg = 'Batch SELECT failed: ' . $result->getError();
-			Buddy::debug("Batch SELECT error: $errorMsg");
-			throw ManticoreSearchClientError::create($errorMsg);
-		}
-
-		/** @var array<int,array<string,mixed>> $data */
-		$data = $result->getResult()->toArray();
-
-		// Validate data structure
-		if (!is_array($data) || !isset($data[0])) {
-			$errorMsg = 'Batch SELECT failed. Response is not an array with data';
-			Buddy::debug("Batch SELECT error: $errorMsg");
-			throw ManticoreSearchClientError::create($errorMsg);
-		}
-
-		// Try wrapped format first (standard Manticore response)
-		if (is_array($data[0]) && isset($data[0]['data']) && is_array($data[0]['data'])) {
-			$batchData = $data[0]['data'];
-			Buddy::debug('Batch SELECT returned ' . sizeof($batchData) . ' records (wrapped format)');
-			return $batchData;
-		}
-
-		// Try unwrapped format (data rows directly)
-		if (is_array($data[0]) && !isset($data[0]['error'])
-			&& !isset($data[0]['data']) && !isset($data[0]['columns'])) {
-			Buddy::debug('Batch SELECT returned ' . sizeof($data) . ' records (unwrapped format)');
-			return $data;
-		}
-
-		$errorMsg = 'Batch SELECT failed. Wrong response structure';
-		Buddy::debug("Batch SELECT error: $errorMsg. Response: " . json_encode($data));
-		throw ManticoreSearchClientError::create($errorMsg);
-	}
-
-	/**
-	 * Process a single batch of records
-	 *
-	 * @param array<int,array<string,mixed>> $batch
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function processBatch(array $batch): void {
-		if (empty($batch)) {
-			return;
-		}
-
-		// Process each row for field type compatibility
-		$processedBatch = [];
-		foreach ($batch as $row) {
-			$processedBatch[] = $this->processRow($row);
-		}
-
-		// Build and execute REPLACE query
-		$this->executeReplaceBatch($processedBatch);
-	}
-
-	/**
-	 * Process a single row for field type compatibility
-	 *
-	 * Position-based processing:
-	 * - Convert row to indexed values array
-	 * - Match each value to target field by position
-	 * - Apply type conversion
-	 * - When column list is specified, process only those columns
-	 * - Return indexed array (no field names)
-	 *
-	 * @param array<string,mixed> $row Associative array from SELECT result
-	 * @return array<int,mixed> Indexed array of converted values
-	 * @throws ManticoreSearchClientError
-	 */
-	private function processRow(array $row): array {
-		// Convert row to indexed values array
-		$values = array_values($row);
-
-		// Route to appropriate processing method based on column list presence
-		if ($this->payload->replaceColumnList !== null) {
-			return $this->processRowWithColumnList($values);
-		}
-
-		return $this->processRowWithoutColumnList($values);
-	}
-
-	/**
-	 * Build map from column name to target field position
-	 *
-	 * @return array<string,int> Column name to position map
-	 */
-	private function buildColumnToFieldMap(): array {
-		$columnToFieldMap = [];
-		foreach ($this->targetFieldsOrdered as $position => $fieldInfo) {
-			$columnToFieldMap[$fieldInfo['name']] = $position;
-		}
-		return $columnToFieldMap;
-	}
-
-	/**
-	 * Validate that field type is a string
-	 *
-	 * @param mixed $fieldType
-	 * @param string $fieldName
-	 * @param int $position
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function validateFieldType(mixed $fieldType, string $fieldName, int $position): void {
-		if (is_string($fieldType)) {
-			return;
-		}
-
-		throw new ManticoreSearchClientError(
-			"Invalid field type for '$fieldName' at position $position: "
-			. 'expected string, got ' . gettype($fieldType)
-		);
-	}
-
-	/**
-	 * Throw field processing error with context
-	 *
-	 * @param string $fieldName
-	 * @param int $position
-	 * @param mixed $value
-	 * @param \Exception $e
-	 * @return never
-	 * @throws ManticoreSearchClientError
-	 */
-	private function throwFieldProcessingError(
-		string $fieldName,
-		int $position,
-		mixed $value,
-		\Exception $e
-	): never {
-		$valuePrev = json_encode($value);
-		$errorMsg = "Failed to process field '$fieldName' at position $position "
-			. "with value '$valuePrev': " . $e->getMessage();
-		Buddy::debug("Field processing error: $errorMsg");
-		throw new ManticoreSearchClientError($errorMsg);
-	}
-
-	/**
-	 * Process single column value with type conversion
-	 *
-	 * @param string $columnName
-	 * @param int $selectIndex
-	 * @param array<int,mixed> $values
-	 * @param array<string,int> $columnToFieldMap
-	 * @param array<int,mixed> $processed Output array (by reference)
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function processColumn(
-		string $columnName,
-		int $selectIndex,
-		array $values,
-		array $columnToFieldMap,
-		array &$processed
-	): void {
-		if (!isset($columnToFieldMap[$columnName])) {
-			throw new ManticoreSearchClientError(
-				"Column '$columnName' not found in target table"
-			);
-		}
-
-		$targetPosition = $columnToFieldMap[$columnName];
-		$fieldInfo = $this->targetFieldsOrdered[$targetPosition];
-		$fieldType = $fieldInfo['type'];
-		$value = $values[$selectIndex] ?? null;
-
-		$this->validateFieldType($fieldType, $columnName, $targetPosition);
-
-		try {
-			Buddy::debug(
-				"Processing column '$columnName' at position $targetPosition with type '$fieldType'"
-			);
-			$processed[$targetPosition] = $this->morphValuesByFieldType($value, $fieldType);
-		} catch (\Exception $e) {
-			$this->throwFieldProcessingError($columnName, $targetPosition, $value, $e);
-		}
-	}
-
-	/**
-	 * Process row with specified column list
-	 *
-	 * @param array<int,mixed> $values Indexed values array from row
-	 * @return array<int,mixed> Processed values indexed by target position
-	 * @throws ManticoreSearchClientError
-	 */
-	private function processRowWithColumnList(array $values): array {
-		$expectedCount = sizeof($this->payload->replaceColumnList);
-		if (sizeof($values) !== $expectedCount) {
-			throw new ManticoreSearchClientError(
-				'Row field count (' . sizeof($values) . ') does not match column list count ('
-				. $expectedCount . ')'
-			);
-		}
-
-		// Build column name to position map
-		$columnToFieldMap = $this->buildColumnToFieldMap();
-
-		// Process each column
-		$processed = [];
-		foreach ($this->payload->replaceColumnList as $selectIndex => $columnName) {
-			$this->processColumn(
-				$columnName,
-				$selectIndex,
-				$values,
-				$columnToFieldMap,
-				$processed
-			);
-		}
-
-		return $processed;
-	}
-
-	/**
-	 * Process field at specific position with type conversion
-	 *
-	 * @param int $index Field position
-	 * @param mixed $value Field value
-	 * @param array<int,mixed> $processed Output array (by reference)
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function processFieldAtPosition(int $index, mixed $value, array &$processed): void {
-		try {
-			$fieldInfo = $this->targetFieldsOrdered[$index];
-			$fieldName = $fieldInfo['name'];
-			$fieldType = $fieldInfo['type'];
-
-			$this->validateFieldType($fieldType, $fieldName, $index);
-
-			Buddy::debug("Processing position $index ('$fieldName') with type '$fieldType'");
-			$processed[$index] = $this->morphValuesByFieldType($value, $fieldType);
-		} catch (\Exception $e) {
-			$fieldName = $this->targetFieldsOrdered[$index]['name'] ?? "position_$index";
-			$this->throwFieldProcessingError($fieldName, $index, $value, $e);
-		}
-	}
-
-	/**
-	 * Process row without column list (all target fields)
-	 *
-	 * @param array<int,mixed> $values Indexed values array from row
-	 * @return array<int,mixed> Processed values indexed by position
-	 * @throws ManticoreSearchClientError
-	 */
-	private function processRowWithoutColumnList(array $values): array {
-		// Validate field count
-		if (sizeof($values) !== sizeof($this->targetFieldsOrdered)) {
-			throw new ManticoreSearchClientError(
-				'Row field count (' . sizeof($values) . ') does not match target field count ('
-				. sizeof($this->targetFieldsOrdered) . ')'
-			);
-		}
-
-		// Process each value by position
-		$processed = [];
-		foreach ($values as $index => $value) {
-			$this->processFieldAtPosition($index, $value, $processed);
-		}
-
-		// Ensure ID field is present (must be at position 0)
-		if (!isset($processed[0])) {
-			throw new ManticoreSearchClientError(
-				"Row missing required 'id' field at position 0"
-			);
-		}
-
-		return $processed;
-	}
-
-	/**
-	 * Determine columns and positions for REPLACE statement
-	 *
-	 * @return array{columnNames: array<int,string>, columnPositions: array<int,int>|null}
-	 */
-	private function determineReplaceColumns(): array {
-		if ($this->payload->replaceColumnList !== null) {
-			return $this->determineColumnsFromList();
-		}
-
-		return $this->determineColumnsFromTargetFields();
-	}
-
-	/**
-	 * Determine columns from explicit column list
-	 *
-	 * @return array{columnNames: array<int,string>, columnPositions: array<int,int>}
-	 */
-	private function determineColumnsFromList(): array {
-		// Build map from column name to target field position
-		$columnToPositionMap = [];
-		foreach ($this->targetFieldsOrdered as $position => $fieldInfo) {
-			$columnToPositionMap[$fieldInfo['name']] = $position;
-		}
-
-		// Use only the specified columns in the order they were specified
-		$columnNames = $this->payload->replaceColumnList;
-		$columnPositions = array_map(
-			fn($colName) => $columnToPositionMap[$colName],
-			$columnNames
-		);
-
-		Buddy::debug(
-			'Building REPLACE statement with column list: ' . implode(',', $columnNames)
-		);
-
-		return [
-			'columnNames' => $columnNames,
-			'columnPositions' => $columnPositions,
-		];
-	}
-
-	/**
-	 * Determine columns from target fields (all fields)
-	 *
-	 * @return array{columnNames: array<int,string>, columnPositions: null}
-	 */
-	private function determineColumnsFromTargetFields(): array {
-		$columnNames = array_map(
-			fn($f) => $f['name'],
-			$this->targetFieldsOrdered
-		);
-
-		Buddy::debug(
-			'Building REPLACE statement with ' . sizeof($this->targetFieldsOrdered) . ' fields'
-		);
-
-		return [
-			'columnNames' => $columnNames,
-			'columnPositions' => null,
-		];
-	}
-
-	/**
-	 * Extract row values for REPLACE statement
-	 *
-	 * @param array<int,mixed> $row
-	 * @param array<int,int>|null $columnPositions
-	 * @return array<int,string> Values ready for SQL insertion
-	 */
-	private function extractRowValues(array $row, ?array $columnPositions): array {
-		$rowValues = [];
-
-		if ($columnPositions !== null) {
-			// Extract only specified columns by position
-			foreach ($columnPositions as $position) {
-				$value = $row[$position] ?? null;
-				$rowValues[] = ($value === null ? 'NULL' : $value);
-			}
-		} else {
-			// Extract all values in order
-			foreach ($row as $value) {
-				$rowValues[] = ($value === null ? 'NULL' : $value);
-			}
-		}
-
-		return $rowValues;
-	}
-
-	/**
-	 * Build VALUES clause for REPLACE statement
-	 *
-	 * @param array<int,array<int,mixed>> $batch
-	 * @param array<int,int>|null $columnPositions
-	 * @return array{values: array<int,string>, count: int}
-	 * @throws ManticoreSearchClientError
-	 */
-	private function buildValuesClause(array $batch, ?array $columnPositions): array {
-		$values = [];
-		$valueCount = 0;
-
-		foreach ($batch as $rowIndex => $row) {
-			try {
-				$rowValues = $this->extractRowValues($row, $columnPositions);
-				$values[] = '(' . implode(',', $rowValues) . ')';
-				$valueCount++;
-			} catch (\Exception $e) {
-				throw new ManticoreSearchClientError(
-					"Failed to format row $rowIndex for REPLACE: " . $e->getMessage()
-				);
-			}
-		}
-
-		return [
-			'values' => $values,
-			'count' => $valueCount,
-		];
-	}
-
-	/**
-	 * Execute REPLACE query and handle errors
-	 *
-	 * @param string $sql
-	 * @param int $valueCount
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function executeReplaceQuery(string $sql, int $valueCount): void {
-		Buddy::debug(
-			"Executing REPLACE with $valueCount rows. SQL preview: "
-			. substr($sql, 0, 200) . '...'
-		);
-
-		$result = $this->client->sendRequest($sql);
-
-		if ($result->hasError()) {
-			$errorMsg = "Batch REPLACE failed for $valueCount rows: " . $result->getError()
-				. "\nSQL: " . substr($sql, 0, 500) . '...';
-			Buddy::debug("REPLACE execution error: $errorMsg");
-			throw ManticoreSearchClientError::create($errorMsg);
-		}
-
-		Buddy::debug("REPLACE batch execution successful for $valueCount rows");
-	}
-
-	/**
-	 * Execute REPLACE query for a batch of processed records
-	 *
-	 * Position-based REPLACE building:
-	 * - When column list specified: use only those columns in REPLACE INTO (col1, col2)
-	 * - When no column list: use all fields from targetFieldsOrdered
-	 * - Values from indexed row arrays (extracted by position)
-	 * - Preserves target DESC field order
-	 *
-	 * @param array<int,array<int,mixed>> $batch Indexed array of indexed row arrays
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function executeReplaceBatch(array $batch): void {
-		if (empty($batch)) {
-			Buddy::debug('Empty batch, skipping REPLACE execution');
-			return;
-		}
-
-		// Determine columns for REPLACE statement
-		$columns = $this->determineReplaceColumns();
-		Buddy::debug('Building REPLACE for ' . sizeof($batch) . ' rows');
-
-		// Build VALUES clause
-		$valuesData = $this->buildValuesClause($batch, $columns['columnPositions']);
-
-		// Build and execute SQL
-		$targetTable = $this->payload->getTargetTableWithCluster();
-		$sql = sprintf(
-			'REPLACE INTO %s (%s) VALUES %s',
-			$targetTable,
-			implode(',', $columns['columnNames']),
-			implode(',', $valuesData['values'])
-		);
-
-		$this->executeReplaceQuery($sql, $valuesData['count']);
-	}
-
-	/**
 	 * Get total number of processed records
 	 *
 	 * @return int
@@ -797,12 +886,12 @@ final class BatchProcessor {
 		$totalDuration = microtime(true) - $this->processingStartTime;
 
 		return [
-			'total_records' => $this->totalProcessed,
-			'total_batches' => $this->batchesProcessed,
-			'total_duration_seconds' => $totalDuration,
-			'records_per_second' => $totalDuration > 0 ? $this->totalProcessed / $totalDuration : 0,
-			'avg_batch_size' => $this->batchesProcessed > 0 ? $this->totalProcessed / $this->batchesProcessed : 0,
-			'batch_statistics' => $this->statistics,
+		'total_records' => $this->totalProcessed,
+		'total_batches' => $this->batchesProcessed,
+		'total_duration_seconds' => $totalDuration,
+		'records_per_second' => $totalDuration > 0 ? $this->totalProcessed / $totalDuration : 0,
+		'avg_batch_size' => $this->batchesProcessed > 0 ? $this->totalProcessed / $this->batchesProcessed : 0,
+		'batch_statistics' => $this->statistics,
 		];
 	}
 }

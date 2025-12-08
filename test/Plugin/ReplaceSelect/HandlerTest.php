@@ -226,7 +226,7 @@ class HandlerTest extends TestCase {
 		$this->assertNotNull($error);
 		$this->assertInstanceOf(ManticoreSearchClientError::class, $error);
 		$message = $error->getMessage();
-		$this->assertStringContainsString('processed 0 records', $message);
+		$this->assertStringNotContainsString('processed 0 records', $message);
 	}
 
 	public function testTransactionRollbackOnBatchProcessingError(): void {
@@ -276,7 +276,7 @@ class HandlerTest extends TestCase {
 		$error = $task->getError();
 		$this->assertNotNull($error);
 		$this->assertInstanceOf(ManticoreSearchClientError::class, $error);
-		$this->assertStringContainsString('processed 0 records', $error->getMessage());
+		$this->assertStringNotContainsString('processed 0 records', $error->getMessage());
 	}
 
 	public function testBeginTransactionFailure(): void {
@@ -300,7 +300,7 @@ class HandlerTest extends TestCase {
 		$this->assertNotNull($error);
 		$this->assertInstanceOf(ManticoreSearchClientError::class, $error);
 		$message = $error->getMessage();
-		$this->assertStringContainsString('processed 0 records', $message);
+		$this->assertStringNotContainsString('processed 0 records', $message);
 	}
 
 	public function testCommitTransactionFailure(): void {
@@ -351,7 +351,7 @@ class HandlerTest extends TestCase {
 		$this->assertNotNull($error);
 		$this->assertInstanceOf(ManticoreSearchClientError::class, $error);
 		$message = $error->getMessage();
-		$this->assertStringContainsString('processed 0 records', $message);
+		$this->assertStringNotContainsString('processed 0 records', $message);
 	}
 
 	// ========================================================================
@@ -528,7 +528,7 @@ class HandlerTest extends TestCase {
 		$this->assertNotNull($error);
 		$this->assertInstanceOf(ManticoreSearchClientError::class, $error);
 		$message = $error->getMessage();
-		$this->assertStringContainsString('processed 0 records', $message);
+		$this->assertStringNotContainsString('processed 0 records', $message);
 	}
 
 	// ========================================================================
@@ -828,7 +828,7 @@ class HandlerTest extends TestCase {
 		$this->assertNotNull($error);
 		$this->assertInstanceOf(ManticoreSearchClientError::class, $error);
 		$message = $error->getMessage();
-		$this->assertStringContainsString('processed 0 records', $message);
+		$this->assertStringNotContainsString('processed 0 records', $message);
 	}
 
 	public function testHandlerWithStatisticsTracking(): void {

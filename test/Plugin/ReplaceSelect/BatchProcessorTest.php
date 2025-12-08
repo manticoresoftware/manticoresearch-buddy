@@ -29,12 +29,19 @@ class BatchProcessorTest extends TestCase {
 
 	/**
 	 * Create a valid payload for testing
+	 *
+	 * @param array<string,mixed> $overrides
 	 */
 	private function createValidPayload(array $overrides = []): Payload {
+		$query = $overrides['query'] ?? 'REPLACE INTO target SELECT id, title, price FROM source';
+		// Type narrowing for PHPStan
+		assert(is_string($query));
+		/** @var string $query */
+
 		$request = Request::fromArray(
 			[
 			'version' => Buddy::PROTOCOL_VERSION,
-			'payload' => $overrides['query'] ?? 'REPLACE INTO target SELECT id, title, price FROM source',
+			'payload' => $query,
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
 			'path' => 'sql?mode=raw',
@@ -58,6 +65,8 @@ class BatchProcessorTest extends TestCase {
 
 	/**
 	 * Create standard target fields for testing (position-indexed, matching test DESC responses)
+	 *
+	 * @return array<int,array{name: string, type: string, properties: string}>
 	 */
 	private function createTargetFields(): array {
 		return [
@@ -69,6 +78,8 @@ class BatchProcessorTest extends TestCase {
 
 	/**
 	 * Create a mock response for SELECT queries
+	 *
+	 * @param array<int,array<string,mixed>> $rows
 	 */
 	private function createSelectResponse(array $rows): Response {
 		return $this->createMockResponse(true, $rows);
@@ -345,6 +356,10 @@ class BatchProcessorTest extends TestCase {
 
 		$processedRow = self::invokeMethod($processor, 'processRow', [$testRow]);
 
+		// Type narrowing for PHPStan
+		assert(is_array($processedRow));
+		/** @var array<int,mixed> $processedRow */
+
 		// processRow returns position-indexed array
 		$this->assertArrayHasKey(0, $processedRow); // id (position 0)
 		$this->assertArrayHasKey(1, $processedRow); // title (position 1)
@@ -388,7 +403,7 @@ class BatchProcessorTest extends TestCase {
 
 		$this->expectException(ManticoreSearchClientError::class);
 		// Field count mismatch: row has 1 value, targetFields expects 2
-		$this->expectExceptionMessage('Row field count (1) does not match target field count (2)');
+		$this->expectExceptionMessage('Column count mismatch: row has 1 values but target has 2');
 
 		self::invokeMethod($processor, 'processRow', [$testRowWithoutId]);
 	}
@@ -430,6 +445,10 @@ class BatchProcessorTest extends TestCase {
 
 		$processedRow = self::invokeMethod($processor, 'processRow', [$testRowWithKnownFields]);
 
+		// Type narrowing for PHPStan
+		assert(is_array($processedRow));
+		/** @var array<int,mixed> $processedRow */
+
 		// processRow returns position-indexed array
 		$this->assertArrayHasKey(0, $processedRow); // id
 		$this->assertArrayHasKey(1, $processedRow); // title
@@ -467,6 +486,7 @@ class BatchProcessorTest extends TestCase {
 
 		$payload = $this->createValidPayload();
 		$targetFields = $this->createTargetFields();
+
 		$processor = new BatchProcessor($mockClient, $payload, $targetFields);
 
 		$testBatch = [
@@ -477,6 +497,8 @@ class BatchProcessorTest extends TestCase {
 		self::invokeMethod($processor, 'executeReplaceBatch', [$testBatch]);
 
 		$this->assertNotNull($capturedReplaceQuery);
+		// Type narrowing for PHPStan
+		/** @var string $capturedReplaceQuery */
 		$this->assertStringContainsString('REPLACE INTO', $capturedReplaceQuery);
 		$this->assertStringContainsString('VALUES', $capturedReplaceQuery);
 		$this->assertStringContainsString('Product A', $capturedReplaceQuery);
@@ -520,6 +542,8 @@ class BatchProcessorTest extends TestCase {
 		self::invokeMethod($processor, 'executeReplaceBatch', [$testBatchWithSpecialChars]);
 
 		$this->assertNotNull($capturedReplaceQuery);
+		// Type narrowing for PHPStan
+		/** @var string $capturedReplaceQuery */
 		// Should contain escaped/handled special characters
 		$this->assertStringContainsString('REPLACE INTO', $capturedReplaceQuery);
 	}
@@ -645,6 +669,11 @@ class BatchProcessorTest extends TestCase {
 		$this->assertEquals(1, $processor->getBatchesProcessed());
 
 		$statistics = $processor->getProcessingStatistics();
+
+		// Type narrowing for PHPStan
+		assert(is_array($statistics));
+		/** @var array<string,mixed> $statistics */
+
 		$this->assertArrayHasKey('total_records', $statistics);
 		$this->assertArrayHasKey('total_batches', $statistics);
 		$this->assertArrayHasKey('total_duration_seconds', $statistics);
@@ -704,12 +733,24 @@ class BatchProcessorTest extends TestCase {
 
 		$statistics = $processor->getProcessingStatistics();
 
+		// Type narrowing for PHPStan
+		assert(is_array($statistics));
+		/** @var array<string,mixed> $statistics */
+
 		// Verify timing metrics are collected
 		$this->assertGreaterThan(0, $statistics['total_duration_seconds']);
 		$this->assertArrayHasKey('batch_statistics', $statistics);
-		$this->assertCount(1, $statistics['batch_statistics']); // Should have 1 batch
 
-		$batchStats = $statistics['batch_statistics'][0];
+		$batchStatistics = $statistics['batch_statistics'];
+		assert(is_array($batchStatistics));
+		/** @var array<int,mixed> $batchStatistics */
+
+		$this->assertCount(1, $batchStatistics); // Should have 1 batch
+
+		$batchStats = $batchStatistics[0];
+		assert(is_array($batchStats));
+		/** @var array<string,mixed> $batchStats */
+
 		$this->assertArrayHasKey('batch_number', $batchStats);
 		$this->assertArrayHasKey('records_count', $batchStats);
 		$this->assertArrayHasKey('duration_seconds', $batchStats);
@@ -791,6 +832,11 @@ class BatchProcessorTest extends TestCase {
 		$this->assertEquals(0, $processor->getBatchesProcessed());
 
 		$statistics = $processor->getProcessingStatistics();
+
+		// Type narrowing for PHPStan
+		assert(is_array($statistics));
+		/** @var array<string,mixed> $statistics */
+
 		$this->assertIsArray($statistics);
 		$this->assertArrayHasKey('total_records', $statistics);
 		$this->assertEquals(0, $statistics['total_records']);
