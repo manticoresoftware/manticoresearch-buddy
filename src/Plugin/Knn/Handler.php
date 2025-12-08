@@ -66,7 +66,9 @@ final class Handler extends BaseHandlerWithClient {
 		$request = $client
 			->sendRequest(
 				'SELECT * FROM ' . $payload->table .
-				' WHERE id = ' . $payload->docId
+				' WHERE id = ' . $payload->docId,
+				'sql?mode=raw',
+				false,
 			);
 
 		if ($request->hasError()) {
@@ -169,7 +171,7 @@ final class Handler extends BaseHandlerWithClient {
 		self::substituteParsedQuery($payload, $queryVector);
 
 		$resp = $manticoreClient
-				->sendRequest($payload::$sqlQueryParser::getCompletedPayload());
+				->sendRequest($payload::$sqlQueryParser::getCompletedPayload(), $payload->endpointBundle->value);
 
 		if ($resp->hasError()) {
 			ManticoreSearchResponseError::throw((string)$resp->getError());
