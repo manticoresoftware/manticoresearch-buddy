@@ -46,6 +46,9 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 		$taskFn = function (): TaskResult {
+			// Debug: log that Handler was called
+			Buddy::debug("ReplaceSelect Handler called with processor: " . ($_ENV['BUDDY_REPLACE_SELECT_PROCESSOR_TYPE'] ?? 'sequential'));
+
 			// Pre-validate payload
 			$this->payload->validate();
 
@@ -62,13 +65,7 @@ final class Handler extends BaseHandlerWithClient {
 				);
 
 				// 3. Execute batch processing
-				$processor = new BatchProcessor(
-					$this->manticoreClient,
-					$this->payload,
-					$validator->getTargetFields(),
-					$this->payload->batchSize
-				);
-
+				$processor = $this->createBatchProcessor($validator->getTargetFields());
 				$totalProcessed = $processor->execute();
 
 				// 4. Commit transaction
@@ -140,7 +137,6 @@ final class Handler extends BaseHandlerWithClient {
 		$this->transactionStarted = false;
 	}
 
-
 	/**
 	 * Rollback database transaction
 	 *
@@ -158,5 +154,38 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$this->transactionStarted = false;
+	}
+
+	/**
+	 * Create batch processor instance based on configuration
+	 *
+	 * @param array<int,array<string,string>> $targetFields
+	 * @return BatchProcessor
+	 */
+	private function createBatchProcessor(array $targetFields): BatchProcessor {
+		$processorType = $_ENV['BUDDY_REPLACE_SELECT_PROCESSOR_TYPE'] ?? 'sequential';
+
+		Buddy::debug("Creating batch processor: $processorType");
+
+		return match($processorType) {
+			'sync_concurrent' => new SynchronousConcurrentBatchProcessor(
+				$this->manticoreClient,
+				$this->payload,
+				$targetFields,
+				$this->payload->batchSize
+			),
+			'async_concurrent' => new AsynchronousBatchProcessor(
+				$this->manticoreClient,
+				$this->payload,
+				$targetFields,
+				$this->payload->batchSize
+			),
+			default => new BatchProcessor(
+				$this->manticoreClient,
+				$this->payload,
+				$targetFields,
+				$this->payload->batchSize
+			),
+		};
 	}
 }
