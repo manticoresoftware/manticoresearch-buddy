@@ -253,8 +253,9 @@ class QueryProcessor {
 		}
 
 		// No match found? throw the error
-		throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload"
-			. static::getRequestErrorMessage($request));
+		throw new SQLQueryCommandNotSupported(
+			"Failed to handle query: $request->payload"	. static::getRequestErrorMessage($request)
+		);
 	}
 
 	/**
@@ -263,7 +264,7 @@ class QueryProcessor {
 	 * @return string
 	 */
 	public static function getRequestErrorMessage(Request $request): string {
-		return $request->error ?  " # error={$request->error}" : '';
+		return $request->error ? " # error={$request->error}" : '';
 	}
 
 	/**
