@@ -253,7 +253,17 @@ class QueryProcessor {
 		}
 
 		// No match found? throw the error
-		throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload");
+		throw new SQLQueryCommandNotSupported("Failed to handle query: $request->payload"
+			. static::getRequestErrorMessage($request));
+	}
+
+	/**
+	 * We use the format from Manticore's query log to return an original error as well
+	 * @param Request $request
+	 * @return string
+	 */
+	public static function getRequestErrorMessage(Request $request): string {
+		return $request->error ?  " # error={$request->error}" : '';
 	}
 
 	/**
