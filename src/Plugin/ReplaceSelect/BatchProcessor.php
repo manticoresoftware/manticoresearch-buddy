@@ -29,21 +29,21 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
  *
  * @phpstan-type FieldInfo array{name: string, type: string, properties: string}
  */
-class BatchProcessor {
+final class BatchProcessor {
 	use StringFunctionsTrait;
 
-	protected Client $client;
-	protected Payload $payload;
+	private Client $client;
+	private Payload $payload;
 	/** @var array<int,FieldInfo> Target fields ordered by position from DESC */
-	protected array $targetFieldsOrdered;
-	protected int $batchSize;
-	protected int $totalProcessed = 0;
-	protected int $batchesProcessed = 0;
-	protected float $processingStartTime;
+	private array $targetFieldsOrdered;
+	private int $batchSize;
+	private int $totalProcessed = 0;
+	private int $batchesProcessed = 0;
+	private float $processingStartTime;
 	/** @var array<int,array<string,mixed>> */
-	protected array $statistics = [];
+	private array $statistics = [];
 	/** Base query template with LIMIT/OFFSET removed, parsed once during construction */
-	protected string $baseQueryTemplate;
+	private string $baseQueryTemplate;
 
 	/**
 	 * Constructor
@@ -82,7 +82,7 @@ class BatchProcessor {
 		$userLimit = $this->payload->selectLimit;
 		$offset = $this->payload->selectOffset ?? 0;
 
-		while (true) {
+		do {
 			if ($this->hasReachedUserLimit($userLimit)) {
 				break;
 			}
@@ -111,12 +111,7 @@ class BatchProcessor {
 			}
 
 			$offset += $currentBatchSize;
-
-			// Stop if we got fewer records than requested (end of data)
-			if (sizeof($batch) < $currentBatchSize) {
-				break;
-			}
-		}
+		} while (sizeof($batch) === $batchSize);
 
 		$this->logProcessingStatistics();
 		return $this->totalProcessed;
@@ -128,7 +123,7 @@ class BatchProcessor {
 	 * @param int|null $userLimit User-specified limit
 	 * @return bool True if limit reached
 	 */
-	protected function hasReachedUserLimit(?int $userLimit): bool {
+	private function hasReachedUserLimit(?int $userLimit): bool {
 		if ($userLimit === null) {
 			return false;
 		}
@@ -192,19 +187,12 @@ class BatchProcessor {
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	protected function fetchBatch(string $query): array {
+	private function fetchBatch(string $query): array {
 		$result = $this->client->sendRequest($query);
 
 		if ($result->hasError()) {
-			$errorMsg = $result->getError();
-
-			// Check for "offset out of bounds" - this means end of data
-			if (str_contains($errorMsg, 'offset out of bounds')) {
-				return []; // End of data reached
-			}
-
-			// For other errors, still throw exception
-			throw ManticoreSearchClientError::create('SELECT query failed: ' . $errorMsg);
+			$errorMsg = 'SELECT query failed: ' . $result->getError();
+			throw ManticoreSearchClientError::create($errorMsg);
 		}
 
 		/** @var array<int,array<string,mixed>> $data */
@@ -286,7 +274,7 @@ class BatchProcessor {
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	protected function processBatch(array $batch): void {
+	private function processBatch(array $batch): void {
 		if (empty($batch)) {
 			return;
 		}
@@ -315,7 +303,7 @@ class BatchProcessor {
 	 * @return array<int,mixed> Indexed array of converted values
 	 * @throws ManticoreSearchClientError
 	 */
-	protected function processRow(array $row): array {
+	private function processRow(array $row): array {
 		// Convert row to indexed values array
 		$values = array_values($row);
 
@@ -542,7 +530,7 @@ class BatchProcessor {
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	protected function executeReplaceBatch(array $batch): void {
+	private function executeReplaceBatch(array $batch): void {
 		if (empty($batch)) {
 			return;
 		}
@@ -571,7 +559,7 @@ class BatchProcessor {
 	 * @return array{columnNames: array<int,string>, columnPositions: array<int,int>|null}
 	 * @throws ManticoreSearchClientError
 	 */
-	protected function determineReplaceColumns(): array {
+	private function determineReplaceColumns(): array {
 		if ($this->payload->replaceColumnList !== null) {
 			return $this->determineColumnsFromList();
 		}
@@ -648,7 +636,7 @@ class BatchProcessor {
 	 * @return array{values: array<int,string>, count: int}
 	 * @throws ManticoreSearchClientError
 	 */
-	protected function buildValuesClause(array $batch, ?array $columnPositions): array {
+	private function buildValuesClause(array $batch, ?array $columnPositions): array {
 		$values = [];
 		$valueCount = 0;
 
@@ -748,18 +736,11 @@ class BatchProcessor {
 	 * @throws ManticoreSearchClientError
 	 */
 	private function executeReplaceQuery(string $sql): void {
-		// Debug: log the SQL being executed
-		Buddy::debug("Executing REPLACE SQL: " . substr($sql, 0, 200) . "...");
-
 		$result = $this->client->sendRequest($sql);
-		Buddy::debug("sendRequest result: " . json_encode($result->getResult()->toArray()));
 
 		if ($result->hasError()) {
 			$errorMsg = 'Data insert failed: ' . $result->getError();
-			Buddy::debug("REPLACE SQL failed: " . $errorMsg);
 			throw ManticoreSearchClientError::create($errorMsg);
-		} else {
-			Buddy::debug("REPLACE SQL succeeded");
 		}
 	}
 
@@ -770,7 +751,7 @@ class BatchProcessor {
 	 * @param float $batchStartTime
 	 * @return void
 	 */
-	protected function recordBatchStatistics(array $batch, float $batchStartTime): void {
+	private function recordBatchStatistics(array $batch, float $batchStartTime): void {
 		$this->totalProcessed += sizeof($batch);
 		$this->batchesProcessed++;
 
@@ -798,7 +779,7 @@ class BatchProcessor {
 	 *
 	 * @return void
 	 */
-	protected function logProcessingStatistics(): void {
+	private function logProcessingStatistics(): void {
 		if (empty($this->statistics)) {
 			return;
 		}
