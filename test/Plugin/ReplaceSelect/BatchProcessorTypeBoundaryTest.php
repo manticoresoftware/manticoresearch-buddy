@@ -458,7 +458,7 @@ class BatchProcessorTypeBoundaryTest extends TestCase {
 	/**
 	 * Create a mock response for table schema (DESC command)
 	 *
-	 * @param array<int,array{Field: string, Type: string, Properties: string}> $fields
+	 * @param array<int,array{name: string, type: string, properties: string}> $fields
 	 */
 	private function createTableSchemaResponse(array $fields): Response {
 		return $this->createMockResponse(true, $fields);

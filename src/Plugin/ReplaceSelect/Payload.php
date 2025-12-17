@@ -36,6 +36,7 @@ final class Payload extends BasePayload {
 	public ?int $selectOffset = null;
 	/** @var array<int,string>|null Column list for REPLACE INTO table (col1, col2, col3) syntax */
 	public ?array $replaceColumnList = null;
+	public bool $hasOrderBy = false;
 
 	/**
 	 * Get description for this plugin
@@ -126,6 +127,9 @@ final class Payload extends BasePayload {
 		// Extract SELECT limit and offset if present
 		$this->selectLimit = $this->extractSelectLimit($this->selectQuery);
 		$this->selectOffset = $this->extractSelectOffset($this->selectQuery);
+
+		// Check if ORDER BY clause is present
+		$this->hasOrderBy = $this->hasOrderByClause($this->selectQuery);
 	}
 
 	/**
@@ -209,6 +213,17 @@ final class Payload extends BasePayload {
 			return (int)$matches[1];
 		}
 		return null;
+	}
+
+	/**
+	 * Check if SELECT query contains ORDER BY clause
+	 *
+	 * @param string $selectQuery
+	 * @return bool True if ORDER BY clause is present
+	 */
+	private function hasOrderByClause(string $selectQuery): bool {
+		// Look for ORDER BY clause before LIMIT/OFFSET
+		return preg_match('/\s+ORDER\s+BY\s+/i', $selectQuery) === 1;
 	}
 
 	/**

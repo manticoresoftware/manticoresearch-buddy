@@ -12,6 +12,8 @@
 use Manticoresearch\Buddy\Base\Plugin\ReplaceSelect\Handler;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\BuddyTest\Trait\ReplaceSelectTestTrait;
 use PHPUnit\Framework\TestCase;
@@ -30,14 +32,13 @@ class HandlerTest extends TestCase {
 
 		$mockClient = $this->createMock(Client::class);
 
-		$mockClient->expects($this->exactly(6))
+		$mockClient->expects($this->exactly(5))
 			->method('sendRequest')
 			->withConsecutive(
 				['BEGIN'],
 				['DESC target'],
 				['SELECT id, title, price FROM source LIMIT 1'],
-				['SELECT id, title, price FROM source LIMIT 1000 OFFSET 0'],
-				['REPLACE INTO target (id,title,price) VALUES (1,\'Test Product\',29.99)'],
+				['SELECT id, title, price FROM source ORDER BY id ASC LIMIT 1000 OFFSET 0'],
 				['COMMIT']
 			)
 			->willReturnOnConsecutiveCalls(
@@ -59,8 +60,28 @@ class HandlerTest extends TestCase {
 					['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
 					]
 				),
-				$this->createMockResponse(true),
 				$this->createMockResponse(true)
+			);
+
+		// Mock sendMultiRequest for bulk operations
+		$mockClient->method('sendMultiRequest')
+			->willReturnCallback(
+				function () {
+					// Mock bulk operations - return success
+					$mockResponse = $this->createMock(Response::class);
+					$mockResponse->method('hasError')->willReturn(false);
+					$mockResponse->method('getResult')->willReturn(
+						Struct::fromData(
+							[
+							'errors' => false,
+							'items' => [
+								['replace' => ['_id' => '1', 'result' => 'created']],
+							],
+							]
+						)
+					);
+					return [$mockResponse];
+				}
 			);
 
 		$payload = $this->createValidPayload();
@@ -70,6 +91,9 @@ class HandlerTest extends TestCase {
 		$task = $handler->run();
 		usleep(500000); // 500ms - allow coroutine to complete
 
+		if (!$task->isSucceed()) {
+			echo 'Task failed with error: ' . $task->getError()->getMessage() . "\n";
+		}
 		$this->assertTrue($task->isSucceed(), 'Handler should successfully complete transaction');
 	}
 
@@ -354,14 +378,13 @@ class HandlerTest extends TestCase {
 		// The real HTTP mock server doesn't support BEGIN/COMMIT/ROLLBACK, so we use client mocks
 		$mockClient = $this->createMock(Client::class);
 
-		$mockClient->expects($this->exactly(6))
+		$mockClient->expects($this->exactly(5))
 			->method('sendRequest')
 			->withConsecutive(
 				['BEGIN'],
 				['DESC target'],
 				['SELECT id, title, price FROM source LIMIT 1'],
-				['SELECT id, title, price FROM source LIMIT 1000 OFFSET 0'],
-				['REPLACE INTO target (id,title,price) VALUES (1,\'Test Product\',29.99)'],
+				['SELECT id, title, price FROM source ORDER BY id ASC LIMIT 1000 OFFSET 0'],
 				['COMMIT']
 			)
 			->willReturnOnConsecutiveCalls(
@@ -383,8 +406,28 @@ class HandlerTest extends TestCase {
 					['id' => 1, 'title' => 'Test Product', 'price' => 29.99],
 					]
 				),
-				$this->createMockResponse(true),
 				$this->createMockResponse(true)
+			);
+
+		// Mock sendMultiRequest for bulk operations
+		$mockClient->method('sendMultiRequest')
+			->willReturnCallback(
+				function () {
+					// Mock bulk operations - return success
+					$mockResponse = $this->createMock(Response::class);
+					$mockResponse->method('hasError')->willReturn(false);
+					$mockResponse->method('getResult')->willReturn(
+						Struct::fromData(
+							[
+							'errors' => false,
+							'items' => [
+								['replace' => ['_id' => '1', 'result' => 'created']],
+							],
+							]
+						)
+					);
+					return [$mockResponse];
+				}
 			);
 
 		$payload = $this->createValidPayload();

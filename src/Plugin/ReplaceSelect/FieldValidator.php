@@ -80,8 +80,6 @@ final class FieldValidator {
 		// 4. Handle column list if provided
 		if (!empty($replaceColumnList)) {
 			$this->validateReplaceColumnList($replaceColumnList);
-			// When column list is provided, we only need to match those columns
-			// The validation will happen per column
 		}
 
 		// 5. Check if SELECT uses * (wildcard)
@@ -451,10 +449,63 @@ final class FieldValidator {
 				$displaySourceType = $this->normalizeTypeForDisplay($sourceType);
 				$displayTargetType = $this->normalizeTypeForDisplay($targetFieldType);
 				throw ManticoreSearchClientError::create(
-					"Column type mismatch: '$targetFieldName' is $displaySourceType but target expects $displayTargetType"
+					"Column type mismatch: '$targetFieldName' is ".
+					"$displaySourceType but target expects $displayTargetType"
 				);
 			}
 		}
+	}
+
+	/**
+	 * Check if two types are equivalent for validation purposes
+	 *
+	 * Supports the following equivalences:
+	 * - 'int' and 'uint' (same logical type, different contexts)
+	 * - 'string' and 'text' (text field variants)
+	 * - 'int'/'uint' to 'bigint' (safe widening conversions)
+	 *
+	 * This improved version uses a mapping for better scalability and readability,
+	 * handles case insensitivity by normalizing to lowercase, and trims whitespace
+	 * for robustness.
+	 *
+	 * @param string $sourceType Source field type
+	 * @param string $targetType Target field type
+	 * @return bool True if types are compatible
+	 */
+	private function areTypesEquivalent(string $sourceType, string $targetType): bool {
+		// Normalize inputs: trim and convert to lowercase for case-insensitivity
+		$sourceType = strtolower(trim($sourceType));
+		$targetType = strtolower(trim($targetType));
+
+		// Define equivalence groups (source => allowed targets)
+		$equivalences = [
+			'int' => ['int', 'uint', 'bigint'],
+			'uint' => ['int', 'uint', 'bigint'],
+			'string' => ['string', 'text'],
+			'text' => ['string', 'text'],
+			'bigint' => ['bigint'], // No widening from bigint assumed
+		];
+
+		// If source type not in map, only direct match allowed
+		$allowedTargets = $equivalences[$sourceType] ?? [$sourceType];
+
+		return in_array($targetType, $allowedTargets, true);
+	}
+
+	/**
+	 * Normalize Manticore internal type names to user-friendly display names
+	 *
+	 * Manticore internally uses 'uint' for integer types, but users expect
+	 * familiar SQL type names like 'int' in error messages.
+	 *
+	 * @param string $type Manticore internal type name
+	 * @return string User-friendly type name for display
+	 */
+	private function normalizeTypeForDisplay(string $type): string {
+		return match ($type) {
+			'uint' => 'int',
+			default => $type
+		};
 	}
 
 	/**
@@ -686,57 +737,5 @@ final class FieldValidator {
 	 */
 	public function getTargetFields(): array {
 		return $this->targetFieldsOrdered;
-	}
-
-	/**
-	 * Normalize Manticore internal type names to user-friendly display names
-	 *
-	 * Manticore internally uses 'uint' for integer types, but users expect
-	 * familiar SQL type names like 'int' in error messages.
-	 *
-	 * @param string $type Manticore internal type name
-	 * @return string User-friendly type name for display
-	 */
-	private function normalizeTypeForDisplay(string $type): string {
-		return match ($type) {
-			'uint' => 'int',
-			default => $type
-		};
-	}
-
-	/**
-	 * Check if two types are equivalent for validation purposes
-	 *
-	 * Supports the following equivalences:
-	 * - 'int' and 'uint' (same logical type, different contexts)
-	 * - 'string' and 'text' (text field variants)
-	 * - 'int'/'uint' to 'bigint' (safe widening conversions)
-	 *
-	 * This improved version uses a mapping for better scalability and readability,
-	 * handles case insensitivity by normalizing to lowercase, and trims whitespace
-	 * for robustness.
-	 *
-	 * @param string $sourceType Source field type
-	 * @param string $targetType Target field type
-	 * @return bool True if types are compatible
-	 */
-	private function areTypesEquivalent(string $sourceType, string $targetType): bool {
-		// Normalize inputs: trim and convert to lowercase for case-insensitivity
-		$sourceType = strtolower(trim($sourceType));
-		$targetType = strtolower(trim($targetType));
-
-		// Define equivalence groups (source => allowed targets)
-		$equivalences = [
-			'int' => ['int', 'uint', 'bigint'],
-			'uint' => ['int', 'uint', 'bigint'],
-			'string' => ['string', 'text'],
-			'text' => ['string', 'text'],
-			'bigint' => ['bigint'], // No widening from bigint assumed
-		];
-
-		// If source type not in map, only direct match allowed
-		$allowedTargets = $equivalences[$sourceType] ?? [$sourceType];
-
-		return in_array($targetType, $allowedTargets, true);
 	}
 }

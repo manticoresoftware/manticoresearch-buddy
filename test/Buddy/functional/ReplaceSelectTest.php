@@ -22,8 +22,11 @@ class ReplaceSelectTest extends TestCase {
 		$this->setupTestTables();
 
 		try {
-			// Execute REPLACE SELECT
-			static::runSqlQuery('REPLACE INTO test_replace_tgt SELECT * FROM test_replace_src');
+			// Execute REPLACE SELECT via HTTP
+			static::runHttpQuery(
+				'REPLACE INTO test_replace_tgt '.
+				'SELECT * FROM test_replace_src', true, 'sql?mode=raw'
+			);
 
 			// Verify all 10 records copied
 			$count = static::runSqlQuery('SELECT COUNT(*) as cnt FROM test_replace_tgt');
@@ -187,10 +190,11 @@ class ReplaceSelectTest extends TestCase {
 
 		try {
 			// REPLACE with LIMIT
-			static::runSqlQuery(
+			$r = static::runSqlQuery(
 				'REPLACE INTO test_replace_tgt (id, title, description) ' .
 				'SELECT id, title, description FROM test_replace_src LIMIT 5'
 			);
+			echo '--->'.json_encode($r)."\n";
 
 			// Verify limited records
 			$count = static::runSqlQuery('SELECT COUNT(*) as cnt FROM test_replace_tgt');

@@ -1,13 +1,13 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
-
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License version 3 or any later
-  version. You should have received a copy of the GPL license along with this
-  program; if you did not, you can find it at http://www.gnu.org/
-*/
+ * Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 or any later
+ * version. You should have received a copy of the GPL license along with this
+ * program; if you did not, you can find it at http://www.gnu.org/
+ */
 
 namespace Manticoresearch\Buddy\Base\Plugin\ReplaceSelect;
 
@@ -29,7 +29,8 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
  *
  * @phpstan-type FieldInfo array{name: string, type: string, properties: string}
  */
-final class BatchProcessor {
+final class BatchProcessor
+{
 	use StringFunctionsTrait;
 
 	private Client $client;
@@ -37,8 +38,11 @@ final class BatchProcessor {
 	/** @var array<int,FieldInfo> Target fields ordered by position from DESC */
 	private array $targetFieldsOrdered;
 	private int $batchSize;
+	/** @var int<1,max> */
+	private int $chunkSize;
 	private int $totalProcessed = 0;
 	private int $batchesProcessed = 0;
+	private int $chunksProcessed = 0;
 	private float $processingStartTime;
 	/** @var array<int,array<string,mixed>> */
 	private array $statistics = [];
@@ -65,7 +69,42 @@ final class BatchProcessor {
 		$this->targetFieldsOrdered = $targetFieldsOrdered;
 		$this->processingStartTime = microtime(true);
 		$this->batchSize = $batchSize;
+		$this->chunkSize = max(1, (int)($batchSize / swoole_cpu_num()));
 		$this->baseQueryTemplate = $this->prepareBaseQueryTemplate();
+	}
+
+	/**
+	 * Prepare base query template by removing existing LIMIT/OFFSET clauses
+	 * and adding ORDER BY if not present
+	 *
+	 * @return string Clean base query template
+	 * @throws ManticoreSearchClientError
+	 */
+	private function prepareBaseQueryTemplate(): string {
+		$baseQuery = $this->payload->selectQuery;
+
+		// Remove LIMIT/OFFSET clauses and store them for later
+		$limitOffsetMatch = [];
+		if (preg_match('/(\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?)\s*$/i', $baseQuery, $limitOffsetMatch)) {
+			$baseQuery = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $baseQuery);
+		}
+
+		if ($baseQuery === null) {
+			throw ManticoreSearchClientError::create(
+				'Invalid SELECT query format'
+			);
+		}
+
+		// Add ORDER BY id ASC if no ORDER BY clause is present
+		if (!$this->payload->hasOrderBy) {
+			$baseQuery .= ' ORDER BY id ASC';
+		}
+
+		// Note: Do not add back the original LIMIT/OFFSET clauses to the base template.
+		// The user's LIMIT/OFFSET are stored in $payload->selectLimit and $payload->selectOffset
+		// and will be enforced by the batch processing logic, not embedded in the query template.
+
+		return $baseQuery;
 	}
 
 	/**
@@ -95,6 +134,10 @@ final class BatchProcessor {
 			);
 
 			$batchQuery = "{$this->baseQueryTemplate} LIMIT $currentBatchSize OFFSET $offset";
+
+			if ($offset >= 1000) {
+				$batchQuery .= ' OPTION max_matches='.($currentBatchSize + $offset);
+			}
 
 			$batch = $this->fetchBatch($batchQuery);
 
@@ -134,26 +177,6 @@ final class BatchProcessor {
 		}
 
 		return false;
-	}
-
-	/**
-	 * Prepare base query template by removing existing LIMIT/OFFSET clauses
-	 * This is called once during construction to avoid repeated regex parsing
-	 *
-	 * @return string Clean base query template
-	 * @throws ManticoreSearchClientError
-	 */
-	private function prepareBaseQueryTemplate(): string {
-		$baseQuery = $this->payload->selectQuery;
-		$result = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $baseQuery);
-
-		if ($result === null) {
-			throw ManticoreSearchClientError::create(
-				'Invalid SELECT query format'
-			);
-		}
-
-		return $result;
 	}
 
 	/**
@@ -279,25 +302,12 @@ final class BatchProcessor {
 			return;
 		}
 
-		// Process each row for field type compatibility
-		$processedBatch = [];
-		foreach ($batch as $row) {
-			$processedBatch[] = $this->processRow($row);
-		}
-
-		// Build and execute REPLACE query
-		$this->executeReplaceBatch($processedBatch);
+		// Pass raw associative arrays to executeReplaceBatch for processing
+		$this->executeReplaceBatch($batch);
 	}
 
 	/**
 	 * Process a single row for field type compatibility
-	 *
-	 * Position-based processing:
-	 * - Convert row to indexed values array
-	 * - Match each value to target field by position
-	 * - Apply type conversion
-	 * - When column list is specified, process only those columns
-	 * - Return indexed array (no field names)
 	 *
 	 * @param array<string,mixed> $row Associative array from SELECT result
 	 * @return array<int,mixed> Indexed array of converted values
@@ -405,55 +415,12 @@ final class BatchProcessor {
 		$fieldType = $fieldInfo['type'];
 		$value = $values[$selectIndex] ?? null;
 
-		$this->validateFieldType($fieldType);
-
 		try {
 			$processed[$targetPosition] = $this->morphValuesByFieldType($value, $fieldType);
 		} catch (Exception $e) {
-			$this->throwFieldProcessingError($columnName, $e);
+			$errorMsg = "Invalid data in column '$columnName': " . $e->getMessage();
+			throw ManticoreSearchClientError::create($errorMsg);
 		}
-	}
-
-	/**
-	 * Validate that field type is a string
-	 *
-	 * @param mixed $fieldType
-	 * @param string|null $fieldName
-	 * @param int|null $position
-	 *
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function validateFieldType(mixed $fieldType, ?string $fieldName = null, ?int $position = null): void {
-		if (is_string($fieldType)) {
-			return;
-		}
-
-		$errorContext = $fieldName !== null
-			? ($position !== null
-				? "at column '$fieldName' (position $position)"
-				: "for column '$fieldName'")
-			: '';
-
-		throw ManticoreSearchClientError::create(
-			"Invalid target table structure $errorContext"
-		);
-	}
-
-	/**
-	 * Throw field processing error with context
-	 *
-	 * @param string $fieldName
-	 * @param Exception $e
-	 * @return never
-	 * @throws ManticoreSearchClientError
-	 */
-	private function throwFieldProcessingError(
-		string $fieldName,
-		Exception $e
-	): never {
-		$errorMsg = "Invalid data in column '$fieldName': " . $e->getMessage();
-		throw ManticoreSearchClientError::create($errorMsg);
 	}
 
 	/**
@@ -501,32 +468,24 @@ final class BatchProcessor {
 		try {
 			$fieldInfo = $this->targetFieldsOrdered[$index];
 
-			// Type alias guarantees name and type are strings, but adding defensive check for safety
 			/** @var string $fieldName */
 			$fieldName = $fieldInfo['name'];
 			/** @var string $fieldType */
 			$fieldType = $fieldInfo['type'];
 
-			$this->validateFieldType($fieldType, $fieldName, $index);
-
 			$processed[$index] = $this->morphValuesByFieldType($value, $fieldType);
 		} catch (Exception $e) {
 			$fieldInfo = $this->targetFieldsOrdered[$index] ?? [];
 			$fieldName = is_string($fieldInfo['name'] ?? null) ? $fieldInfo['name'] : "position_$index";
-			$this->throwFieldProcessingError($fieldName, $e);
+			$errorMsg = "Invalid data in column '$fieldName': " . $e->getMessage();
+			throw ManticoreSearchClientError::create($errorMsg);
 		}
 	}
 
 	/**
-	 * Execute REPLACE query for a batch of processed records
+	 * Execute REPLACE operations using bulk JSON API for a batch of records
 	 *
-	 * Position-based REPLACE building:
-	 * - When column list specified: use only those columns in REPLACE INTO (col1, col2)
-	 * - When no column list: use all fields from targetFieldsOrdered
-	 * - Values from indexed row arrays (extracted by position)
-	 * - Preserves target DESC field order
-	 *
-	 * @param array<int,array<int,mixed>> $batch Indexed array of indexed row arrays
+	 * @param array<int,array<string,mixed>> $batch Array of associative row arrays
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
@@ -535,22 +494,59 @@ final class BatchProcessor {
 			return;
 		}
 
-		// Determine columns for REPLACE statement
+		// Process each row for field type compatibility (convert associative to indexed)
+		$processedBatch = [];
+		foreach ($batch as $row) {
+			$processedBatch[] = $this->processRow($row);
+		}
+
+		// Split batch into chunks for parallel processing
+		$chunks = array_chunk($processedBatch, $this->chunkSize);
+		$requests = [];
+
+		foreach ($chunks as $chunk) {
+			$bulkJson = $this->buildChunkBulk($chunk);
+			$requests[] = $this->buildRequest($bulkJson);
+		}
+
+		$this->executeReplaceChunks($requests);
+	}
+
+	/**
+	 * Build JSON bulk operations for a single chunk
+	 *
+	 * @param array<int,array<int,mixed>> $chunk Chunk of rows to convert to bulk JSON
+	 * @return string JSON bulk operations (NDJSON format)
+	 * @throws ManticoreSearchClientError
+	 */
+	private function buildChunkBulk(array $chunk): string {
+		$targetTable = $this->payload->getTargetTableWithCluster();
 		$columns = $this->determineReplaceColumns();
 
-		// Build VALUES clause
-		$valuesData = $this->buildValuesClause($batch, $columns['columnPositions']);
+		$bulkLines = [];
+		foreach ($chunk as $row) {
+			// Row is already processed by processBatch(), use directly
+			$processedRow = $row;
 
-		// Build and execute SQL
-		$targetTable = $this->payload->getTargetTableWithCluster();
-		$sql = sprintf(
-			/** @lang manticore*/            'REPLACE INTO %s (%s) VALUES %s',
-			$targetTable,
-			implode(',', $columns['columnNames']),
-			implode(',', $valuesData['values'])
-		);
+			// Extract ID field (required for bulk operations)
+			$id = $this->extractIdFromRow($processedRow, $columns);
 
-		$this->executeReplaceQuery($sql);
+			// Build document data (exclude ID field)
+			$doc = $this->buildDocumentFromRow($processedRow, $columns);
+
+			// Create bulk operation JSON
+			$operation = [
+				'replace' => [
+					'id' => $id,
+					'table' => $targetTable,
+					'doc' => $doc,
+				],
+			];
+
+			$bulkLines[] = json_encode($operation);
+		}
+
+		return implode(PHP_EOL, $bulkLines) . PHP_EOL;
 	}
 
 	/**
@@ -629,119 +625,302 @@ final class BatchProcessor {
 	}
 
 	/**
-	 * Build VALUES clause for REPLACE statement
+	 * Extract ID field from processed row
 	 *
-	 * @param array<int,array<int,mixed>> $batch
-	 * @param array<int,int>|null $columnPositions
-	 * @return array{values: array<int,string>, count: int}
+	 * @param array<int,mixed> $processedRow
+	 * @param array{columnNames: array<int,string>, columnPositions: array<int,int>|null} $columns
+	 * @return int|string
 	 * @throws ManticoreSearchClientError
 	 */
-	private function buildValuesClause(array $batch, ?array $columnPositions): array {
-		$values = [];
-		$valueCount = 0;
+	private function extractIdFromRow(array $processedRow, array $columns): int|string {
+		// Find ID field position in the processed row
+		// The processed row is indexed by select position (0, 1, 2, ...)
+		$idPosition = array_search('id', $columns['columnNames'], true);
 
-		foreach ($batch as $row) {
-			try {
-				$rowValues = $this->extractRowValues($row, $columnPositions);
-				$values[] = '(' . implode(',', $rowValues) . ')';
-				$valueCount++;
-			} catch (Exception $e) {
-				throw ManticoreSearchClientError::create(
-					'Failed to format data for REPLACE: ' . $e->getMessage()
-				);
+		if ($idPosition === false) {
+			throw ManticoreSearchClientError::create('ID field is required for bulk operations');
+		}
+
+		$id = $processedRow[$idPosition] ?? null;
+		if ($id === null) {
+			throw ManticoreSearchClientError::create('ID field cannot be null in bulk operations');
+		}
+
+		if (!is_int($id) && !is_string($id)) {
+			throw ManticoreSearchClientError::create('ID field must be int or string');
+		}
+
+		return $id;
+	}
+
+	/**
+	 * Build document data from processed row (excluding ID field)
+	 *
+	 * @param array<int,mixed> $processedRow
+	 * @param array{columnNames: array<int,string>, columnPositions: array<int,int>|null} $columns
+	 * @return array<string,mixed>
+	 */
+	private function buildDocumentFromRow(array $processedRow, array $columns): array {
+		$doc = [];
+
+		if ($columns['columnPositions'] !== null) {
+			// Column list case: use target positions from columnPositions array
+			foreach ($columns['columnNames'] as $i => $columnName) {
+				if ($columnName === 'id') {
+					continue;
+				}
+				// Exclude ID field from document
+				$targetPosition = $columns['columnPositions'][$i];
+				$sqlValue = $processedRow[$targetPosition] ?? null;
+				$doc[$columnName] = $this->convertSqlValueToJsonValue($sqlValue, $columnName, $columns);
+			}
+		} else {
+			// No column list case: use sequential positions
+			foreach ($columns['columnNames'] as $position => $columnName) {
+				if ($columnName === 'id') {
+					continue;
+				}
+				// Exclude ID field from document
+				$sqlValue = $processedRow[$position] ?? null;
+				$doc[$columnName] = $this->convertSqlValueToJsonValue($sqlValue, $columnName, $columns);
 			}
 		}
 
+		return $doc;
+	}
+
+	/**
+	 * Convert SQL-formatted value to JSON-compatible value
+	 *
+	 * @param mixed $sqlValue SQL-formatted value from morphValuesByFieldType()
+	 * @param string $columnName Column name to determine field type
+	 * @param array{columnNames: array<int,string>, columnPositions: array<int,int>|null} $columns Column metadata
+	 * @return mixed JSON-compatible value
+	 */
+	private function convertSqlValueToJsonValue(mixed $sqlValue, string $columnName, array $columns): mixed {
+		if ($sqlValue === null) {
+			return null;
+		}
+
+		// Handle MVA arrays (already converted)
+		if (is_array($sqlValue)) {
+			return $sqlValue;
+		}
+
+		// Convert MVA SQL format to arrays
+		if (is_string($sqlValue)) {
+			if (str_starts_with($sqlValue, '(') && str_ends_with($sqlValue, ')')) {
+				return $this->convertMvaSqlFormatToArray($sqlValue);
+			}
+
+			// Convert SQL-quoted strings to JSON strings
+			if (str_starts_with($sqlValue, "'") && str_ends_with($sqlValue, "'")) {
+				return $this->convertSqlStringToJsonString($sqlValue);
+			}
+		}
+
+		// Convert based on field type
+		$fieldType = $this->getFieldTypeForColumn($columnName, $columns);
+		return $this->convertValueByFieldType($sqlValue, $fieldType);
+	}
+
+	/**
+	 * Convert MVA SQL format to array
+	 *
+	 * @param string $sqlValue SQL-formatted MVA like '(1,2,3)'
+	 * @return array<int,int> Array of integers
+	 */
+	private function convertMvaSqlFormatToArray(string $sqlValue): array {
+
+		$mvaStr = trim($sqlValue, '()');
+		if ($mvaStr !== '') {
+			return array_map('intval', explode(',', $mvaStr));
+		}
+
+		return [];
+	}
+
+	/**
+	 * Convert SQL-formatted string to JSON string
+	 *
+	 * @param mixed $sqlValue SQL-formatted string like "'value'" or "''"
+	 * @return string JSON-compatible string
+	 */
+	private function convertSqlStringToJsonString(mixed $sqlValue): string {
+		if (!is_string($sqlValue)) {
+			if (is_scalar($sqlValue)) {
+				return (string)$sqlValue;
+			}
+			return '';
+		}
+
+		// Remove SQL quotes and unescape
+		$contentLength = strlen($sqlValue) - 2; // Remove 2 quote characters
+		if ($contentLength > 0) {
+			$content = substr($sqlValue, 1, $contentLength);
+			$unescaped = stripslashes($content); // Unescape SQL escaping
+			// Check if the unescaped content represents an empty string
+			if ($unescaped === '' || $unescaped === "''" || $unescaped === "''''") {
+				return ''; // Empty string
+			}
+			return $unescaped;
+		}
+
+		return ''; // Empty string for quoted empty strings like "''"
+	}
+
+	/**
+	 * Get field type for a column name
+	 *
+	 * @param string $columnName Column name
+	 * @param array{columnNames: array<int,string>, columnPositions: array<int,int>|null} $columns Column metadata
+	 * @return string Field type or 'string' if not found
+	 */
+	private function getFieldTypeForColumn(string $columnName, array $columns): string {
+		// Find the target position for this column
+		if ($columns['columnPositions'] !== null) {
+			$position = array_search($columnName, $columns['columnNames'], true);
+			if ($position === false || !isset($columns['columnPositions'][$position])) {
+				return 'string'; // Default fallback
+			}
+
+			$targetPosition = $columns['columnPositions'][$position];
+		} else {
+			$targetPosition = array_search($columnName, $columns['columnNames'], true);
+			if ($targetPosition === false) {
+				return 'string'; // Default fallback
+			}
+		}
+
+		// Get field type from target fields
+		$fieldInfo = $this->targetFieldsOrdered[$targetPosition] ?? null;
+		return $fieldInfo['type'] ?? 'string';
+	}
+
+	/**
+	 * Convert value based on field type
+	 *
+	 * @param mixed $sqlValue The value to convert
+	 * @param string $fieldType Field type from schema
+	 * @return mixed Converted value
+	 */
+	private function convertValueByFieldType(mixed $sqlValue, string $fieldType): mixed {
+		return match ($fieldType) {
+			'float' => is_numeric($sqlValue) ? (float)$sqlValue : 0.0,
+			'int', 'bigint' => is_numeric($sqlValue) ? (int)$sqlValue : 0,
+			'uint' => is_numeric($sqlValue) ? (int)$sqlValue : 0,
+			'bool' => is_numeric($sqlValue) ? ($sqlValue !== 0)
+				: (is_string($sqlValue) && strtolower($sqlValue) === 'true'),
+			'timestamp' => is_numeric($sqlValue) ? (int)$sqlValue : 0,
+			'json' => $this->convertSqlJsonToJsonValue($sqlValue),
+			default => $sqlValue
+		};
+	}
+
+	/**
+	 * Convert SQL-formatted JSON string to JSON value
+	 *
+	 * @param mixed $sqlValue SQL-formatted JSON string like "'{"key":"value"}'"
+	 * @return mixed Decoded JSON value or original string if decoding fails
+	 */
+	private function convertSqlJsonToJsonValue(mixed $sqlValue): mixed {
+		if (!is_string($sqlValue)) {
+			return $sqlValue;
+		}
+
+		// Remove SQL quotes first
+		if (str_starts_with($sqlValue, "'") && str_ends_with($sqlValue, "'")) {
+			$contentLength = strlen($sqlValue) - 2;
+			if ($contentLength > 0) {
+				$jsonStr = substr($sqlValue, 1, $contentLength);
+				$decoded = json_decode(stripslashes($jsonStr), true);
+				return $decoded !== null ? $decoded : stripslashes($jsonStr);
+			}
+
+			return null; // Empty JSON string
+		}
+
+		return $sqlValue;
+	}
+
+	/**
+	 * Build request object for sendMultiRequest
+	 *
+	 * @param string $jsonBulk JSON bulk operations to send
+	 * @return array{url: string, path: string, request: string}
+	 */
+	private function buildRequest(string $jsonBulk): array {
 		return [
-		'values' => $values,
-		'count' => $valueCount,
+			// Use empty string if URL is not directly accessible
+			'url' => '',
+			'path' => 'bulk',
+			'request' => $jsonBulk,
 		];
 	}
 
 	/**
-	 * Extract row values for REPLACE statement
+	 * Execute multiple chunks in parallel using sendMultiRequest
 	 *
-	 * @param array<int,mixed> $row
-	 * @param array<int,int>|null $columnPositions
-	 * @return array<int,string> Values ready for SQL insertion
-	 */
-	private function extractRowValues(array $row, ?array $columnPositions): array {
-		$rowValues = [];
-
-		if ($columnPositions !== null) {
-			// Extract only specified columns by position
-			foreach ($columnPositions as $position) {
-				$value = $row[$position] ?? null;
-				$rowValues[] = $this->convertValueToString($value);
-			}
-		} else {
-			// Extract all values in order
-			foreach ($row as $value) {
-				$rowValues[] = $this->convertValueToString($value);
-			}
-		}
-
-		return $rowValues;
-	}
-
-	/**
-	 * Convert a mixed value to string for SQL insertion
-	 *
-	 * Handles various types:
-	 * - Scalar types (int, float, bool, string): cast to string
-	 * - Arrays: encode as JSON
-	 * - Objects: encode as JSON or use __toString()
-	 * - NULL: convert to 'NULL' string
-	 *
-	 * @param mixed $value The value to convert
-	 * @return string 'NULL' for null values, otherwise string representation
-	 */
-	private function convertValueToString(mixed $value): string {
-		if ($value === null) {
-			return 'NULL';
-		}
-
-		// Scalar types: int, float, bool, string - safely cast to string
-		if (is_scalar($value)) {
-			return (string)$value;
-		}
-
-		// Handle arrays - encode as JSON
-		if (is_array($value)) {
-			$encoded = json_encode($value);
-			return $encoded !== false ? $encoded : 'NULL';
-		}
-
-		// Handle objects
-		if (is_object($value)) {
-			// Try __toString() method if available
-			if (method_exists($value, '__toString')) {
-				return $value->__toString();
-			}
-			// Fallback to JSON encoding
-			$encoded = json_encode($value);
-			return $encoded !== false ? $encoded : 'NULL';
-		}
-
-		// Fallback for any unexpected type
-		return 'NULL';
-	}
-
-	/**
-	 * Execute REPLACE query and handle errors
-	 *
-	 * @param string $sql
+	 * @param array<int,array{url: string, path: string, request: string}> $requests List of chunk requests
 	 *
 	 * @return void
 	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
 	 */
-	private function executeReplaceQuery(string $sql): void {
-		$result = $this->client->sendRequest($sql);
-
-		if ($result->hasError()) {
-			$errorMsg = 'Data insert failed: ' . $result->getError();
-			throw ManticoreSearchClientError::create($errorMsg);
+	private function executeReplaceChunks(array $requests): void {
+		if (empty($requests)) {
+			return;
 		}
+
+		$responses = $this->client->sendMultiRequest($requests);
+
+		// Error handling for each response
+		$failedChunks = [];
+
+		foreach ($responses as $index => $response) {
+			$current = $response->getResult()->toArray();
+
+			// Check for explicit errors first
+			if ($response->hasError()) {
+				$failedChunks[] = [
+					'index' => $index,
+					'error' => $response->getError(),
+					'request' => $requests[$index]['request'],
+				];
+				continue;
+			}
+
+			// Validate bulk response structure
+			if (!isset($current['errors'])) {
+				$failedChunks[] = [
+					'index' => $index,
+					'error' => 'Invalid bulk response structure: missing errors field',
+					'request' => $requests[$index]['request'],
+				];
+				continue;
+			}
+
+			// Check for bulk operation errors
+			if (!$current['errors']) {
+				continue;
+			}
+
+			$failedChunks[] = [
+				'index' => $index,
+				'error' => 'Bulk operation failed',
+				'request' => $requests[$index]['request'],
+			];
+		}
+
+		// If any chunks failed, throw an error
+		if (!empty($failedChunks)) {
+			// Throw the first error as representative
+			throw ManticoreSearchClientError::create(
+				"Chunk insert failed: {$failedChunks[0]['error']}"
+			);
+		}
+
+		$this->chunksProcessed += sizeof($requests);
 	}
 
 	/**
@@ -762,16 +941,6 @@ final class BatchProcessor {
 			'duration_seconds' => $batchDuration,
 			'records_per_second' => sizeof($batch) / $batchDuration,
 		];
-
-		Buddy::debug(
-			sprintf(
-				'Batch %d: %d records in %.2fs (%.0f records/sec)',
-				$this->batchesProcessed,
-				sizeof($batch),
-				$batchDuration,
-				sizeof($batch) / $batchDuration
-			)
-		);
 	}
 
 	/**

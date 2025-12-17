@@ -301,11 +301,6 @@ class FieldValidatorTypeMismatchTest extends TestCase {
 			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
 		];
 
-		$sourceSchema = [
-			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
-			['Field' => 'price', 'Type' => 'float', 'Properties' => ''],
-			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-		];
 
 		$mockClient->method('sendRequest')
 			->willReturnCallback(
