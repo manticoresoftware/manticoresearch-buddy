@@ -138,7 +138,7 @@ final class MetricsEndpointTest extends TestCase {
 		$this->assertArrayHasKey('headers', $sqlResponse[0]);
 		/** @var array{headers:string,status_code:int,data:array<int,array<string,string>>,error:string} $sqlItem */
 		$sqlItem = $sqlResponse[0];
-		$this->assertStringContainsString('Content-Type: text/html', $sqlItem['headers']);
+		$this->assertStringContainsString('Content-Type: application/json', $sqlItem['headers']);
 	}
 
 	/**
