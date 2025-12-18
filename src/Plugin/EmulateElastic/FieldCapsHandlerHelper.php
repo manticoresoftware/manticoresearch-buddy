@@ -189,7 +189,7 @@ class FieldCapsHandlerHelper {
 			// until the issue is fixed in daemon
 			/** @var array{hits:array{hits:array<int,array{_source:array<string,mixed>}>}} */
 			$queryResult = $this->manticoreClient
-				->sendRequest("SELECT $selectExpr FROM {$this->table} $whereExpr LIMIT 1", 'sql', false, true)
+				->sendRequest("SELECT $selectExpr FROM {$this->table} $whereExpr LIMIT 1", 'sql', false)
 				->getResult();
 			// We treat NULL json fields as empty objects
 			if ($unprocessedFields && !$queryResult['hits']['hits']) {
