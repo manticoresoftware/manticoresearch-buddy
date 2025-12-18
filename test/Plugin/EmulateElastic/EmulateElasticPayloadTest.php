@@ -16,7 +16,7 @@ use Manticoresearch\Buddy\Core\Network\Request as NetRequest;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use PHPUnit\Framework\TestCase;
 
-class PayloadTest extends TestCase {
+class EmulateElasticPayloadTest extends TestCase {
 
 	public function testGetTableNameFromElasticQueryOk():void {
 		$request = NetRequest::fromArray(
