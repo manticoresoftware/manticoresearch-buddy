@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
-use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
@@ -35,6 +35,8 @@ final class Payload extends BasePayload {
 	public string $actingUser;
 	public string $action;
 	public ?string $budget = null;
+	public string $rawQuery = '';
+	public string $requestId = '';
 
 	/**
 	 * Get a description for this plugin
@@ -74,6 +76,8 @@ final class Payload extends BasePayload {
 	public static function fromRequest(Request $request): static {
 		$self = new static();
 		$self->actingUser = $request->user;
+		$self->rawQuery = $request->payload;
+		$self->requestId = $request->id;
 
 		[$self->type, $self->handler] = match (true) {
 			self::hasCreateUser($request) => ['create', 'UserHandler'],
@@ -82,7 +86,7 @@ final class Payload extends BasePayload {
 			self::hasRevoke($request) => ['revoke', 'GrantRevokeHandler'],
 			self::hasShowMyPermissions($request) => ['show_my_permissions', 'ShowHandler'],
 			self::hasSetPassword($request) => ['set_password', 'PasswordHandler'],
-			default => throw GenericError::create('Failed to handle your query', true)
+			default => throw AuthError::createFromRequest($request, 'Failed to handle your query', true)
 		};
 
 		switch ($self->handler) {
@@ -216,7 +220,8 @@ final class Payload extends BasePayload {
 			$self->username = $matches[1];
 			$self->password = null;
 		} else {
-			throw GenericError::create('Invalid payload: Does not match CREATE USER or DROP USER command.', true);
+			$error = 'Invalid payload: Does not match CREATE USER or DROP USER command.';
+			throw AuthError::createFromPayload($self, $error, true);
 		}
 	}
 
@@ -228,7 +233,7 @@ final class Payload extends BasePayload {
 			'\s+(TO|FROM)\s+\'([^\']+)\'(?:\s+WITH\s+BUDGET\s+([\'"]?\{.*?\}[\'"]?))?$/i';
 
 		if (!preg_match($pattern, $payload, $matches)) {
-			throw GenericError::create('Invalid payload: Does not match GRANT or REVOKE command.', true);
+			throw AuthError::createFromPayload($self, 'Invalid payload: Does not match GRANT or REVOKE command.', true);
 		}
 
 		$command = strtolower($matches[1]);
@@ -239,22 +244,26 @@ final class Payload extends BasePayload {
 		$budget = isset($matches[7]) ? trim($matches[7], "'\"") : null;
 
 		if ($command === 'grant' && strtoupper($preposition) !== 'TO') {
-			throw GenericError::create('Invalid preposition for GRANT: Must use TO.', true);
+			throw AuthError::createFromPayload($self, 'Invalid preposition for GRANT: Must use TO.', true);
 		}
 		if ($command === 'revoke' && strtoupper($preposition) !== 'FROM') {
-			throw GenericError::create('Invalid preposition for REVOKE: Must use FROM.', true);
+			throw AuthError::createFromPayload($self, 'Invalid preposition for REVOKE: Must use FROM.', true);
 		}
 		if ($command === 'revoke' && $budget !== null) {
-			throw GenericError::create('REVOKE does not support WITH BUDGET.', true);
+			throw AuthError::createFromPayload($self, 'REVOKE does not support WITH BUDGET.', true);
 		}
 
 		$allowedActions = ['read', 'write', 'schema', 'admin', 'replication'];
 		if (!in_array(strtolower($action), $allowedActions)) {
-			throw GenericError::create('Invalid action: Must be one of read, write, schema, admin, replication.', true);
+			throw AuthError::createFromPayload(
+				$self,
+				'Invalid action: Must be one of read, write, schema, admin, replication.',
+				true
+			);
 		}
 
 		if ($budget !== null && json_decode($budget, true) === null) {
-			throw GenericError::create('Invalid budget JSON.', true);
+			throw AuthError::createFromPayload($self, 'Invalid budget JSON.', true);
 		}
 
 		$self->action = $action;
@@ -270,7 +279,7 @@ final class Payload extends BasePayload {
 		$pattern = '/^SET\s+PASSWORD\s+\'([^\']+)\'(?:\s+FOR\s+\'([^\']+)\')?$/i';
 
 		if (!preg_match($pattern, $payload, $matches)) {
-			throw GenericError::create('Invalid payload: Does not match SET PASSWORD command.', true);
+			throw AuthError::createFromPayload($self, 'Invalid payload: Does not match SET PASSWORD command.', true);
 		}
 
 		$self->username = $matches[2] ?? null;
@@ -284,5 +293,19 @@ final class Payload extends BasePayload {
 	 */
 	public function getHandlerClassName(): string {
 		return __NAMESPACE__ . '\\' . $this->handler;
+	}
+
+	public function getRedactedQuery(): string {
+		return preg_replace(
+			[
+				"/(IDENTIFIED\\s+BY\\s+)'[^']*'/iu",
+				"/(SET\\s+PASSWORD\\s+)'[^']*'/iu",
+			],
+			[
+				"$1'***'",
+				"$1'***'",
+			],
+			$this->rawQuery
+		) ?? $this->rawQuery;
 	}
 }

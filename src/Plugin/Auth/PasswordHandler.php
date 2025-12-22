@@ -10,7 +10,7 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
-use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -50,13 +50,13 @@ final class PasswordHandler extends BaseHandlerWithClient {
 	 */
 	private function validatePassword(string $password): void {
 		if (empty($password)) {
-			throw GenericError::create('Password cannot be empty.');
+			throw AuthError::createFromPayload($this->payload, 'Password cannot be empty.');
 		}
 		if (strlen($password) < 8) {
-			throw GenericError::create('Password must be at least 8 characters long.');
+			throw AuthError::createFromPayload($this->payload, 'Password must be at least 8 characters long.');
 		}
 		if (strlen($password) > 128) {
-			throw GenericError::create('Password is too long (max 128 characters).');
+			throw AuthError::createFromPayload($this->payload, 'Password is too long (max 128 characters).');
 		}
 	}
 
@@ -72,7 +72,7 @@ final class PasswordHandler extends BaseHandlerWithClient {
 		$password = $this->payload->password;
 
 		if ($password === null) {
-			throw GenericError::create('Password is required for password update.');
+			throw AuthError::createFromPayload($this->payload, 'Password is required for password update.');
 		}
 
 		$this->validatePassword($password);
@@ -81,11 +81,12 @@ final class PasswordHandler extends BaseHandlerWithClient {
 		$existingHashes = json_decode($userData['hashes'], true);
 
 		if (json_last_error() !== JSON_ERROR_NONE) {
-			throw GenericError::create('Failed to parse user hash data: ' . json_last_error_msg());
+			$error = 'Failed to parse user hash data: ' . json_last_error_msg();
+			throw AuthError::createFromPayload($this->payload, $error);
 		}
 
 		if (!is_array($existingHashes)) {
-			throw GenericError::create('Invalid hash data format: expected array.');
+			throw AuthError::createFromPayload($this->payload, 'Invalid hash data format: expected array.');
 		}
 
 		// Validate hash structure before proceeding
@@ -112,17 +113,17 @@ final class PasswordHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 
 		$result = $resp->getResult()->toArray();
 		if (!is_array($result) || !isset($result[0]['data'][0])) {
-			throw GenericError::create("User '{$username}' does not exist.");
+			throw AuthError::createFromPayload($this->payload, "User '{$username}' does not exist.");
 		}
 
 		$userData = $result[0]['data'][0];
 		if (!is_array($userData) || !isset($userData['salt']) || !isset($userData['hashes'])) {
-			throw GenericError::create('Invalid user data format.');
+			throw AuthError::createFromPayload($this->payload, 'Invalid user data format.');
 		}
 
 		return $userData;
@@ -144,7 +145,7 @@ final class PasswordHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 	}
 }

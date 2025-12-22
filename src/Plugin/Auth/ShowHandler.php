@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
-use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
@@ -38,7 +38,7 @@ final class ShowHandler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, Client $client): TaskResult {
 			$request = $client->sendRequest('SHOW PERMISSIONS');
 			if ($request->hasError()) {
-				throw GenericError::create((string)$request->getError());
+				throw AuthError::createFromPayload($payload, (string)$request->getError());
 			}
 
 			$allPermissions = static::extractPermissionsFromResponse($request->getResult()->toArray());
@@ -66,12 +66,12 @@ final class ShowHandler extends BaseHandlerWithClient {
 	 */
 	private static function extractPermissionsFromResponse(mixed $document): array {
 		if (!is_array($document) || !isset($document[0]['data'])) {
-			throw GenericError::create('Searchd failed with an empty response.');
+			throw AuthError::createForAuth('Searchd failed with an empty response.');
 		}
 
 		$allPermissions = $document[0]['data'];
 		if (!is_array($allPermissions)) {
-			throw GenericError::create('Invalid permissions data format.');
+			throw AuthError::createForAuth('Invalid permissions data format.');
 		}
 
 		return $allPermissions;

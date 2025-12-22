@@ -10,7 +10,7 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
-use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
 
 /**
  * Trait for generating password hashes for authentication
@@ -39,7 +39,7 @@ trait HashGeneratorTrait {
 		$hashesJson = json_encode($hashes);
 
 		if ($hashesJson === false) {
-			throw GenericError::create('Failed to encode hashes as JSON.');
+			throw AuthError::createForAuth('Failed to encode hashes as JSON.');
 		}
 
 		return addslashes($hashesJson);
@@ -56,7 +56,7 @@ trait HashGeneratorTrait {
 	 */
 	private function updatePasswordHashes(string $newPassword, string $salt, array $existingHashes): string {
 		if (empty($existingHashes[self::BEARER_SHA256_KEY])) {
-			throw GenericError::create('Existing bearer_sha256 hash is required for password update.');
+			throw AuthError::createForAuth('Existing bearer_sha256 hash is required for password update.');
 		}
 
 		$updatedHashes = [
@@ -67,7 +67,7 @@ trait HashGeneratorTrait {
 		$hashesJson = json_encode($updatedHashes);
 
 		if ($hashesJson === false) {
-			throw GenericError::create('Failed to encode updated hashes as JSON.');
+			throw AuthError::createForAuth('Failed to encode updated hashes as JSON.');
 		}
 
 		return addslashes($hashesJson);
@@ -83,7 +83,7 @@ trait HashGeneratorTrait {
 		$required = [self::PASSWORD_SHA1_KEY, self::PASSWORD_SHA256_KEY, self::BEARER_SHA256_KEY];
 		foreach ($required as $key) {
 			if (!isset($hashes[$key]) || !is_string($hashes[$key])) {
-				throw GenericError::create("Invalid hash structure: missing or invalid '{$key}'.");
+				throw AuthError::createForAuth("Invalid hash structure: missing or invalid '{$key}'.");
 			}
 		}
 	}

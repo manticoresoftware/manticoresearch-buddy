@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
-use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -64,7 +64,7 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 			return $this->handleRevoke($username, $action, $target);
 		}
 
-		throw GenericError::create('Invalid operation type for GrantRevokeHandler.');
+		throw AuthError::createFromPayload($this->payload, 'Invalid operation type for GrantRevokeHandler.');
 	}
 
 	/**
@@ -81,12 +81,13 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 
 		$result = $resp->getResult()->toArray();
 		if (!is_array($result) || !isset($result[0]['data'][0]['c'])) {
-			throw GenericError::create('Unexpected response format when checking user existence.');
+			$error = 'Unexpected response format when checking user existence.';
+			throw AuthError::createFromPayload($this->payload, $error);
 		}
 
 		$count = (int)$result[0]['data'][0]['c'];
@@ -110,12 +111,13 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 
 		$result = $resp->getResult()->toArray();
 		if (!is_array($result) || !isset($result[0]['data'][0]['c'])) {
-			throw GenericError::create('Unexpected response format when checking permission existence.');
+			$error = 'Unexpected response format when checking permission existence.';
+			throw AuthError::createFromPayload($this->payload, $error);
 		}
 
 		$count = (int)$result[0]['data'][0]['c'];
@@ -134,12 +136,15 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 	 */
 	private function handleGrant(string $username, string $action, string $target, string $budget): TaskResult {
 		if (!$this->userExists($username)) {
-			throw GenericError::create("User '{$username}' does not exist.");
+			throw AuthError::createFromPayload($this->payload, "User '{$username}' does not exist.");
 		}
 
 		// Check if permission already exists
 		if ($this->permissionExists($username, $action, $target)) {
-			throw GenericError::create("User '{$username}' already has '{$action}' permission on '{$target}'.");
+			throw AuthError::createFromPayload(
+				$this->payload,
+				"User '{$username}' already has '{$action}' permission on '{$target}'."
+			);
 		}
 
 		$tablePerms = Payload::AUTH_PERMISSIONS_TABLE;
@@ -149,7 +154,7 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 
 		return TaskResult::none();
@@ -166,12 +171,15 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 	 */
 	private function handleRevoke(string $username, string $action, string $target): TaskResult {
 		if (!$this->userExists($username)) {
-			throw GenericError::create("User '{$username}' does not exist.");
+			throw AuthError::createFromPayload($this->payload, "User '{$username}' does not exist.");
 		}
 
 		// Check if permission exists before revoking
 		if (!$this->permissionExists($username, $action, $target)) {
-			throw GenericError::create("User '{$username}' does not have '{$action}' permission on '{$target}'.");
+			throw AuthError::createFromPayload(
+				$this->payload,
+				"User '{$username}' does not have '{$action}' permission on '{$target}'."
+			);
 		}
 
 		$tablePerms = Payload::AUTH_PERMISSIONS_TABLE;
@@ -181,7 +189,7 @@ final class GrantRevokeHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 
 		return TaskResult::none();

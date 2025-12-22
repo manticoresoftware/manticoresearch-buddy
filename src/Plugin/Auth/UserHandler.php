@@ -12,7 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
 use Exception;
-use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
@@ -55,7 +55,7 @@ final class UserHandler extends BaseHandlerWithClient {
 	 */
 	private function processRequest(): TaskResult {
 		if ($this->payload->username === null) {
-			throw GenericError::create('Username is required.');
+			throw AuthError::createFromPayload($this->payload, 'Username is required.');
 		}
 		$username = addslashes($this->payload->username);
 		$count = $this->getUserCount($username);
@@ -68,7 +68,7 @@ final class UserHandler extends BaseHandlerWithClient {
 			return $this->handleDropUser($username, $count);
 		}
 
-		throw GenericError::create('Invalid operation type for UserHandler.');
+		throw AuthError::createFromPayload($this->payload, 'Invalid operation type for UserHandler.');
 	}
 
 	/**
@@ -85,12 +85,13 @@ final class UserHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 
 		$result = $resp->getResult()->toArray();
 		if (!is_array($result) || !isset($result[0]['data'][0]['c'])) {
-			throw GenericError::create('Unexpected response format when checking user existence.');
+			$error = 'Unexpected response format when checking user existence.';
+			throw AuthError::createFromPayload($this->payload, $error);
 		}
 
 		return (int)$result[0]['data'][0]['c'];
@@ -104,13 +105,13 @@ final class UserHandler extends BaseHandlerWithClient {
 	 */
 	private function validateUsername(string $username): void {
 		if (empty($username)) {
-			throw GenericError::create('Username cannot be empty.');
+			throw AuthError::createFromPayload($this->payload, 'Username cannot be empty.');
 		}
 		if (strlen($username) > 64) {
-			throw GenericError::create('Username is too long (max 64 characters).');
+			throw AuthError::createFromPayload($this->payload, 'Username is too long (max 64 characters).');
 		}
 		if (!preg_match('/^[a-zA-Z0-9_.-]+$/', $username)) {
-			throw GenericError::create('Username contains invalid characters.');
+			throw AuthError::createFromPayload($this->payload, 'Username contains invalid characters.');
 		}
 	}
 
@@ -124,7 +125,7 @@ final class UserHandler extends BaseHandlerWithClient {
 		try {
 			return bin2hex(random_bytes(self::TOKEN_BYTES));
 		} catch (Exception $e) {
-			throw GenericError::create('Failed to generate secure token: ' . $e->getMessage());
+			throw AuthError::createFromPayload($this->payload, 'Failed to generate secure token: ' . $e->getMessage());
 		}
 	}
 
@@ -140,11 +141,11 @@ final class UserHandler extends BaseHandlerWithClient {
 		$this->validateUsername($username);
 
 		if ($count > 0) {
-			throw GenericError::create("User '{$username}' already exists.");
+			throw AuthError::createFromPayload($this->payload, "User '{$username}' already exists.");
 		}
 
 		if (!isset($this->payload->password)) {
-			throw GenericError::create('Password is required for CREATE USER.');
+			throw AuthError::createFromPayload($this->payload, 'Password is required for CREATE USER.');
 		}
 
 		$salt = bin2hex(random_bytes(20));
@@ -159,7 +160,7 @@ final class UserHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 
 		// Return the generated token to the user
@@ -184,7 +185,7 @@ final class UserHandler extends BaseHandlerWithClient {
 	 */
 	private function handleDropUser(string $username, int $count): TaskResult {
 		if ($count === 0) {
-			throw GenericError::create("User '{$username}' does not exist.");
+			throw AuthError::createFromPayload($this->payload, "User '{$username}' does not exist.");
 		}
 
 		$tablePerms = Payload::AUTH_PERMISSIONS_TABLE;
@@ -193,7 +194,7 @@ final class UserHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 
 		$tableUsers = Payload::AUTH_USERS_TABLE;
@@ -202,7 +203,7 @@ final class UserHandler extends BaseHandlerWithClient {
 		$resp = $this->manticoreClient->sendRequest($query);
 
 		if ($resp->hasError()) {
-			throw GenericError::create((string)$resp->getError());
+			throw AuthError::createFromPayload($this->payload, (string)$resp->getError());
 		}
 
 		return TaskResult::none();
