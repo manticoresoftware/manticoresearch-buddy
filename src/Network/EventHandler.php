@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Base\Config\LogLevel;
 use Manticoresearch\Buddy\Base\Exception\SQLQueryCommandNotSupported;
 use Manticoresearch\Buddy\Base\Lib\QueryProcessor;
 use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Core\Error\HasDaemonLogEntity;
 use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\OutputFormat;
@@ -41,6 +42,29 @@ use Throwable;
  * @phpstan-type ConfigStruct array{log_level?:string}
  */
 final class EventHandler {
+	/**
+	 * Buddy log entities are currently flushed by searchd only for `json response` replies.
+	 * For SQL-over-HTTP requests (`http_method` present), we switch the response type to JSON
+	 * while keeping SQL-over-MySQL replies as `sql response`.
+	 *
+	 * @param ?Request $request
+	 * @param Throwable $e
+	 * @return RequestFormat
+	 */
+	private static function getErrorResponseFormat(?Request $request, Throwable $e): RequestFormat {
+		$format = $request?->format ?? RequestFormat::JSON;
+		// Heuristic: SQL-over-HTTP uses `path_query=/sql?...` and ends up with query params in Request::$path.
+		// SQL-over-MySQL uses an empty path_query, so Request::$path is empty.
+		if ($format !== RequestFormat::SQL || $request === null || !str_contains($request->path, '?')) {
+			return $format;
+		}
+		if (!($e instanceof HasDaemonLogEntity)) {
+			return $format;
+		}
+
+		return RequestFormat::JSON;
+	}
+
 	/**
 	 * Check if a custom error should be sent
 	 *
@@ -251,8 +275,7 @@ final class EventHandler {
 				Buddy::error($e, "[$id] processing error");
 			}
 
-
-			$response = Response::fromError($e, $request->format ?? RequestFormat::JSON);
+			$response = Response::fromError($e, static::getErrorResponseFormat($request ?? null, $e));
 		}
 		return $response;
 	}
