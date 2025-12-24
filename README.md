@@ -230,21 +230,21 @@ Example of HTTP Response:
 
 ```json
 {
-  "type": "json response",
-  "message": {
-    "a": 123,
-    "b": "abc"
-  },
-  "error_code": 0,
-  "version": 3,
-  "content_type": "text/html",
-  "log": {
-    [
-        "type": "auth",
-        "severity": "ERROR",    
-        "message": "user already exists"
+    "type": "json response",
+    "message": {
+        "a": 123,
+        "b": "abc"
+    },
+    "error_code": 0,
+    "version": 3,
+    "content_type": "text/html",
+    "log": [
+        {
+            "type": "auth",
+            "severity": "ERROR",
+            "message": "user already exists"
+        }
     ]
-  }
 }
 ```
 
