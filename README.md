@@ -216,20 +216,35 @@ The response JSON structure:
 | `error_code` | An integer representing the HTTP error code which will be a part of the HTTP response to the user making a JSON over HTTP request. For SQL over HTTP/mysql communications, this field is ignored. |
 | `version` | Indicates the current protocol version being used. Current version is 3. |
 | `content_type` | Optional string that defines the Content-Type header value for the reply to the client. |
+| `log` | Optional array of log objects. Used to instruct the Manticore daemon to write specific events to its internal logs. If omitted, no special logging occurs.
 
+##### Log Array Structure Details
+
+| Key | Value | Description |
+|-|-|-|
+| `type` | `auth` | Specifies which log file/system the event should be written to. `auth` directs the event to the dedicated authentication `searchd.log.auth`.
+| `severity` | `INFO`, `WARN`, `ERROR`, `CRITICAL` | The severity level at which the message should be logged. Must be one of the daemon's supported log levels.
+| `message` | String | The detailed, human-readable log message to be written. This message is distinct from the end-user error in the main `message` property.
 
 Example of HTTP Response:
 
 ```json
 {
-  "type": "json response",
-  "message": {
-    "a": 123,
-    "b": "abc"
-  },
-  "error_code": 0,
-  "version": 3,
-  "content_type": "text/html"
+    "type": "json response",
+    "message": {
+        "a": 123,
+        "b": "abc"
+    },
+    "error_code": 0,
+    "version": 3,
+    "content_type": "text/html",
+    "log": [
+        {
+            "type": "auth",
+            "severity": "ERROR",
+            "message": "user already exists"
+        }
+    ]
 }
 ```
 
