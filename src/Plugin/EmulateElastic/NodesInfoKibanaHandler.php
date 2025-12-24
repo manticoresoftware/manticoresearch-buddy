@@ -24,7 +24,7 @@ use RuntimeException;
  */
 class NodesInfoKibanaHandler extends BaseHandlerWithClient {
 
-	const DEFAULT_KIBANA_VERSION = '7.6.0';
+	use Traits\KibanaVersionTrait;
 
 	/**
 	 *  Initialize the executor
@@ -60,7 +60,7 @@ class NodesInfoKibanaHandler extends BaseHandlerWithClient {
 								'publish_address' => "$ip:$port",
 							],
 							'ip' => $ip,
-							'version' => $settings->searchdKibanaVersionString ?? self::DEFAULT_KIBANA_VERSION,
+							'version' => self::getKibanaVersion($manticoreClient),
 						],
 					],
 				]

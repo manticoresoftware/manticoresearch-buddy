@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Prepares payload for Elastic-like queries and determines the appropriate handler for them
@@ -203,6 +204,7 @@ final class Payload extends BasePayload {
 	 * @return string
 	 */
 	public function getHandlerClassName(): string {
+		Buddy::debug("TEST 1 " . static::$requestTarget);
 		$namespace = __NAMESPACE__ . '\\';
 		$handlerName = match (static::$requestTarget) {
 			'_alias' => 'GetAliasesHandler',

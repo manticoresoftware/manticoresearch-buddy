@@ -21,7 +21,7 @@ use RuntimeException;
  */
 class AddAliasHandler extends BaseEntityHandler {
 
-	use QueryMapLoaderTrait;
+	use Traits\EntityAliasTrait;
 
 	/**
 	 *  Initialize the executor
@@ -54,24 +54,7 @@ class AddAliasHandler extends BaseEntityHandler {
 				throw new \Exception("Index '{$index}' does not exist");
 			}
 
-			$query = "CREATE TABLE IF NOT EXISTS {$payload->table} (index string, alias string)";
-			$manticoreClient->sendRequest($query);
-
-			$query = "SELECT 1 FROM {$payload->table} WHERE index='{$index}'";
-			/** @var array{0:array{data:array<mixed>}} $queryResult */
-			$queryResult = $manticoreClient->sendRequest($query)->getResult();
-			$isExistingIndex = (bool)$queryResult[0]['data'];
-			$query = $isExistingIndex
-				? "UPDATE {$payload->table} SET alias='{$alias}' WHERE index='{$index}'"
-				: "INSERT INTO {$payload->table} (index, alias) VALUES('{$index}', '{$alias}')";
-			/** @var array{error?:string,0:array{data?:array<mixed>}} $queryResult */
-			$queryResult = $manticoreClient->sendRequest($query)->getResult();
-			if (isset($queryResult['error'])) {
-				throw new \Exception('Unknown error on template creation');
-			}
-			if (!$isExistingIndex) {
-				self::refreshAliasedEntities($index, $alias, $manticoreClient);
-			}
+			self::addEntityAlias($index, $alias, $manticoreClient, $payload->table);
 
 			return TaskResult::raw(['acknowledged' => 'true']);
 		};
@@ -98,37 +81,4 @@ class AddAliasHandler extends BaseEntityHandler {
 		throw new \Exception('Unknown error on alias creation');
 	}
 
-	/**
-	 *
-	 * @param string $index
-	 * @param string $alias
-	 * @param HTTPClient $manticoreClient
-	 * @return void
-	 * @throws RuntimeException
-	 */
-	protected static function refreshAliasedEntities(string $index, string $alias, HTTPClient $manticoreClient): void {
-		$query = 'CREATE TABLE IF NOT EXISTS ' . parent::ENTITY_TABLE
-			. ' (_id string, _index string, _index_alias string, _type string, _source json)';
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
-		if (isset($queryResult['error'])) {
-			throw new \Exception('Unknown error on entity table creation');
-		}
-		$queryMapName = ($alias === '.kibana') ? 'Settings' : 'ManagerSettings';
-		self::initQueryMap($queryMapName);
-		/** @var array{settings:array{index:array{created:string,uuid:string}}} $sourceObj */
-		$sourceObj = self::$queryMap[$queryMapName][$alias];
-		$created = time();
-		$uuid = substr(md5(microtime()), 0, 16);
-		$sourceObj['settings']['index']['created'] = $created;
-		$sourceObj['settings']['index']['uuid'] = $uuid;
-		$source = (string)json_encode($sourceObj);
-		$entityId = "settings:{$index}";
-		AddEntityHandler::add($source, $entityId, 'settings', $index, $alias, $manticoreClient);
-
-		$query = 'UPDATE ' . parent::ENTITY_TABLE . " SET _index='{$index}' WHERE _index=''";
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
-		if (isset($queryResult['error'])) {
-			throw new \Exception('Unknown error on entity alias update');
-		}
-	}
 }

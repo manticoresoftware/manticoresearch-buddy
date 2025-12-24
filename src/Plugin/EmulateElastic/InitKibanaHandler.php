@@ -22,6 +22,10 @@ use RuntimeException;
  */
 class InitKibanaHandler extends BaseEntityHandler {
 
+	use Traits\EntityAliasTrait;
+
+	const DEFAULT_KIBANA_INDEX = '.kibana_1';
+
 	/**
 	 *  Initialize the executor
 	 *
@@ -45,32 +49,12 @@ class InitKibanaHandler extends BaseEntityHandler {
 			/** @var array{error?:string,0:array{data?:array<array{_index:string,_source:string}>}} $queryResult */
 			$queryResult = $manticoreClient->sendRequest($query)->getResult();
 			if (isset($queryResult['error']) || !isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
-				$resp = [
-					'error' => [
-						'index' => $alias,
-						'index_uuid' => '_na_',
-						'reason' => "no such index [{$alias}]",
-						'resource.id' => $alias,
-						'resource.type' => 'index_or_alias',
-						'root_cause' => [
-							[
-								'index' => $alias,
-								'index_uuid' => '_na_',
-								'reason' => "no such index [{$alias}]",
-								'resource.id' => $alias,
-								'resource.type' => 'index_or_alias',
-								'type' => 'index_not_found_exception',
-							],
-						],
-						'type' => 'index_not_found_exception',
-					],
-					'status' => 404,
-				];
-				$customError = GenericError::create('', false);
-				$customError->setResponseErrorBody($resp);
-				$customError->setResponseErrorCode(404);
-
-				throw $customError;
+				if (self::isCommonKibana($manticoreClient)) {
+					self::errorResponse();
+				} else {
+					// Emulation of Opensearch-like behavior where pre-defined Kibana object is returned
+					self::addEntityAlias(self::DEFAULT_KIBANA_INDEX, $alias, $manticoreClient);
+				}
 			}
 
 			$resp = [];
@@ -90,4 +74,39 @@ class InitKibanaHandler extends BaseEntityHandler {
 		)->run();
 	}
 
+	/**
+	 *
+	 * @param string $alias
+	 * @return void
+	 * @throws GenericError
+	 */
+	protected static function errorResponse(string $alias): void {
+		$resp = [
+			'error' => [
+				'index' => $alias,
+				'index_uuid' => '_na_',
+				'reason' => "no such index [{$alias}]",
+				'resource.id' => $alias,
+				'resource.type' => 'index_or_alias',
+				'root_cause' => [
+					[
+						'index' => $alias,
+						'index_uuid' => '_na_',
+						'reason' => "no such index [{$alias}]",
+						'resource.id' => $alias,
+						'resource.type' => 'index_or_alias',
+						'type' => 'index_not_found_exception',
+					],
+				],
+				'type' => 'index_not_found_exception',
+			],
+			'status' => 404,
+		];
+		$customError = GenericError::create('', false);
+		$customError->setResponseErrorBody($resp);
+		$customError->setResponseErrorCode(404);
+
+		throw $customError;
+	}
+	
 }

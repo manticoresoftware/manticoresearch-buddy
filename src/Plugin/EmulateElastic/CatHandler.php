@@ -23,6 +23,8 @@ use RuntimeException;
  */
 class CatHandler extends BaseHandlerWithClient {
 
+	use Traits\QueryMapLoaderTrait;
+
 	const CAT_ENTITIES = ['templates', 'plugins'];
 
 	/**
@@ -61,7 +63,9 @@ class CatHandler extends BaseHandlerWithClient {
 			foreach ($queryResult[0]['data'] as $entityInfo) {
 				$catInfo[] = match ($entityTable) {
 					'_templates' => self::buildCatTemplateRow($entityInfo),
-					default => [],
+					default => self::getVersionedEntity(
+						self::$queryMap['Plugins']['_plugins']
+					)
 				};
 			}
 
@@ -71,6 +75,10 @@ class CatHandler extends BaseHandlerWithClient {
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
 		)->run();
+	}
+
+	private static function getPluginDefaultInfo(): array {
+				
 	}
 
 	/**
