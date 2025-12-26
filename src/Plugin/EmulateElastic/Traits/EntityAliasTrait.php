@@ -9,8 +9,9 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
+namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\Traits;
 
+use Manticoresearch\Buddy\Base\Plugin\EmulateElastic\AddEntityHandler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use RuntimeException;
 
@@ -47,6 +48,38 @@ trait EntityAliasTrait {
 
 	/**
 	 *
+	 * @param HTTPClient $manticoreClient
+	 * @param array<string> $tables
+	 * @return array<mixed>
+	 */
+	protected static function getAliasData(HTTPClient $manticoreClient, array $tables = []): array {
+		$query = "SHOW TABLES LIKE '" . self::DEFAULT_ALIAS_TABLE . "'";
+		/** @var array{0?:array{data?:array<mixed>}} $queryResult */
+		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		if (!isset($queryResult[0])) {
+			return [];
+		}
+		
+		$query = 'SELECT index, alias FROM ' . self::DEFAULT_ALIAS_TABLE;
+		if ($tables) {
+			array_walk(
+				$tables,
+				fn(&$value, $key) => $value = "'" . $value . "'"
+			);
+			$tablesExpr = implode(',', $tables);
+			$query .= " WHERE index IN ({$tablesExpr})";
+		}
+		/** @var array{0:array{data?:array<array{index:string,alias:string}>}} $queryResult */
+		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		if (!isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
+			return [];
+		}
+		
+		return $queryResult[0]['data'];
+	}
+
+	/**
+	 *
 	 * @param string $index
 	 * @param string $alias
 	 * @param HTTPClient $manticoreClient
@@ -64,7 +97,7 @@ trait EntityAliasTrait {
 		$queryMapName = ($alias === '.kibana') ? 'Settings' : 'ManagerSettings';
 		self::initQueryMap($queryMapName);
 		/** @var array{settings:array{index:array{created:string,uuid:string}}} $sourceObj */
-		$sourceObj = self::getVersionedEntity($sourceObj, $manticoreClient);
+		$sourceObj = self::getVersionedEntity(self::$queryMap[$queryMapName][$alias], $manticoreClient);
 		
 		$created = time();
 		$uuid = substr(md5(microtime()), 0, 16);

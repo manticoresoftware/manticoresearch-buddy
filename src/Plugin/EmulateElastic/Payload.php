@@ -16,7 +16,6 @@ use Manticoresearch\Buddy\Core\Error\InvalidNetworkRequestError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * Prepares payload for Elastic-like queries and determines the appropriate handler for them
@@ -26,7 +25,7 @@ final class Payload extends BasePayload {
 
 	// Endpoint position in Kibana request path
 	const KIBANA_ENDPOINT_PATH_POS = [
-		0 => ['_aliases', '_alias', '_cat', '_field_caps', '_template', '_index_template'],
+		0 => ['_aliases', '_alias', '_cat', '_field_caps', '_template', '_index_template', '_plugins', '_resolve'],
 		1 => ['_create', '_doc', '_update', '_field_caps'],
 	];
 
@@ -85,6 +84,7 @@ final class Payload extends BasePayload {
 				$self->body = $request->payload;
 				break;
 			case '_alias':
+			case '_resolve':
 				$self->table = end($pathParts);
 				break;
 			case '_aliases':
@@ -126,8 +126,8 @@ final class Payload extends BasePayload {
 					static::$requestTarget,
 					[
 						'_cat', '_count', '_license', '_nodes', '_xpack', '.kibana', '.kibana_task_manager',
-						'_update_by_query', 'metric', 'config', 'space', 'index-pattern', 'settings', 'telemetry',
-						'stats',
+						'_update_by_query', 'metric', 'config', 'space', 'index-pattern', '_plugins', '_resolve',
+						'settings', 'telemetry', 'stats',
 					]
 				)) {
 					throw new Exception("Unsupported request type in {$request->path}: " . static::$requestTarget);
@@ -204,7 +204,6 @@ final class Payload extends BasePayload {
 	 * @return string
 	 */
 	public function getHandlerClassName(): string {
-		Buddy::debug("TEST 1 " . static::$requestTarget);
 		$namespace = __NAMESPACE__ . '\\';
 		$handlerName = match (static::$requestTarget) {
 			'_alias' => 'GetAliasesHandler',
@@ -212,12 +211,14 @@ final class Payload extends BasePayload {
 			'_bulk' => 'ImportKibanaHandler',
 			'_cat' => 'CatHandler',
 			'_count' => 'CountInfoKibanaHandler',
-			'_create', '_doc_post' => 'AddEntityHandler',
+			'_create', '_doc_post', '_doc_put' => 'AddEntityHandler',
 			'_doc_get' => 'GetEntityHandler',
 			'_mget' => 'MgetKibanaHandler',
 			'_field_caps' => 'FieldCapsHandler',
 			'_license' => 'LicenseHandler',
 			'_nodes' => 'NodesInfoKibanaHandler',
+			'_plugins' => 'PluginsKibanaHandler',
+			'_resolve' => 'ResolveHandler',
 			'_xpack' => 'XpackInfoKibanaHandler',
 			'.kibana', '.kibana_task_manager' => 'InitKibanaHandler',
 			'config', 'space', 'index-pattern' => 'SettingsKibanaHandler',

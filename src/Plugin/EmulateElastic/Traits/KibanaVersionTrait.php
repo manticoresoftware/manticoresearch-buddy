@@ -9,7 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
+namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\Traits;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use RuntimeException;
@@ -54,18 +54,7 @@ trait KibanaVersionTrait {
 			}
 		}
 		
-		throw new \RuntimeException('Unknown Kibana version requested');
+		throw new \RuntimeException('Unknown Kibana version requested ' . $kibanaVersion);
 	}
 
-	/**
-	 * @param HTTPClient $manticoreClient
-	 * @return bool
-	 */
-	protected static function isCommonKibana(HTTPClient $manticoreClient): bool {
-		/** @var Settings $settings */
-		$settings = $manticoreClient->getSettings();
-		return (isset($settings->searchdKibanaVersionString)
-			&& version_compare($settings->searchdKibanaVersionString, self::DEFAULT_KIBANA_VERSION, '>='));
-	}
-	
 }

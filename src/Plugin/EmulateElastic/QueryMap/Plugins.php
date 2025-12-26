@@ -10,12 +10,16 @@
 */
 
 return [
+	'_plugins/_security/api/account' => [
+		'error' => 'no handler found for uri [/_plugins/_security/api/account] and method [GET]'
+	],
+	'_plugins/_query/_datasources' => [],
 	'_plugins' => [
 		[
 			'7.6.0' => []
 		],
 		[
-			'3.3.0' => [
+			'3.4.0' => [
 				[
 					'name' => 'opensearch-node',
 					'component' => 'opensearch-alerting',

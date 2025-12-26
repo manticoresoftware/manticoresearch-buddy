@@ -23,6 +23,7 @@ use RuntimeException;
  */
 class CatHandler extends BaseHandlerWithClient {
 
+	use Traits\KibanaVersionTrait;
 	use Traits\QueryMapLoaderTrait;
 
 	const CAT_ENTITIES = ['templates', 'plugins'];
@@ -46,12 +47,23 @@ class CatHandler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			$pathParts = explode('/', $payload->path);
 			if (!isset($pathParts[1], $pathParts[2])
-			&& !in_array($pathParts[1], self::CAT_ENTITIES) && !str_ends_with($pathParts[1], '*')) {
+				&& !in_array($pathParts[1], self::CAT_ENTITIES) && !str_ends_with($pathParts[1], '*')) {
 				throw new \Exception('Cannot parse request');
 			}
 			$entityTable = "_{$pathParts[1]}";
-			$entityNamePattern = $pathParts[2];
+			
+			if (in_array($pathParts[1], self::CAT_ENTITIES) && !isset($pathParts[2])) {
+				$queryMapName = 'Plugins';
+				self::initQueryMap($queryMapName);
+				$catInfo = self::getVersionedEntity(
+					self::$queryMap[$queryMapName][$entityTable],
+					$manticoreClient
+				);
 
+				return TaskResult::raw($catInfo);
+			}
+			
+			$entityNamePattern = $pathParts[2];
 			$query = "SELECT * FROM {$entityTable} WHERE MATCH('{$entityNamePattern}')";
 			/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string}>}} $queryResult */
 			$queryResult = $manticoreClient->sendRequest($query)->getResult();
@@ -63,9 +75,7 @@ class CatHandler extends BaseHandlerWithClient {
 			foreach ($queryResult[0]['data'] as $entityInfo) {
 				$catInfo[] = match ($entityTable) {
 					'_templates' => self::buildCatTemplateRow($entityInfo),
-					default => self::getVersionedEntity(
-						self::$queryMap['Plugins']['_plugins']
-					)
+					default => []
 				};
 			}
 
@@ -75,10 +85,6 @@ class CatHandler extends BaseHandlerWithClient {
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
 		)->run();
-	}
-
-	private static function getPluginDefaultInfo(): array {
-				
 	}
 
 	/**
