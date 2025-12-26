@@ -12,7 +12,6 @@
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 
 abstract class BaseEntityHandler extends BaseHandlerWithClient {

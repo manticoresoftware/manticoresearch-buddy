@@ -92,6 +92,27 @@ class QueryProcessorTest extends TestCase {
 		QueryProcessor::process($request);
 	}
 
+	public function testUnsupportedCommandProcessFailWithErrorReturned(): void {
+		echo "\nTesting the return of original error message for unsupported execution command\n";
+		$this->expectException(SQLQueryCommandNotSupported::class);
+		$this->expectExceptionMessage('Failed to handle query: Some command # error=Some error');
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => 'Some error',
+				'payload' => 'Some command',
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+			]
+		);
+		$settings = static::getSettings();
+		$refCls = new ReflectionClass(QueryProcessor::class);
+		$refCls->setStaticPropertyValue('settings', $settings);
+		$refCls->setStaticPropertyValue('pluggable', static::getPluggable($settings));
+		QueryProcessor::process($request);
+	}
+
 	public function testNotAllowedCommandProcessFail(): void {
 		echo "\nTesting the processing of not allowed execution command\n";
 

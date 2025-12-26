@@ -49,11 +49,11 @@ final class Payload extends BasePayload {
 		$self = new static();
 		$pathParts = explode('/', ltrim($request->path, '/'));
 		$self->path = $request->path;
-		self::detectRequestTarget($pathParts, $self);
-		
+		self::detectRequestTarget($pathParts);
+
 		// Set body for search requests
-		if (static::$requestTarget === '_search' || 
-			in_array(static::$requestTarget, ['_doc', '_create', '_update', '_bulk'])) {
+		if (static::$requestTarget === '_search'
+			|| in_array(static::$requestTarget, ['_doc', '_create', '_update', '_bulk'])) {
 			$self->body = $request->payload;
 		}
 
@@ -90,7 +90,7 @@ final class Payload extends BasePayload {
 			'index-pattern',
 			'settings',
 			'telemetry',
-			'stats'
+			'stats',
 		];
 
 		// Check if the first path part matches any OpenSearch Dashboards endpoint
@@ -112,10 +112,9 @@ final class Payload extends BasePayload {
 	/**
 	 * Detect the request target from path parts
 	 * @param array<string> $pathParts
-	 * @param Payload $self
 	 * @return void
 	 */
-	protected static function detectRequestTarget(array $pathParts, Payload $self): void {
+	protected static function detectRequestTarget(array $pathParts): void {
 		if (empty($pathParts)) {
 			static::$requestTarget = '';
 			return;
@@ -180,4 +179,4 @@ final class Payload extends BasePayload {
 	public function getHandlerClassName(): string {
 		return Handler::class;
 	}
-} 
+}

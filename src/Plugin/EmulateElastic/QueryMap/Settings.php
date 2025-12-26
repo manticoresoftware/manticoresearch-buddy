@@ -71,7 +71,7 @@ return [
 				//'aliases' => [
 				//	'.kibana' => []
 				//],
-			    'mappings' => [
+				'mappings' => [
 					'dynamic' => 'strict',
 					'_meta' => [
 						'migrationMappingPropertyHashes' => [
@@ -106,295 +106,295 @@ return [
 							'config' => 'c63748b75f39d0c54de12d12c1ccbc20',
 							'tsvb-validation-telemetry' => '3a37ef6c8700ae6fc97d5c7da00e9215',
 							'namespaces' => '2f4316de49999235636386fe51dc06c1',
-							'homepage' => 'a8d79cfe4f79546aa5bbee73facc51dc'
-						]
+							'homepage' => 'a8d79cfe4f79546aa5bbee73facc51dc',
+						],
 					],
 					'properties' => [
 						'application_usage_daily' => [
 							'dynamic' => 'false',
 							'properties' => [
 								'timestamp' => [
-									'type' => 'date'
-								]
-							]
+									'type' => 'date',
+								],
+							],
 						],
 						'application_usage_totals' => [
 							'type' => 'object',
-							'dynamic' => 'false'
+							'dynamic' => 'false',
 						],
 						'application_usage_transactional' => [
 							'type' => 'object',
-							'dynamic' => 'false'
+							'dynamic' => 'false',
 						],
 						'augment-vis' => [
 							'properties' => [
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'originPlugin' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'pluginResource' => [
 									'properties' => [
 										'id' => [
-											'type' => 'text'
+											'type' => 'text',
 										],
 										'type' => [
-											'type' => 'text'
-										]
-									]
+											'type' => 'text',
+										],
+									],
 								],
 								'title' => [
-			              			'type' => 'text'
+									'type' => 'text',
 								],
 								'version' => [
-									'type' => 'integer'
+									'type' => 'integer',
 								],
 								'visLayerExpressionFn' => [
 									'properties' => [
 										'args' => [
 											'type' => 'object',
-											'dynamic' => 'true'
+											'dynamic' => 'true',
 										],
 										'name' => [
-											'type' => 'text'
+											'type' => 'text',
 										],
 										'type' => [
-											'type' => 'text'
-										]
-									]
+											'type' => 'text',
+										],
+									],
 								],
 								'visName' => [
 									'type' => 'keyword',
 									'index' => false,
-									'doc_values' => false
-								]
-							]
+									'doc_values' => false,
+								],
+							],
 						],
 						'config' => [
 							'dynamic' => 'false',
 							'properties' => [
 								'buildNum' => [
-									'type' => 'keyword'
-								]
-							]
+									'type' => 'keyword',
+								],
+							],
 						],
 						'dashboard' => [
 							'properties' => [
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'hits' => [
 									'type' => 'integer',
 									'index' => false,
-									'doc_values' => false
+									'doc_values' => false,
 								],
 								'kibanaSavedObjectMeta' => [
 									'properties' => [
 										'searchSourceJSON' => [
 											'type' => 'text',
-											'index' => false
-										]
-									]
+											'index' => false,
+										],
+									],
 								],
 								'optionsJSON' => [
 									'type' => 'text',
-									'index' => false
+									'index' => false,
 								],
 								'panelsJSON' => [
 									'type' => 'text',
-									'index' => false
+									'index' => false,
 								],
 								'refreshInterval' => [
 									'properties' => [
 										'display' => [
 											'type' => 'keyword',
 											'index' => false,
-											'doc_values' => false
+											'doc_values' => false,
 										],
 										'pause' => [
 											'type' => 'boolean',
 											'doc_values' => false,
-											'index' => false
+											'index' => false,
 										],
 										'section' => [
 											'type' => 'integer',
 											'index' => false,
-											'doc_values' => false
+											'doc_values' => false,
 										],
 										'value' => [
 											'type' => 'integer',
 											'index' => false,
-											'doc_values' => false
-										]
-									]
+											'doc_values' => false,
+										],
+									],
 								],
 								'timeFrom' => [
 									'type' => 'keyword',
 									'index' => false,
-									'doc_values' => false
+									'doc_values' => false,
 								],
 								'timeRestore' => [
 									'type' => 'boolean',
 									'doc_values' => false,
-									'index' => false
+									'index' => false,
 								],
 								'timeTo' => [
 									'type' => 'keyword',
 									'index' => false,
-									'doc_values' => false
+									'doc_values' => false,
 								],
 								'title' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'version' => [
-									'type' => 'integer'
-								]
-							]
+									'type' => 'integer',
+								],
+							],
 						],
 						'dql-telemetry' => [
 							'properties' => [
 								'optInCount' => [
-									'type' => 'long'
+									'type' => 'long',
 								],
 								'optOutCount' => [
-									'type' => 'long'
-								]
-							]
+									'type' => 'long',
+								],
+							],
 						],
 						'homepage' => [
 							'properties' => [
 								'heroes' => [
 									'properties' => [
 										'id' => [
-											'type' => 'keyword'
-										]
-									]
+											'type' => 'keyword',
+										],
+									],
 								],
 								'kibanaSavedObjectMeta' => [
 									'properties' => [
 										'searchSourceJSON' => [
 											'type' => 'text',
-											'index' => false
-										]
-									]
+											'index' => false,
+										],
+									],
 								],
 								'sections' => [
 									'properties' => [
 										'id' => [
-											'type' => 'keyword'
-										]
-									]
-								]
-							]
+											'type' => 'keyword',
+										],
+									],
+								],
+							],
 						],
 						'index-pattern' => [
 							'dynamic' => 'false',
 							'properties' => [
 								'title' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'type' => [
-									'type' => 'keyword'
-								]
-							]
+									'type' => 'keyword',
+								],
+							],
 						],
 						'integration-instance' => [
 							'dynamic' => 'false',
 							'properties' => [
 								'assets' => [
-									'type' => 'nested'
+									'type' => 'nested',
 								],
 								'creationDate' => [
-									'type' => 'date'
+									'type' => 'date',
 								],
 								'dataSource' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'name' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'templateName' => [
-									'type' => 'text'
-								]
-							]
+									'type' => 'text',
+								],
+							],
 						],
 						'integration-template' => [
 							'dynamic' => 'false',
 							'properties' => [
 								'assets' => [
-									'type' => 'nested'
+									'type' => 'nested',
 								],
 								'author' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'components' => [
-									'type' => 'nested'
+									'type' => 'nested',
 								],
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'displayName' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'labels' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'license' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'name' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'sampleData' => [
-									'type' => 'nested'
+									'type' => 'nested',
 								],
 								'sourceUrl' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'statics' => [
-									'type' => 'nested'
+									'type' => 'nested',
 								],
 								'type' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'version' => [
-									'type' => 'text'
-								]
-							]
+									'type' => 'text',
+								],
+							],
 						],
 						'map' => [
 							'properties' => [
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'kibanaSavedObjectMeta' => [
 									'properties' => [
 										'searchSourceJSON' => [
 											'type' => 'text',
-											'index' => false
-										]
-									]
+											'index' => false,
+										],
+									],
 								],
 								'layerList' => [
 									'type' => 'text',
-									'index' => false
+									'index' => false,
 								],
 								'mapState' => [
 									'type' => 'text',
-									'index' => false
+									'index' => false,
 								],
 								'title' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'uiState' => [
 									'type' => 'text',
-									'index' => false
+									'index' => false,
 								],
 								'version' => [
-									'type' => 'integer'
-								]
-							]
+									'type' => 'integer',
+								],
+							],
 						],
 						'migrationVersion' => [
 							'dynamic' => 'true',
@@ -404,85 +404,85 @@ return [
 									'fields' => [
 										'keyword' => [
 											'type' => 'keyword',
-											'ignore_above' => 256
-										]
-									]
-								]
-							]
+											'ignore_above' => 256,
+										],
+									],
+								],
+							],
 						],
 						'namespace' => [
-							'type' => 'keyword'
+							'type' => 'keyword',
 						],
 						'namespaces' => [
-							'type' => 'keyword'
+							'type' => 'keyword',
 						],
 						'observability-notebook' => [
 							'dynamic' => 'false',
-								'properties' => [
-									'description' => [
-										'type' => 'text'
-									],
-									'title' => [
-										'type' => 'text'
-									],
-									'version' => [
-										'type' => 'integer'
-									]
-								]
+							'properties' => [
+								'description' => [
+									'type' => 'text',
+								],
+								'title' => [
+									'type' => 'text',
+								],
+								'version' => [
+									'type' => 'integer',
+								],
+							],
 						],
 						'observability-panel' => [
 							'dynamic' => 'false',
 							'properties' => [
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'title' => [
-									'type' => 'text'
-								]
-							]
+									'type' => 'text',
+								],
+							],
 						],
 						'observability-search' => [
 							'dynamic' => 'false',
 							'properties' => [
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'title' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'version' => [
-									'type' => 'integer'
-								]
-							]
+									'type' => 'integer',
+								],
+							],
 						],
 						'observability-visualization' => [
 							'dynamic' => 'false',
 							'properties' => [
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'title' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'version' => [
-									'type' => 'integer'
-								]
-							]
+									'type' => 'integer',
+								],
+							],
 						],
 						'originId' => [
-							'type' => 'keyword'
+							'type' => 'keyword',
 						],
 						'query' => [
 							'properties' => [
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'filters' => [
 									'type' => 'object',
-									'enabled' => false
+									'enabled' => false,
 								],
 								'isTemplate' => [
-									'type' => 'boolean'
+									'type' => 'boolean',
 								],
 								'query' => [
 									'properties' => [
@@ -491,240 +491,240 @@ return [
 												'dataSource' => [
 													'properties' => [
 														'id' => [
-															'type' => 'text'
+															'type' => 'text',
 														],
 														'meta' => [
 															'properties' => [
 																'name' => [
-																	'type' => 'text'
+																	'type' => 'text',
 																],
 																'sessionId' => [
-																	'type' => 'text'
-																]
-															]
+																	'type' => 'text',
+																],
+															],
 														],
 														'title' => [
-															'type' => 'text'
+															'type' => 'text',
 														],
 														'type' => [
-															'type' => 'text'
-														]
-													]
+															'type' => 'text',
+														],
+													],
 												],
 												'id' => [
-													'type' => 'text'
+													'type' => 'text',
 												],
 												'language' => [
-													'type' => 'text'
+													'type' => 'text',
 												],
 												'timeFieldName' => [
-													'type' => 'text'
+													'type' => 'text',
 												],
 												'title' => [
-													'type' => 'text'
+													'type' => 'text',
 												],
 												'type' => [
-													'type' => 'text'
-												]
-											]
+													'type' => 'text',
+												],
+											],
 										],
 										'language' => [
-											'type' => 'keyword'
+											'type' => 'keyword',
 										],
 										'query' => [
 											'type' => 'keyword',
-											'index' => false
-										]
-									]
+											'index' => false,
+										],
+									],
 								],
 								'timefilter' => [
 									'type' => 'object',
-									'enabled' => false
+									'enabled' => false,
 								],
 								'title' => [
-									'type' => 'text'
-								]
-							]
+									'type' => 'text',
+								],
+							],
 						],
 						'references' => [
 							'type' => 'nested',
 							'properties' => [
 								'id' => [
-									'type' => 'keyword'
+									'type' => 'keyword',
 								],
 								'name' => [
-									'type' => 'keyword'
+									'type' => 'keyword',
 								],
 								'type' => [
-									'type' => 'keyword'
-								]
-							]
+									'type' => 'keyword',
+								],
+							],
 						],
 						'sample-data-telemetry' => [
 							'properties' => [
 								'installCount' => [
-									'type' => 'long'
+									'type' => 'long',
 								],
 								'unInstallCount' => [
-									'type' => 'long'
-								]
-							]
+									'type' => 'long',
+								],
+							],
 						],
 						'search' => [
 							'properties' => [
 								'columns' => [
 									'type' => 'keyword',
 									'index' => false,
-									'doc_values' => false
+									'doc_values' => false,
 								],
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'hits' => [
 									'type' => 'integer',
 									'index' => false,
-									'doc_values' => false
+									'doc_values' => false,
 								],
 								'kibanaSavedObjectMeta' => [
 									'properties' => [
 										'searchSourceJSON' => [
 											'type' => 'text',
-											'index' => false
-										]
-									]
+											'index' => false,
+										],
+									],
 								],
 								'sort' => [
 									'type' => 'keyword',
 									'index' => false,
-									'doc_values' => false
+									'doc_values' => false,
 								],
 								'title' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'version' => [
-									'type' => 'integer'
-								]
-							]
+									'type' => 'integer',
+								],
+							],
 						],
 						'search-telemetry' => [
 							'type' => 'object',
-							'dynamic' => 'false'
+							'dynamic' => 'false',
 						],
 						'tsvb-validation-telemetry' => [
 							'properties' => [
 								'failedRequests' => [
-										'type' => 'long'
-									]
-							]
+									'type' => 'long',
+								],
+							],
 						],
 						'type' => [
-							'type' => 'keyword'
+							'type' => 'keyword',
 						],
 						'ui-metric' => [
 							'properties' => [
 								'count' => [
-									'type' => 'integer'
-								]
-							]
+									'type' => 'integer',
+								],
+							],
 						],
 						'updated_at' => [
-							'type' => 'date'
+							'type' => 'date',
 						],
 						'url' => [
 							'properties' => [
 								'accessCount' => [
-									'type' => 'long'
+									'type' => 'long',
 								],
 								'accessDate' => [
-									'type' => 'date'
+									'type' => 'date',
 								],
 								'createDate' => [
-									'type' => 'date'
+									'type' => 'date',
 								],
 								'url' => [
 									'type' => 'text',
 									'fields' => [
 										'keyword' => [
 											'type' => 'keyword',
-											'ignore_above' => 2048
-										]
-									]
-								]
-							]
+											'ignore_above' => 2048,
+										],
+									],
+								],
+							],
 						],
 						'visualization' => [
 							'properties' => [
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'kibanaSavedObjectMeta' => [
 									'properties' => [
 										'searchSourceJSON' => [
 											'type' => 'text',
-											'index' => false
-										]
-									]
+											'index' => false,
+										],
+									],
 								],
 								'savedSearchRefName' => [
 									'type' => 'keyword',
 									'index' => false,
-									'doc_values' => false
+									'doc_values' => false,
 								],
 								'title' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'uiStateJSON' => [
 									'type' => 'text',
-									'index' => false
+									'index' => false,
 								],
 								'version' => [
-									'type' => 'integer'
+									'type' => 'integer',
 								],
 								'visState' => [
 									'type' => 'text',
-									'index' => false
-								]	
-							]
+									'index' => false,
+								],
+							],
 						],
 						'visualization-visbuilder' => [
 							'properties' => [
 								'description' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'kibanaSavedObjectMeta' => [
 									'properties' => [
 										'searchSourceJSON' => [
 											'type' => 'text',
-											'index' => false
-										]
-									]
+											'index' => false,
+										],
+									],
 								],
 								'styleState' => [
 									'type' => 'text',
-									'index' => false
+									'index' => false,
 								],
 								'title' => [
-									'type' => 'text'
+									'type' => 'text',
 								],
 								'uiState' => [
 									'type' => 'text',
-									'index' => false
+									'index' => false,
 								],
 								'version' => [
-									'type' => 'integer'
+									'type' => 'integer',
 								],
 								'visualizationState' => [
 									'type' => 'text',
-									'index' => false
-								]
-							]
-						]
-					]
+									'index' => false,
+								],
+							],
+						],
+					],
 				],
 				'settings' => [
 					'index' => [
 						'replication' => [
-							'type' => 'DOCUMENT'
+							'type' => 'DOCUMENT',
 						],
 						'number_of_shards' => '1',
 						'auto_expand_replicas' => '0-1',
@@ -733,11 +733,11 @@ return [
 						'number_of_replicas' => '0',
 						'uuid' => '2gSm_H2YTj-nbTIbPS9qKA',
 						'version' => [
-							'created' => '137237827'
-						]
-					]
-				]
-			]
+							'created' => '137237827',
+						],
+					],
+				],
+			],
 		],
 		[
 			'7.6.0' => [

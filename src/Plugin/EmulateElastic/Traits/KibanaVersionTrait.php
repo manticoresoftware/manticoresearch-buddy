@@ -12,11 +12,11 @@
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\Traits;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
+// @phpcs:ignore
+use Manticoresearch\Buddy\Core\ManticoreSearch\Settings;
 use RuntimeException;
 
 trait KibanaVersionTrait {
-
-	const DEFAULT_KIBANA_VERSION = '7.6.0';
 
 	/**
 	 * @param HTTPClient $manticoreClient
@@ -25,7 +25,7 @@ trait KibanaVersionTrait {
 	protected static function getKibanaVersion(HTTPClient $manticoreClient): string {
 		/** @var Settings $settings */
 		$settings = $manticoreClient->getSettings();
-		return $settings->searchdKibanaVersionString ?? self::DEFAULT_KIBANA_VERSION;
+		return $settings->searchdKibanaVersionString ?? '7.6.0';
 	}
 
 	/**
@@ -41,7 +41,7 @@ trait KibanaVersionTrait {
 		$kibanaVersion = self::getKibanaVersion($manticoreClient);
 		foreach ($entityList as $entityItem) {
 			// Extra checks to make sure it's a valid versioned entity
-			if (sizeof( array_keys($entityItem) ) !== 1) {
+			if (sizeof(array_keys($entityItem)) !== 1) {
 				return $entityList;
 			}
 			$entityVersion = array_key_first($entityItem);
@@ -53,7 +53,6 @@ trait KibanaVersionTrait {
 				return $entityItem[$entityVersion];
 			}
 		}
-		
 		throw new \RuntimeException('Unknown Kibana version requested ' . $kibanaVersion);
 	}
 

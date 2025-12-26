@@ -42,12 +42,14 @@ trait QueryMapLoaderTrait {
 		];
 
 		foreach ($queryMapFiles as $file) {
-			if (file_exists($file)) {
-				$map = include $file;
-				if (is_array($map)) {
-					self::$queryMaps = array_merge(self::$queryMaps, $map);
-				}
+			if (!file_exists($file)) {
+				continue;
 			}
+			$map = include $file;
+			if (!is_array($map)) {
+				continue;
+			}
+			self::$queryMaps = array_merge(self::$queryMaps, $map);
 		}
 	}
 
@@ -62,4 +64,4 @@ trait QueryMapLoaderTrait {
 
 		return self::$queryMaps;
 	}
-} 
+}

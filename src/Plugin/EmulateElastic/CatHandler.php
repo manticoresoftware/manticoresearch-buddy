@@ -51,18 +51,17 @@ class CatHandler extends BaseHandlerWithClient {
 				throw new \Exception('Cannot parse request');
 			}
 			$entityTable = "_{$pathParts[1]}";
-			
+
 			if (in_array($pathParts[1], self::CAT_ENTITIES) && !isset($pathParts[2])) {
 				$queryMapName = 'Plugins';
 				self::initQueryMap($queryMapName);
-				$catInfo = self::getVersionedEntity(
-					self::$queryMap[$queryMapName][$entityTable],
-					$manticoreClient
-				);
+				/** @var array{name:string,patterns:string,content:string} $entityInfo */
+				$entityInfo = self::$queryMap[$queryMapName][$entityTable];
+				$catInfo = self::getVersionedEntity($entityInfo, $manticoreClient);
 
 				return TaskResult::raw($catInfo);
 			}
-			
+
 			$entityNamePattern = $pathParts[2];
 			$query = "SELECT * FROM {$entityTable} WHERE MATCH('{$entityNamePattern}')";
 			/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string}>}} $queryResult */

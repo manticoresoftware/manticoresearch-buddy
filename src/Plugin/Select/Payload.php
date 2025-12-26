@@ -165,18 +165,32 @@ final class Payload extends BasePayload {
 	}
 
 	/**
+	 * Helper function to remove limit info we don't actually use from the field clause
+	 *
+	 * @param string $fieldClause
+	 */
+	protected static function removeLimitStatement(string $fieldClause): string {
+		$limitClausePattern = '/\s+LIMIT\s+\d+(\s*,\s*\d+)?\s*$/i';
+		if (preg_match('/\s+LIMIT\s+\d+(\s*,\d+)?\s*$/i', $fieldClause) !== false) {
+			$fieldClause = (string)preg_replace($limitClausePattern, '', $fieldClause);
+		}
+		return $fieldClause;
+	}
+
+	/**
 	 * Handle no table matches from select query
 	 * @param array<string> $matches
 	 * @return static
 	 */
 	protected function handleNoTableMatches(array $matches): static {
+
 		if (isset($matches[6])) {
-			$fields = preg_split('/\s*,\s*/', $matches[6]);
+			$fields = preg_split('/\s*,\s*/', self::removeLimitStatement($matches[6]));
 			$this->fields = $fields ?: [];
 		} elseif (isset($matches[5])) {
 			$this->values = [trim($matches[5], "'")];
 		} elseif (isset($matches[4])) {
-			$this->fields[] = $matches[4];
+			$this->fields[] = self::removeLimitStatement($matches[4]);
 		} elseif (stripos($this->originalQuery, 'database()') !== false
 			&& stripos($this->originalQuery, 'schema()') !== false
 			&& stripos($this->originalQuery, 'left(user()') !== false) {
@@ -186,6 +200,7 @@ final class Payload extends BasePayload {
 				'user',
 			];
 		}
+
 		return $this;
 	}
 

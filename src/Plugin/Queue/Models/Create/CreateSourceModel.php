@@ -35,7 +35,7 @@ class CreateSourceModel extends Model {
 	public function parseSourceType(): string {
 		foreach ($this->getPayload()['SOURCE']['options'] as $option) {
 			if (isset($option['sub_tree'][0]['base_expr'])
-				&& $option['sub_tree'][0]['base_expr'] === 'type') {
+				&& strtolower($option['sub_tree'][0]['base_expr']) === 'type') {
 				return match (SqlQueryParser::removeQuotes($option['sub_tree'][2]['base_expr'])) {
 					'kafka' => 'Handlers\\Source\\CreateKafka',
 					default => throw new GenericError('Cannot find handler for request type: ' . static::class)

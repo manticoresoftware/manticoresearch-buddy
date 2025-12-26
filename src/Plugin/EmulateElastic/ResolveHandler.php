@@ -12,7 +12,6 @@
 namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
@@ -20,7 +19,7 @@ use RuntimeException;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class ResolveHandler extends BaseHandlerWithClient {
+class ResolveHandler extends BaseEntityHandler {
 
 	use Traits\EntityAliasTrait;
 
@@ -42,11 +41,11 @@ class ResolveHandler extends BaseHandlerWithClient {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			// Replacing the wildcard from the HTTP request with the one used in Manticore
-			$tableName = str_replace('*', '%', $payload->table); 
+			$tableName = str_replace('*', '%', $payload->table);
 			$query = "SHOW TABLES LIKE '{$tableName}'";
-			/** @var array{0?:array{data?:array<mixed>}} $queryResult */
+			/** @var array{0?:array{data?:array<int,array{Table:string}>}} $queryResult */
 			$queryResult = $manticoreClient->sendRequest($query)->getResult();
-			if (!isset($queryResult[0])) {
+			if (!isset($queryResult[0]) || !isset($queryResult[0]['data'])) {
 				return TaskResult::raw([]);
 			}
 
@@ -54,10 +53,10 @@ class ResolveHandler extends BaseHandlerWithClient {
 			foreach ($queryResult[0]['data'] as $row) {
 				$tables[] = $row['Table'];
 			}
-
+			/** @var array<array{index: string, alias: string}> $aliasData */
 			$aliasData = self::getAliasData($manticoreClient, $tables);
 			return TaskResult::raw(
-				self::buildResponse($tables, $aliasData)
+				self::buildResolveResponse($tables, $aliasData)
 			);
 		};
 
@@ -71,7 +70,7 @@ class ResolveHandler extends BaseHandlerWithClient {
 	 * @param array<array{index:string,alias:string}> $aliasData
 	 * @return array<mixed>
 	 */
-	protected static function buildResponse(array $tables, array $aliasData = []): array {
+	protected static function buildResolveResponse(array $tables, array $aliasData = []): array {
 		if ($aliasData) {
 			$aliasData = array_combine(
 				array_column($aliasData, 'index'),

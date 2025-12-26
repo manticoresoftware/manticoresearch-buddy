@@ -52,7 +52,7 @@ class InitKibanaHandler extends BaseEntityHandler {
 			/** @var array{error?:string,0:array{data?:array<array{_index:string,_source:string}>}} $queryResult */
 			$queryResult = $manticoreClient->sendRequest($entityQuery)->getResult();
 			if (isset($queryResult['error']) || !isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
-				self::errorResponse($alias);
+				throw self::errorResponse($alias);
 			}
 
 			$resp = [];
@@ -75,10 +75,9 @@ class InitKibanaHandler extends BaseEntityHandler {
 	/**
 	 *
 	 * @param string $alias
-	 * @return void
-	 * @throws GenericError
+	 * @return GenericError
 	 */
-	protected static function errorResponse(string $alias): void {
+	protected static function errorResponse(string $alias): GenericError {
 		$resp = [
 			'error' => [
 				'index' => $alias,
@@ -104,7 +103,6 @@ class InitKibanaHandler extends BaseEntityHandler {
 		$customError->setResponseErrorBody($resp);
 		$customError->setResponseErrorCode(404);
 
-		throw $customError;
+		return $customError;
 	}
-	
 }

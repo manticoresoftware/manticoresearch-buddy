@@ -64,6 +64,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$suggestions = $this->getSuggestions($phrases, $maxCount);
 			$this->sortSuggestions($suggestions, $phrases);
 
+			// Filter out suggestions with zero docs
+			$suggestions = $this->filterSuggestionsWithDocs($suggestions);
+
 			// Preparing the final result with suggestions
 			$data = [];
 			foreach ($suggestions as $suggestion) {
@@ -212,8 +215,26 @@ final class Handler extends BaseHandlerWithFlagCache {
 			[$words, $scoreMap] = $this->manticoreClient->fetchFuzzyVariations(
 				$phrase,
 				$this->payload->table,
+				$this->payload->forceBigrams,
 				$distance
 			);
+
+			// Normalize bigram separators in keywords from fuzzy variations
+			foreach ($words as &$word) {
+				$word['keywords'] = array_map(
+					fn($kw) => static::normalizeBigramSeparator($kw),
+					$word['keywords']
+				);
+			}
+			unset($word);
+
+			// Normalize bigram separators in score map keys
+			$normalizedScoreMap = [];
+			foreach ($scoreMap as $key => $value) {
+				$normalizedKey = static::normalizeBigramSeparator($key);
+				$normalizedScoreMap[$normalizedKey] = $value;
+			}
+			$scoreMap = $normalizedScoreMap;
 		}
 
 		// If no words found, we just add the original phrase
@@ -263,7 +284,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			return [];
 		}
 
-		$combinations = ['' => 0.0];
+		$combinations = new \Ds\Map(['' => 0.0]);
 		$positions = array_keys($words);
 
 		foreach ($positions as $position) {
@@ -272,42 +293,149 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$combinations = static::processCombinations($combinations, $keywords, $scoreMap, $maxCount);
 		}
 
-		arsort($combinations);
-		return array_slice(array_filter(array_keys($combinations)), 0, $maxCount);
+		$combinations->ksort(
+			function (mixed $a, mixed $b) use ($combinations): int {
+				if (!$combinations->hasKey($a) || !$combinations->hasKey($b)) {
+					return 0; // Equal if either key doesn't exist
+				}
+				$scoreA = $combinations->get($a);
+				$scoreB = $combinations->get($b);
+				return $scoreB <=> $scoreA;
+			}
+		);
+
+		/** @var array<string> */
+		return array_values(
+			array_slice(
+				array_filter(
+					$combinations->keys()->toArray(),
+				),
+				0,
+				$maxCount
+			)
+		);
 	}
 
 	/**
-	 * @param array<string,float> $combinations
+	 * @param \Ds\Map<string,float> $combinations
 	 * @param array<string> $positionWords
 	 * @param array<string,float> $scoreMap
 	 * @param int $maxCount
-	 * @return array<string,float>
+	 * @return \Ds\Map<string,float>
 	 */
 	private static function processCombinations(
-		array $combinations,
+		\Ds\Map $combinations,
 		array $positionWords,
 		array $scoreMap,
 		int $maxCount
-	): array {
-		$newCombinations = [];
+	): \Ds\Map {
+		$newCombinations = new \Ds\Map();
 		foreach ($combinations as $combination => $score) {
 			foreach ($positionWords as $word) {
-				$newCombination = trim($combination . ' ' . $word);
+				// Normalize bigram separator before building combination
+				$normalizedWord = static::normalizeBigramSeparator($word);
+				$normalizedCombination = static::normalizeBigramSeparator($combination);
+
+				$newCombination = trim($normalizedCombination . ' ' . $normalizedWord);
+
+				// Skip if the new combination has duplicate consecutive words
+				// This happens when expanded keywords contain multi-word phrases
+				// Example: "how do buy" + "iphone buy" = "how do buy iphone buy" (bad)
+				if (static::hasDuplicateWords($newCombination)) {
+					continue;
+				}
+
 				$newScore = $score + ($scoreMap[$word] ?? 0);
-				if (sizeof($newCombinations) >= $maxCount && $newScore <= min($newCombinations)) {
+
+				// If we already have max items and the new score is too low, skip
+				if (static::shouldSkipCombination($newCombinations, $newScore, $maxCount)) {
 					continue;
 				}
 
-				$newCombinations[$newCombination] = $newScore;
-				if (sizeof($newCombinations) <= $maxCount) {
+				$newCombinations->put($newCombination, $newScore);
+				if ($newCombinations->count() <= $maxCount) {
 					continue;
 				}
 
-				arsort($newCombinations);
-				array_pop($newCombinations);
+				$newCombinations = static::trimCombinationsToMaxCount($newCombinations, $maxCount);
 			}
 		}
+
 		return $newCombinations;
+	}
+
+	/**
+	 * Normalize bigram separator (ASCII 3) to space
+	 * Manticore stores bigrams with \u0003 separator which needs to be converted
+	 * @param string $text
+	 * @return string
+	 */
+	private static function normalizeBigramSeparator(string $text): string {
+		return str_replace("\u{0003}", ' ', $text);
+	}
+
+	/**
+	 * Check if a phrase contains duplicate consecutive or nearby words
+	 * @param string $phrase
+	 * @return bool
+	 */
+	private static function hasDuplicateWords(string $phrase): bool {
+		$words = preg_split('/\s+/', trim($phrase), -1, PREG_SPLIT_NO_EMPTY);
+		if (!$words) {
+			return false;
+		}
+
+		$wordCount = sizeof($words);
+		for ($i = 0; $i < $wordCount; $i++) {
+			// Check for consecutive duplicates or duplicates within 2 positions
+			// This catches patterns like "buy iphone buy" or "buy x buy"
+			for ($j = $i + 1; $j < min($i + 3, $wordCount); $j++) {
+				if ($words[$i] === $words[$j]) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * @param \Ds\Map<string,float> $combinations
+	 * @param float $newScore
+	 * @param int $maxCount
+	 * @return bool
+	 */
+	private static function shouldSkipCombination(\Ds\Map $combinations, float $newScore, int $maxCount): bool {
+		return $combinations->count() >= $maxCount && $newScore <= min($combinations->values()->toArray());
+	}
+
+	/**
+	 * @param \Ds\Map<string,float> $combinations
+	 * @param int $maxCount
+	 * @return \Ds\Map<string,float>
+	 */
+	private static function trimCombinationsToMaxCount(\Ds\Map $combinations, int $maxCount): \Ds\Map {
+		// Sort and trim the map
+		$pairs = $combinations->pairs()->toArray();
+		usort(
+			$pairs, static function ($a, $b): int {
+				if ($b->value > $a->value) {
+					return 1;
+				}
+				if ($b->value < $a->value) {
+					return -1;
+				}
+				return 0;
+			}
+		);
+
+		// Create a new map with only the top items
+		$trimmedCombinations = new \Ds\Map();
+		for ($i = 0; $i < $maxCount; $i++) {
+			$trimmedCombinations->put($pairs[$i]->key, $pairs[$i]->value);
+		}
+
+		return $trimmedCombinations;
 	}
 
 
@@ -322,9 +450,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		}
 		$wordLen = strlen($word);
 		// If we set fuzziness, we choose minimal distance from out algo and parameter set
+		// When force_bigrams is true, use distance=2 for wordLen > 3 instead of > 6
+		$distanceThreshold = $this->payload->forceBigrams ? 3 : 6;
 		return min(
 			$this->payload->fuzziness, match (true) {
-				$wordLen > 6 => 2,
+				$wordLen > $distanceThreshold => 2,
 				$wordLen > 2 => 1,
 				default => 0,
 			}
@@ -351,7 +481,10 @@ final class Handler extends BaseHandlerWithFlagCache {
 		/** @var array<keyword> */
 		$data = static::applyThreshold($data, 0.5);
 		/** @var array<string> */
-		$keywords = array_map(fn($row) => ltrim($row['normalized'], '='), $data);
+		$keywords = array_map(
+			fn($row) => static::normalizeBigramSeparator(ltrim($row['normalized'], '=')),
+			$data
+		);
 		// Filter out keywords that are too long to given config
 		$maxLen = strlen($word) + $this->payload->expansionLen;
 		$keywords = array_filter($keywords, fn ($keyword) => strlen($keyword) <= $maxLen);
@@ -383,6 +516,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$rawSuggestionsCount = sizeof($data);
 		/** @var array<string> */
 		$suggestions = array_column(static::applyThreshold($data, 0.5, 20), 'suggest');
+		// Normalize bigram separators in suggestions
+		$suggestions = array_map(fn($s) => static::normalizeBigramSeparator($s), $suggestions);
 		$thresholdSuggestionsCount = sizeof($suggestions);
 		$filterFn = function (string $suggestion) use ($lastWord, $lastWordLen, $distance) {
 			$suggestionLen = strlen($suggestion);
@@ -448,6 +583,40 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$match = "*$match";
 		}
 		return $match;
+	}
+
+	/**
+	 * Filter out suggestions that have zero document matches
+	 * @param array<string> $suggestions
+	 * @return array<string>
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 */
+	private function filterSuggestionsWithDocs(array $suggestions): array {
+		$validSuggestions = [];
+		foreach ($suggestions as $suggestion) {
+			$escapedSuggestion = addcslashes($suggestion, '*%?\'');
+			$q = "CALL KEYWORDS('{$escapedSuggestion}', '{$this->payload->table}', 1 as stats)";
+			/** @var array{0:array{data?:array<keyword>}} $result */
+			$result = $this->manticoreClient->sendRequest($q)->getResult();
+			$data = $result[0]['data'] ?? [];
+
+			// Check if any keyword has docs > 0
+			$hasDocs = false;
+			foreach ($data as $row) {
+				if ($row['docs'] > 0) {
+					$hasDocs = true;
+					break;
+				}
+			}
+
+			if ($hasDocs) {
+				$validSuggestions[] = $suggestion;
+			} else {
+				Buddy::debug("Autocomplete: filtering out '$suggestion' (zero docs)");
+			}
+		}
+		return $validSuggestions;
 	}
 
 	/**

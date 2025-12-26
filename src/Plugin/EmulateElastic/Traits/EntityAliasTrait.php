@@ -20,30 +20,44 @@ trait EntityAliasTrait {
 	use QueryMapLoaderTrait;
 	use KibanaVersionTrait;
 
-	const DEFAULT_ALIAS_TABLE = '_aliases';
+	protected static string $defaulAliasTable = '_aliases';
 
-	protected static function addEntityAlias($index, $alias, $manticoreClient, $aliasTable = null): void {
+	/**
+	 *
+	 * @param string $index
+	 * @param string $alias
+	 * @param HTTPClient $manticoreClient
+	 * @param string $aliasTable
+	 * @return void
+	 */
+	protected static function addEntityAlias(
+		string $index,
+		string $alias,
+		HTTPClient $manticoreClient,
+		string $aliasTable = null
+	): void {
 		if (!isset($aliasTable)) {
-			$aliasTable = self::DEFAULT_ALIAS_TABLE;
+			$aliasTable = self::$defaulAliasTable;
 		}
 		$query = "CREATE TABLE IF NOT EXISTS $aliasTable (index string, alias string)";
 		$manticoreClient->sendRequest($query);
-		
+
 		$query = "SELECT 1 FROM $aliasTable WHERE index='{$index}'";
 		/** @var array{0:array{data:array<mixed>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
 		$isExistingIndex = (bool)$queryResult[0]['data'];
 		$query = $isExistingIndex
-			? "UPDATE {$payload->table} SET alias='{$alias}' WHERE index='{$index}'"
+			? "UPDATE {$aliasTable} SET alias='{$alias}' WHERE index='{$index}'"
 			: "INSERT INTO $aliasTable (index, alias) VALUES('{$index}', '{$alias}')";
 		/** @var array{error?:string,0:array{data?:array<mixed>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error'])) {
 			throw new \Exception('Unknown error on template creation');
 		}
-		if (!$isExistingIndex) {
-			self::refreshAliasedEntities($index, $alias, $manticoreClient);
+		if ($isExistingIndex) {
+			return;
 		}
+		self::refreshAliasedEntities($index, $alias, $manticoreClient);
 	}
 
 	/**
@@ -53,18 +67,18 @@ trait EntityAliasTrait {
 	 * @return array<mixed>
 	 */
 	protected static function getAliasData(HTTPClient $manticoreClient, array $tables = []): array {
-		$query = "SHOW TABLES LIKE '" . self::DEFAULT_ALIAS_TABLE . "'";
+		$query = "SHOW TABLES LIKE '" . self::$defaulAliasTable . "'";
 		/** @var array{0?:array{data?:array<mixed>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
 		if (!isset($queryResult[0])) {
 			return [];
 		}
-		
-		$query = 'SELECT index, alias FROM ' . self::DEFAULT_ALIAS_TABLE;
+
+		$query = 'SELECT index, alias FROM ' . self::$defaulAliasTable;
 		if ($tables) {
 			array_walk(
 				$tables,
-				fn(&$value, $key) => $value = "'" . $value . "'"
+				fn(&$value) => $value = "'" . $value . "'"
 			);
 			$tablesExpr = implode(',', $tables);
 			$query .= " WHERE index IN ({$tablesExpr})";
@@ -74,7 +88,7 @@ trait EntityAliasTrait {
 		if (!isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
 			return [];
 		}
-		
+
 		return $queryResult[0]['data'];
 	}
 
@@ -96,9 +110,11 @@ trait EntityAliasTrait {
 
 		$queryMapName = ($alias === '.kibana') ? 'Settings' : 'ManagerSettings';
 		self::initQueryMap($queryMapName);
+		/** @var array<mixed> $entityInfo */
+		$entityInfo = self::$queryMap[$queryMapName][$alias];
 		/** @var array{settings:array{index:array{created:string,uuid:string}}} $sourceObj */
-		$sourceObj = self::getVersionedEntity(self::$queryMap[$queryMapName][$alias], $manticoreClient);
-		
+		$sourceObj = self::getVersionedEntity($entityInfo, $manticoreClient);
+
 		$created = time();
 		$uuid = substr(md5(microtime()), 0, 16);
 		$sourceObj['settings']['index']['created'] = $created;
@@ -106,7 +122,7 @@ trait EntityAliasTrait {
 		$source = (string)json_encode($sourceObj);
 		$entityId = "settings:{$index}";
 		AddEntityHandler::add($source, $entityId, 'settings', $index, $alias, $manticoreClient);
-		
+
 		$query = 'UPDATE ' . parent::ENTITY_TABLE . " SET _index='{$index}' WHERE _index=''";
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error'])) {

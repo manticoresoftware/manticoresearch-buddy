@@ -40,20 +40,20 @@ final class Handler extends BaseHandlerWithClient {
 				case '_search':
 					return self::handleSearch($payload, $manticoreClient);
 				case '_cat':
-					return self::handleCat($payload, $manticoreClient);
+					return self::handleCat($manticoreClient);
 				case '_count':
 					return self::handleCount($payload, $manticoreClient);
 				case '_license':
-					return self::handleLicense($payload, $manticoreClient);
+					return self::handleLicense();
 				case '_nodes':
-					return self::handleNodes($payload, $manticoreClient);
+					return self::handleNodes();
 				case '_xpack':
-					return self::handleXpack($payload, $manticoreClient);
+					return self::handleXpack();
 				case '.opensearch_dashboards':
 				case '.opensearch_dashboards_task_manager':
-					return self::handleOpenSearchDashboards($payload, $manticoreClient);
+					return self::handleOpenSearchDashboards($payload);
 				default:
-					return self::handleDefault($payload, $manticoreClient);
+					return self::handleDefault();
 			}
 		};
 
@@ -76,16 +76,16 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$query = 'SELECT * FROM ' . $payload->table;
-		
+
 		if (isset($request['query'])) {
-			$query .= ' WHERE MATCH(\'@* ' . addslashes(json_encode($request['query'])) . '\')';
+			$query .= ' WHERE MATCH(\'@* ' . addslashes((string)json_encode($request['query'])) . '\')';
 		}
 
 		$size = $request['size'] ?? 10;
 		$query .= ' LIMIT ' . (int)$size;
-
-		$result = $manticoreClient->sendRequest($query);
-		$data = $result->getResult()[0]['data'] ?? [];
+		/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string,id?:int}>}} $result */
+		$result = $manticoreClient->sendRequest($query)->getResult();
+		$data = $result[0]['data'] ?? [];
 
 		// Build OpenSearch response format
 		$response = [
@@ -99,7 +99,7 @@ final class Handler extends BaseHandlerWithClient {
 			],
 			'hits' => [
 				'total' => [
-					'value' => count($data),
+					'value' => sizeof($data),
 					'relation' => 'eq',
 				],
 				'max_score' => 1.0,
@@ -122,19 +122,19 @@ final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * Handle cat requests
-	 * @param Payload $payload
 	 * @param Client $manticoreClient
 	 * @return TaskResult
 	 */
-	private static function handleCat(Payload $payload, Client $manticoreClient): TaskResult {
+	private static function handleCat(Client $manticoreClient): TaskResult {
 		$query = 'SHOW TABLES';
-		$result = $manticoreClient->sendRequest($query);
-		$data = $result->getResult()[0]['data'] ?? [];
+		/** @var array{0:array{data?:array<array{Index?:string}>}} $result */
+		$result = $manticoreClient->sendRequest($query)->getResult();
+		$data = $result[0]['data'] ?? [];
 
 		$response = [];
 		foreach ($data as $row) {
 			$tableName = $row['Index'] ?? '';
-			$response[] = $tableName . "\t" . "open\t" . "1\t" . "1\t" . "0\t" . "0\t" . "0b";
+			$response[] = $tableName . "\t" . "open\t" . "1\t" . "1\t" . "0\t" . "0\t" . '0b';
 		}
 
 		return TaskResult::raw(implode("\n", $response));
@@ -148,8 +148,9 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private static function handleCount(Payload $payload, Client $manticoreClient): TaskResult {
 		$query = 'SELECT COUNT(*) as count FROM ' . $payload->table;
-		$result = $manticoreClient->sendRequest($query);
-		$data = $result->getResult()[0]['data'] ?? [];
+		/** @var array{0:array{data?:array<array{count?:int}>}} $result */
+		$result = $manticoreClient->sendRequest($query)->getResult();
+		$data = $result[0]['data'] ?? [];
 		$count = $data[0]['count'] ?? 0;
 
 		$response = [
@@ -167,11 +168,9 @@ final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * Handle license requests
-	 * @param Payload $payload
-	 * @param Client $manticoreClient
 	 * @return TaskResult
 	 */
-	private static function handleLicense(Payload $payload, Client $manticoreClient): TaskResult {
+	private static function handleLicense(): TaskResult {
 		$response = [
 			'license' => [
 				'status' => 'active',
@@ -193,11 +192,9 @@ final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * Handle nodes requests
-	 * @param Payload $payload
-	 * @param Client $manticoreClient
 	 * @return TaskResult
 	 */
-	private static function handleNodes(Payload $payload, Client $manticoreClient): TaskResult {
+	private static function handleNodes(): TaskResult {
 		$response = [
 			'_nodes' => [
 				'total' => 1,
@@ -240,11 +237,9 @@ final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * Handle xpack requests
-	 * @param Payload $payload
-	 * @param Client $manticoreClient
 	 * @return TaskResult
 	 */
-	private static function handleXpack(Payload $payload, Client $manticoreClient): TaskResult {
+	private static function handleXpack(): TaskResult {
 		$response = [
 			'build' => [
 				'hash' => 'abcdef123456',
@@ -322,10 +317,9 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Handle OpenSearch Dashboards requests
 	 * @param Payload $payload
-	 * @param Client $manticoreClient
 	 * @return TaskResult
 	 */
-	private static function handleOpenSearchDashboards(Payload $payload, Client $manticoreClient): TaskResult {
+	private static function handleOpenSearchDashboards(Payload $payload): TaskResult {
 		$response = [
 			'_index' => $payload->table,
 			'_type' => '_doc',
@@ -347,11 +341,9 @@ final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * Handle default requests
-	 * @param Payload $payload
-	 * @param Client $manticoreClient
 	 * @return TaskResult
 	 */
-	private static function handleDefault(Payload $payload, Client $manticoreClient): TaskResult {
+	private static function handleDefault(): TaskResult {
 		$response = [
 			'acknowledged' => true,
 			'status' => 'ok',
@@ -359,4 +351,4 @@ final class Handler extends BaseHandlerWithClient {
 
 		return TaskResult::raw($response);
 	}
-} 
+}

@@ -93,4 +93,4 @@ class OpenSearchDashboardsTest extends TestCase {
 		$this->assertStringContainsString('OpenSearch Dashboards', $info);
 		$this->assertStringContainsString('OpenSearch', $info);
 	}
-} 
+}
