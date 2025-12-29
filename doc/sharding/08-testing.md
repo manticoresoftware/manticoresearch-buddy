@@ -364,12 +364,14 @@ private function createTestableQueue(): TestableQueue {
             parent::__construct();
         }
 
-        public function add(string $nodeId, string $query): int {
+        public function add(string $nodeId, string $query, string $rollbackQuery, ?string $operationGroup = null): int {
             $queueId = $this->nextQueueId++;
             $command = [
                 'id' => $queueId,
                 'node' => $nodeId,
                 'query' => $query,
+                'rollback_query' => $rollbackQuery,
+                'operation_group' => $operationGroup ?? '',
                 'wait_for_id' => end($this->waitForIds) ?: null,
             ];
             $this->capturedCommands[] = $command;
