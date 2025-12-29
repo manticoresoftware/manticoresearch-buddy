@@ -27,14 +27,14 @@ trait EntityAliasTrait {
 	 * @param string $index
 	 * @param string $alias
 	 * @param HTTPClient $manticoreClient
-	 * @param string $aliasTable
+	 * @param ?string $aliasTable
 	 * @return void
 	 */
 	protected static function addEntityAlias(
 		string $index,
 		string $alias,
 		HTTPClient $manticoreClient,
-		string $aliasTable = null
+		?string $aliasTable = null
 	): void {
 		if (!isset($aliasTable)) {
 			$aliasTable = self::$defaulAliasTable;
