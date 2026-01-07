@@ -150,7 +150,7 @@ final class Payload extends BasePayload {
 		}
 		// Make sure that we set default values for options
 		if (!isset($self->layouts)) {
-			$self->layouts = KeyboardLayout::getSupportedLanguages();
+			$self->layouts = [];
 		}
 		return $self;
 	}
@@ -238,7 +238,7 @@ final class Payload extends BasePayload {
 		if (isset($layouts)) {
 			$layouts = $layouts ? array_map('trim', explode(',', $layouts)) : [];
 		} else {
-			$layouts = KeyboardLayout::getSupportedLanguages();
+			$layouts = [];
 		}
 
 		if ($layouts && sizeof($layouts) < 2) {
