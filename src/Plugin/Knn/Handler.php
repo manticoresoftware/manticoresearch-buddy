@@ -64,12 +64,7 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private static function getQueryVectorValue(Client $client, Payload $payload): string|false {
 		$request = $client
-			->sendRequest(
-				'SELECT * FROM ' . $payload->table .
-				' WHERE id = ' . $payload->docId,
-				'sql?mode=raw',
-				false,
-			);
+			->sendRequest('SELECT * FROM ' . $payload->table . ' WHERE id = ' . $payload->docId);
 
 		if ($request->hasError()) {
 			ManticoreSearchResponseError::throw((string)$request->getError());
