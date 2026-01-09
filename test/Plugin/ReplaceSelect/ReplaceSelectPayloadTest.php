@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2026, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 3 or any later
@@ -233,8 +233,8 @@ class ReplaceSelectPayloadTest extends TestCase {
 		$this->assertEquals('target', $payload2->getTargetTableWithCluster());
 	}
 
-	public function testValidation(): void {
-		echo "\nTesting payload validation\n";
+		public function testValidation(): void {
+			echo "\nTesting payload validation\n";
 
 		$request = Request::fromArray(
 			[
@@ -247,44 +247,44 @@ class ReplaceSelectPayloadTest extends TestCase {
 			]
 		);
 
-		$payload = Payload::fromRequest($request);
-		$payload->validate(); // Should not throw
+			$payload = Payload::fromRequest($request);
+			$payload->validate(); // Should not throw
 
-		// Test with invalid batch size (too large)
-		$originalBatchSize = $_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] ?? null;
-		$originalMaxBatchSize = $_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] ?? null;
+			// Test with invalid batch size (too large)
+			$originalBatchSize = getenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
+			$originalMaxBatchSize = getenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE');
 
-		// Set max batch size to a small value to test validation
-		$_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] = 100;
-		$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = 200; // Exceeds max, but will be clamped to 100
+			try {
+				putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=100');
+				putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE=200');
 
-		// Create new payload to pick up new environment values
-		Payload::fromRequest($request);
+				// Create new payload to pick up new environment values
+				Payload::fromRequest($request);
 
 
-		$this->expectException(GenericError::class);
+				$this->expectException(GenericError::class);
 
-		$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = -10;
-		$negativePayload = Payload::fromRequest($request);
-		$negativePayload->validate();
+				putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE=-10');
+				$negativePayload = Payload::fromRequest($request);
+				$negativePayload->validate();
 
-		$_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] = 0;
-		$zeroMaxPayload = Payload::fromRequest($request);
-		$zeroMaxPayload->validate();
+				putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=0');
+				$zeroMaxPayload = Payload::fromRequest($request);
+				$zeroMaxPayload->validate();
+			} finally {
+				if ($originalBatchSize === false) {
+					putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
+				} else {
+					putenv("BUDDY_REPLACE_SELECT_BATCH_SIZE=$originalBatchSize");
+				}
 
-		// Restore original environment
-		if ($originalBatchSize !== null) {
-			$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = $originalBatchSize;
-		} else {
-			unset($_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE']);
+				if ($originalMaxBatchSize === false) {
+					putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE');
+				} else {
+					putenv("BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=$originalMaxBatchSize");
+				}
+			}
 		}
-
-		if ($originalMaxBatchSize !== null) {
-			$_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE'] = $originalMaxBatchSize;
-		} else {
-			unset($_ENV['BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE']);
-		}
-	}
 
 	public function testInvalidQuery(): void {
 		echo "\nTesting invalid query handling\n";

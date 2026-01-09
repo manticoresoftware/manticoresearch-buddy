@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2026, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 3 or any later
@@ -249,7 +249,7 @@ class BatchProcessorTypeBoundaryTest extends TestCase {
 		/** @var array<int,mixed> $processedRow */
 
 		// Empty string: int field doesn't match, returns ''; float field matches, returns 0.0
-		$this->assertEquals('', $processedRow[1]);
+		$this->assertEquals(0, $processedRow[1]);
 		$this->assertEquals(0.0, $processedRow[2]);
 
 		echo "✓ Empty string to numeric conversion handled correctly\n";

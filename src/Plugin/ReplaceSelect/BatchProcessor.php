@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- * Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ * Copyright (c) 2026, Manticore Software LTD (https://manticoresearch.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 or any later
@@ -32,6 +32,10 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 final class BatchProcessor
 {
 	use StringFunctionsTrait;
+
+	private const string LIMIT_OFFSET_TRAILING_PATTERN = '/(\\s+LIMIT\\s+\\d+\\s*(?:OFFSET\\s+\\d+)?)\\s*$/i';
+	private const int MAX_EMPTY_BATCHES = 3;
+	private const int OFFSET_MAX_MATCHES_THRESHOLD = 1000;
 
 	private Client $client;
 	private Payload $payload;
@@ -85,15 +89,10 @@ final class BatchProcessor
 
 		// Remove LIMIT/OFFSET clauses and store them for later
 		$limitOffsetMatch = [];
-		if (preg_match('/(\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?)\s*$/i', $baseQuery, $limitOffsetMatch)) {
-			$baseQuery = preg_replace('/\s+LIMIT\s+\d+\s*(?:OFFSET\s+\d+)?\s*$/i', '', $baseQuery);
+		if (preg_match(self::LIMIT_OFFSET_TRAILING_PATTERN, $baseQuery, $limitOffsetMatch) === 1) {
+			$baseQuery = substr($baseQuery, 0, -strlen($limitOffsetMatch[0]));
 		}
-
-		if ($baseQuery === null) {
-			throw ManticoreSearchClientError::create(
-				'Invalid SELECT query format'
-			);
-		}
+		$baseQuery = rtrim($baseQuery);
 
 		// Add ORDER BY id ASC if no ORDER BY clause is present
 		if (!$this->payload->hasOrderBy) {
@@ -115,9 +114,7 @@ final class BatchProcessor
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function execute(): int {
-		$batchSize = $this->batchSize;
 		$consecutiveEmptyBatches = 0;
-		$maxEmptyBatches = 3;
 		$userLimit = $this->payload->selectLimit;
 		$offset = $this->payload->selectOffset ?? 0;
 
@@ -128,25 +125,28 @@ final class BatchProcessor
 
 			$batchStartTime = microtime(true);
 			$currentBatchSize = $this->calculateCurrentBatchSize(
-				$batchSize,
+				$this->batchSize,
 				$this->totalProcessed,
 				$userLimit
 			);
 
 			$batchQuery = "{$this->baseQueryTemplate} LIMIT $currentBatchSize OFFSET $offset";
 
-			if ($offset >= 1000) {
+			if ($offset >= self::OFFSET_MAX_MATCHES_THRESHOLD) {
 				$batchQuery .= ' OPTION max_matches='.($currentBatchSize + $offset);
 			}
 
 			$batch = $this->fetchBatch($batchQuery);
 
 			if (empty($batch)) {
-				if ($this->handleEmptyBatch($consecutiveEmptyBatches, $maxEmptyBatches)) {
+				$consecutiveEmptyBatches++;
+				if ($consecutiveEmptyBatches >= self::MAX_EMPTY_BATCHES) {
 					break;
 				}
 			} else {
-				$this->handleNonEmptyBatch($batch, $batchStartTime, $consecutiveEmptyBatches);
+				$consecutiveEmptyBatches = 0;
+				$this->executeReplaceBatch($batch);
+				$this->recordBatchStatistics($batch, $batchStartTime);
 
 				if ($this->hasReachedUserLimit($userLimit)) {
 					break;
@@ -154,7 +154,7 @@ final class BatchProcessor
 			}
 
 			$offset += $currentBatchSize;
-		} while (sizeof($batch) === $batchSize);
+		} while (sizeof($batch) === $this->batchSize);
 
 		$this->logProcessingStatistics();
 		return $this->totalProcessed;
@@ -188,14 +188,12 @@ final class BatchProcessor
 	 * @return int Adjusted batch size
 	 */
 	private function calculateCurrentBatchSize(int $batchSize, int $processed, ?int $userLimit): int {
-		$currentBatchSize = $batchSize;
-
 		if ($userLimit === null) {
-			return $currentBatchSize;
+			return $batchSize;
 		}
 
-		if (($processed + $currentBatchSize) <= $userLimit) {
-			return $currentBatchSize;
+		if (($processed + $batchSize) <= $userLimit) {
+			return $batchSize;
 		}
 
 		return max(0, $userLimit - $processed);
@@ -246,64 +244,35 @@ final class BatchProcessor
 	}
 
 	/**
-	 * Handle empty batch and determine if processing should stop
+	 * Execute REPLACE operations using bulk JSON API for a batch of records
 	 *
-	 * @param int $consecutiveEmptyBatches Counter for consecutive empty batches
-	 * @param int $maxEmptyBatches Maximum allowed empty batches
-	 * @return bool True if processing should stop
-	 */
-	private function handleEmptyBatch(int &$consecutiveEmptyBatches, int $maxEmptyBatches): bool {
-		$consecutiveEmptyBatches++;
-		return $this->shouldStopProcessing($consecutiveEmptyBatches, $maxEmptyBatches);
-	}
-
-	/**
-	 * Check if we should stop processing due to empty batches
+	 * @param array<int,array<string,mixed>> $batch Array of associative row arrays
 	 *
-	 * @param int $consecutiveEmptyBatches
-	 * @param int $maxEmptyBatches
-	 * @return bool
-	 */
-	private function shouldStopProcessing(int $consecutiveEmptyBatches, int $maxEmptyBatches): bool {
-		if ($consecutiveEmptyBatches >= $maxEmptyBatches) {
-			return true;
-		}
-		return false;
-	}
-
-	/**
-	 * Handle non-empty batch processing
-	 *
-	 * @param array<int,array<string,mixed>> $batch
-	 * @param float $batchStartTime
-	 * @param int $consecutiveEmptyBatches
 	 * @return void
 	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
 	 */
-	private function handleNonEmptyBatch(
-		array $batch,
-		float $batchStartTime,
-		int &$consecutiveEmptyBatches
-	): void {
-		$consecutiveEmptyBatches = 0;
-		$this->processBatch($batch);
-		$this->recordBatchStatistics($batch, $batchStartTime);
-	}
-
-	/**
-	 * Process a single batch of records
-	 *
-	 * @param array<int,array<string,mixed>> $batch
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function processBatch(array $batch): void {
+	private function executeReplaceBatch(array $batch): void {
 		if (empty($batch)) {
 			return;
 		}
 
-		// Pass raw associative arrays to executeReplaceBatch for processing
-		$this->executeReplaceBatch($batch);
+		// Process each row for field type compatibility (convert associative to indexed)
+		$processedBatch = [];
+		foreach ($batch as $row) {
+			$processedBatch[] = $this->processRow($row);
+		}
+
+		// Split batch into chunks for parallel processing
+		$chunks = array_chunk($processedBatch, $this->chunkSize);
+		$requests = [];
+
+		foreach ($chunks as $chunk) {
+			$bulkJson = $this->buildChunkBulk($chunk);
+			$requests[] = $this->buildRequest($bulkJson);
+		}
+
+		$this->executeReplaceChunks($requests);
 	}
 
 	/**
@@ -333,15 +302,13 @@ final class BatchProcessor
 	 * @throws ManticoreSearchClientError
 	 */
 	private function processRowWithColumnList(array $values): array {
-		$columnList = $this->payload->replaceColumnList;
-
-		if ($columnList === null) {
+		if ($this->payload->replaceColumnList === null) {
 			throw ManticoreSearchClientError::create(
 				'Missing column list for REPLACE operation'
 			);
 		}
 
-		$expectedCount = sizeof($columnList);
+		$expectedCount = sizeof($this->payload->replaceColumnList);
 		if (sizeof($values) !== $expectedCount) {
 			throw ManticoreSearchClientError::create(
 				'Column count mismatch: row has ' . sizeof($values) . ' values but expected ' . $expectedCount
@@ -353,7 +320,7 @@ final class BatchProcessor
 
 		// Process each column
 		$processed = [];
-		foreach ($columnList as $selectIndex => $columnName) {
+		foreach ($this->payload->replaceColumnList as $selectIndex => $columnName) {
 			$this->processColumn(
 				$columnName,
 				$selectIndex,
@@ -483,36 +450,6 @@ final class BatchProcessor
 	}
 
 	/**
-	 * Execute REPLACE operations using bulk JSON API for a batch of records
-	 *
-	 * @param array<int,array<string,mixed>> $batch Array of associative row arrays
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function executeReplaceBatch(array $batch): void {
-		if (empty($batch)) {
-			return;
-		}
-
-		// Process each row for field type compatibility (convert associative to indexed)
-		$processedBatch = [];
-		foreach ($batch as $row) {
-			$processedBatch[] = $this->processRow($row);
-		}
-
-		// Split batch into chunks for parallel processing
-		$chunks = array_chunk($processedBatch, $this->chunkSize);
-		$requests = [];
-
-		foreach ($chunks as $chunk) {
-			$bulkJson = $this->buildChunkBulk($chunk);
-			$requests[] = $this->buildRequest($bulkJson);
-		}
-
-		$this->executeReplaceChunks($requests);
-	}
-
-	/**
 	 * Build JSON bulk operations for a single chunk
 	 *
 	 * @param array<int,array<int,mixed>> $chunk Chunk of rows to convert to bulk JSON
@@ -521,11 +458,12 @@ final class BatchProcessor
 	 */
 	private function buildChunkBulk(array $chunk): string {
 		$targetTable = $this->payload->getTargetTableWithCluster();
-		$columns = $this->determineReplaceColumns();
+		$columns = $this->payload->replaceColumnList !== null
+			? $this->determineColumnsFromList()
+			: $this->determineColumnsFromTargetFields();
 
 		$bulkLines = [];
 		foreach ($chunk as $row) {
-			// Row is already processed by processBatch(), use directly
 			$processedRow = $row;
 
 			// Extract ID field (required for bulk operations)
@@ -547,20 +485,6 @@ final class BatchProcessor
 		}
 
 		return implode(PHP_EOL, $bulkLines) . PHP_EOL;
-	}
-
-	/**
-	 * Determine columns and positions for REPLACE statement
-	 *
-	 * @return array{columnNames: array<int,string>, columnPositions: array<int,int>|null}
-	 * @throws ManticoreSearchClientError
-	 */
-	private function determineReplaceColumns(): array {
-		if ($this->payload->replaceColumnList !== null) {
-			return $this->determineColumnsFromList();
-		}
-
-		return $this->determineColumnsFromTargetFields();
 	}
 
 	/**
@@ -805,13 +729,21 @@ final class BatchProcessor
 	 * @return mixed Converted value
 	 */
 	private function convertValueByFieldType(mixed $sqlValue, string $fieldType): mixed {
+		if ($fieldType === 'bool') {
+			if (is_string($sqlValue)) {
+				$value = strtolower(trim($sqlValue));
+				if (is_numeric($value)) {
+					return (int)$value !== 0;
+				}
+				return $value === 'true';
+			}
+
+			return (bool)$sqlValue;
+		}
+
 		return match ($fieldType) {
-			'float' => is_numeric($sqlValue) ? (float)$sqlValue : 0.0,
-			'int', 'bigint' => is_numeric($sqlValue) ? (int)$sqlValue : 0,
-			'uint' => is_numeric($sqlValue) ? (int)$sqlValue : 0,
-			'bool' => is_numeric($sqlValue) ? ($sqlValue !== 0)
-				: (is_string($sqlValue) && strtolower($sqlValue) === 'true'),
-			'timestamp' => is_numeric($sqlValue) ? (int)$sqlValue : 0,
+			'float' => (float)$sqlValue,
+			'int', 'bigint', 'uint', 'timestamp' => (int)$sqlValue,
 			'json' => $this->convertSqlJsonToJsonValue($sqlValue),
 			default => $sqlValue
 		};
@@ -878,8 +810,6 @@ final class BatchProcessor
 		$failedChunks = [];
 
 		foreach ($responses as $index => $response) {
-			$current = $response->getResult()->toArray();
-
 			// Check for explicit errors first
 			if ($response->hasError()) {
 				$failedChunks[] = [
@@ -889,6 +819,8 @@ final class BatchProcessor
 				];
 				continue;
 			}
+
+			$current = $response->getResult()->toArray();
 
 			// Validate bulk response structure
 			if (!isset($current['errors'])) {
@@ -912,7 +844,6 @@ final class BatchProcessor
 			];
 		}
 
-		// If any chunks failed, throw an error
 		if (!empty($failedChunks)) {
 			// Throw the first error as representative
 			throw ManticoreSearchClientError::create(

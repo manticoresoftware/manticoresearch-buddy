@@ -120,7 +120,7 @@ class ReplaceSelectOrderingTest extends TestCase {
 			}
 
 			// Execute REPLACE SELECT with small batch size to test multiple batches
-			$_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] = '10';
+			putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE=10');
 
 			static::runSqlQuery(
 				'REPLACE INTO test_replace_tgt (id, title, price) ' .
@@ -143,7 +143,7 @@ class ReplaceSelectOrderingTest extends TestCase {
 
 			echo "✓ Batch processing with automatic ordering works correctly\n";
 		} finally {
-			unset($_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE']);
+			putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
 			$this->cleanupTestTables();
 		}
 	}

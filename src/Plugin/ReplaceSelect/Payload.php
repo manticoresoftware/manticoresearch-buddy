@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
-  Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+  Copyright (c) 2026, Manticore Software LTD (https://manticoresearch.com)
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 3 or any later
@@ -54,15 +54,8 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		// Match pattern: REPLACE INTO table [(...)] SELECT ... FROM source
-		// Supports both syntaxes:
-		// 1. REPLACE INTO table SELECT ... FROM source
-		// 2. REPLACE INTO table (col1, col2) SELECT ... FROM source
-		// Uses word characters for table name to prevent greedy matching of parentheses
-		return preg_match(
-			'/^\s*REPLACE\s+INTO\s+\w+(?::\w+)?\s*(?:\([^)]+\))?\s+SELECT\s+.*?\s+FROM\s+\S+/is',
-			$request->payload
-		) === 1;
+		$matchPattern = '/^\\s*REPLACE\\s+INTO\\s+\\w+(?::\\w+)?\\s*(?:\\([^)]+\\))?\\s+SELECT\\s+.*?\\s+FROM\\s+\\S+/is';
+		return preg_match($matchPattern, $request->payload) === 1;
 	}
 
 	/**
@@ -75,7 +68,11 @@ final class Payload extends BasePayload {
 	public static function fromRequest(Request $request): static {
 		$self = new static();
 		$self->originalQuery = $request->payload;
-		$self->batchSize = (int)($_ENV['BUDDY_REPLACE_SELECT_BATCH_SIZE'] ?? 1000);
+		$batchSize = getenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
+		if ($batchSize === false || $batchSize === '') {
+			$batchSize = 1000;
+		}
+		$self->batchSize = (int)$batchSize;
 		try {
 			// Use regex parsing for REPLACE INTO ... SELECT
 			$self->parseWithRegex($request->payload);
@@ -95,41 +92,31 @@ final class Payload extends BasePayload {
 	 * @throws GenericError
 	 */
 	private function parseWithRegex(string $sql): void {
-		// Extract target table and optional column list: REPLACE INTO [cluster:]table [(col1, col2, col3)]
-		if (!preg_match('/REPLACE\s+INTO\s+(\w+(?::\w+)?)\s*(?:\(([^)]+)\))?/i', $sql, $matches)) {
-			$errorMsg = 'Cannot extract target table from SQL. Pattern did not match';
-			throw GenericError::create($errorMsg);
+		$parsePattern = '/^\\s*REPLACE\\s+INTO\\s+(?<table>\\w+(?::\\w+)?)\\s*(?:\\((?<columns>[^)]*)\\))?\\s+'
+			. '(?<select>SELECT\\s+.*?\\s+FROM\\s+\\S.+?)(?:\\s*\\/\\*.*?\\*\\/\\s*)?;?\\s*$/is';
+
+		if (!preg_match($parsePattern, $sql, $matches)) {
+			throw GenericError::create('Cannot parse SQL. Pattern did not match');
 		}
 
-		$tableSpec = $matches[1];
-		$this->parseTargetTableFromString($tableSpec);
+		$this->parseTargetTableFromString($matches['table']);
 
-		// Extract column list if present
-		if (!empty($matches[2])) {
-			$this->replaceColumnList = $this->parseColumnList($matches[2]);
-		} else {
-			$this->replaceColumnList = null;
+		$this->replaceColumnList = isset($matches['columns']) && trim($matches['columns']) !== ''
+			? $this->parseColumnList($matches['columns'])
+			: null;
+
+		$this->selectQuery = trim($matches['select']);
+		$this->hasOrderBy = stripos($this->selectQuery, 'ORDER BY') !== false;
+
+		$this->selectLimit = null;
+		$this->selectOffset = null;
+		$limitOffsetPattern = '/\\s+LIMIT\\s+(?<limit>\\d+)(?:\\s+OFFSET\\s+(?<offset>\\d+))?\\s*$/i';
+		if (preg_match($limitOffsetPattern, $this->selectQuery, $limitMatches)) {
+			$this->selectLimit = (int)$limitMatches['limit'];
+			if (isset($limitMatches['offset']) && $limitMatches['offset'] !== '') {
+				$this->selectOffset = (int)$limitMatches['offset'];
+			}
 		}
-
-		// Extract SELECT query
-		// Use 's' flag (DOTALL) to make '.' match newline characters for multi-line queries
-		if (!preg_match(
-			'/REPLACE\s+INTO\s+[\w]+(?::[\w]+)?\s*(?:\([^)]+\))?\s+(SELECT\s+.+?)(?:\s*\/\*.*?\*\/\s*)?;?\s*$/is',
-			$sql,
-			$matches
-		)) {
-			$errorMsg = 'Cannot extract SELECT query from SQL. Pattern did not match';
-			throw GenericError::create($errorMsg);
-		}
-
-		$this->selectQuery = trim($matches[1]);
-
-		// Extract SELECT limit and offset if present
-		$this->selectLimit = $this->extractSelectLimit($this->selectQuery);
-		$this->selectOffset = $this->extractSelectOffset($this->selectQuery);
-
-		// Check if ORDER BY clause is present
-		$this->hasOrderBy = $this->hasOrderByClause($this->selectQuery);
 	}
 
 	/**
@@ -185,45 +172,6 @@ final class Payload extends BasePayload {
 		}
 
 		return $cleanedColumns;
-	}
-
-	/**
-	 * Extract LIMIT value from SELECT query if present
-	 *
-	 * @param string $selectQuery
-	 * @return int|null The LIMIT value or null if not present
-	 */
-	private function extractSelectLimit(string $selectQuery): ?int {
-		// Match LIMIT followed by number, with optional OFFSET clause
-		if (preg_match('/\s+LIMIT\s+(\d+)(?:\s+OFFSET\s+\d+)?\s*$/i', $selectQuery, $matches)) {
-			return (int)$matches[1];
-		}
-		return null;
-	}
-
-	/**
-	 * Extract OFFSET value from SELECT query if present
-	 *
-	 * @param string $selectQuery
-	 * @return int|null The OFFSET value or null if not present
-	 */
-	private function extractSelectOffset(string $selectQuery): ?int {
-		// Match OFFSET after LIMIT
-		if (preg_match('/\s+LIMIT\s+\d+\s+OFFSET\s+(\d+)\s*$/i', $selectQuery, $matches)) {
-			return (int)$matches[1];
-		}
-		return null;
-	}
-
-	/**
-	 * Check if SELECT query contains ORDER BY clause
-	 *
-	 * @param string $selectQuery
-	 * @return bool True if ORDER BY clause is present
-	 */
-	private function hasOrderByClause(string $selectQuery): bool {
-		// Look for ORDER BY clause before LIMIT/OFFSET
-		return preg_match('/\s+ORDER\s+BY\s+/i', $selectQuery) === 1;
 	}
 
 	/**
