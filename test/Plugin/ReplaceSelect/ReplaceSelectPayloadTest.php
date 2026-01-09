@@ -258,19 +258,26 @@ class ReplaceSelectPayloadTest extends TestCase {
 			putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=100');
 			putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE=200');
 
-			// Create new payload to pick up new environment values
-			Payload::fromRequest($request);
-
-
-			$this->expectException(GenericError::class);
+			$tooLargePayload = Payload::fromRequest($request);
+			try {
+				$tooLargePayload->validate();
+				$this->fail('Expected GenericError for batch size exceeding maximum');
+			} catch (GenericError) {
+			}
 
 			putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE=-10');
+			putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=10000');
 			$negativePayload = Payload::fromRequest($request);
+			$this->assertEquals(1000, $negativePayload->batchSize);
 			$negativePayload->validate();
 
 			putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=0');
 			$zeroMaxPayload = Payload::fromRequest($request);
-			$zeroMaxPayload->validate();
+			try {
+				$zeroMaxPayload->validate();
+				$this->fail('Expected GenericError for max batch size less than 1');
+			} catch (GenericError) {
+			}
 		} finally {
 			if ($originalBatchSize === false) {
 				putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');

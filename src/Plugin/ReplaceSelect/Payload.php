@@ -69,12 +69,9 @@ final class Payload extends BasePayload {
 	public static function fromRequest(Request $request): static {
 		$self = new static();
 		$self->originalQuery = $request->payload;
-		$batchSizeEnv = getenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
-		if ($batchSizeEnv === false) {
+		$self->batchSize = (int)getenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
+		if ($self->batchSize < 1) {
 			$self->batchSize = 1000;
-		} else {
-			$batchSize = filter_var(trim($batchSizeEnv), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-			$self->batchSize = $batchSize !== false ? $batchSize : 1000;
 		}
 		try {
 			// Use regex parsing for REPLACE INTO ... SELECT
@@ -214,7 +211,21 @@ final class Payload extends BasePayload {
 
 		// Check batch size (from environment config)
 		if ($this->batchSize < 1) {
-			throw GenericError::create('Batch size validation failed: Batch size must be greater than 1');
+			throw GenericError::create('Batch size validation failed: Batch size must be greater than 0');
+		}
+
+		$maxBatchSizeEnv = getenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE');
+		if ($maxBatchSizeEnv !== false) {
+			$maxBatchSize = filter_var(trim($maxBatchSizeEnv), FILTER_VALIDATE_INT);
+			if ($maxBatchSize === false) {
+				throw GenericError::create('Invalid BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE; expected integer');
+			}
+			if ($maxBatchSize < 1) {
+				throw GenericError::create('Max batch size validation failed: Max batch size must be greater than 0');
+			}
+			if ($this->batchSize > $maxBatchSize) {
+				throw GenericError::create('Batch size validation failed: Batch size exceeds configured maximum');
+			}
 		}
 
 		// Basic SELECT query validation - starts with SELECT
