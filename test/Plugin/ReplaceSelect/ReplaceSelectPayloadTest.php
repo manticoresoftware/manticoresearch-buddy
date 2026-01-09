@@ -233,8 +233,8 @@ class ReplaceSelectPayloadTest extends TestCase {
 		$this->assertEquals('target', $payload2->getTargetTableWithCluster());
 	}
 
-		public function testValidation(): void {
-			echo "\nTesting payload validation\n";
+	public function testValidation(): void {
+		echo "\nTesting payload validation\n";
 
 		$request = Request::fromArray(
 			[
@@ -247,44 +247,44 @@ class ReplaceSelectPayloadTest extends TestCase {
 			]
 		);
 
-			$payload = Payload::fromRequest($request);
-			$payload->validate(); // Should not throw
+		$payload = Payload::fromRequest($request);
+		$payload->validate(); // Should not throw
 
-			// Test with invalid batch size (too large)
-			$originalBatchSize = getenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
-			$originalMaxBatchSize = getenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE');
+		// Test with invalid batch size (too large)
+		$originalBatchSize = getenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
+		$originalMaxBatchSize = getenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE');
 
-			try {
-				putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=100');
-				putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE=200');
+		try {
+			putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=100');
+			putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE=200');
 
-				// Create new payload to pick up new environment values
-				Payload::fromRequest($request);
+			// Create new payload to pick up new environment values
+			Payload::fromRequest($request);
 
 
-				$this->expectException(GenericError::class);
+			$this->expectException(GenericError::class);
 
-				putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE=-10');
-				$negativePayload = Payload::fromRequest($request);
-				$negativePayload->validate();
+			putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE=-10');
+			$negativePayload = Payload::fromRequest($request);
+			$negativePayload->validate();
 
-				putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=0');
-				$zeroMaxPayload = Payload::fromRequest($request);
-				$zeroMaxPayload->validate();
-			} finally {
-				if ($originalBatchSize === false) {
-					putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
-				} else {
-					putenv("BUDDY_REPLACE_SELECT_BATCH_SIZE=$originalBatchSize");
-				}
+			putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=0');
+			$zeroMaxPayload = Payload::fromRequest($request);
+			$zeroMaxPayload->validate();
+		} finally {
+			if ($originalBatchSize === false) {
+				putenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
+			} else {
+				putenv("BUDDY_REPLACE_SELECT_BATCH_SIZE=$originalBatchSize");
+			}
 
-				if ($originalMaxBatchSize === false) {
-					putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE');
-				} else {
-					putenv("BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=$originalMaxBatchSize");
-				}
+			if ($originalMaxBatchSize === false) {
+				putenv('BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE');
+			} else {
+				putenv("BUDDY_REPLACE_SELECT_MAX_BATCH_SIZE=$originalMaxBatchSize");
 			}
 		}
+	}
 
 	public function testInvalidQuery(): void {
 		echo "\nTesting invalid query handling\n";

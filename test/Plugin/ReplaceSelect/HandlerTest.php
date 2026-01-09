@@ -130,16 +130,16 @@ class HandlerTest extends TestCase {
 							return $this->createMockResponse(
 								true, [
 								['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
-							['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
-							]
-						);
-					}
-					if (str_contains($query, 'LIMIT 1')) {
-						return $this->createMockResponse(
-							true, [
-							['id' => 1, 'title' => 'Test Product'],
-							]
-						);
+								['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
+								]
+							);
+						}
+						if (str_contains($query, 'LIMIT 1')) {
+							return $this->createMockResponse(
+								true, [
+								['id' => 1, 'title' => 'Test Product'],
+								]
+							);
 						}
 						if (str_contains($query, 'LIMIT 1000')) {
 							return $this->createMockResponse(false, null, 'Connection lost during batch processing');

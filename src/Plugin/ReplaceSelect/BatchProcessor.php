@@ -33,9 +33,9 @@ final class BatchProcessor
 {
 	use StringFunctionsTrait;
 
-	private const string LIMIT_OFFSET_TRAILING_PATTERN = '/(\\s+LIMIT\\s+\\d+\\s*(?:OFFSET\\s+\\d+)?)\\s*$/i';
-	private const int MAX_EMPTY_BATCHES = 3;
-	private const int OFFSET_MAX_MATCHES_THRESHOLD = 1000;
+	private const LIMIT_OFFSET_TRAILING_PATTERN = '/(\\s+LIMIT\\s+\\d+\\s*(?:OFFSET\\s+\\d+)?)\\s*$/i';
+	private const MAX_EMPTY_BATCHES = 3;
+	private const OFFSET_MAX_MATCHES_THRESHOLD = 1000;
 
 	private Client $client;
 	private Payload $payload;
@@ -742,8 +742,10 @@ final class BatchProcessor
 		}
 
 		return match ($fieldType) {
-			'float' => (float)$sqlValue,
-			'int', 'bigint', 'uint', 'timestamp' => (int)$sqlValue,
+			'float' => is_numeric($sqlValue) ? (float)$sqlValue : 0.0,
+			'int', 'bigint', 'uint', 'timestamp' => is_numeric($sqlValue) ? (int)$sqlValue : 0,
+			'bool' => is_numeric($sqlValue) ? ($sqlValue !== 0)
+				: (is_string($sqlValue) && strtolower($sqlValue) === 'true'),
 			'json' => $this->convertSqlJsonToJsonValue($sqlValue),
 			default => $sqlValue
 		};

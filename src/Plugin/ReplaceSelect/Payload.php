@@ -54,7 +54,8 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		$matchPattern = '/^\\s*REPLACE\\s+INTO\\s+\\w+(?::\\w+)?\\s*(?:\\([^)]+\\))?\\s+SELECT\\s+.*?\\s+FROM\\s+\\S+/is';
+		$matchPattern = '/^\\s*REPLACE\\s+INTO\\s+\\w+(?::\\w+)?\\s*'.
+			'(?:\\([^)]+\\))?\\s+SELECT\\s+.*?\\s+FROM\\s+\\S+/is';
 		return preg_match($matchPattern, $request->payload) === 1;
 	}
 
@@ -68,11 +69,13 @@ final class Payload extends BasePayload {
 	public static function fromRequest(Request $request): static {
 		$self = new static();
 		$self->originalQuery = $request->payload;
-		$batchSize = getenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
-		if ($batchSize === false || $batchSize === '') {
-			$batchSize = 1000;
+		$batchSizeEnv = getenv('BUDDY_REPLACE_SELECT_BATCH_SIZE');
+		if ($batchSizeEnv === false) {
+			$self->batchSize = 1000;
+		} else {
+			$batchSize = filter_var(trim($batchSizeEnv), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+			$self->batchSize = $batchSize !== false ? $batchSize : 1000;
 		}
-		$self->batchSize = (int)$batchSize;
 		try {
 			// Use regex parsing for REPLACE INTO ... SELECT
 			$self->parseWithRegex($request->payload);
@@ -101,7 +104,7 @@ final class Payload extends BasePayload {
 
 		$this->parseTargetTableFromString($matches['table']);
 
-		$this->replaceColumnList = isset($matches['columns']) && trim($matches['columns']) !== ''
+		$this->replaceColumnList = trim($matches['columns']) !== ''
 			? $this->parseColumnList($matches['columns'])
 			: null;
 
@@ -111,12 +114,16 @@ final class Payload extends BasePayload {
 		$this->selectLimit = null;
 		$this->selectOffset = null;
 		$limitOffsetPattern = '/\\s+LIMIT\\s+(?<limit>\\d+)(?:\\s+OFFSET\\s+(?<offset>\\d+))?\\s*$/i';
-		if (preg_match($limitOffsetPattern, $this->selectQuery, $limitMatches)) {
-			$this->selectLimit = (int)$limitMatches['limit'];
-			if (isset($limitMatches['offset']) && $limitMatches['offset'] !== '') {
-				$this->selectOffset = (int)$limitMatches['offset'];
-			}
+		if (!preg_match($limitOffsetPattern, $this->selectQuery, $limitMatches)) {
+			return;
 		}
+
+		$this->selectLimit = (int)$limitMatches['limit'];
+		if (!isset($limitMatches['offset'])) {
+			return;
+		}
+
+		$this->selectOffset = (int)$limitMatches['offset'];
 	}
 
 	/**
