@@ -42,14 +42,15 @@ final class EventHandlerLogTest extends TestCase {
 		$exception = AuthError::createFromRequest($request, $needle, true);
 		$response = Response::fromError($exception, RequestFormat::SQL);
 
+		echo $response;
 		/** @var array<string,mixed> $decoded */
 		$decoded = (array)json_decode((string)$response, true, 512, JSON_THROW_ON_ERROR);
 
 		$this->assertArrayHasKey('log', $decoded);
 		$this->assertIsArray($decoded['log']);
-		$this->assertSame('auth', $decoded['log']['type'] ?? null);
-		$this->assertSame('ERROR', $decoded['log']['severity'] ?? null);
-		$message = (string)($decoded['log']['message'] ?? '');
+		$this->assertSame('auth', $decoded['log'][0]['type'] ?? null);
+		$this->assertSame('ERROR', $decoded['log'][0]['severity'] ?? null);
+		$message = (string)($decoded['log'][0]['message'] ?? '');
 		$this->assertStringContainsString($needle, $message);
 		$this->assertStringContainsString('rid=' . $requestId, $message);
 	}
