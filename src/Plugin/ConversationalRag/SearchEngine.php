@@ -240,7 +240,7 @@ class SearchEngine {
 		// Check settings
 		if (isset($modelConfig['settings'])) {
 			$settings = is_string($modelConfig['settings'])
-				? json_decode($modelConfig['settings'], true) ?? []
+				? simdjson_decode($modelConfig['settings'], true) ?? []
 				: $modelConfig['settings'];
 
 			if (is_array($settings) && isset($settings['k_results'])) {

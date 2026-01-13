@@ -161,7 +161,6 @@ class DynamicThresholdManager {
 		LLMProviderManager $llmProvider,
 		array $modelConfig
 	): bool {
-		try {
 			// CRITICAL: If no conversation history, cannot be expansion (from original)
 			if (empty(trim($conversationHistory))) {
 				Buddy::info("\n[DEBUG EXPANSION CHECK]");
@@ -215,10 +214,6 @@ Answer: YES or NO";
 			Buddy::info('└─ Expansion: ' . ($result === 'yes' ? 'YES' : 'NO'));
 
 			return $result === 'yes';
-		} catch (Exception $e) {
-			// Fallback to false on error
-			return false;
-		}
 	}
 
 

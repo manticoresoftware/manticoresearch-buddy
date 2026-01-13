@@ -363,31 +363,34 @@ final class Handler extends BaseHandlerWithClient {
 		SearchEngine $searchEngine,
 		Client $client
 	): TaskResult {
-		/** @var array{query:string, table: string, model_uuid: string,
-		 *   conversation_uuid: string, content_fields: string} $params */
-		$params = self::parseCallRagParams($payload);
-		$conversationUuid = self::ensureConversationUuid($params);
-		$model = self::getModel($modelManager, $client, $params['model_uuid']);
+		$request = self::parseCallRagParams($payload);
+		if (empty($request->conversationUuid)) {
+			$request = $request->withConversationUuid(self::generateUuid());
+		}
+
+		$conversationUuid = $request->conversationUuid;
+		$model = $modelManager->getModelByUuidOrName($client, $request->modelUuid);
+		$services = new SearchServices($conversationManager, $providerManager, $searchEngine, $client);
 
 		self::logConversationStart($conversationUuid);
 		$conversationHistory = $conversationManager->getConversationHistory($conversationUuid);
 		self::logConversationHistory($conversationHistory);
 
 		$intent = self::classifyIntent(
-			$intentClassifier, $params['query'], $conversationHistory, $providerManager, $model
+			$intentClassifier, $request->query, $conversationHistory, $providerManager, $model
 		);
 
 		$settings = $model['settings'];
+		$searchContext = new SearchContext($intent, $request, $conversationHistory, $model);
 		[$searchResults, $queries, $excludedIds] = self::performSearch(
-			$intent, $params, $conversationHistory, $conversationManager,
-			$conversationUuid, $providerManager, $model, $searchEngine, $client
+			$searchContext, $services
 		);
 
-		self::logPreprocessingResults($params, $intent, $queries);
-		$context = self::buildContext($searchResults, $settings, $params['content_fields']);
+		self::logPreprocessingResults($request, $intent, $queries);
+		$context = self::buildContext($searchResults, $settings, $request->contentFields);
 		self::logContextBuilding($searchResults, $context, $settings);
 		$response = self::generateResponse(
-			$model, $params['query'], $context, $conversationHistory, $settings, $providerManager
+			$model, $request->query, $context, $conversationHistory, $settings, $providerManager
 		);
 
 		if (!$response['success']) {
@@ -397,9 +400,9 @@ final class Handler extends BaseHandlerWithClient {
 		$responseText = $response['content'];
 		$tokensUsed = $response['metadata']['tokens_used'] ?? 0;
 
+		$turn = new ConversationTurn($intent, $queries, $excludedIds, $responseText, $tokensUsed);
 		self::saveConversationMessages(
-			$conversationManager, $conversationUuid, $model['uuid'], $intent,
-			$params, $queries, $excludedIds, $responseText, $tokensUsed
+			$conversationManager, $request, $model['uuid'], $turn
 		);
 
 		return TaskResult::withRow(
@@ -416,30 +419,17 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * @param Payload $payload
 	 *
-	 * @return array{query:string, table: string, model_uuid: string, conversation_uuid: string, content_fields: string}
+	 * @return ConversationRequest
 	 */
-	private static function parseCallRagParams(Payload $payload): array {
+	private static function parseCallRagParams(Payload $payload): ConversationRequest {
 		// Parse CALL CONVERSATIONAL_RAG parameters from payload
-		return [
-			'query' => $payload->params['query'] ?? '',
-			'table' => $payload->params['table'] ?? '',
-			'model_uuid' => $payload->params['model_uuid'] ?? '',
-			'content_fields' => $payload->params['content_fields'],
-			'conversation_uuid' => $payload->params['conversation_uuid'] ?? '',
-		];
-	}
-
-	/**
-	 * Ensure conversation UUID exists
-	 *
-	 * @param array<string, string> $params
-	 * @return string
-	 */
-	private static function ensureConversationUuid(array $params): string {
-		if (empty($params['conversation_uuid'])) {
-			$params['conversation_uuid'] = self::generateUuid();
-		}
-		return $params['conversation_uuid'];
+		return new ConversationRequest(
+			(string)($payload->params['query'] ?? ''),
+			(string)($payload->params['table'] ?? ''),
+			(string)($payload->params['model_uuid'] ?? ''),
+			(string)$payload->params['content_fields'],
+			(string)($payload->params['conversation_uuid'] ?? '')
+		);
 	}
 
 	/**
@@ -452,23 +442,6 @@ final class Handler extends BaseHandlerWithClient {
 		$data[6] = chr(ord($data[6]) & 0x0f | 0x40); // Version 4
 		$data[8] = chr(ord($data[8]) & 0x3f | 0x80); // Variant 10
 		return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
-	}
-
-	/**
-	 * Get model by UUID or name
-	 *
-	 * @param ModelManager $modelManager
-	 * @param Client $client
-	 * @param string $modelUuid
-	 *
-	 * @return array{id:string, uuid:string, name:string,llm_provider:string,
-	 *   llm_model:string,style_prompt:string,settings:array{ temperature?: string,
-	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
-	 *   max_document_length?: string},created_at:string,updated_at:string}
-	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
-	 */
-	private static function getModel(ModelManager $modelManager, Client $client, string $modelUuid): array {
-		return $modelManager->getModelByUuidOrName($client, $modelUuid);
 	}
 
 	/**
@@ -524,61 +497,31 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Perform search based on intent
 	 *
-	 * @param string $intent
-	 * @param array{query:string, table: string, model_uuid: string,
-	 *   conversation_uuid: string, content_fields: string} $params
-	 * @param string $conversationHistory
-	 * @param ConversationManager $conversationManager
-	 * @param string $conversationUuid
-	 * @param LLMProviderManager $providerManager
-	 * @param array{id:string, uuid:string, name:string,llm_provider:string,
-	 *   llm_model:string,style_prompt:string,settings:array{ temperature?: string,
-	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
-	 *   max_document_length?: string},created_at:string,updated_at:string} $model
-	 * @param SearchEngine $searchEngine
-	 * @param Client $client
+	 * @param SearchContext $context
+	 * @param SearchServices $services
 	 * @return array{array<int, array<string, mixed>>, array{search_query:string,
 	 *   exclude_query:string}, array<int, string|int>}
 	 */
 	private static function performSearch(
-		string $intent,
-		array $params,
-		string $conversationHistory,
-		ConversationManager $conversationManager,
-		string $conversationUuid,
-		LLMProviderManager $providerManager,
-		array $model,
-		SearchEngine $searchEngine,
-		Client $client
+		SearchContext $context,
+		SearchServices $services
 	): array {
-		if ($intent === 'CONTENT_QUESTION') {
+		if ($context->intent === 'CONTENT_QUESTION') {
 			return self::handleContentQuestionIntent(
-				$params, $conversationHistory, $conversationManager, $conversationUuid,
-				$providerManager, $model, $searchEngine, $client
+				$context, $services
 			);
 		}
 
 		return self::handleQueryGeneratingIntent(
-			$intent, $params, $conversationHistory, $conversationManager,
-			$conversationUuid, $providerManager, $model, $searchEngine, $client
+			$context, $services
 		);
 	}
 
 	/**
 	 * Handle CONTENT_QUESTION intent
 	 *
-	 * @param array{query:string, table: string, model_uuid: string,
-	 *   conversation_uuid: string, content_fields: string} $params
-	 * @param string $conversationHistory
-	 * @param ConversationManager $conversationManager
-	 * @param string $conversationUuid
-	 * @param LLMProviderManager $providerManager
-	 * @param array{id:string, uuid:string, name:string,llm_provider:string,
-	 *   llm_model:string,style_prompt:string,settings:array{ temperature?: string,
-	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
-	 *   max_document_length?: string},created_at:string,updated_at:string} $model
-	 * @param SearchEngine $searchEngine
-	 * @param Client $client
+	 * @param SearchContext $context
+	 * @param SearchServices $services
 	 *
 	 * @return array{array<int, array<string, mixed>>, array{search_query: string,
 	 *   exclude_query: string}, array<int, string|int>}
@@ -586,17 +529,11 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchResponseError
 	 */
 	private static function handleContentQuestionIntent(
-		array $params,
-		string $conversationHistory,
-		ConversationManager $conversationManager,
-		string $conversationUuid,
-		LLMProviderManager $providerManager,
-		array $model,
-		SearchEngine $searchEngine,
-		Client $client
+		SearchContext $context,
+		SearchServices $services
 	): array {
 		Buddy::info('├─ Processing CONTENT_QUESTION intent');
-		$lastContext = $conversationManager->getLatestSearchContext($conversationUuid);
+		$lastContext = $services->conversationManager->getLatestSearchContext($context->request->conversationUuid);
 
 		if ($lastContext) {
 			Buddy::info('├─ Found previous search context to reuse');
@@ -605,19 +542,22 @@ final class Handler extends BaseHandlerWithClient {
 				'exclude_query' => $lastContext['exclude_query'],
 			];
 
-			$thresholdManager = new DynamicThresholdManager();
-			$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-				$params['query'], $conversationHistory, $providerManager, $model
-			);
+				$thresholdManager = new DynamicThresholdManager();
+				$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
+					$context->request->query,
+					$context->conversationHistory,
+					$services->providerManager,
+					$context->model
+				);
 
-			$excludedIds = json_decode($lastContext['excluded_ids'], true) ?? [];
+			$excludedIds = simdjson_decode($lastContext['excluded_ids'], true) ?? [];
 			if (!is_array($excludedIds)) {
 				throw ManticoreSearchClientError::create('Excluded IDs must be an array');
 			}
 
-			$searchResults = $searchEngine->performSearchWithExcludedIds(
-				$client, $params['table'], $queries['search_query'], $excludedIds,
-				$model, $thresholdInfo['threshold']
+			$searchResults = $services->searchEngine->performSearchWithExcludedIds(
+				$services->client, $context->request->table, $queries['search_query'], $excludedIds,
+				$context->model, $thresholdInfo['threshold']
 			);
 			Buddy::info('├─ CONTENT_QUESTION performed KNN search with previous query parameters');
 			return [$searchResults, $queries, $excludedIds];
@@ -626,69 +566,59 @@ final class Handler extends BaseHandlerWithClient {
 		Buddy::info('├─ No previous search context found, falling back to NEW_SEARCH');
 		// Fallback to NEW_SEARCH logic
 		return self::handleQueryGeneratingIntent(
-			'NEW_SEARCH', $params, $conversationHistory, $conversationManager,
-			$conversationUuid, $providerManager, $model, $searchEngine, $client
+			$context->withIntent('NEW_SEARCH'), $services
 		);
 	}
 
 	/**
 	 * Handle query-generating intents
 	 *
-	 * @param string $intent
-	 * @param array{query:string, table: string, model_uuid: string,
-	 *   conversation_uuid: string, content_fields: string} $params
-	 * @param string $conversationHistory
-	 * @param ConversationManager $conversationManager
-	 * @param string $conversationUuid
-	 * @param LLMProviderManager $providerManager
-	 * @param array{id:string, uuid:string, name:string,llm_provider:string,
-	 *   llm_model:string,style_prompt:string,settings:array{ temperature?: string,
-	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
-	 *   max_document_length?: string},created_at:string,updated_at:string} $model
-	 * @param SearchEngine $searchEngine
-	 * @param Client $client
+	 * @param SearchContext $context
+	 * @param SearchServices $services
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 *
 	 * @return array{array<int, array<string, mixed>>, array{search_query:string,
 	 *   exclude_query:string}, array<int, string|int>}
 	 */
 	private static function handleQueryGeneratingIntent(
-		string $intent,
-		array $params,
-		string $conversationHistory,
-		ConversationManager $conversationManager,
-		string $conversationUuid,
-		LLMProviderManager $providerManager,
-		array $model,
-		SearchEngine $searchEngine,
-		Client $client
+		SearchContext $context,
+		SearchServices $services
 	): array {
-		Buddy::info("├─ Processing query-generating intent: {$intent}");
-		$cleanHistory = $conversationManager->getConversationHistoryForQueryGeneration($conversationUuid);
+		Buddy::info("├─ Processing query-generating intent: {$context->intent}");
+		$cleanHistory = $services->conversationManager->getConversationHistoryForQueryGeneration(
+			$context->request->conversationUuid
+		);
 
 		Buddy::info('├─ Using filtered history for query generation');
 		Buddy::info('├─ Clean history length: ' . strlen($cleanHistory) . ' chars');
 
-		$intentClassifierInstance = new IntentClassifier();
-		$queries = $intentClassifierInstance->generateQueries(
-			$params['query'], $intent, $cleanHistory, $providerManager, $model
-		);
+			$intentClassifierInstance = new IntentClassifier();
+			$queries = $intentClassifierInstance->generateQueries(
+				$context->request->query,
+				$context->intent,
+				$cleanHistory,
+				$services->providerManager,
+				$context->model
+			);
 
-		$thresholdManager = new DynamicThresholdManager();
-		$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-			$params['query'], $conversationHistory, $providerManager, $model
-		);
+			$thresholdManager = new DynamicThresholdManager();
+			$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
+				$context->request->query,
+				$context->conversationHistory,
+				$services->providerManager,
+				$context->model
+			);
 
 		$excludedIds = [];
 		if (!empty($queries['exclude_query']) && $queries['exclude_query'] !== 'none') {
-			$excludedIds = $searchEngine->getExcludedIds(
-				$client, $params['table'], $queries['exclude_query']
+			$excludedIds = $services->searchEngine->getExcludedIds(
+				$services->client, $context->request->table, $queries['exclude_query']
 			);
 		}
 
-		$searchResults = $searchEngine->performSearchWithExcludedIds(
-			$client, $params['table'], $queries['search_query'], $excludedIds,
-			$model, $thresholdInfo['threshold']
+		$searchResults = $services->searchEngine->performSearchWithExcludedIds(
+			$services->client, $context->request->table, $queries['search_query'], $excludedIds,
+			$context->model, $thresholdInfo['threshold']
 		);
 
 		return [$searchResults, $queries, $excludedIds];
@@ -697,15 +627,14 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Log preprocessing results
 	 *
-	 * @param array{query:string, table: string, model_uuid: string,
-	 *   conversation_uuid: string, content_fields: string} $params
+	 * @param ConversationRequest $request
 	 * @param string $intent
 	 * @param array{search_query:string, exclude_query:string} $queries
 	 * @return void
 	 */
-	private static function logPreprocessingResults(array $params, string $intent, array $queries): void {
+	private static function logPreprocessingResults(ConversationRequest $request, string $intent, array $queries): void {
 		Buddy::info('[DEBUG PREPROCESSING]');
-		Buddy::info("├─ User query: '{$params['query']}'");
+		Buddy::info("├─ User query: '{$request->query}'");
 		Buddy::info("├─ Intent: $intent");
 		Buddy::info("├─ Search query: '{$queries['search_query']}'");
 		Buddy::info("└─ Exclude query: '{$queries['exclude_query']}'");
@@ -835,50 +764,40 @@ final class Handler extends BaseHandlerWithClient {
 	 * Save conversation messages
 	 *
 	 * @param ConversationManager $conversationManager
-	 * @param string $conversationUuid
+	 * @param ConversationRequest $request
 	 * @param string $modelUuid
-	 * @param string $intent
-	 * @param array{query:string, table: string, model_uuid: string,
-	 *   conversation_uuid: string, content_fields: string} $params
-	 * @param array{search_query:string, exclude_query:string} $queries
-	 * @param array<int, string|int> $excludedIds
-	 * @param string $responseText
-	 * @param int $tokensUsed
+	 * @param ConversationTurn $turn
 	 * @throws ManticoreSearchClientError|JsonException
 	 *
 	 * @return void
 	 */
 	private static function saveConversationMessages(
 		ConversationManager $conversationManager,
-		string $conversationUuid,
+		ConversationRequest $request,
 		string $modelUuid,
-		string $intent,
-		array $params,
-		array $queries,
-		array $excludedIds,
-		string $responseText,
-		int $tokensUsed
+		ConversationTurn $turn
 	): void {
-		if ($intent === 'CONTENT_QUESTION') {
+		$conversationUuid = $request->conversationUuid;
+		if ($turn->intent === 'CONTENT_QUESTION') {
 			$conversationManager->saveMessage(
-				$conversationUuid, $modelUuid, 'user', $params['query'], 0, $intent
+				$conversationUuid, $modelUuid, 'user', $request->query, 0, $turn->intent
 			);
 		} else {
-			$stringExcludedIds = array_map('strval', $excludedIds);
+			$stringExcludedIds = array_map('strval', $turn->excludedIds);
 			$conversationManager->saveMessage(
-				$conversationUuid, $modelUuid, 'user', $params['query'],
-				0, $intent, $queries['search_query'], $queries['exclude_query'], $stringExcludedIds
+				$conversationUuid, $modelUuid, 'user', $request->query,
+				0, $turn->intent, $turn->queries['search_query'], $turn->queries['exclude_query'], $stringExcludedIds
 			);
 		}
 
-		$assistantIntent = ($intent === 'CONTENT_QUESTION') ? 'CONTENT_QUESTION' : null;
+		$assistantIntent = ($turn->intent === 'CONTENT_QUESTION') ? 'CONTENT_QUESTION' : null;
 		Buddy::info('├─ Saving assistant response');
 		Buddy::info('├─ Assistant intent: ' . ($assistantIntent ?? 'none'));
-		Buddy::info('├─ Response length: ' . strlen($responseText) . ' chars');
-		Buddy::info("├─ Tokens used: {$tokensUsed}");
+		Buddy::info('├─ Response length: ' . strlen($turn->responseText) . ' chars');
+		Buddy::info("├─ Tokens used: {$turn->tokensUsed}");
 
 		$conversationManager->saveMessage(
-			$conversationUuid, $modelUuid, 'assistant', $responseText, $tokensUsed, $assistantIntent
+			$conversationUuid, $modelUuid, 'assistant', $turn->responseText, $turn->tokensUsed, $assistantIntent
 		);
 
 		Buddy::info('└─ Conversation processing completed');

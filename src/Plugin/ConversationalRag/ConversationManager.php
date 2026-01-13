@@ -18,6 +18,7 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 class ConversationManager {
 	use SqlEscapeTrait;
 	public const CONVERSATIONS_TABLE = 'rag_conversations';
+	private const CONVERSATION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
 	/**
 	 * @param Client $client
@@ -92,7 +93,7 @@ class ConversationManager {
 		Buddy::info('└─ Excluded IDs count: ' . ($excludedIds ? sizeof($excludedIds) : 0));
 
 		$currentTime = time();
-		$ttlTime = $currentTime + (30 * 24 * 60 * 60); // 30 days
+		$ttlTime = $currentTime + self::CONVERSATION_TTL_SECONDS;
 
 		$intentValue = $intent ? $this->quote($intent) : "''";
 		$searchQueryValue = $searchQuery ? $this->quote($searchQuery) : "''";

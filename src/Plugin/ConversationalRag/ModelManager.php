@@ -275,15 +275,6 @@ class ModelManager {
 	}
 
 	/**
-	 * Clean up conversations for a deleted model
-	 *
-	 * @param HTTPClient $client
-	 * @param string $modelUuid
-	 *
-	 * @return void
-	 */
-
-	/**
 	 * Get model by name or UUID (returns environment variable names, does not resolve them)
 	 *
 	 * @param HTTPClient $client

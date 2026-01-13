@@ -41,19 +41,11 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		// Debug: log that our hasMatch is being called
-		error_log('[ConversationalRag] hasMatch called with payload: ' . substr($request->payload, 0, 100));
-		error_log('[ConversationalRag] Request error: ' . ($request->error ?? 'none'));
-
 		// Check SQL patterns first
 		if (self::matchesSQL($request)) {
-			error_log('[ConversationalRag] SQL pattern matched!');
 			return true;
 		}
 
-
-
-		error_log('[ConversationalRag] No patterns matched');
 		return false;
 	}
 
