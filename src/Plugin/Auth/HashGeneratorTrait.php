@@ -11,6 +11,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
 use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 
 /**
  * Trait for generating password hashes for authentication

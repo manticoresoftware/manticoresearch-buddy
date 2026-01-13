@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
 use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 

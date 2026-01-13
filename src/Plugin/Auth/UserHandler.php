@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Auth;
 
 use Exception;
 use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
