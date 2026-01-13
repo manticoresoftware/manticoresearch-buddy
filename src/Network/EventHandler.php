@@ -208,6 +208,7 @@ final class EventHandler {
 
 			// Check if this is a cli and we need to activate Table Formatter
 			$outputFormat = $request->getOutputFormat();
+			$contentType = $result->getContentType();
 			$message = match ($outputFormat) {
 				// TODO: Maybe later we can use meta for time, but not now cuz no time for non select
 				OutputFormat::Table => $result->getTableFormatted($startTime),
@@ -220,6 +221,7 @@ final class EventHandler {
 				$message,
 				$result->getMeta(),
 				$request->format,
+				$contentType
 			);
 		} catch (Throwable $e) {
 			if (isset($request)) {

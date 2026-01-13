@@ -680,7 +680,8 @@ final class Handler extends BaseHandlerWithClient
 	public function run(): Task {
 		$taskFn = static function (Client $client): TaskResult {
 			self::getMetrics($client);
-			return TaskResult::raw(implode('', self::drawMetrics()));
+			return TaskResult::raw(implode('', self::drawMetrics()))
+				->setContentType('text/plain');
 		};
 
 		return Task::create(
