@@ -72,8 +72,8 @@ final class AuthLogTest extends TestCase {
 		$originalError = 'P03: syntax error, unexpected tablename, expecting ' .
 			"CLUSTER or FUNCTION or PLUGIN or TABLE near 'USER";
 		$buddyResponse = static::runHttpBuddyRequest($query, ['message' => $originalError]);
+		echo 'Debug error: --- '.json_encode($buddyResponse, JSON_PRETTY_PRINT);
 		$this->assertArrayHasKey('log', $buddyResponse);
-    echo "Debug error: --- ".json_encode($buddyResponse['log'], JSON_PRETTY_PRINT);
 		// Then, try to observe it in Manticore logs (requires daemon-side support).
 		// Make a failed auth attempt to force auth log file creation.
 		$port = static::getListenHttpPort();
