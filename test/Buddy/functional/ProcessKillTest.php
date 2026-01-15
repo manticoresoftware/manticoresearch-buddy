@@ -35,6 +35,9 @@ final class ProcessKillTest extends TestCase {
 		self::tearDownAfterClass();
 	}
 
+	protected static function getConfigFileName(): string {
+		return 'manticore-bench.conf';
+	}
 	/**
 	 *
 	 * @return void
