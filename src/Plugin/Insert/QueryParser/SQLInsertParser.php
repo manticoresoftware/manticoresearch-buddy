@@ -264,7 +264,6 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 	 * @return bool
 	 */
 	protected static function isValidJSONVal(string $val): bool {
-		/** @phpstan-ignore-next-line */
 		return json_validate(substr($val, 1, -1));
 	}
 
