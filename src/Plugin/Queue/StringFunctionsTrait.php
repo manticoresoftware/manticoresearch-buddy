@@ -83,7 +83,6 @@ trait StringFunctionsTrait {
 			throw BuddyRequestError::create("Error or JSON parsing for attr $fieldType");
 		}
 
-
 		return match ($fieldType) {
 			Fields::TYPE_INT, Fields::TYPE_BIGINT => (int)$fieldValue,
 			Fields::TYPE_TIMESTAMP => is_numeric($fieldValue)

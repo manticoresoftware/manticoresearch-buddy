@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+
 use RuntimeException;
 
 /**
@@ -22,7 +23,10 @@ use RuntimeException;
  */
 class CatHandler extends BaseHandlerWithClient {
 
-	const CAT_ENTITIES = ['templates'];
+	use Traits\KibanaVersionTrait;
+	use Traits\QueryMapLoaderTrait;
+
+	const CAT_ENTITIES = ['templates', 'plugins'];
 
 	/**
 	 *  Initialize the executor
@@ -43,12 +47,22 @@ class CatHandler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			$pathParts = explode('/', $payload->path);
 			if (!isset($pathParts[1], $pathParts[2])
-			&& !in_array($pathParts[1], self::CAT_ENTITIES) && !str_ends_with($pathParts[1], '*')) {
+				&& !in_array($pathParts[1], self::CAT_ENTITIES) && !str_ends_with($pathParts[1], '*')) {
 				throw new \Exception('Cannot parse request');
 			}
 			$entityTable = "_{$pathParts[1]}";
-			$entityNamePattern = $pathParts[2];
 
+			if (in_array($pathParts[1], self::CAT_ENTITIES) && !isset($pathParts[2])) {
+				$queryMapName = 'Plugins';
+				self::initQueryMap($queryMapName);
+				/** @var array{name:string,patterns:string,content:string} $entityInfo */
+				$entityInfo = self::$queryMap[$queryMapName][$entityTable];
+				$catInfo = self::getVersionedEntity($entityInfo, $manticoreClient);
+
+				return TaskResult::raw($catInfo);
+			}
+
+			$entityNamePattern = $pathParts[2];
 			$query = "SELECT * FROM {$entityTable} WHERE MATCH('{$entityNamePattern}')";
 			/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string}>}} $queryResult */
 			$queryResult = $manticoreClient->sendRequest($query)->getResult();
@@ -58,11 +72,10 @@ class CatHandler extends BaseHandlerWithClient {
 
 			$catInfo = [];
 			foreach ($queryResult[0]['data'] as $entityInfo) {
-				$catInfo[] = [
-					'name' => $entityInfo['name'],
-					'order' => 0,
-					'index_patterns' => simdjson_decode($entityInfo['patterns'], true),
-				] + simdjson_decode($entityInfo['content'], true);
+				$catInfo[] = match ($entityTable) {
+					'_templates' => self::buildCatTemplateRow($entityInfo),
+					default => []
+				};
 			}
 
 			return TaskResult::raw($catInfo);
@@ -72,4 +85,18 @@ class CatHandler extends BaseHandlerWithClient {
 			$taskFn, [$this->payload, $this->manticoreClient]
 		)->run();
 	}
+
+	/**
+	 *
+	 * @param array{name:string,patterns:string,content:string} $entityInfo
+	 * @return array<string,mixed>
+	 */
+	private static function buildCatTemplateRow(array $entityInfo): array {
+		return [
+			'name' => $entityInfo['name'],
+			'order' => 0,
+			'index_patterns' => simdjson_decode($entityInfo['patterns'], true),
+		] + simdjson_decode($entityInfo['content'], true);
+	}
+
 }

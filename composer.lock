@@ -712,12 +712,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "181b2f88365a03e73e23344149f969ad5729466e"
+                "reference": "bc07db43c5da01185e2f9962c2271bae7d3f6cf7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/181b2f88365a03e73e23344149f969ad5729466e",
-                "reference": "181b2f88365a03e73e23344149f969ad5729466e",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/bc07db43c5da01185e2f9962c2271bae7d3f6cf7",
+                "reference": "bc07db43c5da01185e2f9962c2271bae7d3f6cf7",
                 "shasum": ""
             },
             "require": {
