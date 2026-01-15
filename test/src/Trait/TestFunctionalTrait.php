@@ -417,7 +417,8 @@ trait TestFunctionalTrait {
 	 * @param string $query
 	 * @param array{message:string} $error
 	 * @param bool $redirectOutput
-	 * @return array{version:int,type:string,message:array<int,array{columns:array<string>,data:array<int,array<string,string>>}>}
+	 * @return array{version:int,type:string,log?:array<int,array{type:string,severity:string,message:string}>,
+	 *   message:array<int,array{columns:array<string>,data:array<int,array<string,string>>}>}
 	 * @throws Exception
 	 */
 	protected static function runHttpBuddyRequest(
