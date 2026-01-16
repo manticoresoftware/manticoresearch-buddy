@@ -88,7 +88,6 @@ trait TestFunctionalTrait {
 		if (self::isAuthEnabled()) {
 			self::ensureAuthJson();
 		}
-		system('rm -f /var/run/manticore-test/searchd.pid');
 		system('rm -f /var/log/manticore-test/searchd.pid');
 		system('rm -f /var/log/manticore-test/searchd.log');
 		self::startSearchdOrFail();
