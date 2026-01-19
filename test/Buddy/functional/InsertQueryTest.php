@@ -66,6 +66,25 @@ class InsertQueryTest extends TestCase {
 		$this->assertEquals($result, $out);
 	}
 
+	public function testHTTPJsonReplaceEndpointOk(): void {
+		echo "\nTesting the execution of HTTP JSON replace query to a non-existing table\n";
+		$payload = json_encode(
+			[
+				'table' => $this->testTable,
+				'id' => 1,
+				'doc' => ['col1' => 1, 'col2' => 2],
+			],
+			JSON_THROW_ON_ERROR
+		);
+		$out = static::runHttpQuery((string)$payload, true, 'replace');
+		$this->assertArrayHasKey(0, $out);
+		$this->assertEquals('', $out[0]['error']);
+		$this->assertArrayHasKey('data', $out[0]);
+		$dataRow = $out[0]['data'][0] ?? [];
+		$this->assertNotEmpty($dataRow);
+		$this->assertEquals($this->testTable, $dataRow['_index'] ?? $dataRow['table'] ?? null);
+	}
+
 	public function testHTTPInsertQueryWithUppercasedTableNameOk(): void {
 		echo "\nTesting the execution of HTTP insert query with an uppercased table name to a non-existing table\n";
 		$query = 'INSERT into ' . strtoupper($this->testTable) . '(col1,col2) VALUES(1,2) ';

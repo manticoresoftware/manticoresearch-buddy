@@ -27,10 +27,14 @@ final class MockManticoreServer {
 		. 'CLUSTER or FUNCTION or PLUGIN or TABLE near \'tablee test(col1 text)\'"}';
 	const CREATE_RESPONSE_OK = '[{"total":0,"error":"","warning":""}]';
 	const SQL_INSERT_RESPONSE_FAIL = '{"error":"table \'test\' absent, or does not support INSERT"}';
+	const SQL_REPLACE_RESPONSE_FAIL = '{"error":"table \'test\' absent, or does not support REPLACE"}';
 	const JSON_INSERT_RESPONSE_FAIL = '{"error":{"type":"table \'test\' absent, or does not support INSERT"'
+		. ',"index":"test"},"status":500}';
+	const JSON_REPLACE_RESPONSE_FAIL = '{"error":{"type":"table \'test\' absent, or does not support REPLACE"'
 		. ',"index":"test"},"status":500}';
 	const SQL_INSERT_RESPONSE_OK = '[{"total":1,"error":"","warning":""}]';
 	const JSON_INSERT_RESPONSE_OK = '{"_index": "test","_id": 1,"created": true,"result": "created","status": 201}';
+	const JSON_REPLACE_RESPONSE_OK = '{"_index": "test","_id": 1,"result": "updated","status": 200}';
 	const SHOW_QUERIES_RESPONSE_FAIL = '';
 	const SHOW_QUERIES_RESPONSE_OK = "[{\n"
 		. '"columns":[{"id":{"type":"long long"}},{"proto":{"type":"string"}},{"state":{"type":"string"}},'
@@ -230,15 +234,25 @@ final class MockManticoreServer {
 		if (str_starts_with($request, 'query=')) {
 			$request = substr($request, 6);
 		}
-		if (stripos($request, 'CREATE') === 0) {
+		$normalizedRequest = $request;
+		$endpoint = null;
+		try {
+			$endpoint = ManticoreEndpoint::from($this->reqEndpoint);
+		} catch (\ValueError) {
+			$endpoint = null;
+		}
+
+		if (stripos($normalizedRequest, 'CREATE') === 0) {
 			$resp = $this->hasErrorResponse ? self::CREATE_RESPONSE_FAIL : self::CREATE_RESPONSE_OK;
-		} elseif (stripos($request, 'INSERT') === 0) {
+		} elseif (stripos($normalizedRequest, 'INSERT') === 0) {
 			$resp = $this->hasErrorResponse ? self::SQL_INSERT_RESPONSE_FAIL : self::SQL_INSERT_RESPONSE_OK;
-		} elseif (stripos($request, 'REPLACE') === 0) {
-			$resp = $this->hasErrorResponse ? self::SQL_INSERT_RESPONSE_FAIL : self::SQL_INSERT_RESPONSE_OK;
-		} elseif (ManticoreEndpoint::from($this->reqEndpoint) === ManticoreEndpoint::Insert) {
+		} elseif (stripos($normalizedRequest, 'REPLACE') === 0) {
+			$resp = $this->hasErrorResponse ? self::SQL_REPLACE_RESPONSE_FAIL : self::SQL_INSERT_RESPONSE_OK;
+		} elseif ($endpoint === ManticoreEndpoint::Insert) {
 			$resp = $this->hasErrorResponse ? self::JSON_INSERT_RESPONSE_FAIL : self::JSON_INSERT_RESPONSE_OK;
-		} elseif (stripos($request, 'SELECT') === 0) {
+		} elseif ($endpoint === ManticoreEndpoint::Replace) {
+			$resp = $this->hasErrorResponse ? self::JSON_REPLACE_RESPONSE_FAIL : self::JSON_REPLACE_RESPONSE_OK;
+		} elseif (stripos($normalizedRequest, 'SELECT') === 0) {
 			$resp = $this->hasErrorResponse ? self::SHOW_QUERIES_RESPONSE_FAIL : self::SHOW_QUERIES_RESPONSE_OK;
 		} else {
 			$resp = '';

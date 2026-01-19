@@ -69,4 +69,28 @@ class InsertQueryPayloadTest extends TestCase {
 			$payload->queries
 		);
 	}
+
+	public function testCreationFromHttpReplaceRequest(): void {
+		echo "\nTesting the creation of InsertQuery\Request from HTTP REPLACE request\n";
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => "table 'test' absent, or does not support REPLACE",
+				'payload' => '{"table":"test","id":1,"doc":{"col1":1}}',
+				'format' => RequestFormat::JSON,
+				'endpointBundle' => ManticoreEndpoint::Replace,
+				'path' => 'replace',
+			]
+		);
+		$payload = Payload::fromRequest($request);
+		$this->assertInstanceOf(Payload::class, $payload);
+		$this->assertEquals('replace', $payload->path);
+		$this->assertEquals(
+			[
+				'CREATE TABLE IF NOT EXISTS `test` (`col1` int)',
+				'{"table":"test","id":1,"doc":{"col1":1}}',
+			],
+			$payload->queries
+		);
+	}
 }
