@@ -18,6 +18,7 @@
 * [5743](https://github.com/manticoresoftware/buddy-core/commit/57438ea9a64e66d77afbbbf8543eb676ec60b8e8) [Core] Add Docs generation with Doctum
 * [4389](https://github.com/manticoresoftware/buddy-core/commit/4389a6ff6dcc0eb3998dff2e5b8e96311d581534) [Core] Updated the handling of the Request-id header
 * [c5b4](https://github.com/manticoresoftware/buddy-core/commit/c5b446e7f219025f0e96c48f1c3e6dffb120374d) [Core] Use urlencode for all requests sending to the Manticore daemon
+* Add auto-schema support for REPLACE queries when tables are missing
 
 
 

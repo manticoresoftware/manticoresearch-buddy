@@ -46,4 +46,27 @@ class InsertQueryPayloadTest extends TestCase {
 			], $payload->queries
 		);
 	}
+
+	public function testCreationFromNetworkRequestWithReplace(): void {
+		echo "\nTesting the creation of InsertQuery\Request from SQL REPLACE data struct\n";
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => 'REPLACE INTO test(int_col) VALUES(1)',
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
+			]
+		);
+		$payload = Payload::fromRequest($request);
+		$this->assertInstanceOf(Payload::class, $payload);
+		$this->assertEquals(
+			[
+				'CREATE TABLE IF NOT EXISTS `test` (`int_col` int)',
+				'REPLACE INTO test(int_col) VALUES(1)',
+			],
+			$payload->queries
+		);
+	}
 }

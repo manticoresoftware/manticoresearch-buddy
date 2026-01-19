@@ -234,6 +234,8 @@ final class MockManticoreServer {
 			$resp = $this->hasErrorResponse ? self::CREATE_RESPONSE_FAIL : self::CREATE_RESPONSE_OK;
 		} elseif (stripos($request, 'INSERT') === 0) {
 			$resp = $this->hasErrorResponse ? self::SQL_INSERT_RESPONSE_FAIL : self::SQL_INSERT_RESPONSE_OK;
+		} elseif (stripos($request, 'REPLACE') === 0) {
+			$resp = $this->hasErrorResponse ? self::SQL_INSERT_RESPONSE_FAIL : self::SQL_INSERT_RESPONSE_OK;
 		} elseif (ManticoreEndpoint::from($this->reqEndpoint) === ManticoreEndpoint::Insert) {
 			$resp = $this->hasErrorResponse ? self::JSON_INSERT_RESPONSE_FAIL : self::JSON_INSERT_RESPONSE_OK;
 		} elseif (stripos($request, 'SELECT') === 0) {

@@ -97,4 +97,21 @@ class InsertQueryHandlerTest extends TestCase {
 		);
 		$this->runTask($request, $mockServerUrl, $resp);
 	}
+
+	public function testReplaceQueryExecutesProperly(): void {
+		echo "\nTesting the execution of a task with REPLACE query request\n";
+		$resp = '[{"total":1,"error":"","warning":""}]';
+		$mockServerUrl = self::setUpMockManticoreServer(false);
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => "table 'test' absent, or does not support INSERT",
+				'payload' => 'REPLACE INTO test(col1) VALUES(1)',
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
+			]
+		);
+		$this->runTask($request, $mockServerUrl, $resp);
+	}
 }

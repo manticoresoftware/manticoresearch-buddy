@@ -34,6 +34,14 @@ class InsertQueryTest extends TestCase {
 		$this->assertEquals($result, $out);
 	}
 
+	public function testSqlReplaceQueryOk(): void {
+		echo "\nTesting the execution of SQL replace query to a non-existing table\n";
+		$query = "REPLACE into {$this->testTable}(col1,col2) VALUES(1,2) ";
+		$out = static::runSqlQuery($query);
+		$result = [];
+		$this->assertEquals($result, $out);
+	}
+
 	public function testSqlInsertQueryFail(): void {
 		echo "\nTesting the fail on the execution of SQL insert query to a non-existing table\n";
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1,2) ";
@@ -45,6 +53,14 @@ class InsertQueryTest extends TestCase {
 	public function testHTTPInsertQueryOk(): void {
 		echo "\nTesting the execution of HTTP insert query to a non-existing table\n";
 		$query = "INSERT into {$this->testTable}(col1,col2) VALUES(1,2) ";
+		$out = static::runHttpQuery($query);
+		$result = [['total' => 1,'error' => '','warning' => '']];
+		$this->assertEquals($result, $out);
+	}
+
+	public function testHTTPReplaceQueryOk(): void {
+		echo "\nTesting the execution of HTTP replace query to a non-existing table\n";
+		$query = "REPLACE into {$this->testTable}(col1,col2) VALUES(1,2) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 1,'error' => '','warning' => '']];
 		$this->assertEquals($result, $out);
