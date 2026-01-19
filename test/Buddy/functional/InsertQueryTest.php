@@ -76,6 +76,7 @@ class InsertQueryTest extends TestCase {
 			],
 			JSON_THROW_ON_ERROR
 		);
+		/** @var array<int,array{error:string,data:array<int,array<string,string>>,total?:string,columns?:string}> $out */
 		$out = static::runHttpQuery((string)$payload, true, 'replace');
 		$this->assertArrayHasKey(0, $out);
 		$this->assertEquals('', $out[0]['error']);

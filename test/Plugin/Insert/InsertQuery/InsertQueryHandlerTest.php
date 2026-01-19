@@ -19,9 +19,9 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Settings as ManticoreSettings;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\Buddy\CoreTest\Lib\MockManticoreServer;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
 use Manticoresearch\Buddy\CoreTest\Trait\TestInEnvironmentTrait;
-use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
 use PHPUnit\Framework\TestCase;
 
 /** @package  */
@@ -81,7 +81,7 @@ class InsertQueryHandlerTest extends TestCase {
 		);
 		\Swoole\Event::wait();
 	}
-/*
+
 	public function testInsertQueryExecutesProperly(): void {
 		echo "\nTesting the execution of a task with INSERT query request\n";
 		$resp = '[{"total":1,"error":"","warning":""}]';
@@ -98,15 +98,15 @@ class InsertQueryHandlerTest extends TestCase {
 		);
 		$this->runTask($request, $mockServerUrl, $resp);
 	}
-*/
-	public function testReplaceQueryExecutesProperly(): void {
+
+	public function testReplaceQueryViaSQLExecutesProperly(): void {
 		echo "\nTesting the execution of a task with REPLACE query request\n";
 		$resp = '[{"total":1,"error":"","warning":""}]';
 		$mockServerUrl = self::setUpMockManticoreServer(false);
 		$request = Request::fromArray(
 			[
 				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => "table 'test' absent, or does not support INSERT",
+				'error' => "table 'test' absent, or does not support REPLACE",
 				'payload' => 'REPLACE INTO test(col1) VALUES(1)',
 				'format' => RequestFormat::SQL,
 				'endpointBundle' => ManticoreEndpoint::Sql,
@@ -116,9 +116,9 @@ class InsertQueryHandlerTest extends TestCase {
 		$this->runTask($request, $mockServerUrl, $resp);
 	}
 
-	public function testHttpReplaceEndpointExecutesProperly(): void {
+	public function testReplaceQueryViaJSONExecutesProperly(): void {
 		echo "\nTesting the execution of a task with HTTP REPLACE query request\n";
-		$resp = json_encode(MockManticoreServer::JSON_REPLACE_RESPONSE_OK);
+		$resp = (string)json_encode(MockManticoreServer::JSON_REPLACE_RESPONSE['ok']);
 		$mockServerUrl = self::setUpMockManticoreServer(false);
 		$request = Request::fromArray(
 			[
