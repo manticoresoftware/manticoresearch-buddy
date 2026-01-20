@@ -113,26 +113,49 @@ class TableKibanaHandler extends BaseEntityHandler {
 			if (!array_key_exists('filter', $searchConds)) {
 				continue;
 			}
-			/** @var array<int|string,array<mixed>> $propVal */
-			$propVal = $hit['_source'];
-			/** @var array{fields:array<string>,query:string} $filter */
-			$filter = $searchConds['filter'];
-			/** @var array<int|string> $props */
-			$props = explode('.', $filter['fields'][0]);
-			foreach ($props as $prop) {
-				/** @var array<int|string,mixed>|string $propVal */
-				$propVal = $propVal[$prop];
+			if (!self::isHitFiltered($hit['_source'], $searchConds['filter'])) {
+				unset($resultData['data'][$i]);
 			}
-			$query = $filter['query'];
-			if ($query[0] === '"' && $query[-1] === '"') {
-				$query = substr($filter['query'], 1, -1);
-			}
-			if ($propVal === $query) {
-				continue;
-			}
-			unset($resultData['data'][$i]);
 		}
 		$resp['hits']['hits'] = $resultData['data'];
+		// Updating total to match the size of a filtered dataset 
+		$resp['hits']['total'] = sizeof($resp['hits']['hits']);
+	}
+
+	/**
+	 * Checking if a result row suits all conditions from Kibana's filter
+	 *
+	 * @param array<int|string,array<mixed>> $hitSource
+	 * @param array{fields:array<string>,query:string} $filter
+	 * @return bool
+	 */
+	protected static function isHitFiltered(array $hitSource, array $filter): bool {
+		$query = $filter['query'];
+		if ($query === '*') {
+			return true;
+		}
+		if ($query[0] === '"' && $query[-1] === '"') {
+			$query = substr($filter['query'], 1, -1);
+		}
+		/** @var array<int|string> $props */
+		$props = explode('.', $filter['fields'][0]);
+		// Checking all result fields if the field wildcard is passed
+		if ($props === ['*']) {
+			foreach ($hitSource as $hitSourceVal) {
+				if ($hitSourceVal === $query) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		// Extracting a result field to filter by
+		foreach ($props as $prop) {
+			/** @var array<int|string,mixed>|string $hitSource */
+			$hitSource = $hitSource[$prop];
+		}
+
+		return ($hitSource === $query);
 	}
 
 	/**
