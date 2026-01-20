@@ -24,6 +24,8 @@ use RuntimeException;
  */
 class NodesInfoKibanaHandler extends BaseHandlerWithClient {
 
+	const DEFAULT_KIBANA_VERSION = '7.6.0';
+
 	/**
 	 *  Initialize the executor
 	 *
@@ -58,7 +60,7 @@ class NodesInfoKibanaHandler extends BaseHandlerWithClient {
 								'publish_address' => "$ip:$port",
 							],
 							'ip' => $ip,
-							'version' => '7.6.0',
+							'version' => $settings->searchdKibanaVersionString ?? self::DEFAULT_KIBANA_VERSION,
 						],
 					],
 				]
