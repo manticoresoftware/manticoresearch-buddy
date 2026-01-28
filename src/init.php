@@ -74,6 +74,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-insert',
 	'manticoresoftware/buddy-plugin-alias',
 	'manticoresoftware/buddy-plugin-select',
+	'manticoresoftware/buddy-plugin-replace-select',
 	'manticoresoftware/buddy-plugin-show',
 	'manticoresoftware/buddy-plugin-plugin',
 	'manticoresoftware/buddy-plugin-test',
