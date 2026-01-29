@@ -44,7 +44,7 @@ final class Payload extends BasePayload {
 	 * @return string
 	 */
 	public static function getInfo(): string {
-		return 'Auto schema support. When an insert operation is performed'
+		return 'Auto schema support. When an insert or replace operation is performed'
 			. ' and the table does not exist, it creates it with data types auto-detection';
 	}
 
@@ -169,16 +169,21 @@ final class Payload extends BasePayload {
 			$queryLowercase = ltrim(substr($queryLowercase, 1));
 		}
 
-		$isInsertSQLQuery = match ($request->endpointBundle) {
-			ManticoreEndpoint::Sql, ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson => str_starts_with(
-				$queryLowercase, 'insert into'
+		$startsWithInsert = str_starts_with($queryLowercase, 'insert into');
+		$startsWithReplace = str_starts_with($queryLowercase, 'replace into');
+
+		$isWriteSQLQuery = match ($request->endpointBundle) {
+			ManticoreEndpoint::Sql, ManticoreEndpoint::Cli, ManticoreEndpoint::CliJson => (
+				$startsWithInsert || $startsWithReplace
 			),
 			default => false,
 		};
-		$isInsertHTTPQuery = match ($request->endpointBundle) {
+
+		$isWriteHTTPQuery = match ($request->endpointBundle) {
 			ManticoreEndpoint::Insert, ManticoreEndpoint::Replace => true,
 			ManticoreEndpoint::Bulk => str_starts_with($queryLowercase, '"insert"')
 				|| str_starts_with($queryLowercase, '"create"')
+				|| str_starts_with($queryLowercase, '"replace"')
 				|| str_starts_with($queryLowercase, '"index"'),
 			default => false,
 		};
@@ -188,6 +193,6 @@ final class Payload extends BasePayload {
 			|| (str_contains($request->error, 'table ') && str_contains($request->error, ' absent'))
 			|| (str_contains($request->error, ' body ') && str_ends_with($request->error, ' is required'));
 
-		return ($isInsertError && ($isInsertSQLQuery || $isInsertHTTPQuery));
+		return ($isInsertError && ($isWriteSQLQuery || $isWriteHTTPQuery));
 	}
 }

@@ -12,7 +12,7 @@
 namespace Manticoresearch\BuddyTest\Trait;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
-use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
+use Manticoresearch\Buddy\CoreTest\Lib\MockManticoreServer;
 use Manticoresearch\BuddyTest\Lib\SocketError;
 use ReflectionClass;
 use RuntimeException;
