@@ -1,0 +1,92 @@
+groups:
+  - name: manticore-buddy.rules
+    rules:
+      - alert: ManticoreBuddyTargetDown
+        expr: up{job="manticoresearch"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Manticore Buddy target down
+          description: Prometheus cannot scrape the Manticore Buddy metrics endpoint for 2 minutes.
+
+      - alert: ManticoreBuddyRecentlyRestarted
+        expr: manticore_uptime_seconds{job="manticoresearch"} < 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Manticore Buddy restarted recently
+          description: Uptime is under 5 minutes for more than 5 minutes.
+
+      - alert: ManticoreBuddyMaxedOutErrors
+        expr: increase(manticore_maxed_out_error_count{job="manticoresearch"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: maxed_out errors detected
+          description: One or more maxed_out errors occurred in the last 5 minutes.
+
+      - alert: ManticoreBuddySearchLatencyP95High
+        expr: manticore_search_stats_ms_pct95_5m_millisecond{job="manticoresearch"} > 500
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: High search latency (p95)
+          description: 95th percentile search latency is above 500 ms for 10 minutes.
+
+      - alert: ManticoreBuddySearchLatencyP99High
+        expr: manticore_search_stats_ms_pct99_5m_millisecond{job="manticoresearch"} > 1000
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Very high search latency (p99)
+          description: 99th percentile search latency is above 1000 ms for 10 minutes.
+
+      - alert: ManticoreBuddyWorkQueueBacklog
+        expr: manticore_work_queue_length_count{job="manticoresearch"} > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Work queue backlog
+          description: Work queue length is above 100 for 5 minutes.
+
+      - alert: ManticoreBuddyWorkersSaturated
+        expr: (manticore_workers_active_count{job="manticoresearch"} / manticore_workers_total_count{job="manticoresearch"}) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Workers saturated
+          description: More than 90% of worker threads are active for 10 minutes.
+
+      - alert: ManticoreBuddyQueryCacheNearLimit
+        expr: (manticore_qcache_used_bytes{job="manticoresearch"} / manticore_qcache_max_bytes{job="manticoresearch"}) > 0.9 and manticore_qcache_max_bytes{job="manticoresearch"} > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Query cache near limit
+          description: Query cache usage is above 90% of configured max for 10 minutes.
+
+      - alert: ManticoreBuddyDiskMappedCacheLow
+        expr: manticore_disk_mapped_cached_ratio_percent{job="manticoresearch"} < 50
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Low disk mapped cache ratio
+          description: Disk mapped cache ratio is below 50% for 15 minutes.
+
+      - alert: ManticoreBuddyDiskMappedCacheVeryLow
+        expr: manticore_disk_mapped_cached_ratio_percent{job="manticoresearch"} < 20
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: Very low disk mapped cache ratio
+          description: Disk mapped cache ratio is below 20% for 15 minutes.
