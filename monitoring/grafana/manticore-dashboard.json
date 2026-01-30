@@ -1,9 +1,9 @@
 {
-  "uid": "manticore-buddy-prometheus",
-  "title": "Manticore Buddy (Prometheus)",
+  "uid": "manticore-search-prometheus",
+  "title": "Manticore Search (Prometheus)",
   "tags": [
     "manticore",
-    "buddy",
+    "manticore search",
     "prometheus"
   ],
   "timezone": "browser",
