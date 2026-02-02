@@ -29,7 +29,7 @@ services:
     entrypoint:
       - "/bin/sh"
       - "-c"
-      - "grep buddy_path /etc/manticoresearch/manticore.conf > /dev/null 2>&1 || sed -i '/searchd {/a \\    buddy_path = manticore-executor /workdir/src/main.php --debugvv' /etc/manticoresearch/manticore.conf && sed -i '/^searchd {/a \\    listen = /var/run/mysqld/mysqld.sock:mysql41' /etc/manticoresearch/manticore.conf; exec /bin/bash"
+      - "grep -q '^\\s*auth\\s*=\\s*1\\s*$' /etc/manticoresearch/manticore.conf 2>/dev/null || sed -i '/^searchd {/a \\    auth = 1' /etc/manticoresearch/manticore.conf; grep -q 'buddy_path' /etc/manticoresearch/manticore.conf 2>/dev/null || sed -i '/searchd {/a \\    buddy_path = manticore-executor /workdir/src/main.php --debugvv' /etc/manticoresearch/manticore.conf; grep -q '^\\s*listen\\s*=\\s*/var/run/mysqld/mysqld\\.sock:mysql41\\s*$' /etc/manticoresearch/manticore.conf 2>/dev/null || sed -i '/^searchd {/a \\    listen = /var/run/mysqld/mysqld.sock:mysql41' /etc/manticoresearch/manticore.conf; exec /bin/bash"
     working_dir: "/workdir"
     networks:
       - app-network
