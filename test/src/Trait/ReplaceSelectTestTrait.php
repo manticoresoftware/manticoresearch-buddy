@@ -42,7 +42,7 @@ trait ReplaceSelectTestTrait {
 	 *
 	 * @param array<int,array{Field: string, Type: string, Properties: string}>|null $fields
 	 */
-	private function createTableSchemaResponse(array $fields = null): Response {
+	private function createTableSchemaResponse(?array $fields = null): Response {
 		$response = $this->createMockResponse();
 		$response->method('hasError')->willReturn(false);
 		$response->method('getResult')->willReturn(
