@@ -74,7 +74,7 @@ class FieldValidatorTest extends TestCase {
 	 *
 	 * @param array<int,array{Field: string, Type: string, Properties: string}>|null $fields
 	 */
-	private function createTableSchemaResponse(array $fields = null): Response {
+	private function createTableSchemaResponse(?array $fields = null): Response {
 		$defaultFields = [
 			['Field' => 'id', 'Type' => 'bigint', 'Properties' => ''],
 			['Field' => 'title', 'Type' => 'text', 'Properties' => 'stored'],
