@@ -12,11 +12,15 @@ use RuntimeException;
  * @phpstan-type QueryItem array{
  *  id:int,
  *  query:string,
+ *  rollback_query:string,
  *  wait_for_id:int,
+ *  rollback_wait_for_id:int,
+ *  operation_group:string,
  *  tries:int,
  *  status:string,
  *  created_at:int,
- *  updated_at:int
+ *  updated_at:int,
+ *  duration:int
  * }
  */
 final class Queue {
@@ -61,23 +65,36 @@ final class Queue {
 	 * Add new query for requested node to the queue
 	 * @param string $nodeId
 	 * @param string $query
+	 * @param string $rollbackQuery Required rollback command (rollback always enabled)
+	 * @param string|null $operationGroup Optional operation group
 	 * @return int the queue id
 	 */
-	public function add(string $nodeId, string $query): int {
+	public function add(string $nodeId, string $query, string $rollbackQuery, ?string $operationGroup = null): int {
 		$table = $this->cluster->getSystemTableName($this->table);
 		$mt = (int)(microtime(true) * 1000);
 		$query = addcslashes($query, "'");
 		$id = hrtime(true);
+
+		$rollbackQuery = addcslashes($rollbackQuery, "'");
+		$operationGroup = $operationGroup ?? '';
+
 		$this->client->sendRequest(
 			"
 			INSERT INTO {$table}
-				(`id`, `node`, `query`, `wait_for_id`, `tries`, `status`, `created_at`, `updated_at`, `duration`)
+			(`id`, `node`, `query`, `rollback_query`, `wait_for_id`,
+			`rollback_wait_for_id`, `operation_group`, `tries`, `status`,
+			`created_at`, `updated_at`, `duration`)
 			VALUES
-				($id, '{$nodeId}', '{$query}', $this->waitForId, 0,'created', {$mt}, {$mt}, 0)
+			($id, '{$nodeId}', '{$query}', '{$rollbackQuery}',
+			$this->waitForId, 0, '{$operationGroup}', 0, 'created',
+			{$mt}, {$mt}, 0)
 			"
 		);
+
 		return $id;
 	}
+
+
 
 	/**
 	 * Get the single row by id
@@ -157,6 +174,11 @@ final class Queue {
 
 		$res = $this->executeQuery($query);
 		$status = empty($res['error']) ? 'processed' : 'error';
+
+		// Special handling for ALTER CLUSTER ADD TABLE commands
+		if ($status === 'error' && $this->isAlterClusterAddTableQuery($query['query'])) {
+			$status = $this->handleAlterClusterAddTableError($query['query'], $res);
+		}
 
 		Buddy::debugvv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
 
@@ -279,7 +301,10 @@ final class Queue {
 		$query = "CREATE TABLE {$this->table} (
 			`node` string,
 			`query` string,
+			`rollback_query` string,
 			`wait_for_id` bigint,
+			`rollback_wait_for_id` bigint,
+			`operation_group` string,
 			`tries` int,
 			`status` string,
 			`created_at` bigint,
@@ -311,5 +336,184 @@ final class Queue {
 		}
 
 		mkdir($dir, 0755);
+	}
+
+	/**
+	 * Check if query is ALTER CLUSTER ADD TABLE command
+	 * @param string $query
+	 * @return bool
+	 */
+	protected function isAlterClusterAddTableQuery(string $query): bool {
+		return (bool)preg_match('/^\s*ALTER\s+CLUSTER\s+\w+\s+ADD\s+/i', $query);
+	}
+
+	/**
+	 * Handle error for ALTER CLUSTER ADD TABLE by checking if query is still running
+	 * or if tables are already synced in cluster
+	 * @param string $query
+	 * @param Struct $errorResult
+	 * @return string 'processed' if verified successful, 'error' otherwise
+	 */
+	protected function handleAlterClusterAddTableError(string $query, Struct $errorResult): string {
+		// First check if query is still running
+		if ($this->checkQueryStillRunning($query)) {
+			Buddy::debugvv("ALTER CLUSTER ADD TABLE still running, will retry later");
+			return 'error'; // Will be retried by existing mechanism
+		}
+
+		// Query finished, check if tables are actually in cluster
+		Buddy::debugvv("ALTER CLUSTER ADD TABLE no longer running, verifying cluster status");
+		
+		$clusterName = $this->extractClusterNameFromQuery($query);
+		$tableNames = $this->extractTableNamesFromQuery($query);
+		
+		if ($clusterName && !empty($tableNames)) {
+			if ($this->cluster->verifyTablesInCluster($clusterName, $tableNames)) {
+				Buddy::debugvv("Tables verified in cluster, marking as processed");
+				return 'processed';
+			}
+		}
+
+		return 'error';
+	}
+
+	/**
+	 * Check if the query is still running using SHOW QUERIES
+	 * @param string $query
+	 * @return bool
+	 */
+	protected function checkQueryStillRunning(string $query): bool {
+		try {
+			$res = $this->client->sendRequest('SHOW QUERIES')->getResult();
+			/** @var array{0?:array{data?:array<array{query:string}>}} */
+			$data = $res;
+			
+			if (!isset($data[0]['data'])) {
+				return false;
+			}
+
+			$normalizedQuery = preg_replace('/\s+/', ' ', trim($query));
+			
+			foreach ($data[0]['data'] as $runningQuery) {
+				$runningQueryText = preg_replace('/\s+/', ' ', trim($runningQuery['query'] ?? ''));
+				if (stripos($runningQueryText, 'ALTER CLUSTER') !== false && 
+					stripos($runningQueryText, 'ADD') !== false) {
+					// Simple pattern match for ALTER CLUSTER ... ADD queries
+					return true;
+				}
+			}
+		} catch (\Throwable $e) {
+			Buddy::debugvv("Error checking running queries: " . $e->getMessage());
+		}
+
+		return false;
+	}
+
+	/**
+	 * Extract cluster name from ALTER CLUSTER ADD TABLE query
+	 * @param string $query
+	 * @return string|null
+	 */
+	protected function extractClusterNameFromQuery(string $query): ?string {
+		if (preg_match('/ALTER\s+CLUSTER\s+(\w+)\s+ADD/i', $query, $matches)) {
+			return $matches[1];
+		}
+		return null;
+	}
+
+	/**
+	 * Extract table names from ALTER CLUSTER ADD TABLE query
+	 * @param string $query
+	 * @return array<string>
+	 */
+	protected function extractTableNamesFromQuery(string $query): array {
+		if (preg_match('/ADD\s+(.+)$/i', $query, $matches)) {
+			$tablesStr = trim($matches[1]);
+			// Split by comma and clean up table names
+			$tables = array_map('trim', explode(',', $tablesStr));
+			return array_filter($tables);
+		}
+		return [];
+	}
+
+	/**
+	 * Rollback entire operation group
+	 * @param string $operationGroup Group to rollback
+	 * @return bool Success status
+	 */
+	public function rollbackOperationGroup(string $operationGroup): bool {
+		try {
+			$rollbackCommands = $this->getRollbackCommands($operationGroup);
+			if (empty($rollbackCommands)) {
+				Buddy::debugvv("No rollback commands found for group {$operationGroup}");
+				return true; // Nothing to rollback is considered success
+			}
+
+			return $this->executeRollbackSequence($rollbackCommands);
+		} catch (\Throwable $e) {
+			Buddy::debugvv("Rollback failed for group {$operationGroup}: " . $e->getMessage());
+			return false;
+		}
+	}
+
+	/**
+	 * Get rollback commands for operation group in reverse order
+	 * @param string $operationGroup
+	 * @return array<array{id:int,node:string,rollback_query:string,rollback_wait_for_id:int}>
+	 *         Rollback commands in reverse execution order
+	 */
+	protected function getRollbackCommands(string $operationGroup): array {
+		$table = $this->cluster->getSystemTableName($this->table);
+
+		// Get completed commands with rollback queries in reverse order
+		$query = "
+			SELECT id, node, rollback_query, rollback_wait_for_id
+			FROM {$table}
+			WHERE operation_group = '{$operationGroup}'
+			AND status = 'processed'
+			AND rollback_query != ''
+			ORDER BY id DESC
+		";
+
+		/** @var array{0?:array{data?:array<array{id:int,node:string,rollback_query:string,rollback_wait_for_id:int}>}} */
+		$result = $this->client->sendRequest($query)->getResult();
+
+		return $result[0]['data'] ?? [];
+	}
+
+	/**
+	 * Execute rollback commands in sequence
+	 * @param array<array{id:int,node:string,rollback_query:string,rollback_wait_for_id:int}> $rollbackCommands
+	 * @return bool Success status
+	 */
+	protected function executeRollbackSequence(array $rollbackCommands): bool {
+		$allSuccess = true;
+
+		foreach ($rollbackCommands as $command) {
+			try {
+				// Execute rollback command on the specific node
+				$nodeId = $command['node'];
+				$rollbackQuery = $command['rollback_query'];
+
+				Buddy::debugvv("Executing rollback on {$nodeId}: {$rollbackQuery}");
+
+				// Execute the rollback query
+				$res = $this->client->sendRequest($rollbackQuery);
+				if ($res->hasError()) {
+					$error = $res->getError();
+					Buddy::debugvv("Rollback command failed: {$rollbackQuery} - Error: {$error}");
+					$allSuccess = false;
+					// Continue with other rollback commands even if one fails
+				} else {
+					Buddy::debugvv("Rollback successful: {$rollbackQuery}");
+				}
+			} catch (\Throwable $e) {
+				Buddy::debugvv("Rollback command exception: {$command['rollback_query']} - " . $e->getMessage());
+				$allSuccess = false;
+				// Continue with other rollback commands
+			}
+		}
+
+		return $allSuccess;
 	}
 }
