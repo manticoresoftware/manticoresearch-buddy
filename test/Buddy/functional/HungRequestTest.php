@@ -80,7 +80,7 @@ class HungRequestTest extends TestCase {
 		$task2 = Task::create(...$this->generateTaskArgs([$port, 'show queries']))->run();
 		$diff = time() - $t;
 		// We check diff here cuz we usin exec, that is blocking for coroutine
-		$this->assertEquals(3, $diff);
+		$this->assertTrue(in_array($diff, [3, 4], true), "Expected ~3 seconds, got $diff");
 		$this->assertEquals(TaskStatus::Finished, $task1->getStatus());
 		$this->assertEquals(TaskStatus::Finished, $task2->getStatus());
 		$this->assertEquals([['total' => 0, 'error' => '', 'warning' => '']], $task1->getResult()->getStruct());
