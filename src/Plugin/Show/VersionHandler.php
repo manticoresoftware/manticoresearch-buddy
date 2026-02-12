@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
+use Manticoresearch\Buddy\Base\Lib\VersionStringParser;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
@@ -59,19 +60,12 @@ final class VersionHandler extends BaseHandlerWithClient
 		if (is_array($result[0]) && isset($result[0]['data'][0]['Value'])) {
 			$value = $result[0]['data'][0]['Value'];
 
-			$splittedVersions = explode('(', $value);
-
-			foreach ($splittedVersions as $n => $version) {
-				$version = trim($version);
-
-				if ($version[mb_strlen($version) - 1] === ')') {
-					$version = substr($version, 0, -1);
-				}
-
-				$exploded = explode(' ', $version);
-				$component = $n > 0 ? ucfirst($exploded[0]) : 'Daemon';
-
-				$versions[] = ['Component' => $component, 'Version' => $version];
+			$parsed = VersionStringParser::parse((string)$value);
+			if ($parsed['daemon'] !== '') {
+				$versions[] = ['Component' => 'Daemon', 'Version' => $parsed['daemon']];
+			}
+			foreach ($parsed['groups'] as $group) {
+				$versions[] = ['Component' => ucfirst($group['name']), 'Version' => $group['raw']];
 			}
 		}
 
