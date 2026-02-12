@@ -208,65 +208,17 @@ jobs:
 
   clt:
     name: Run CLT tests
-    needs: [test_kit, ref_detection, clt_matrix]
-    runs-on: ubuntu-22.04
-    timeout-minutes: 30
-    continue-on-error: ${{ github.ref == 'refs/heads/main' }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.clt_matrix.outputs.matrix) }}
-
-    steps:
-      - name: Run CLT (${{ matrix.suite.name }})
-        uses: manticoresoftware/clt@0.7.8
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
-          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
-        with:
-          image: ${{ needs.test_kit.outputs.docker_repo }}:${{ needs.test_kit.outputs.docker_tag }}
-          repository: manticoresoftware/manticoresearch
-          ref: ${{ needs.ref_detection.outputs.ref }}
-          test_prefix: ${{ matrix.suite.test_prefix }}
-          comment_mode: failures
-          run_args: "-e OPENAI_API_KEY -e VOYAGE_API_KEY -e JINA_API_KEY"
-          ui_host: "https://clt.manticoresearch.com"
-
-  clt_matrix:
-    name: Build CLT matrix
-    runs-on: ubuntu-22.04
-    needs: [ref_detection]
-    outputs:
-      matrix: ${{ steps.matrix.outputs.matrix }}
-    steps:
-      - name: Checkout manticoresearch at selected ref
-        uses: actions/checkout@v4
-        with:
-          repository: manticoresoftware/manticoresearch
-          ref: ${{ needs.ref_detection.outputs.ref }}
-          path: manticoresearch
-          fetch-depth: 1
-
-      - name: Build matrix from clt_tests.yml
-        id: matrix
-        run: |
-          set -euo pipefail
-
-          ruby -ryaml -rjson -e '
-            data = YAML.load_file("manticoresearch/.github/workflows/clt_tests.yml")
-            suites = data.dig("jobs", "clt", "strategy", "matrix", "test-suite") || []
-
-            matrix = {
-              "suite" => suites.map { |suite|
-                {
-                  "name" => suite.fetch("name"),
-                  "test_prefix" => suite.fetch("test_prefix"),
-                }
-              }
-            }
-
-            File.open(ENV.fetch("GITHUB_OUTPUT"), "a") { |f| f.puts("matrix=#{JSON.generate(matrix)}") }
-          '
+    needs: [test_kit, ref_detection]
+    uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@master
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+    with:
+      docker_image: ${{ needs.test_kit.outputs.docker_repo }}:${{ needs.test_kit.outputs.docker_tag }}
+      repository: manticoresoftware/manticoresearch
+      ref: ${{ needs.ref_detection.outputs.ref }}
+      continue_on_error: ${{ github.ref == 'refs/heads/main' }}
 
   codestyle:
     name: PHPCS validation
