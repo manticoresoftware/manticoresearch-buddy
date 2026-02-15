@@ -33,7 +33,11 @@ class SQLInsertParser extends BaseParser implements InsertQueryParserInterface {
 	public function parse($query): array {
 		$this->cols = $this->colTypes = [];
 		$matches = [];
-		preg_match_all('/\s*INSERT\s+INTO\s+(.*?)\s*\((.*?)\)\s+VALUES\s*(.*?)\s*;?\s*$/is', $query, $matches);
+		preg_match_all(
+			'/\s*(?:INSERT|REPLACE)\s+INTO\s+(.*?)\s*\((.*?)\)\s+VALUES\s*(.*?)\s*;?\s*$/is',
+			$query,
+			$matches
+		);
 		if (empty($matches[2])) {
 			throw QueryParseError::create('Cannot create table with column names missing');
 		}

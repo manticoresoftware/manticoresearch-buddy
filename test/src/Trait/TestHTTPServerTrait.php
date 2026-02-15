@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /*
- Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
+ Copyright (c) 2026, Manticore Software LTD (https://manticoresearch.com)
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License version 3 or any later
@@ -12,7 +12,7 @@
 namespace Manticoresearch\BuddyTest\Trait;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
-use Manticoresearch\BuddyTest\Lib\MockManticoreServer;
+use Manticoresearch\Buddy\CoreTest\Lib\MockManticoreServer;
 use Manticoresearch\BuddyTest\Lib\SocketError;
 use ReflectionClass;
 use RuntimeException;
