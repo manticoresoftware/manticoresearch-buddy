@@ -9,21 +9,18 @@
   program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Core\Error\QueryParseError;
-use Manticoresearch\BuddyTest\LLMProviders\TestableBaseProvider;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use PHPUnit\Framework\TestCase;
 
 class BaseProviderTest extends TestCase {
-	private TestableBaseProvider $provider;
+	private LlmProvider $provider;
 
 	protected function setUp(): void {
-		$this->provider = new TestableBaseProvider();
+		$this->provider = new LlmProvider();
 	}
 
 	protected function tearDown(): void {
-		// Clean up environment variables
-		putenv('OPENAI_API_KEY');
-		putenv('ANTHROPIC_API_KEY');
+		// Nothing to clean up
 	}
 
 	public function testConfigureResetsClient(): void {
@@ -32,19 +29,17 @@ class BaseProviderTest extends TestCase {
 		// Configure once
 		$this->provider->configure($config);
 
-		// Get client to initialize it using reflection
+		// Initialize client via reflection
 		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('getClient');
-		$method->setAccessible(true);
-		$client1 = $method->invoke($this->provider);
+		$clientProperty = $reflection->getProperty('client');
+		$clientProperty->setAccessible(true);
+		$clientProperty->setValue($this->provider, (object)['test' => 'client']);
 
 		// Configure again
 		$this->provider->configure($config);
 
 		// Client should be reset
-		$client2 = $method->invoke($this->provider);
-
-		$this->assertNotSame($client1, $client2);
+		$this->assertNull($clientProperty->getValue($this->provider));
 	}
 
 	public function testGetSettingsMergesOverrides(): void {
@@ -199,7 +194,7 @@ class BaseProviderTest extends TestCase {
 			'success' => false,
 			'error' => 'Test message',
 			'details' => 'Test exception',
-			'provider' => 'test_provider',
+			'provider' => 'llm',
 			], $result
 		);
 	}
@@ -218,53 +213,11 @@ class BaseProviderTest extends TestCase {
 			'success' => true,
 			'content' => 'Test content',
 			'metadata' => [
-				'provider' => 'test_provider',
+				'provider' => 'llm',
 				'model' => 'test-model',
 				'tokens' => 100,
 			],
 			], $result
 		);
-	}
-
-	public function testGetApiKeyForProviderValid(): void {
-		putenv('OPENAI_API_KEY=test-key-123');
-
-		$this->provider->configure(['llm_provider' => 'openai']);
-
-		// Use reflection to access private method
-		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('getApiKeyForProvider');
-		$method->setAccessible(true);
-
-		$result = $method->invoke($this->provider, 'openai');
-		$this->assertEquals('test-key-123', $result);
-	}
-
-	public function testGetApiKeyForProviderUnsupportedProvider(): void {
-		$this->provider->configure(['llm_provider' => 'openai']);
-
-		// Use reflection to access private method
-		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('getApiKeyForProvider');
-		$method->setAccessible(true);
-
-		$this->expectException(QueryParseError::class);
-		$this->expectExceptionMessage("Unsupported LLM provider: 'unsupported'");
-
-		$method->invoke($this->provider, 'unsupported');
-	}
-
-	public function testGetApiKeyForProviderMissingEnvVar(): void {
-		$this->provider->configure(['llm_provider' => 'openai']);
-
-		// Use reflection to access private method
-		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('getApiKeyForProvider');
-		$method->setAccessible(true);
-
-		$this->expectException(QueryParseError::class);
-		$this->expectExceptionMessage("Environment variable 'OPENAI_API_KEY' not found or empty");
-
-		$method->invoke($this->provider, 'openai');
 	}
 }

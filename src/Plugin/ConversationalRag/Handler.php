@@ -29,17 +29,17 @@ use Random\RandomException;
  */
 final class Handler extends BaseHandlerWithClient {
 
-	private ?LLMProviderManager $llmProviderManager;
+	private ?LlmProvider $llmProvider;
 
 	/**
 	 * Initialize the handler
 	 *
 	 * @param Payload $payload
-	 * @param LLMProviderManager|null $llmProviderManager
+	 * @param LlmProvider|null $llmProvider
 	 * @return void
 	 */
-	public function __construct(public Payload $payload, ?LLMProviderManager $llmProviderManager = null) {
-		$this->llmProviderManager = $llmProviderManager;
+	public function __construct(public Payload $payload, ?LlmProvider $llmProvider = null) {
+		$this->llmProvider = $llmProvider;
 	}
 
 	/**
@@ -51,11 +51,11 @@ final class Handler extends BaseHandlerWithClient {
 		$taskFn = static function (
 			Payload $payload,
 			Client $client,
-			?LLMProviderManager $injectedProviderManager
+			?LlmProvider $injectedProvider
 		): TaskResult {
 			// Initialize components with the client
 			$modelManager = new ModelManager();
-			$providerManager = $injectedProviderManager ?? new LLMProviderManager();
+			$provider = $injectedProvider ?? new LlmProvider();
 			$conversationManager = new ConversationManager($client);
 			$intentClassifier = new IntentClassifier();
 			$searchEngine = new SearchEngine();
@@ -70,14 +70,14 @@ final class Handler extends BaseHandlerWithClient {
 				Payload::ACTION_DESCRIBE_MODEL => self::describeModel($payload, $modelManager, $client),
 				Payload::ACTION_DROP_MODEL => self::dropModel($payload, $modelManager, $client),
 				Payload::ACTION_CONVERSATION => self::handleConversation(
-					$payload, $modelManager, $providerManager,
+					$payload, $modelManager, $provider,
 					$conversationManager, $intentClassifier, $searchEngine, $client
 				),
 				default => throw QueryParseError::create("Unknown action: {$payload->action}")
 			};
 		};
 
-		return Task::create($taskFn, [$this->payload, $this->manticoreClient, $this->llmProviderManager])->run();
+		return Task::create($taskFn, [$this->payload, $this->manticoreClient, $this->llmProvider])->run();
 	}
 
 	/**
@@ -345,7 +345,7 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @param Payload $payload
 	 * @param ModelManager $modelManager
-	 * @param LLMProviderManager $providerManager
+	 * @param LlmProvider $provider
 	 * @param ConversationManager $conversationManager
 	 * @param IntentClassifier $intentClassifier
 	 * @param SearchEngine $searchEngine
@@ -357,7 +357,7 @@ final class Handler extends BaseHandlerWithClient {
 	private static function handleConversation(
 		Payload $payload,
 		ModelManager $modelManager,
-		LLMProviderManager $providerManager,
+		LlmProvider $provider,
 		ConversationManager $conversationManager,
 		IntentClassifier $intentClassifier,
 		SearchEngine $searchEngine,
@@ -370,14 +370,14 @@ final class Handler extends BaseHandlerWithClient {
 
 		$conversationUuid = $request->conversationUuid;
 		$model = $modelManager->getModelByUuidOrName($client, $request->modelUuid);
-		$services = new SearchServices($conversationManager, $providerManager, $searchEngine, $client);
+		$services = new SearchServices($conversationManager, $provider, $searchEngine, $client);
 
 		self::logConversationStart($conversationUuid);
 		$conversationHistory = $conversationManager->getConversationHistory($conversationUuid);
 		self::logConversationHistory($conversationHistory);
 
 		$intent = self::classifyIntent(
-			$intentClassifier, $request->query, $conversationHistory, $providerManager, $model
+			$intentClassifier, $request->query, $conversationHistory, $provider, $model
 		);
 
 		$settings = $model['settings'];
@@ -390,7 +390,7 @@ final class Handler extends BaseHandlerWithClient {
 		$context = self::buildContext($searchResults, $settings, $request->contentFields);
 		self::logContextBuilding($searchResults, $context, $settings);
 		$response = self::generateResponse(
-			$model, $request->query, $context, $conversationHistory, $settings, $providerManager
+			$model, $request->query, $context, $conversationHistory, $settings, $provider
 		);
 
 		if (!$response['success']) {
@@ -473,7 +473,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param IntentClassifier $intentClassifier
 	 * @param string $query
 	 * @param string $conversationHistory
-	 * @param LLMProviderManager $providerManager
+	 * @param LlmProvider $provider
 	 * @param array{id:string, uuid:string, name:string,llm_provider:string,
 	 *   llm_model:string,style_prompt:string,settings:array{ temperature?: string,
 	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
@@ -484,11 +484,11 @@ final class Handler extends BaseHandlerWithClient {
 		IntentClassifier $intentClassifier,
 		string $query,
 		string $conversationHistory,
-		LLMProviderManager $providerManager,
+		LlmProvider $provider,
 		array $model
 	): string {
 		$intent = $intentClassifier->classifyIntent(
-			$query, $conversationHistory, $providerManager, $model
+			$query, $conversationHistory, $provider, $model
 		);
 		Buddy::info("├─ Intent classified: {$intent}");
 		return $intent;
@@ -542,13 +542,13 @@ final class Handler extends BaseHandlerWithClient {
 				'exclude_query' => $lastContext['exclude_query'],
 			];
 
-				$thresholdManager = new DynamicThresholdManager();
-				$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-					$context->request->query,
-					$context->conversationHistory,
-					$services->providerManager,
-					$context->model
-				);
+			$thresholdManager = new DynamicThresholdManager();
+			$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
+				$context->request->query,
+				$context->conversationHistory,
+				$services->provider,
+				$context->model
+			);
 
 			$excludedIds = simdjson_decode($lastContext['excluded_ids'], true) ?? [];
 			if (!is_array($excludedIds)) {
@@ -592,22 +592,22 @@ final class Handler extends BaseHandlerWithClient {
 		Buddy::info('├─ Using filtered history for query generation');
 		Buddy::info('├─ Clean history length: ' . strlen($cleanHistory) . ' chars');
 
-			$intentClassifierInstance = new IntentClassifier();
-			$queries = $intentClassifierInstance->generateQueries(
-				$context->request->query,
-				$context->intent,
-				$cleanHistory,
-				$services->providerManager,
-				$context->model
-			);
+		$intentClassifierInstance = new IntentClassifier();
+		$queries = $intentClassifierInstance->generateQueries(
+			$context->request->query,
+			$context->intent,
+			$cleanHistory,
+			$services->provider,
+			$context->model
+		);
 
-			$thresholdManager = new DynamicThresholdManager();
-			$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-				$context->request->query,
-				$context->conversationHistory,
-				$services->providerManager,
-				$context->model
-			);
+		$thresholdManager = new DynamicThresholdManager();
+		$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
+			$context->request->query,
+			$context->conversationHistory,
+			$services->provider,
+			$context->model
+		);
 
 		$excludedIds = [];
 		if (!empty($queries['exclude_query']) && $queries['exclude_query'] !== 'none') {
@@ -719,7 +719,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param array{ temperature?: string, max_tokens?: string,
 	 *   k_results?: string, similarity_threshold?: string,
 	 *   max_document_length?: string} $settings
-	 * @param LLMProviderManager $providerManager
+	 * @param LlmProvider $provider
 	 *
 	 * @return array{error?:string,success:bool,content:string,
 	 *   metadata?:array{tokens_used:integer, input_tokens:integer,
@@ -732,10 +732,9 @@ final class Handler extends BaseHandlerWithClient {
 		string $context,
 		string $history,
 		array $settings,
-		LLMProviderManager $providerManager
+		LlmProvider $provider
 	): array {
-		// Use LLM provider manager for proper connection handling
-		$provider = $providerManager->getConnection($model['uuid'], $model);
+		$provider->configure($model);
 
 		$prompt = self::buildPrompt($model['style_prompt'], $query, $context, $history);
 

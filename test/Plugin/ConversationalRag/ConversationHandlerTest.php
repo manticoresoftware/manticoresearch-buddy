@@ -10,8 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Handler as RagHandler;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\BaseProvider;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Payload as RagPayload;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
@@ -777,14 +776,14 @@ class ConversationHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertEquals('content', $payload->params['content_fields']);
+			$this->assertEquals('content', $payload->params['content_fields']);
 
-		$handler = new RagHandler(
-			$payload, $this->createMockLLMProviderManager(
-				[
-				['content' => 'NEW_SEARCH', 'success' => true, 'metadata' => []], // classifyIntent response
-				[
-					'content' => 'SEARCH_QUERY: action movies\nEXCLUDE_QUERY: none',
+			$handler = new RagHandler(
+				$payload, $this->createMockLlmProvider(
+					[
+					['content' => 'NEW_SEARCH', 'success' => true, 'metadata' => []], // classifyIntent response
+					[
+						'content' => 'SEARCH_QUERY: action movies\nEXCLUDE_QUERY: none',
 					'success' => true,
 					'metadata' => [],
 				], // generateQueries response
@@ -989,34 +988,30 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertEquals('conv-uuid', $struct[0]['data'][0]['conversation_uuid']);
 	}
 
-	/**
-	 * Create a mock LLM provider manager with predefined responses
-	 *
-	 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
-	 * @return LLMProviderManager
-	 */
-	private function createMockLLMProviderManager(array $responses): LLMProviderManager {
-		$mockProviderManager = $this->createMock(LLMProviderManager::class);
-		$mockProvider = $this->createMock(BaseProvider::class);
-
-		$mockProviderManager->method('getConnection')->willReturn($mockProvider);
-
-		$callCount = 0;
-		$mockProvider->method('generateResponse')
-			->willReturnCallback(
-				function ($_prompt, $_options = []) use (&$responses, &$callCount) {
-					unset($_prompt, $_options);
+		/**
+		 * Create a mock LLM provider with predefined responses
+		 *
+		 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
+		 * @return LlmProvider
+		 */
+		private function createMockLlmProvider(array $responses): LlmProvider {
+			$mockProvider = $this->createMock(LlmProvider::class);
+			$callCount = 0;
+			$mockProvider->method('generateResponse')
+				->willReturnCallback(
+					function ($_prompt, $_options = []) use (&$responses, &$callCount) {
+						unset($_prompt, $_options);
 					if ($callCount >= sizeof($responses)) {
 						throw new \Exception(
 							'Too many LLM calls: expected ' . sizeof($responses) . ', got ' . ($callCount + 1)
 						);
 					}
 					$result = $responses[$callCount];
-					$callCount++;
-					return $result;
-				}
-			);
+						$callCount++;
+						return $result;
+					}
+				);
 
-		return $mockProviderManager;
+			return $mockProvider;
+		}
 	}
-}

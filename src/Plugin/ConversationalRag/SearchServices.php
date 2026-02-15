@@ -17,10 +17,9 @@ final class SearchServices {
 
 	public function __construct(
 		public ConversationManager $conversationManager,
-		public LLMProviderManager $providerManager,
+		public LlmProvider $provider,
 		public SearchEngine $searchEngine,
 		public Client $client
 	) {
 	}
 }
-

@@ -10,8 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\IntentClassifier;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\BaseProvider;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use PHPUnit\Framework\TestCase;
 
 class IntentClassifierTest extends TestCase {
@@ -32,9 +31,14 @@ class IntentClassifierTest extends TestCase {
 	public function testClassifyIntentRejection(): void {
 		$intentClassifier = new IntentClassifier();
 
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+
 		// Mock LLM provider
-		/** @var BaseProvider $mockProvider */
-		$mockProvider = $this->createMock(BaseProvider::class);
+		/** @var LlmProvider $mockProvider */
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
 		/** @phpstan-ignore-next-line */
 		$mockProvider->method('generateResponse')
 			->willReturn(
@@ -45,18 +49,10 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
-
 		$intent = $intentClassifier->classifyIntent(
 			'I already watched that movie',
 			"user: I want to watch a comedy\nassistant: I recommend The Office\nuser: I already watched that",
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig
 		);
 
@@ -66,8 +62,13 @@ class IntentClassifierTest extends TestCase {
 	public function testClassifyIntentAlternatives(): void {
 		$intentClassifier = new IntentClassifier();
 
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+
 		// Mock LLM provider
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -77,18 +78,10 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
-
 		$intent = $intentClassifier->classifyIntent(
 			'What else do you have?',
 			"user: Show me comedies\nassistant: I recommend The Office\nuser: What else do you have?",
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig
 		);
 
@@ -98,8 +91,13 @@ class IntentClassifierTest extends TestCase {
 	public function testClassifyIntentNewSearch(): void {
 		$intentClassifier = new IntentClassifier();
 
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+
 		// Mock LLM provider
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -109,18 +107,10 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
-
 		$intent = $intentClassifier->classifyIntent(
 			'Show me action movies',
 			'', // No conversation history
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig
 		);
 
@@ -130,8 +120,13 @@ class IntentClassifierTest extends TestCase {
 	public function testClassifyIntentLLMFailure(): void {
 		$intentClassifier = new IntentClassifier();
 
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+
 		// Mock LLM provider that fails
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -141,18 +136,10 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
-
 		$intent = $intentClassifier->classifyIntent(
 			'What movies do you recommend?',
 			'',
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig
 		);
 
@@ -163,8 +150,13 @@ class IntentClassifierTest extends TestCase {
 	public function testGenerateQueriesWithExclusions(): void {
 		$intentClassifier = new IntentClassifier();
 
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+
 		// Mock LLM provider
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -174,19 +166,11 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
-
 		$result = $intentClassifier->generateQueries(
 			'I want action movies but not comedies',
 			'NEW_SEARCH',
 			'',
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig
 		);
 
@@ -197,8 +181,13 @@ class IntentClassifierTest extends TestCase {
 	public function testGenerateQueriesNoExclusions(): void {
 		$intentClassifier = new IntentClassifier();
 
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+
 		// Mock LLM provider
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -208,19 +197,11 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
-
 		$result = $intentClassifier->generateQueries(
 			'Show me science fiction movies',
 			'NEW_SEARCH',
 			'',
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig
 		);
 
@@ -231,8 +212,13 @@ class IntentClassifierTest extends TestCase {
 	public function testGenerateQueriesIntentBased(): void {
 		$intentClassifier = new IntentClassifier();
 
+		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+
 		// Mock LLM provider
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -242,19 +228,11 @@ class IntentClassifierTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
-
 		$result = $intentClassifier->generateQueries(
 			'I liked Inception, what else?',
 			'INTEREST',
 			"user: Show me Inception\nassistant: Here's Inception\nuser: I liked Inception, what else?",
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig
 		);
 

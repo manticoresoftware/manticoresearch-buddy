@@ -32,7 +32,7 @@ class DynamicThresholdManager {
 	 *
 	 * @param string $userQuery
 	 * @param string $conversationHistory
-	 * @param LLMProviderManager $llmProvider
+	 * @param LlmProvider $llmProvider
 	 * @param array<string, mixed> $modelConfig
 	 * @param float $baseThreshold
 	 * @return array{threshold: float, expansion_level: int, is_expanded: bool, max_threshold: float,
@@ -41,7 +41,7 @@ class DynamicThresholdManager {
 	public function calculateDynamicThreshold(
 		string $userQuery,
 		string $conversationHistory,
-		LLMProviderManager $llmProvider,
+		LlmProvider $llmProvider,
 		array $modelConfig,
 		float $baseThreshold = 0.8
 	): array {
@@ -151,14 +151,14 @@ class DynamicThresholdManager {
 	 *
 	 * @param string $userQuery
 	 * @param string $conversationHistory
-	 * @param LLMProviderManager $llmProvider
+	 * @param LlmProvider $llmProvider
 	 * @param array<string, mixed> $modelConfig
 	 * @return bool
 	 */
 	private function detectExpansionIntent(
 		string $userQuery,
 		string $conversationHistory,
-		LLMProviderManager $llmProvider,
+		LlmProvider $llmProvider,
 		array $modelConfig
 	): bool {
 			// CRITICAL: If no conversation history, cannot be expansion (from original)
@@ -199,8 +199,8 @@ Current query: {$userQuery}
 Does this query request BROADENING beyond previous results?
 Answer: YES or NO";
 
-			$provider = $llmProvider->getConnection('expansion_detector', $modelConfig);
-			$response = $provider->generateResponse($expansionPrompt, ['temperature' => 0.1, 'max_tokens' => 10]);
+			$llmProvider->configure($modelConfig);
+			$response = $llmProvider->generateResponse($expansionPrompt, ['temperature' => 0.1, 'max_tokens' => 10]);
 
 			if (!$response['success']) {
 				return false;

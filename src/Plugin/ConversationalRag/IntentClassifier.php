@@ -26,14 +26,14 @@ class IntentClassifier {
 	 *
 	 * @param string $userQuery
 	 * @param string $conversationHistory
-	 * @param LLMProviderManager $llmProvider
+	 * @param LlmProvider $llmProvider
 	 * @param array<string, mixed> $modelConfig
 	 * @return string
 	 */
 	public function classifyIntent(
 		string $userQuery,
 		string $conversationHistory,
-		LLMProviderManager $llmProvider,
+		LlmProvider $llmProvider,
 		array $modelConfig
 	): string {
 		try {
@@ -67,8 +67,8 @@ Classify as ONE of:
 Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST,
 NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 
-			$provider = $llmProvider->getConnection('intent_classifier', $modelConfig);
-			$response = $provider->generateResponse($intentPrompt, ['temperature' => 0.1, 'max_tokens' => 50]);
+			$llmProvider->configure($modelConfig);
+			$response = $llmProvider->generateResponse($intentPrompt, ['temperature' => 0.1, 'max_tokens' => 50]);
 
 			if (!$response['success']) {
 				throw new ManticoreSearchClientError(
@@ -140,7 +140,7 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 	 * @param string $userQuery
 	 * @param string $intent
 	 * @param string $conversationHistory
-	 * @param LLMProviderManager $llmProvider
+	 * @param LlmProvider $llmProvider
 	 * @param array<string, mixed> $modelConfig
 	 * @return array{search_query:string, exclude_query: string, llm_response: string}
 	 */
@@ -148,7 +148,7 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 		string $userQuery,
 		string $intent,
 		string $conversationHistory,
-		LLMProviderManager $llmProvider,
+		LlmProvider $llmProvider,
 		array $modelConfig
 	): array {
 
@@ -218,8 +218,8 @@ Examples:
 
 Answer ONLY in the format above.";
 
-			$provider = $llmProvider->getConnection('query_generator', $modelConfig);
-			$response = $provider->generateResponse($queryPrompt, ['temperature' => 0.3, 'max_tokens' => 200]);
+			$llmProvider->configure($modelConfig);
+			$response = $llmProvider->generateResponse($queryPrompt, ['temperature' => 0.3, 'max_tokens' => 200]);
 
 			if (!$response['success']) {
 				throw new ManticoreSearchClientError(

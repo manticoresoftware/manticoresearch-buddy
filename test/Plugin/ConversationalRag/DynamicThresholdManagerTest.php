@@ -10,8 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\DynamicThresholdManager;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviderManager;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LLMProviders\BaseProvider;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use PHPUnit\Framework\TestCase;
 
 class DynamicThresholdManagerTest extends TestCase {
@@ -32,29 +31,15 @@ class DynamicThresholdManagerTest extends TestCase {
 	public function testCalculateDynamicThresholdNoExpansion(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
-		// Mock LLM provider that says no expansion
-		$mockProvider = $this->createMock(BaseProvider::class);
-		$mockProvider->method('generateResponse')
-			->willReturn(
-				[
-				'success' => true,
-				'content' => 'no',
-				'metadata' => [],
-				]
-			);
-
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
+		// Provider shouldn't be called when there is no history
+		$mockProvider = $this->createMock(LlmProvider::class);
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
 		$result = $thresholdManager->calculateDynamicThreshold(
 			'Show me comedies',
 			'', // No history
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig,
 			0.8
 		);
@@ -69,7 +54,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that says yes to expansion
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -79,18 +64,12 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
 		$result = $thresholdManager->calculateDynamicThreshold(
 			'What else do you have?',
 			"user: Show me comedies\nassistant: I recommend The Office\nuser: What else do you have?",
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig,
 			0.8
 		);
@@ -105,7 +84,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that always says yes
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -115,12 +94,6 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
 		// Call multiple times to reach max expansion
@@ -128,7 +101,7 @@ class DynamicThresholdManagerTest extends TestCase {
 			$result = $thresholdManager->calculateDynamicThreshold(
 				'What else?',
 				"user: Show me comedies\nassistant: I recommend The Office\nuser: What else?",
-				$mockProviderManager,
+				$mockProvider,
 				$modelConfig,
 				0.8
 			);
@@ -142,12 +115,7 @@ class DynamicThresholdManagerTest extends TestCase {
 	public function testDetectExpansionIntentNoHistory(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
-		$mockProvider = $this->createMock(BaseProvider::class);
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
+		$mockProvider = $this->createMock(LlmProvider::class);
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
@@ -156,7 +124,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$method = $reflection->getMethod('detectExpansionIntent');
 		$method->setAccessible(true);
 
-		$result = $method->invoke($thresholdManager, 'Show me movies', '', $mockProviderManager, $modelConfig);
+		$result = $method->invoke($thresholdManager, 'Show me movies', '', $mockProvider, $modelConfig);
 
 		$this->assertFalse($result); // Should be false with no history
 	}
@@ -165,7 +133,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that says yes
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -174,12 +142,6 @@ class DynamicThresholdManagerTest extends TestCase {
 				'metadata' => [],
 				]
 			);
-
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
@@ -191,7 +153,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$result = $method->invoke(
 			$thresholdManager, 'What else do you have?',
 			"user: Show me comedies\nassistant: I recommend The Office\nuser: What else do you have?",
-			$mockProviderManager, $modelConfig
+			$mockProvider, $modelConfig
 		);
 
 		$this->assertTrue($result);
@@ -201,7 +163,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that fails
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -210,12 +172,6 @@ class DynamicThresholdManagerTest extends TestCase {
 				'metadata' => [],
 				]
 			);
-
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
@@ -227,7 +183,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$result = $method->invoke(
 			$thresholdManager, 'What else?',
 			"user: Show me comedies\nassistant: I recommend The Office\nuser: What else?",
-			$mockProviderManager, $modelConfig
+			$mockProvider, $modelConfig
 		);
 
 		$this->assertFalse($result); // Should return false on failure
@@ -237,7 +193,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider that says yes
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
 		$mockProvider->method('generateResponse')
 			->willReturn(
 				[
@@ -247,19 +203,13 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
 		// First call with one conversation
 		$result1 = $thresholdManager->calculateDynamicThreshold(
 			'What else?',
 			'conversation1: user message',
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig,
 			0.8
 		);
@@ -270,7 +220,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$result2 = $thresholdManager->calculateDynamicThreshold(
 			'What else?',
 			'conversation2: different user message',
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig,
 			0.8
 		);
@@ -282,7 +232,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$thresholdManager = new DynamicThresholdManager();
 
 		// Mock LLM provider - first says yes, then no (topic change)
-		$mockProvider = $this->createMock(BaseProvider::class);
+		$mockProvider = $this->createMock(LlmProvider::class);
 		$mockProvider->expects($this->exactly(2))
 			->method('generateResponse')
 			->willReturnOnConsecutiveCalls(
@@ -290,19 +240,13 @@ class DynamicThresholdManagerTest extends TestCase {
 				['success' => true, 'content' => 'no', 'metadata' => []]
 			);
 
-		$mockProviderManager = $this->createMock(
-			LLMProviderManager::class
-		);
-		$mockProviderManager->method('getConnection')
-			->willReturn($mockProvider);
-
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
 		// First call - expansion
 		$result1 = $thresholdManager->calculateDynamicThreshold(
 			'What else?',
 			'conversation: user wants comedies',
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig,
 			0.8
 		);
@@ -313,7 +257,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$result2 = $thresholdManager->calculateDynamicThreshold(
 			'Now show me action movies',
 			'conversation: user wants comedies, now wants action',
-			$mockProviderManager,
+			$mockProvider,
 			$modelConfig,
 			0.8
 		);
