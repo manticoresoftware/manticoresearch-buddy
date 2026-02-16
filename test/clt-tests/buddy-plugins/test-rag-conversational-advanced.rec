@@ -47,11 +47,6 @@ VALUES
 EOF
 ––– output –––
 ––– comment –––
-Wait for auto-embeddings generation (async via Buddy)
-––– input –––
-mysql -h0 -P9306 -e "debug sleep 20;" > /dev/null 2>&1
-––– output –––
-––– comment –––
 Verify all documents are inserted
 ––– input –––
 mysql -h0 -P9306 -e "SELECT COUNT(*) FROM knowledge_base;"
@@ -106,7 +101,7 @@ mysql -h0 -P9306 -e "CALL CONVERSATIONAL_RAG('Tell me about vector search', 'kno
 ––– output –––
 *************************** 1. row ***************************
 conversation_uuid: #!/[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}/!#
-         response: #!/.+/!#
+         response: #!/.*[Vv]ector.*[Ss]earch.*/!#
           sources: #!/\[.*/!#
 ––– comment –––
 Test with two content fields (title, content)
@@ -115,16 +110,15 @@ mysql -h0 -P9306 -e "CALL CONVERSATIONAL_RAG('Explain vector search', 'knowledge
 ––– output –––
 *************************** 1. row ***************************
 conversation_uuid: #!/[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}/!#
-         response: #!/.+/!#
+         response: #!/.*[Vv]ector.*[Ss]earch.*/!#
           sources: #!/\[.*/!#
 ––– comment –––
 Test with multiple content fields (title, summary, content)
 ––– input –––
-mysql -h0 -P9306 -e "CALL CONVERSATIONAL_RAG('Tell me about RAG architecture', 'knowledge_base', 'creative_assistant', 'title,summary,content')\G;"
+mysql -h0 -P9306 -e "CALL CONVERSATIONAL_RAG('Tell me about RAG architecture', 'knowledge_base', 'creative_assistant', 'title,summary,content')\G;" | grep -E "conversation_uuid:|response:|sources:"
 ––– output –––
-*************************** 1. row ***************************
 conversation_uuid: #!/[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}/!#
-         response: #!/.+/!#
+         response: #!/.*(RAG|[Rr]etrieval|[Gg]eneration).*/!#
           sources: #!/\[.*/!#
 ––– comment –––
 Test conversation tracking - first message in a new conversation
@@ -133,7 +127,7 @@ mysql -h0 -P9306 -e "CALL CONVERSATIONAL_RAG('What is clustering?', 'knowledge_b
 ––– output –––
 *************************** 1. row ***************************
 conversation_uuid: conv-test-1234-5678-90ab-cdef12345678
-         response: #!/.+/!#
+         response: #!/.*[Cc]luster.*/!#
           sources: #!/\[.*/!#
 ––– comment –––
 Test conversation tracking - follow-up message (should maintain context)
@@ -147,9 +141,8 @@ conversation_uuid: conv-test-1234-5678-90ab-cdef12345678
 ––– comment –––
 Test different model on same conversation
 ––– input –––
-mysql -h0 -P9306 -e "CALL CONVERSATIONAL_RAG('What are best practices?', 'knowledge_base', 'detailed_assistant', 'title,summary,content', 'conv-test-1234-5678-90ab-cdef12345678')\G;"
+mysql -h0 -P9306 -e "CALL CONVERSATIONAL_RAG('What are best practices?', 'knowledge_base', 'detailed_assistant', 'title,summary,content', 'conv-test-1234-5678-90ab-cdef12345678')\G;" | grep -E "conversation_uuid:|response:|sources:"
 ––– output –––
-*************************** 1. row ***************************
 conversation_uuid: conv-test-1234-5678-90ab-cdef12345678
          response: #!/.+/!#
           sources: #!/\[.*/!#
@@ -161,7 +154,7 @@ mysql -h0 -P9306 -e "CALL CONVERSATIONAL_RAG('Show me tutorials', 'knowledge_bas
 *************************** 1. row ***************************
 conversation_uuid: conv-other-aaaa-bbbb-cccc-dddddddddddd
          response: #!/.+/!#
-          sources: #!/\[.*/!#
+          sources: #!/\[.*\]/!#
 ––– comment –––
 Cleanup - drop all models
 ––– input –––
