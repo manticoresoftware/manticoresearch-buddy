@@ -70,7 +70,6 @@ trait TestFunctionalTrait {
 		self::setConfWithBuddyPath();
 		self::applySearchdArgs();
 		self::checkManticorePathes();
-		system('rm -f /var/log/manticore-test/searchd.pid');
 		system('rm -f /var/log/manticore-test/searchd.log');
 		system('searchd --config ' . static::$manticoreConfigFilePath);
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));

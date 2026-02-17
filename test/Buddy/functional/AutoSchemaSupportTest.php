@@ -35,6 +35,9 @@ class AutoSchemaSupportTest extends TestCase {
 	 * @return void
 	 */
 	protected function setUpAutoSchema(int $value): void {
+
+		echo "Start updating config (AutoSchema)" . PHP_EOL;
+
 		// Adding the auto schema option to manticore config
 		$conf = str_replace(
 			'searchd {' . PHP_EOL,
@@ -48,6 +51,8 @@ class AutoSchemaSupportTest extends TestCase {
 		static::tearDownAfterClass();
 		sleep(5); // <- give 5 secs to protect from any kind of lags
 		static::setUpBeforeClass();
+
+		echo "End updating config (AutoSchema)" . PHP_EOL;
 	}
 
 	public function testAutoSchemaOptionDisabled(): void {
