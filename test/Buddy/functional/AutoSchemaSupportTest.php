@@ -65,6 +65,13 @@ class AutoSchemaSupportTest extends TestCase {
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 1, 'error' => '','warning' => '']];
+
+		if ($result !== $out) {
+			$config = file_get_contents(static::$manticoreConfigFilePath);
+			echo $config . PHP_EOL;
+			echo '-----'.PHP_EOL;
+			static::runHttpQuery('SHOW SETTINGS');
+		}
 		$this->assertEquals($result, $out);
 	}
 
