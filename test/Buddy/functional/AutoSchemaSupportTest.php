@@ -35,23 +35,22 @@ class AutoSchemaSupportTest extends TestCase {
 	 * @return void
 	 */
 	protected function setUpAutoSchema(int $value): void {
+		// Kill any running instance first
+		static::tearDownAfterClass();
+		sleep(5); // <- give 5 secs to protect from any kind of lags
 
-		if (static::$manticoreConf === '') {
-			self::setManticoreConfigFile(static::$configFileName);
-		}
-		// Adding the auto schema option to manticore config
+		// Reload config from template, apply buddy path, then inject auto_schema
+		self::setManticoreConfigFile(static::$configFileName);
+		self::setConfWithBuddyPath();
 		$conf = str_replace(
 			'searchd {' . PHP_EOL,
 			'searchd {' . PHP_EOL . "    auto_schema = $value" . PHP_EOL,
 			static::$manticoreConf
 		);
-
 		self::updateManticoreConf((string)$conf);
 		echo "Updated configuration:".PHP_EOL.$conf . PHP_EOL;
 
-		// Restart manticore
-		static::tearDownAfterClass();
-		sleep(5); // <- give 5 secs to protect from any kind of lags
+		// Start manticore with the modified config
 		static::setUpBeforeClass();
 	}
 
