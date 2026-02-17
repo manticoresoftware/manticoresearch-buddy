@@ -44,8 +44,9 @@ class AutoSchemaSupportTest extends TestCase {
 			'searchd {' . PHP_EOL . "    auto_schema = $value" . PHP_EOL,
 			static::$manticoreConf
 		);
+
 		self::updateManticoreConf((string)$conf);
-		echo $conf . PHP_EOL;
+		echo "Updated configuration:".PHP_EOL.$conf . PHP_EOL;
 
 		// Restart manticore
 		static::tearDownAfterClass();
