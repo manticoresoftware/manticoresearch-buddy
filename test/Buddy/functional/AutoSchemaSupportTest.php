@@ -36,8 +36,9 @@ class AutoSchemaSupportTest extends TestCase {
 	 */
 	protected function setUpAutoSchema(int $value): void {
 
-		echo "Start updating config (AutoSchema)" . PHP_EOL;
-
+		if (static::$manticoreConf === '') {
+			self::setManticoreConfigFile(static::$configFileName);
+		}
 		// Adding the auto schema option to manticore config
 		$conf = str_replace(
 			'searchd {' . PHP_EOL,
@@ -52,8 +53,6 @@ class AutoSchemaSupportTest extends TestCase {
 		static::tearDownAfterClass();
 		sleep(5); // <- give 5 secs to protect from any kind of lags
 		static::setUpBeforeClass();
-
-		echo "End updating config (AutoSchema)" . PHP_EOL;
 	}
 
 	public function testAutoSchemaOptionDisabled(): void {
@@ -71,13 +70,6 @@ class AutoSchemaSupportTest extends TestCase {
 		$query = "INSERT into {$this->testTable}(col1) VALUES(1) ";
 		$out = static::runHttpQuery($query);
 		$result = [['total' => 1, 'error' => '','warning' => '']];
-
-		if ($result !== $out) {
-			$config = file_get_contents(static::$manticoreConfigFilePath);
-			echo $config . PHP_EOL;
-			echo '-----'.PHP_EOL;
-			static::runHttpQuery('SHOW SETTINGS');
-		}
 		$this->assertEquals($result, $out);
 	}
 
