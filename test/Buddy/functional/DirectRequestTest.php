@@ -43,7 +43,7 @@ final class DirectRequestTest extends TestCase {
 		static::runSqlQuery('CREATE TABLE test (name text)');
 		static::runSqlQuery('INSERT INTO test (name) values (\'some data\')');
 		system("ss -nlp");
-		$response = static::runHttpBuddyRequest('BACKUP TO /tmp');
+		$response = static::runHttpBuddyRequest('BACKUP TO /tmp', ['message' => ''], false);
 		echo "\n\n\n----->".json_encode($response);
 
 		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
