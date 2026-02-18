@@ -27,6 +27,13 @@ final class DirectRequestTest extends TestCase {
 
 	public function testShowQueries(): void {
 		$response = static::runHttpBuddyRequest('SHOW QUERIES');
+
+		echo "----->".json_encode($response);
+
+		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
+		$logPath = $matches[1] ?? '/var/log/manticore-test/searchd.log';
+		echo "-Log---->". file_get_contents($logPath);
+
 		$this->assertBasicChecks($response);
 		$this->assertDataChecks($response);
 	}
