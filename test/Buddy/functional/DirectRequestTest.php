@@ -21,6 +21,10 @@ use PHPUnit\Framework\TestCase;
 final class DirectRequestTest extends TestCase {
 	use TestFunctionalTrait;
 
+	protected static function configure(): void {
+		static::$searchdArgs = ['--log-level=debugv'];
+	}
+
 	public function testShowQueries(): void {
 		$response = static::runHttpBuddyRequest('SHOW QUERIES');
 		$this->assertBasicChecks($response);
