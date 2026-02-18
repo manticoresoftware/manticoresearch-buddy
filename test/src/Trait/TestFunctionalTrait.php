@@ -73,7 +73,6 @@ trait TestFunctionalTrait {
 	protected static function initConfig(): void {
 		static::configure();
 		self::setManticoreConfigFile(static::$configFileName);
-		self::setConfWithBuddyPath();
 		self::applySearchdArgs();
 	}
 
@@ -149,7 +148,7 @@ trait TestFunctionalTrait {
 			}
 			usleep(500_000); // poll every 0.5s
 		}
-		throw new Exception("Buddy did not start within {$timeoutSeconds}s\nLog ({$logPath}):\n{$log}\nConf(".static::$manticoreConfigFilePath."):\n".static::$manticoreConf);
+		throw new Exception("Buddy did not start within {$timeoutSeconds}s\nLog ({$logPath}):\n{$log}");
 	}
 
 	/**
@@ -499,22 +498,6 @@ trait TestFunctionalTrait {
 				throw new Exception("Cannot create Manticore `$prop` dir at $checkDir");
 			}
 		}
-	}
-
-	/**
-	 * Helper that sets the `buddy_path` config option relative to the current Buddy root folder
-	 *
-	 * @return void
-	 */
-	protected static function setConfWithBuddyPath(): void {
-		$buddyPath = __DIR__ . '/../../..';
-		$configFile = static::$manticoreConfigFilePath;
-		$conf = file_get_contents($configFile);
-		if ($conf === false) {
-			throw new Exception("Invalid Manticore config found at $configFile");
-		}
-		$conf = str_replace('%BUDDY%', $buddyPath, $conf);
-		self::updateManticoreConf((string)$conf);
 	}
 
 	/**
