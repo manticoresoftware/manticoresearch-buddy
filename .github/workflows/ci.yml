@@ -75,12 +75,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-        with:
-          path: /workdir
 
       - name: Run unit tests
         run: |
           set -e
+          ln -snf "$GITHUB_WORKSPACE" /workdir
           # the entrypoint is rewritten so we need to launch searchd manually
           searchd
           cd /workdir
