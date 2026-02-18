@@ -41,7 +41,7 @@ final class DirectRequestTest extends TestCase {
 
 	public function testBackupAll(): void {
 		static::runSqlQuery('CREATE TABLE test (name text)');
-		static::runSqlQuery('INSERT INTO test (name) values ("some data")');
+		static::runSqlQuery('INSERT INTO test (name) values (\'some data\')');
 		static::$listenBuddyPort = (int)system("ss -nlp | grep 'manticore-execu' | cut -d: -f2 | cut -d' ' -f1");
 		$response = static::runHttpBuddyRequest('BACKUP TO /tmp');
 		echo "----->".json_encode($response);
