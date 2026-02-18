@@ -26,7 +26,7 @@ final class DirectRequestTest extends TestCase {
 	}
 
 	public function testShowQueries(): void {
-		system("px ax");
+		system("ss -nlp");
 		$response = static::runHttpBuddyRequest('SHOW QUERIES');
 
 		echo "----->".json_encode($response);
@@ -42,7 +42,7 @@ final class DirectRequestTest extends TestCase {
 	public function testBackupAll(): void {
 		static::runSqlQuery('CREATE TABLE test (name text)');
 		static::runSqlQuery('INSERT INTO test (name) values (\'some data\')');
-		system("px ax");
+		system("ss -nlp");
 		$response = static::runHttpBuddyRequest('BACKUP TO /tmp');
 		echo "----->".json_encode($response);
 
