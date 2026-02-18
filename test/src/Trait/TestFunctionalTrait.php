@@ -149,7 +149,7 @@ trait TestFunctionalTrait {
 			}
 			usleep(500_000); // poll every 0.5s
 		}
-		throw new Exception("Buddy did not start within {$timeoutSeconds}s\nLog ({$logPath}):\n{$log}");
+		throw new Exception("Buddy did not start within {$timeoutSeconds}s\nLog ({$logPath}):\n{$log}\nConf(".static::$manticoreConfigFilePath."):\n".static::$manticoreConf);
 	}
 
 	/**
