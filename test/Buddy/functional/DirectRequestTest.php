@@ -31,6 +31,7 @@ final class DirectRequestTest extends TestCase {
 		static::runSqlQuery('CREATE TABLE test (name text)');
 		static::runSqlQuery('INSERT INTO test (name) values ("some data")');
 		$response = static::runHttpBuddyRequest('BACKUP TO /tmp');
+		echo "----->".json_encode($response);
 		$this->assertBasicChecks($response);
 		$this->assertDataChecks($response);
 		$this->assertEquals(true, isset($response['message'][0]['data'][0]['Path']));
