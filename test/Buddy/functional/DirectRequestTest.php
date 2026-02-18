@@ -22,18 +22,18 @@ final class DirectRequestTest extends TestCase {
 	use TestFunctionalTrait;
 
 	protected static function configure(): void {
-		static::$searchdArgs = ['--log-level=debugv'];
+		static::$searchdArgs = ['--log-level=debugvv'];
 	}
 
 	public function testShowQueries(): void {
 		system("ss -nlp");
 		$response = static::runHttpBuddyRequest('SHOW QUERIES');
 
-		echo "----->".json_encode($response);
+		echo "\n\n\n----->".json_encode($response);
 
 		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
 		$logPath = $matches[1] ?? '/var/log/manticore-test/searchd.log';
-		echo "-Log---->". file_get_contents($logPath);
+		echo "\n-Log---->". file_get_contents($logPath);
 
 		$this->assertBasicChecks($response);
 		$this->assertDataChecks($response);
@@ -44,11 +44,11 @@ final class DirectRequestTest extends TestCase {
 		static::runSqlQuery('INSERT INTO test (name) values (\'some data\')');
 		system("ss -nlp");
 		$response = static::runHttpBuddyRequest('BACKUP TO /tmp');
-		echo "----->".json_encode($response);
+		echo "\n\n\n----->".json_encode($response);
 
 		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
 		$logPath = $matches[1] ?? '/var/log/manticore-test/searchd.log';
-		echo "-Log---->". file_get_contents($logPath);
+		echo "\n-Log---->". file_get_contents($logPath);
 
 
 		$this->assertBasicChecks($response);
