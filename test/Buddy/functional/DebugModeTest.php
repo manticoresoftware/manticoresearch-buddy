@@ -9,12 +9,12 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
+use Manticoresearch\BuddyTest\Trait\RerunSearchdPerTestTrait;
 use PHPUnit\Framework\TestCase;
 
 class DebugModeTest extends TestCase {
 
-	use TestFunctionalTrait;
+	use RerunSearchdPerTestTrait;
 
 	/**
 	 * @var string $searchdLog
@@ -26,18 +26,13 @@ class DebugModeTest extends TestCase {
 	 */
 	protected string $searchdLogFilepath;
 
-	public function setUp(): void {
+	protected function beforeSearchdStart(): void {
 		preg_match('/log = (.*?)[\r\n]/', self::$manticoreConf, $matches);
 		if (!$matches) {
 			throw new Exception('Cannot find searchd log path in manticore config');
 		}
 		$this->searchdLogFilepath = $matches[1];
 		$this->searchdLog = (string)file_get_contents($this->searchdLogFilepath);
-		self::setUpBeforeClass();
-	}
-
-	public function tearDown(): void {
-		self::tearDownAfterClass();
 	}
 
 	public function testDebugModeOff(): void {
