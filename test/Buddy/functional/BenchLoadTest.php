@@ -25,21 +25,14 @@ class BenchLoadTest extends TestCase {
 	// How many iterations we do to detect avg time for query (per single thread)
 	const ITERATIONS = 1000;
 
-	use TestFunctionalTrait {
-		setUpBeforeClass as traitSetUpBeforeClass;
-		tearDownAfterClass as traitTearDownAfterClass;
-	}
+	use TestFunctionalTrait;
 
-	public static function setUpBeforeClass(): void {
+	protected static function configure(): void {
 		static::$configFileName = 'manticore-bench.conf';
-
-		static::traitSetUpBeforeClass();
 	}
 
-	public static function tearDownAfterClass(): void {
+	protected static function cleanUp(): void {
 		static::runSqlQuery('DROP TABLE IF EXISTS test');
-
-		static::traitTearDownAfterClass();
 	}
 
 	public function testSequentialLoadIsOk(): void {
