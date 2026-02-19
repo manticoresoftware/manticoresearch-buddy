@@ -475,8 +475,6 @@ trait TestFunctionalTrait {
 		file_put_contents($payloadFile, json_encode($request));
 		$redirect = $redirectOutput ? '2>&1' : '';
 		exec("curl -s 127.0.0.1:$port -H 'Content-type: application/json' -d @$payloadFile $redirect", $output);
-
-		echo "\n--curl -s 127.0.0.1:$port--\n";
 		/** @var array{version:int,type:string,message:array<int,array{columns:array<string>,data:array<int,array<string,string>>}>} $result */
 		$result = (array)simdjson_decode($output[0] ?? '{}', true);
 		return $result;

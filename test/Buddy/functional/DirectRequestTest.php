@@ -21,37 +21,16 @@ use PHPUnit\Framework\TestCase;
 final class DirectRequestTest extends TestCase {
 	use TestFunctionalTrait;
 
-	protected static function configure(): void {
-		static::$searchdArgs = ['--log-level=debugvv'];
-	}
-
 	public function testShowQueries(): void {
-		system("ss -nlp");
 		$response = static::runHttpBuddyRequest('SHOW QUERIES');
-
-		echo "\n\n\n----->".json_encode($response);
-
-		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
-		$logPath = $matches[1] ?? '/var/log/manticore-test/searchd.log';
-		echo "\n-Log---->". file_get_contents($logPath);
-
 		$this->assertBasicChecks($response);
 		$this->assertDataChecks($response);
 	}
 
 	public function testBackupAll(): void {
-		sleep(5);
 		static::runSqlQuery('CREATE TABLE test (name text)');
 		static::runSqlQuery('INSERT INTO test (name) values (\'some data\')');
-		system("ss -nlp");
 		$response = static::runHttpBuddyRequest('BACKUP TO /tmp', ['message' => ''], false);
-		echo "\n\n\n----->".json_encode($response);
-
-		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
-		$logPath = $matches[1] ?? '/var/log/manticore-test/searchd.log';
-		echo "\n-Log---->". file_get_contents($logPath);
-
-
 		$this->assertBasicChecks($response);
 		$this->assertDataChecks($response);
 		$this->assertEquals(true, isset($response['message'][0]['data'][0]['Path']));
