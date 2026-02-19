@@ -92,6 +92,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-distributed-insert',
 	'manticoresoftware/buddy-plugin-truncate',
 	'manticoresoftware/buddy-plugin-metrics',
+	'manticoresoftware/buddy-plugin-conversational-rag',
 ];
 // Filtering out the plugins that we don't need
 if (!empty($opts['enable-plugin'])) {
