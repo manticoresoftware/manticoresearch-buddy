@@ -5,6 +5,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Metrics\Collector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricStore;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricsScrapeContext;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class CrashCollector implements CollectorInterface {
 
@@ -12,15 +13,22 @@ final class CrashCollector implements CollectorInterface {
 	private const CRASH_MARKER = 'FATAL: CRASH DUMP';
 
 	public function collect(Client $client, MetricStore $store, MetricsScrapeContext $context): void {
-		unset($client);
+		$logPath = '';
+		try {
+			$settings = $client->getSettings();
+			$logPath = (string)($settings->searchdLog ?? '');
+		} catch (\Throwable $e) {
+			Buddy::debug('Collector fallback (' . self::class . '): ' . $e->getMessage());
+		}
 
-		$logPath = (string)($context->settings['searchd.log'] ?? '');
 		if ($logPath === '' || !file_exists($logPath)) {
+			$context->searchdCrashesTotal = 0;
 			$this->emitCrashesMetric($store, 0);
 			return;
 		}
 
 		$currentCount = $this->countCrashesInLog($logPath);
+		$context->searchdCrashesTotal = $currentCount;
 		$this->emitCrashesMetric($store, $currentCount);
 
 		// No crashes in the log -> do not create or touch any state file.
@@ -87,7 +95,8 @@ final class CrashCollector implements CollectorInterface {
 
 		try {
 			file_put_contents($statePath, $currentCount . "\n", LOCK_EX);
-		} catch (\Throwable) {
+		} catch (\Throwable $e) {
+			Buddy::debug('Collector fallback (' . self::class . '): ' . $e->getMessage());
 		}
 	}
 }

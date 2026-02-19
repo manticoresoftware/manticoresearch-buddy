@@ -5,6 +5,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Metrics\Collector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricStore;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricsScrapeContext;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Throwable;
 
 final class ProcessCollector implements CollectorInterface {
@@ -201,7 +202,8 @@ final class ProcessCollector implements CollectorInterface {
 				return '';
 			}
 			return str_replace("\0", ' ', trim($content));
-		} catch (Throwable) {
+		} catch (Throwable $e) {
+			Buddy::debug('Collector fallback (' . self::class . '): ' . $e->getMessage());
 			return '';
 		}
 	}

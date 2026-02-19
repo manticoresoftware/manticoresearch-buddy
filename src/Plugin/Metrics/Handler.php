@@ -15,7 +15,6 @@ use Manticoresearch\Buddy\Base\Plugin\Metrics\Collector\CrashCollector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\Collector\FilesystemCollector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\Collector\ProcessCollector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\Collector\SchemaCollector;
-use Manticoresearch\Buddy\Base\Plugin\Metrics\Collector\SettingsCollector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\Collector\StatusCollector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\Collector\TablesCollector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\Collector\ThreadsCollector;
@@ -35,14 +34,14 @@ final class Handler extends BaseHandlerWithClient
 	 */
 	public function run(): Task {
 		$taskFn = static function (Client $client): TaskResult {
+			$json = (string)file_get_contents(__DIR__ . '/metric_definitions.json');
 			/** @var array<string, array{name: string, type: string, description: string, deprecated_use?: string}> $definitions */
-			$definitions = require __DIR__ . '/MetricDefinitionsMap.php';
+			$definitions = (array)simdjson_decode($json, true);
 			$store = new MetricStore($definitions);
 			$context = new MetricsScrapeContext();
 
 			$collectors = [
 				new ConnectivityCollector(),
-				new SettingsCollector(),
 				new ProcessCollector(),
 				new CrashCollector(),
 				new StatusCollector(),

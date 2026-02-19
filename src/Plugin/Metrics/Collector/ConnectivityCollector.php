@@ -5,6 +5,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Metrics\Collector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricStore;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricsScrapeContext;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class ConnectivityCollector implements CollectorInterface {
 
@@ -28,7 +29,8 @@ final class ConnectivityCollector implements CollectorInterface {
 			}
 
 			$this->addSuccessMetrics($store, $elapsed);
-		} catch (\Throwable) {
+		} catch (\Throwable $e) {
+			Buddy::debug('Collector fallback (' . self::class . '): ' . $e->getMessage());
 			$this->addFailureMetrics($store);
 		}
 	}

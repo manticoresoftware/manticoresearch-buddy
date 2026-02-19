@@ -12,13 +12,6 @@ final class MetricsScrapeContext {
 	public array $tableNames = [];
 
 	/**
-	 * Parsed output of SHOW SETTINGS (Setting_name => Value).
-	 *
-	 * @var array<string, string>
-	 */
-	public array $settings = [];
-
-	/**
 	 * Parsed output of SHOW STATUS (Counter => Value).
 	 *
 	 * @var array<string, float|int|string>
@@ -45,4 +38,9 @@ final class MetricsScrapeContext {
 	 * @var array<int, array<string, mixed>>
 	 */
 	public array $threadsRows = [];
+
+	/**
+	 * Count of detected searchd crashes (from searchd.log).
+	 */
+	public ?int $searchdCrashesTotal = null;
 }

@@ -19,6 +19,8 @@ final class StatusCollector implements CollectorInterface {
 	private const CONNECTIONS_TOTAL = 'connections_total';
 	private const AGENT_TFO_TOTAL = 'agent_tfo_total';
 
+	private const OFF_VALUES = ['OFF', '-'];
+
 	/**
 	 * @throws GenericError
 	 * @throws ManticoreSearchClientError
@@ -160,6 +162,10 @@ final class StatusCollector implements CollectorInterface {
 			return false;
 		}
 
+		if (!is_int($value) && !is_float($value) && !is_string($value)) {
+			$value = 0;
+		}
+
 		$store->addDirect(
 			self::UPTIME_SECONDS_GAUGE,
 			'gauge',
@@ -173,6 +179,10 @@ final class StatusCollector implements CollectorInterface {
 	private function addConnectionsMetric(MetricStore $store, string $counter, mixed $value): bool {
 		if ($counter !== 'connections') {
 			return false;
+		}
+
+		if (!is_int($value) && !is_float($value) && !is_string($value)) {
+			$value = 0;
 		}
 
 		$store->addDirect(
@@ -190,6 +200,10 @@ final class StatusCollector implements CollectorInterface {
 			return false;
 		}
 
+		if (!is_int($value) && !is_float($value) && !is_string($value)) {
+			$value = 0;
+		}
+
 		$store->addDirect(
 			self::AGENT_TFO_TOTAL,
 			'counter',
@@ -205,7 +219,7 @@ final class StatusCollector implements CollectorInterface {
 			return false;
 		}
 
-		$enabled = $this->isOff($value) ? 0 : 1;
+		$enabled = is_string($value) && $this->isOff($value) ? 0 : 1;
 		$store->addDirect(
 			'query_cpu_enabled',
 			'gauge',
@@ -221,7 +235,12 @@ final class StatusCollector implements CollectorInterface {
 			return false;
 		}
 
-		$enabled = $this->isOff($value) ? 0 : 1;
+		$enabled = is_string($value) && $this->isOff($value) ? 0 : 1;
+		$scalarValue = $value;
+		if (!is_int($scalarValue) && !is_float($scalarValue) && !is_string($scalarValue)) {
+			$scalarValue = 0;
+		}
+
 		$store->addDirect(
 			'query_reads_enabled',
 			'gauge',
@@ -232,7 +251,7 @@ final class StatusCollector implements CollectorInterface {
 			'query_reads_count_total',
 			'counter',
 			'Total read IO calls (fired by search queries)',
-			$enabled === 1 ? $this->toNumberOrZero($value) : 0
+			$enabled === 1 ? $this->toNumberOrZero($scalarValue) : 0
 		);
 
 		return true;
@@ -243,7 +262,12 @@ final class StatusCollector implements CollectorInterface {
 			return false;
 		}
 
-		$enabled = $this->isOff($value) ? 0 : 1;
+		$enabled = is_string($value) && $this->isOff($value) ? 0 : 1;
+		$scalarValue = $value;
+		if (!is_int($scalarValue) && !is_float($scalarValue) && !is_string($scalarValue)) {
+			$scalarValue = 0;
+		}
+
 		$store->addDirect(
 			'query_readkb_enabled',
 			'gauge',
@@ -251,7 +275,7 @@ final class StatusCollector implements CollectorInterface {
 			$enabled
 		);
 
-		$kb = $enabled === 1 ? $this->toNumberOrZero($value) : 0;
+		$kb = $enabled === 1 ? $this->toNumberOrZero($scalarValue) : 0;
 		$store->addDirect(
 			'query_readkb_bytes_total',
 			'counter',
@@ -267,7 +291,12 @@ final class StatusCollector implements CollectorInterface {
 			return false;
 		}
 
-		$enabled = $this->isOff($value) ? 0 : 1;
+		$enabled = is_string($value) && $this->isOff($value) ? 0 : 1;
+		$scalarValue = $value;
+		if (!is_int($scalarValue) && !is_float($scalarValue) && !is_string($scalarValue)) {
+			$scalarValue = 0;
+		}
+
 		$store->addDirect(
 			'query_readtime_enabled',
 			'gauge',
@@ -278,27 +307,23 @@ final class StatusCollector implements CollectorInterface {
 			'query_readtime_seconds_total',
 			'counter',
 			'Total read IO time in seconds',
-			$enabled === 1 ? $this->toNumberOrZero($value) : 0
+			$enabled === 1 ? $this->toNumberOrZero($scalarValue) : 0
 		);
 
 		return true;
 	}
 
-	private function isOff(mixed $value): bool {
-		return is_string($value) && in_array($value, ['OFF', '-'], true);
+	private function isOff(string $value): bool {
+		return in_array($value, self::OFF_VALUES, true);
 	}
 
-	private function toNumberOrZero(mixed $value): int|float {
+	private function toNumberOrZero(int|float|string $value): int|float {
 		if (is_int($value) || is_float($value)) {
 			return $value;
 		}
 
-		if (!is_string($value)) {
-			return 0;
-		}
-
 		$value = trim($value);
-		if ($value === '' || in_array($value, ['OFF', '-'], true)) {
+		if ($value === '' || in_array($value, self::OFF_VALUES, true)) {
 			return 0;
 		}
 
