@@ -16,13 +16,10 @@ class MetricThreadTest extends TestCase {
 
 	const SEARCHD_LOG_PATH = '/var/log/manticore-test/searchd.log';
 
-	use TestFunctionalTrait {
-		setUpBeforeClass as traitSetUpBeforeClass;
-	}
-	public static function setUpBeforeClass(): void {
-		static::setSearchdArgs(['--log-level=debugvv']);
+	use TestFunctionalTrait;
 
-		static::traitSetUpBeforeClass();
+	protected static function configure(): void {
+		static::$searchdArgs = ['--log-level=debugvv'];
 	}
 
 	public function testMetricThreadPrintDebugMessages(): void {
