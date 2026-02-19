@@ -40,6 +40,7 @@ final class DirectRequestTest extends TestCase {
 	}
 
 	public function testBackupAll(): void {
+		sleep(5);
 		static::runSqlQuery('CREATE TABLE test (name text)');
 		static::runSqlQuery('INSERT INTO test (name) values (\'some data\')');
 		system("ss -nlp");
