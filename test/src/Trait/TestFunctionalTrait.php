@@ -133,28 +133,28 @@ trait TestFunctionalTrait {
 	 * @return void
 	 * @throws Exception
 	 */
-		protected static function waitForBuddyReady(int $timeoutSeconds = 30): void {
-			preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
-			$logPath = $matches[1] ?? '/var/log/manticore-test/searchd.log';
+	protected static function waitForBuddyReady(int $timeoutSeconds = 30): void {
+		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
+		$logPath = $matches[1] ?? '/var/log/manticore-test/searchd.log';
 
-			$log = '';
-			$deadline = time() + $timeoutSeconds;
-			while (time() < $deadline) {
-				$log = (string)file_get_contents($logPath);
-				$matches = [];
-				if (preg_match_all(
+		$log = '';
+		$deadline = time() + $timeoutSeconds;
+		while (time() < $deadline) {
+			$log = (string)file_get_contents($logPath);
+			$matches = [];
+			if (preg_match_all(
 				'/\\[(?<pid>[0-9]+)\\]\\s+\\[BUDDY\\]\\s+started.*?at\\s+http:\\/\\/127\\.0\\.0\\.1:(?<port>[0-9]+)/',
 				$log,
 				$matches,
-					PREG_SET_ORDER
-				)) {
-					$last = $matches[sizeof($matches) - 1];
-					static::$buddyPid = (int)$last['pid'];
-					static::$listenBuddyPort = (int)$last['port'];
-					return;
-				}
-				usleep(500_000); // poll every 0.5s
+				PREG_SET_ORDER
+			)) {
+				$last = $matches[sizeof($matches) - 1];
+				static::$buddyPid = (int)$last['pid'];
+				static::$listenBuddyPort = (int)$last['port'];
+				return;
 			}
+			usleep(500_000); // poll every 0.5s
+		}
 		throw new Exception("Buddy did not start within {$timeoutSeconds}s\nLog ({$logPath}):\n{$log}");
 	}
 
