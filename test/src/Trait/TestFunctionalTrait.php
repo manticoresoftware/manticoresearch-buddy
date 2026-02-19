@@ -80,19 +80,19 @@ trait TestFunctionalTrait {
 	 * Start daemon, wait for buddy readiness, detect ports, clean tables.
 	 * @return void
 	 */
-		protected static function startSearchd(): void {
-			self::checkManticorePathes();
-			preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $logMatches);
-			$logPath = $logMatches[1] ?? '/var/log/manticore-test/searchd.log';
-			system('rm -f ' . escapeshellarg($logPath));
-			system('searchd --config ' . static::$manticoreConfigFilePath);
-			self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
-			self::waitForBuddyReady();
+	protected static function startSearchd(): void {
+		self::checkManticorePathes();
+		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $logMatches);
+		$logPath = $logMatches[1] ?? '/var/log/manticore-test/searchd.log';
+		system('rm -f ' . escapeshellarg($logPath));
+		system('searchd --config ' . static::$manticoreConfigFilePath);
+		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
+		self::waitForBuddyReady();
 
-			// Clean up all tables and run fresh instance
-			$output = static::runSqlQuery('show tables');
-			if (sizeof($output) > 1) {
-				array_shift($output);
+		// Clean up all tables and run fresh instance
+		$output = static::runSqlQuery('show tables');
+		if (sizeof($output) > 1) {
+			array_shift($output);
 			foreach ($output as $line) {
 				$table = trim(str_replace(['rt','plain', 'distributed', 'percolate'], '', $line), ' |+-');
 				if (!$table || strpos($table, '|')) {
@@ -137,25 +137,26 @@ trait TestFunctionalTrait {
 			preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
 			$logPath = $matches[1] ?? '/var/log/manticore-test/searchd.log';
 
+			$log = '';
 			$deadline = time() + $timeoutSeconds;
 			while (time() < $deadline) {
 				$log = (string)file_get_contents($logPath);
 				$matches = [];
 				if (preg_match_all(
-					'/\\[(?<pid>[0-9]+)\\]\\s+\\[BUDDY\\]\\s+started.*?at\\s+http:\\/\\/127\\.0\\.0\\.1:(?<port>[0-9]+)/',
-					$log,
-					$matches,
+				'/\\[(?<pid>[0-9]+)\\]\\s+\\[BUDDY\\]\\s+started.*?at\\s+http:\\/\\/127\\.0\\.0\\.1:(?<port>[0-9]+)/',
+				$log,
+				$matches,
 					PREG_SET_ORDER
 				)) {
 					$last = $matches[sizeof($matches) - 1];
-					static::$buddyPid = (int)($last['pid'] ?? 0);
-					static::$listenBuddyPort = (int)($last['port'] ?? 0);
+					static::$buddyPid = (int)$last['pid'];
+					static::$listenBuddyPort = (int)$last['port'];
 					return;
 				}
 				usleep(500_000); // poll every 0.5s
 			}
-			throw new Exception("Buddy did not start within {$timeoutSeconds}s\nLog ({$logPath}):\n{$log}");
-		}
+		throw new Exception("Buddy did not start within {$timeoutSeconds}s\nLog ({$logPath}):\n{$log}");
+	}
 
 	/**
 	 * Launch daemon as setup stage
