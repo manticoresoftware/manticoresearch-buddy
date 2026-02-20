@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f8b8f7446a01b57af60c5fcd61adb8c7",
+    "content-hash": "ef1dcf5b5b168d675512f8ea400ef158",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -708,16 +708,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-fix/autocomplete-with-numeric-prefix",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "a892c2bdd2ff0844840d3bfc373beab09e587cb8"
+                "reference": "bb708700d16e7fc67aa189b0d2c9f3b34fdc5086"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/a892c2bdd2ff0844840d3bfc373beab09e587cb8",
-                "reference": "a892c2bdd2ff0844840d3bfc373beab09e587cb8",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/bb708700d16e7fc67aa189b0d2c9f3b34fdc5086",
+                "reference": "bb708700d16e7fc67aa189b0d2c9f3b34fdc5086",
                 "shasum": ""
             },
             "require": {
@@ -733,7 +733,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -754,9 +753,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/autocomplete-with-numeric-prefix"
             },
-            "time": "2026-01-28T09:17:29+00:00"
+            "time": "2026-02-20T12:54:54+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -5339,10 +5338,10 @@
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.1.0"
     },
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
