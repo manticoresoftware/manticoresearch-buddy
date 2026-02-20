@@ -222,7 +222,9 @@ final class Handler extends BaseHandlerWithFlagCache {
 			// Normalize bigram separators in keywords from fuzzy variations
 			foreach ($words as &$word) {
 				$word['keywords'] = array_map(
-					fn($kw) => static::normalizeBigramSeparator($kw),
+					// We need here string otherwise php will convert it to int
+					// if it starts with number
+					fn(string $kw) => static::normalizeBigramSeparator($kw),
 					$word['keywords']
 				);
 			}
@@ -482,7 +484,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$data = static::applyThreshold($data, 0.5);
 		/** @var array<string> */
 		$keywords = array_map(
-			fn($row) => static::normalizeBigramSeparator(ltrim($row['normalized'], '=')),
+			// Type is important due to numeric string prefixes converted to int
+			fn(string $row) => static::normalizeBigramSeparator(ltrim($row['normalized'], '=')),
 			$data
 		);
 		// Filter out keywords that are too long to given config
