@@ -222,7 +222,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			// Normalize bigram separators in keywords from fuzzy variations
 			foreach ($words as &$word) {
 				$word['keywords'] = array_map(
-					fn($kw) => static::normalizeBigramSeparator($kw),
+					fn(string $kw) => static::normalizeBigramSeparator($kw),
 					$word['keywords']
 				);
 			}
@@ -517,7 +517,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 		/** @var array<string> */
 		$suggestions = array_column(static::applyThreshold($data, 0.5, 20), 'suggest');
 		// Normalize bigram separators in suggestions
-		$suggestions = array_map(fn($s) => static::normalizeBigramSeparator($s), $suggestions);
+		$suggestions = array_map(fn(string $s) => static::normalizeBigramSeparator($s), $suggestions);
 		$thresholdSuggestionsCount = sizeof($suggestions);
 		$filterFn = function (string $suggestion) use ($lastWord, $lastWordLen, $distance) {
 			$suggestionLen = strlen($suggestion);
