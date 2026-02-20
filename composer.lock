@@ -712,12 +712,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "bb708700d16e7fc67aa189b0d2c9f3b34fdc5086"
+                "reference": "b3f2ad57301cd9bd26eba817e0d8e41cb39933d8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/bb708700d16e7fc67aa189b0d2c9f3b34fdc5086",
-                "reference": "bb708700d16e7fc67aa189b0d2c9f3b34fdc5086",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/b3f2ad57301cd9bd26eba817e0d8e41cb39933d8",
+                "reference": "b3f2ad57301cd9bd26eba817e0d8e41cb39933d8",
                 "shasum": ""
             },
             "require": {
@@ -755,7 +755,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/autocomplete-with-numeric-prefix"
             },
-            "time": "2026-02-20T12:54:54+00:00"
+            "time": "2026-02-20T13:32:07+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
