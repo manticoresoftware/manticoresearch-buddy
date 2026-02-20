@@ -1,6 +1,319 @@
 # Error Handling and Recovery
 
-The sharding system implements comprehensive error handling and recovery mechanisms to ensure system reliability and data safety during failures. This section covers error scenarios, recovery strategies, and troubleshooting procedures.
+The sharding system implements comprehensive error handling and recovery mechanisms to ensure system reliability and data safety during failures. This section covers error scenarios, recovery strategies, rollback mechanisms, and troubleshooting procedures.
+
+## ALTER CLUSTER ADD TABLE Special Handling
+
+### The Blocking Query Problem
+
+`ALTER CLUSTER ADD TABLE` commands have unique characteristics that require special handling:
+
+**Why Special Handling is Needed:**
+- **Blocking Nature**: These commands can block for extended periods during table synchronization
+- **Network-Intensive**: Large tables may take significant time to sync across cluster nodes
+- **Timeout vs Success**: Query may timeout/fail but table synchronization continues in background
+- **False Negatives**: Command appears to fail but tables are actually being synchronized successfully
+
+### Implementation Strategy
+
+The system implements a two-phase verification approach for `ALTER CLUSTER ADD TABLE` commands:
+
+#### Phase 1: Query Execution Detection
+When an `ALTER CLUSTER ADD TABLE` command returns an error:
+
+```php
+// Check if query is still running using SHOW QUERIES
+if ($this->checkQueryStillRunning($query)) {
+    // Query still executing - let existing retry mechanism handle it
+    return 'error'; // Will be retried later
+}
+```
+
+#### Phase 2: Cluster Status Verification
+If query is no longer running, verify actual cluster state:
+
+```php
+// Extract cluster and table information
+$clusterName = $this->extractClusterNameFromQuery($query);
+$tableNames = $this->extractTableNamesFromQuery($query);
+
+// Verify tables are actually in cluster
+if ($this->cluster->verifyTablesInCluster($clusterName, $tableNames)) {
+    return 'processed'; // Success despite error response
+}
+```
+
+### Technical Implementation
+
+#### Query Detection
+```php
+protected function isAlterClusterAddTableQuery(string $query): bool {
+    return (bool)preg_match('/^\s*ALTER\s+CLUSTER\s+\w+\s+ADD\s+/i', $query);
+}
+```
+
+#### Running Query Check
+```php
+protected function checkQueryStillRunning(string $query): bool {
+    $res = $this->client->sendRequest('SHOW QUERIES')->getResult();
+    
+    foreach ($res[0]['data'] as $runningQuery) {
+        if (stripos($runningQuery['query'], 'ALTER CLUSTER') !== false && 
+            stripos($runningQuery['query'], 'ADD') !== false) {
+            return true; // Still running
+        }
+    }
+    return false;
+}
+```
+
+#### Cluster Verification
+```php
+public function verifyTablesInCluster(string $clusterName, array $tableNames): bool {
+    $clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
+    $data = $clusterResult->getResult();
+    
+    foreach ($data[0]['data'] as $cluster) {
+        if ($cluster['cluster'] === $clusterName) {
+            $clusterTables = array_map('trim', explode(',', $cluster['tables']));
+            
+            // Check if all requested tables are in cluster
+            foreach ($tableNames as $tableName) {
+                if (!in_array($tableName, $clusterTables)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+```
+
+### Flow Diagram
+
+```
+ALTER CLUSTER ADD TABLE executed
+           ↓
+    Returns error/timeout
+           ↓
+    Check SHOW QUERIES
+           ↓
+    ┌─────────────────┐
+    │ Still running?  │
+    └─────────────────┘
+           ↓
+    ┌─────────────────┐         ┌─────────────────┐
+    │      YES        │         │       NO        │
+    │ Return 'error'  │         │ Check cluster   │
+    │ (retry later)   │         │ status          │
+    └─────────────────┘         └─────────────────┘
+                                        ↓
+                                ┌─────────────────┐
+                                │ Tables synced?  │
+                                └─────────────────┘
+                                        ↓
+                        ┌─────────────────┐         ┌─────────────────┐
+                        │      YES        │         │       NO        │
+                        │ Return          │         │ Return 'error'  │
+                        │ 'processed'     │         │ (actual failure)│
+                        └─────────────────┘         └─────────────────┘
+```
+
+### Benefits
+
+1. **Reliability**: Prevents false failures for long-running synchronization operations
+2. **Efficiency**: Avoids unnecessary retries when tables are already synchronized
+3. **Transparency**: Maintains existing queue behavior for all other command types
+4. **Robustness**: Handles network timeouts and large table synchronization gracefully
+
+### Logging and Monitoring
+
+The system provides detailed logging for troubleshooting:
+
+```
+[DEBUG] ALTER CLUSTER ADD TABLE still running, will retry later
+[DEBUG] ALTER CLUSTER ADD TABLE no longer running, verifying cluster status  
+[DEBUG] Tables verified in cluster, marking as processed
+[INFO] Queue query error: ALTER CLUSTER cluster1 ADD table1,table2
+```
+
+### Configuration
+
+No additional configuration is required. The feature:
+- Automatically detects `ALTER CLUSTER ADD TABLE` commands
+- Uses existing retry mechanisms and timeouts
+- Maintains backward compatibility with all other command types
+- Integrates seamlessly with existing error handling
+
+## Rollback System
+
+### Overview
+
+The sharding system now includes a comprehensive rollback mechanism that automatically reverses failed operations to maintain system consistency.
+
+### Operation Groups
+
+All related operations are grouped together for atomic execution:
+
+```php
+public function shard(Queue $queue, int $shardCount, int $replicationFactor = 2): Map {
+    // Create unique operation group
+    $operationGroup = "shard_create_{$this->name}_" . uniqid();
+
+    try {
+        // All operations in this group (rollback required)
+        $queue->add($node, $createSql, $rollbackSql, $operationGroup);
+        // ... more operations
+
+        return $result;
+    } catch (\Throwable $t) {
+        // Automatic rollback of entire group
+        $queue->rollbackOperationGroup($operationGroup);
+        throw $t;
+    }
+}
+```
+
+### Rollback Command Handling
+
+The system requires explicit rollback commands for all operations:
+
+```php
+// Rollback commands must be provided when queuing operations
+$forwardSql = "CREATE TABLE users (id bigint, name string)";
+$rollbackSql = "DROP TABLE IF EXISTS users";
+$queue->add($nodeId, $forwardSql, $rollbackSql, $operationGroup);
+
+// Common rollback patterns:
+"CREATE TABLE users" → "DROP TABLE IF EXISTS users"
+"CREATE CLUSTER c1" → "DELETE CLUSTER c1"
+"ALTER CLUSTER c1 ADD t1" → "ALTER CLUSTER c1 DROP t1"
+"JOIN CLUSTER c1" → "DELETE CLUSTER c1"
+```
+
+### Rollback Execution Flow
+
+1. **Failure Detection**: Operation fails and throws exception
+2. **Group Identification**: Find all commands in operation group
+3. **Rollback Sequence**: Execute rollback commands in reverse order
+4. **State Cleanup**: Reset state and mark as failed
+5. **Error Reporting**: Log details for debugging
+
+```php
+protected function executeRollbackSequence(array $rollbackCommands): bool {
+    foreach ($rollbackCommands as $command) {
+        try {
+            $this->client->sendRequest($command['rollback_query']);
+            Buddy::debugvv("Rollback successful: {$command['rollback_query']}");
+        } catch (\Throwable $e) {
+            Buddy::debugvv("Rollback failed: " . $e->getMessage());
+            // Continue with other rollback commands
+        }
+    }
+    return true;
+}
+```
+
+## Rebalancing Control
+
+### Stop/Pause/Resume Operations
+
+The system now provides full control over rebalancing operations:
+
+```php
+// Graceful stop - completes current operation
+$result = $table->stopRebalancing(true);
+
+// Immediate stop with rollback
+$result = $table->stopRebalancing(false);
+
+// Pause operation
+$table->pauseRebalancing();
+
+// Resume paused operation
+$table->resumeRebalancing();
+
+// Get progress
+$progress = $table->getRebalancingProgress();
+```
+
+### Stop Signal Mechanism
+
+Operations check for stop signals between steps:
+
+```php
+if ($this->checkStopSignal()) {
+    $queue->rollbackOperationGroup($operationGroup);
+    $state->set($rebalanceKey, 'stopped');
+    $this->clearStopSignal();
+    return;
+}
+```
+
+## Health Monitoring
+
+### Automatic Health Checks
+
+The HealthMonitor performs comprehensive system checks:
+
+```php
+$monitor = new HealthMonitor($client, $cluster);
+$health = $monitor->performHealthCheck();
+
+// Health check results
+[
+    'overall_status' => 'healthy|unhealthy',
+    'checks' => [
+        'stuck_operations' => [...],
+        'failed_operations' => [...],
+        'orphaned_resources' => [...],
+        'queue_health' => [...]
+    ],
+    'issues' => [...],
+    'warnings' => [...],
+    'recommendations' => [...]
+]
+```
+
+### Auto-Recovery
+
+The system can automatically recover from common issues:
+
+```php
+if ($health['overall_status'] !== 'healthy') {
+    $recovery = $monitor->performAutoRecovery();
+    // Automatic recovery actions:
+    // - Reset stuck operations
+    // - Clean failed operation groups
+    // - Remove orphaned resources
+}
+```
+
+## Resource Cleanup
+
+### Cleanup Manager
+
+Automatic cleanup of orphaned resources:
+
+```php
+$cleanup = new CleanupManager($client, $cluster);
+$results = $cleanup->performFullCleanup();
+
+// Cleanup actions:
+// - Remove orphaned temporary clusters (>1 hour old)
+// - Delete failed operation groups (>24 hours old)
+// - Clean expired queue items (>7 days old)
+// - Remove stale state entries (>30 days old)
+```
+
+### Cleanup Schedule
+
+Recommended cleanup schedule:
+- **Hourly**: Check for orphaned temporary clusters
+- **Daily**: Clean failed operation groups
+- **Weekly**: Remove expired queue items
+- **Monthly**: Clean stale state entries
 
 ## Error Handling Strategy
 

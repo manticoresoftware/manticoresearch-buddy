@@ -85,6 +85,9 @@ class RebalancingMetrics {
             'running_operations' => 0,
             'completed_operations' => 0,
             'failed_operations' => 0,
+            'stopped_operations' => 0,        // NEW
+            'paused_operations' => 0,         // NEW
+            'rollback_count' => 0,            // NEW
             'average_duration' => 0,
             'longest_running' => 0,
         ];
@@ -97,6 +100,21 @@ class RebalancingMetrics {
             switch ($item['value']) {
                 case 'idle':
                     $metrics['idle_tables']++;
+                    break;
+                case 'running':
+                    $metrics['running_operations']++;
+                    break;
+                case 'completed':
+                    $metrics['completed_operations']++;
+                    break;
+                case 'failed':
+                    $metrics['failed_operations']++;
+                    break;
+                case 'stopped':                // NEW
+                    $metrics['stopped_operations']++;
+                    break;
+                case 'paused':                 // NEW
+                    $metrics['paused_operations']++;
                     break;
                 case 'running':
                     $metrics['running_operations']++;
@@ -246,6 +264,137 @@ class ShardingDashboard {
         }
 
         return 'healthy';
+    }
+}
+```
+
+## Rollback and Recovery in Production
+
+### Automatic Rollback System
+
+The sharding system now includes automatic rollback capabilities for all operations:
+
+```php
+class RollbackMonitoring {
+    public function getRollbackMetrics(): array {
+        $queueTable = 'system.sharding_queue';
+
+        // Count rollback operations
+        $result = $this->client->sendRequest("
+            SELECT
+                COUNT(*) as total_operations,
+                SUM(CASE WHEN rollback_query != '' THEN 1 ELSE 0 END) as rollback_enabled,
+                COUNT(DISTINCT operation_group) as operation_groups
+            FROM {$queueTable}
+            WHERE created_at > " . ((time() - 86400) * 1000) // Last 24 hours
+        );
+
+        return [
+            'rollback_coverage' => $rollback_enabled / $total_operations * 100,
+            'operation_groups_24h' => $operation_groups,
+            'rollback_success_rate' => $this->calculateRollbackSuccessRate(),
+        ];
+    }
+}
+```
+
+### Health Monitoring Setup
+
+Configure automatic health monitoring and recovery:
+
+```php
+// Cron job for health monitoring (every 5 minutes)
+class HealthMonitoringCron {
+    public function run(): void {
+        $monitor = new HealthMonitor($this->client, $this->cluster);
+
+        // Perform health check
+        $health = $monitor->performHealthCheck();
+
+        // Log health status
+        $this->logHealthStatus($health);
+
+        // Auto-recovery if needed
+        if ($health['overall_status'] !== 'healthy') {
+            $recovery = $monitor->performAutoRecovery();
+            $this->logRecoveryActions($recovery);
+
+            // Alert if recovery failed
+            if (!empty($recovery['failed_recoveries'])) {
+                $this->sendAlert('Recovery failed', $recovery['failed_recoveries']);
+            }
+        }
+    }
+}
+```
+
+### Cleanup Schedule
+
+Configure automatic cleanup tasks:
+
+```php
+// Cleanup configuration
+class CleanupSchedule {
+    // Run hourly
+    public function hourlyCleanup(): void {
+        $cleanup = new CleanupManager($this->client, $this->cluster);
+        $cleanup->cleanupOrphanedTemporaryClusters();
+    }
+
+    // Run daily
+    public function dailyCleanup(): void {
+        $cleanup = new CleanupManager($this->client, $this->cluster);
+        $cleanup->cleanupFailedOperationGroups();
+    }
+
+    // Run weekly
+    public function weeklyCleanup(): void {
+        $cleanup = new CleanupManager($this->client, $this->cluster);
+        $cleanup->cleanupExpiredQueueItems();
+        $cleanup->cleanupStaleStateEntries();
+    }
+}
+```
+
+### Rebalancing Control in Production
+
+Managing rebalancing operations in production:
+
+```php
+class RebalancingController {
+    // Check before maintenance
+    public function prepareForMaintenance(): void {
+        $tables = $this->getShardedTables();
+
+        foreach ($tables as $tableName) {
+            $table = new Table($this->client, $this->cluster, $tableName, '', '');
+
+            // Stop any running rebalancing
+            $result = $table->stopRebalancing(true); // Graceful stop
+
+            if ($result['status'] === 'stop_requested') {
+                // Wait for graceful stop
+                $this->waitForStop($tableName);
+            }
+        }
+    }
+
+    // Emergency stop
+    public function emergencyStop(string $tableName): void {
+        $table = new Table($this->client, $this->cluster, $tableName, '', '');
+
+        // Immediate stop with rollback
+        $result = $table->stopRebalancing(false);
+
+        if ($result['rollback_executed']) {
+            $this->logEmergencyStop($tableName, $result);
+        }
+    }
+
+    // Monitor progress
+    public function monitorProgress(string $tableName): array {
+        $table = new Table($this->client, $this->cluster, $tableName, '', '');
+        return $table->getRebalancingProgress();
     }
 }
 ```

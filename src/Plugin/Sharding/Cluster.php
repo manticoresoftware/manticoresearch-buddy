@@ -5,6 +5,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 use Ds\Set;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 
 final class Cluster {
@@ -60,13 +61,15 @@ final class Cluster {
 	 * Initialize and create the current cluster
 	 * This method should be executed on main cluster node
 	 * @param ?Queue $queue
+	 * @param string|null $operationGroup Optional operation group for rollback
 	 * @return int Last insert id into the queue or 0
 	 */
-	public function create(?Queue $queue = null): int {
+	public function create(?Queue $queue = null, ?string $operationGroup = null): int {
 		// TODO: the pass is the subject to remove
 		$galeraOptions = static::GALERA_OPTIONS;
 		$query = "CREATE CLUSTER IF NOT EXISTS {$this->name} '{$this->name}' as path, '{$galeraOptions}' as options";
-		return $this->runQuery($queue, $query);
+		$rollback = "DELETE CLUSTER {$this->name}";
+		return $this->runQuery($queue, $query, $rollback, $operationGroup);
 	}
 
 	/**
@@ -95,12 +98,19 @@ final class Cluster {
 	/**
 	 * Helper function to run query on the node
 	 * @param  ?Queue $queue
-	 * @param  string     $query
+	 * @param  string $query
+	 * @param  string|null $rollbackQuery Optional rollback command
+	 * @param  string|null $operationGroup Optional operation group
 	 * @return int
 	 */
-	protected function runQuery(?Queue $queue, string $query): int {
+	protected function runQuery(
+		?Queue $queue,
+		string $query,
+		?string $rollbackQuery = null,
+		?string $operationGroup = null
+	): int {
 		if ($queue) {
-			$queueId = $queue->add($this->nodeId, $query);
+			$queueId = $queue->add($this->nodeId, $query, $rollbackQuery ?? '', $operationGroup);
 		} else {
 			$this->client->sendRequest($query, disableAgentHeader: true);
 		}
@@ -187,17 +197,19 @@ final class Cluster {
 	 * Create a cluster by using distributed queue with list of nodes
 	 * This method just add join queries to the queue to all requested nodes
 	 * @param  Queue  $queue
-	 * @param  string ...$nodeIds
+	 * @param  array<string> $nodeIds
+	 * @param  string|null $operationGroup Optional operation group for rollback
 	 * @return static
 	 */
-	public function addNodeIds(Queue $queue, string ...$nodeIds): static {
+	public function addNodeIds(Queue $queue, array $nodeIds, ?string $operationGroup = null): static {
 		$galeraOptions = static::GALERA_OPTIONS;
 		foreach ($nodeIds as $node) {
 			$this->nodes->add($node);
 			// TODO: the pass is the subject to remove
 			$query = "JOIN CLUSTER {$this->name} at '{$this->nodeId}' '{$this->name}' as " .
 				"path, '{$galeraOptions}' as options";
-			$queue->add($node, $query);
+			$rollback = "DELETE CLUSTER {$this->name}";
+			$queue->add($node, $query, $rollback, $operationGroup);
 		}
 		return $this;
 	}
@@ -224,31 +236,35 @@ final class Cluster {
 	/**
 	 * Enqueue the tables attachments to all nodes of current cluster
 	 * @param Queue  $queue
-	 * @param string ...$tables
+	 * @param array<string> $tables
+	 * @param string|null $operationGroup Optional operation group for rollback
 	 * @return int
 	 */
-	public function addTables(Queue $queue, string ...$tables): int {
-		if (!$tables) {
+	public function addTables(Queue $queue, array $tables, ?string $operationGroup = null): int {
+		if (empty($tables)) {
 			throw new \Exception('Tables must be passed to add');
 		}
-		$tables = implode(',', $tables);
-		$query = "ALTER CLUSTER {$this->name} ADD {$tables}";
-		return $queue->add($this->nodeId, $query);
+		$tablesStr = implode(',', $tables);
+		$query = "ALTER CLUSTER {$this->name} ADD {$tablesStr}";
+		$rollback = "ALTER CLUSTER {$this->name} DROP {$tablesStr}";
+		return $queue->add($this->nodeId, $query, $rollback, $operationGroup);
 	}
 
 	/**
 	 * Enqueue the tables detachement to all nodes of current cluster
 	 * @param Queue  $queue
-	 * @param string ...$tables
+	 * @param array<string> $tables
+	 * @param string|null $operationGroup Optional operation group for rollback
 	 * @return int
 	 */
-	public function removeTables(Queue $queue, string ...$tables): int {
-		if (!$tables) {
+	public function removeTables(Queue $queue, array $tables, ?string $operationGroup = null): int {
+		if (empty($tables)) {
 			throw new \Exception('Tables must be passed to remove');
 		}
-		$tables = implode(',', $tables);
-		$query = "ALTER CLUSTER {$this->name} DROP {$tables}";
-		return $queue->add($this->nodeId, $query);
+		$tablesStr = implode(',', $tables);
+		$query = "ALTER CLUSTER {$this->name} DROP {$tablesStr}";
+		$rollback = "ALTER CLUSTER {$this->name} ADD {$tablesStr}";
+		return $queue->add($this->nodeId, $query, $rollback, $operationGroup);
 	}
 
 	/**
@@ -319,18 +335,19 @@ final class Cluster {
 	/**
 	 * Process pending tables to add and drop in current cluster
 	 * @param Queue $queue
+	 * @param string|null $operationGroup Optional operation group for rollback
 	 * @return static
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 */
-	public function processPendingTables(Queue $queue): static {
+	public function processPendingTables(Queue $queue, ?string $operationGroup = null): static {
 		if ($this->tablesToDetach->count()) {
-			$this->removeTables($queue, ...$this->tablesToDetach);
+			$this->removeTables($queue, $this->tablesToDetach->toArray(), $operationGroup);
 			$this->tablesToDetach = new Set;
 		}
 
 		if ($this->tablesToAttach->count()) {
-			$this->addTables($queue, ...$this->tablesToAttach);
+			$this->addTables($queue, $this->tablesToAttach->toArray(), $operationGroup);
 			$this->tablesToAttach = new Set;
 		}
 
@@ -354,4 +371,42 @@ final class Cluster {
 	public function getSystemTableName(string $table): string {
 		return $this->getTableName($table);
 	}
+
+	/**
+	 * Verify that specified tables are present in the cluster
+	 * @param string $clusterName
+	 * @param array<string> $tableNames
+	 * @return bool
+	 */
+	public function verifyTablesInCluster(string $clusterName, array $tableNames): bool {
+		try {
+			$clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
+			/** @var array{0?:array{data?:array<array{cluster:string,tables?:string}>}} */
+			$data = $clusterResult->getResult();
+			
+			if (!isset($data[0]['data'])) {
+				return false;
+			}
+
+			foreach ($data[0]['data'] as $cluster) {
+				if ($cluster['cluster'] === $clusterName) {
+					$clusterTables = isset($cluster['tables']) ? 
+						array_map('trim', explode(',', $cluster['tables'])) : [];
+					
+					// Check if all requested tables are in cluster
+					foreach ($tableNames as $tableName) {
+						if (!in_array($tableName, $clusterTables)) {
+							return false;
+						}
+					}
+					return true;
+				}
+			}
+		} catch (\Throwable $e) {
+			Buddy::debugvv("Error verifying tables in cluster: " . $e->getMessage());
+		}
+
+		return false;
+	}
+
 }

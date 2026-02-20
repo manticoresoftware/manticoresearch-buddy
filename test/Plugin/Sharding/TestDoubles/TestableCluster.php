@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Test\Plugin\Sharding\TestDoubles;
+namespace Manticoresearch\BuddyTest\Plugin\Sharding\TestDoubles;
 
 use Ds\Set;
 use Manticoresearch\Buddy\Base\Plugin\Sharding\Cluster;
@@ -21,8 +21,16 @@ use Manticoresearch\Buddy\Base\Plugin\Sharding\Cluster;
  */
 class TestableCluster {
 
+	/** @var Set<string> $mockNodes Mock nodes for testing */
+	private Set $mockNodes;
+
+	/** @var Set<string> $mockInactiveNodes Mock inactive nodes for testing */
+	private Set $mockInactiveNodes;
+
 	public function __construct(private ?Cluster $cluster = null) {
 		// Allow null for pure mocking scenarios
+		$this->mockNodes = new Set();
+		$this->mockInactiveNodes = new Set();
 	}
 
 	/**
@@ -30,7 +38,7 @@ class TestableCluster {
 	 * @return Set<string>
 	 */
 	public function getNodes(): Set {
-		return $this->cluster?->getNodes() ?? new Set();
+		return $this->cluster?->getNodes() ?? $this->mockNodes;
 	}
 
 	/**
@@ -38,7 +46,7 @@ class TestableCluster {
 	 * @return Set<string>
 	 */
 	public function getInactiveNodes(): Set {
-		return $this->cluster?->getInactiveNodes() ?? new Set();
+		return $this->cluster?->getInactiveNodes() ?? $this->mockInactiveNodes;
 	}
 
 	/**
@@ -123,32 +131,47 @@ class TestableCluster {
 	/**
 	 * Add node IDs to cluster
 	 * @param \Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue
-	 * @param string ...$nodeIds
+	 * @param array<string> $nodeIds
+	 * @param string|null $operationGroup
 	 * @return static
 	 */
-	public function addNodeIds(\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue, string ...$nodeIds): static {
-		$this->cluster?->addNodeIds($queue, ...$nodeIds);
+	public function addNodeIds(
+		\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue,
+		array $nodeIds,
+		?string $operationGroup = null
+	): static {
+		$this->cluster?->addNodeIds($queue, $nodeIds, $operationGroup);
 		return $this;
 	}
 
 	/**
 	 * Add tables to cluster
 	 * @param \Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue
-	 * @param string ...$tables
+	 * @param array<string> $tables
+	 * @param string|null $operationGroup
 	 * @return int
 	 */
-	public function addTables(\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue, string ...$tables): int {
-		return $this->cluster?->addTables($queue, ...$tables) ?? 0;
+	public function addTables(
+		\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue,
+		array $tables,
+		?string $operationGroup = null
+	): int {
+		return $this->cluster?->addTables($queue, $tables, $operationGroup) ?? 0;
 	}
 
 	/**
 	 * Remove tables from cluster
 	 * @param \Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue
-	 * @param string ...$tables
+	 * @param array<string> $tables
+	 * @param string|null $operationGroup
 	 * @return int
 	 */
-	public function removeTables(\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue, string ...$tables): int {
-		return $this->cluster?->removeTables($queue, ...$tables) ?? 0;
+	public function removeTables(
+		\Manticoresearch\Buddy\Base\Plugin\Sharding\Queue $queue,
+		array $tables,
+		?string $operationGroup = null
+	): int {
+		return $this->cluster?->removeTables($queue, $tables, $operationGroup) ?? 0;
 	}
 
 	/**
@@ -214,5 +237,33 @@ class TestableCluster {
 	 */
 	public function getName(): string {
 		return $this->cluster?->name ?? 'test_cluster';
+	}
+
+	/**
+	 * Set nodes for testing purposes
+	 * @param array<string>|Set<string> $nodes
+	 * @return static
+	 */
+	public function setNodes(array|Set $nodes): static {
+		if (is_array($nodes)) {
+			$this->mockNodes = new Set($nodes);
+		} else {
+			$this->mockNodes = $nodes;
+		}
+		return $this;
+	}
+
+	/**
+	 * Set inactive nodes for testing purposes
+	 * @param array<string>|Set<string> $inactiveNodes
+	 * @return static
+	 */
+	public function setInactiveNodes(array|Set $inactiveNodes): static {
+		if (is_array($inactiveNodes)) {
+			$this->mockInactiveNodes = new Set($inactiveNodes);
+		} else {
+			$this->mockInactiveNodes = $inactiveNodes;
+		}
+		return $this;
 	}
 }

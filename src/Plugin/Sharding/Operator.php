@@ -291,12 +291,18 @@ final class Operator {
 		Buddy::debugvv("Sharding: table status of {$table}: queue size: {$queueSize}, processed: {$processed}");
 
 		$isProcessed = $processed === $queueSize;
-		// Update the state
+	// Update the state when all queue items are processed
 		if ($isProcessed) {
 			$result['status'] = 'done';
+
+			// Set the result field that CreateHandler waits for
+			// - In DEBUG mode: return actual SHOW CREATE TABLE response for debugging
+			// - In production: return empty success response
 			$result['result'] = ConfigManager::getInt('DEBUG') && $result['type'] === 'create'
 			? $this->client->sendRequest("SHOW CREATE TABLE {$table} OPTION force=1")->getBody()
 			: TaskResult::none()->toString();
+
+			Buddy::debugvv("Sharding: table {$table} completed, setting result: " . substr($result['result'], 0, 100));
 			$this->state->set($stateKey, $result);
 		}
 
