@@ -86,28 +86,15 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$words = [];
 		$scoreMap = [];
 		foreach ($phrases as $phrase) {
-			[$variations, $variationScores] = $this->manticoreClient->fetchFuzzyVariations(
-				$phrase,
-				$this->payload->table,
-				$this->payload->forceBigrams,
-				$this->payload->distance
-			);
-			Buddy::debug("Fuzzy: variations for '$phrase': " . json_encode($variations));
-			// Extend varitions for each iteration we have
-			foreach ($variations as $pos => $variation) {
-				$keywords = $variation['keywords'];
-				if (!$keywords) {
-					if (!$this->payload->preserve) {
-						continue;
-					}
-
-					$keywords = [$variation['original']];
-				}
-
-				$words[$pos] ??= [];
-				$blend = Arrays::blend($words[$pos], $keywords);
-				$words[$pos] = array_values(array_unique($blend));
-				$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
+			foreach ($this->payload->tables as $table) {
+				[$variations, $variationScores] = $this->manticoreClient->fetchFuzzyVariations(
+					$phrase,
+					$table,
+					$this->payload->forceBigrams,
+					$this->payload->distance
+				);
+				Buddy::debug("Fuzzy: variations for '$phrase' in '$table': " . json_encode($variations));
+				$this->mergeVariations($variations, $variationScores, $words, $scoreMap);
 			}
 		}
 
@@ -127,11 +114,36 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 */
 	protected function validate(): void {
 		$validator = new TableValidator($this->manticoreClient, $this->flagCache, 30);
-		if ($validator->hasMinInfixLen($this->payload->table)) {
-			return;
-		}
+		foreach ($this->payload->tables as $table) {
+			if ($validator->hasMinInfixLen($table)) {
+				continue;
+			}
 
-		QueryValidationError::throw('Fuzzy search requires min_infix_len to be set');
+			QueryValidationError::throw('Fuzzy search requires min_infix_len to be set');
+		}
 	}
+
+	/**
+	 * @param array<int,array{keywords:array<string>,original:string}> $variations
+	 * @param array<string,float> $variationScores
+	 * @param array<int,array<string>> $words
+	 * @param array<string,int> $scoreMap
+	 */
+	private function mergeVariations(array $variations, array $variationScores, array &$words, array &$scoreMap): void {
+		foreach ($variations as $pos => $variation) {
+			$keywords = $variation['keywords'];
+			if (!$keywords) {
+				if (!$this->payload->preserve) {
+					continue;
+				}
+				$keywords = [$variation['original']];
+			}
+
+			$words[$pos] ??= [];
+			$words[$pos] = array_values(array_unique(Arrays::blend($words[$pos], $keywords)));
+			$scoreMap = Arrays::getMapSum($scoreMap, $variationScores);
+		}
+	}
+
 
 }
