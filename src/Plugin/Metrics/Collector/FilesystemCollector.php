@@ -11,12 +11,12 @@ final class FilesystemCollector implements CollectorInterface {
 	public function collect(Client $client, MetricStore $store, MetricsScrapeContext $context): void {
 		unset($client);
 
-		$dataDir = trim($context->settings['searchd.data_dir'] ?? '');
+		$dataDir = trim($context->settings['searchd.data_dir']);
 		if ($dataDir === '') {
-			$dataDir = '/var/lib/manticore';
+			return;
 		}
 
-		$binlogDir = trim($context->settings['searchd.binlog_path'] ?? '');
+		$binlogDir = trim($context->settings['searchd.binlog_path']);
 		if ($binlogDir !== '') {
 			$binlog = $this->dirFilesCountAndSize($binlogDir);
 			if (isset($binlog)) {
@@ -38,7 +38,7 @@ final class FilesystemCollector implements CollectorInterface {
 		$totalFilesCount = 0;
 		$totalFilesBytes = 0;
 		foreach ($context->tableNames as $tableName) {
-			$tableDir = $dataDir . '/' . $tableName;
+			$tableDir = $dataDir . DIRECTORY_SEPARATOR . $tableName;
 			$stats = $this->dirFilesCountAndSize($tableDir);
 			if (!isset($stats)) {
 				continue;

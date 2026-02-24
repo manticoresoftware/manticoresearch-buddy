@@ -27,12 +27,12 @@ final class StatusCollector implements CollectorInterface {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function collect(Client $client, MetricStore $store, MetricsScrapeContext $context): void {
-		$rows = $this->getStatusRows($client, $context);
+		$rows = $this->getStatusRows($client);
 		if ($rows === []) {
 			return;
 		}
 
-		$this->processRows($store, $rows);
+		$this->processRows($store, $context, $rows);
 	}
 
 	/**
@@ -42,61 +42,33 @@ final class StatusCollector implements CollectorInterface {
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	private function getStatusRows(Client $client, MetricsScrapeContext $context): array {
-		if ($context->statusRows === []) {
-			$request = $client->sendRequest('SHOW STATUS');
-			if ($request->hasError()) {
-				ManticoreSearchResponseError::throw((string)$request->getError());
-			}
-
-			$result = $request->getResult();
-			if (!is_array($result[0])) {
-				return [];
-			}
-
-			$data = $result[0]['data'] ?? null;
-			if (!is_array($data)) {
-				return [];
-			}
-
-			$context->statusRows = $data;
+	private function getStatusRows(Client $client): array {
+		$request = $client->sendRequest('SHOW STATUS');
+		if ($request->hasError()) {
+			ManticoreSearchResponseError::throw((string)$request->getError());
 		}
 
-		$this->ensureStatusMap($context);
-
-		return $context->statusRows;
-	}
-
-	private function ensureStatusMap(MetricsScrapeContext $context): void {
-		if ($context->status !== [] || $context->statusRows === []) {
-			return;
+		$result = $request->getResult();
+		if (!is_array($result[0])) {
+			return [];
 		}
 
-		$map = [];
-		foreach ($context->statusRows as $row) {
-			$counter = $row['Counter'] ?? null;
-			$value = $row['Value'] ?? null;
-			if (!is_string($counter) || $counter === '') {
-				continue;
-			}
-			if (!is_int($value) && !is_float($value) && !is_string($value)) {
-				continue;
-			}
-
-			$map[$counter] = $value;
+		$data = $result[0]['data'] ?? null;
+		if (!is_array($data)) {
+			return [];
 		}
 
-		$context->status = $map;
+		return $data;
 	}
 
 	/**
 	 * @param array<int, array<string, mixed>> $rows
 	 */
-	private function processRows(MetricStore $store, array $rows): void {
+	private function processRows(MetricStore $store, MetricsScrapeContext $context, array $rows): void {
 		$clusterName = $this->getClusterName($rows);
 
 		foreach ($rows as $row) {
-			$this->processRow($store, $row, $clusterName);
+			$this->processRow($store, $context, $row, $clusterName);
 		}
 	}
 
@@ -104,7 +76,12 @@ final class StatusCollector implements CollectorInterface {
 	 * @param array<string, mixed> $row
 	 * @param null|string $clusterName
 	 */
-	private function processRow(MetricStore $store, array $row, ?string $clusterName): void {
+	private function processRow(
+		MetricStore $store,
+		MetricsScrapeContext $context,
+		array $row,
+		?string $clusterName
+	): void {
 		$counter = $row['Counter'] ?? null;
 		if (!is_string($counter) || $counter === '') {
 			return;
@@ -118,7 +95,7 @@ final class StatusCollector implements CollectorInterface {
 		}
 
 		if ($counter === 'version') {
-			$this->addBuildInfoMetric($store, $value);
+			$this->addBuildInfoMetric($store, $context, $value);
 		}
 
 		if (str_starts_with($counter, 'load') || str_contains($counter, '_stats_ms_')) {
@@ -338,12 +315,12 @@ final class StatusCollector implements CollectorInterface {
 		return 0;
 	}
 
-	private function addBuildInfoMetric(MetricStore $store, mixed $value): void {
+	private function addBuildInfoMetric(MetricStore $store, MetricsScrapeContext $context, mixed $value): void {
 		if (!is_string($value) || trim($value) === '') {
 			return;
 		}
 
-		$labels = BuildInfoParser::parseLabels($value);
+		$labels = BuildInfoParser::parseLabels($value, $context);
 		$store->addMapped('build_info', 1, $labels);
 	}
 

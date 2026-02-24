@@ -5,34 +5,28 @@ namespace Manticoresearch\Buddy\Base\Plugin\Metrics\Collector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricStore;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricsScrapeContext;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class ConnectivityCollector implements CollectorInterface {
 
 	public function collect(Client $client, MetricStore $store, MetricsScrapeContext $context): void {
 		$t = microtime(true);
-		try {
-			$request = $client->sendRequest('SHOW THREADS');
-			$elapsed = microtime(true) - $t;
+		$request = $client->sendRequest('SHOW THREADS');
+		$elapsed = microtime(true) - $t;
 
-			if ($request->hasError()) {
-				$this->addFailureMetrics($store);
-				return;
-			}
-
-			$result = $request->getResult();
-			if (is_array($result[0])) {
-				$rows = $result[0]['data'] ?? null;
-				if (is_array($rows)) {
-					$context->threadsRows = $rows;
-				}
-			}
-
-			$this->addSuccessMetrics($store, $elapsed);
-		} catch (\Throwable $e) {
-			Buddy::debug('Collector fallback (' . self::class . '): ' . $e->getMessage());
+		if ($request->hasError()) {
 			$this->addFailureMetrics($store);
+			return;
 		}
+
+		$result = $request->getResult();
+		if (is_array($result[0])) {
+			$rows = $result[0]['data'] ?? null;
+			if (is_array($rows)) {
+				$context->threadsRows = $rows;
+			}
+		}
+
+		$this->addSuccessMetrics($store, $elapsed);
 	}
 
 	private function addSuccessMetrics(MetricStore $store, float $elapsedSeconds): void {

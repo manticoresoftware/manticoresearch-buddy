@@ -14,9 +14,9 @@ final class SchemaCollector implements CollectorInterface {
 	public function collect(Client $client, MetricStore $store, MetricsScrapeContext $context): void {
 		unset($client);
 
-		$dataDir = trim((string)($context->settings['searchd.data_dir'] ?? ''));
+		$dataDir = trim($context->settings['searchd.data_dir']);
 		if ($dataDir === '') {
-			$dataDir = '/var/lib/manticore';
+			return;
 		}
 
 		$jsonPath = $dataDir . '/manticore.json';
@@ -29,7 +29,7 @@ final class SchemaCollector implements CollectorInterface {
 			return;
 		}
 
-		$data = json_decode($content, true);
+		$data = simdjson_decode($content, true);
 		if (!is_array($data)) {
 			return;
 		}
@@ -68,39 +68,13 @@ final class SchemaCollector implements CollectorInterface {
 			);
 		}
 
-		$normalized = $this->normalizeJson($indexes);
-		$encoded = json_encode($normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-		if (!is_string($encoded)) {
-			return;
-		}
-
-		$hash = hash('sha256', $encoded);
+		$hash = hash('sha256', implode("\0", $indexNames));
 		$store->addDirect(
 			self::SCHEMA_HASH_METRIC,
 			'gauge',
-			'Schema hash (sha256) derived from manticore.json indexes section',
+			'Schema hash (sha256) derived from manticore.json index names',
 			1,
 			['hash' => $hash]
 		);
-	}
-
-	private function normalizeJson(mixed $value): mixed {
-		if (!is_array($value)) {
-			return $value;
-		}
-
-		if (array_is_list($value)) {
-			return array_map($this->normalizeJson(...), $value);
-		}
-
-		$keys = array_keys($value);
-		sort($keys);
-
-		$result = [];
-		foreach ($keys as $key) {
-			$result[$key] = $this->normalizeJson($value[$key]);
-		}
-
-		return $result;
 	}
 }

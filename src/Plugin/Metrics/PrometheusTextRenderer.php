@@ -3,7 +3,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Metrics;
 
 /**
- * @phpstan-type MetricData array{value: mixed, label?: array<string, float|int|string>}
+ * @phpstan-type MetricData array{value: float|int|string|bool|null, label: array<string, float|int|string>}
  * @phpstan-type Metric array{type: string, info: string, data: MetricData[], deprecated_use?: string}
  */
 final class PrometheusTextRenderer {
@@ -17,7 +17,10 @@ final class PrometheusTextRenderer {
 			$info = (string)$metric['info'];
 			$type = (string)$metric['type'];
 
-			$deprecatedUse = $metric['deprecated_use'] ?? null;
+			$deprecatedUse = null;
+			if (array_key_exists('deprecated_use', $metric)) {
+				$deprecatedUse = $metric['deprecated_use'];
+			}
 			if (is_string($deprecatedUse) && $deprecatedUse !== '') {
 				$result[] = "# DEPRECATED: manticore_$metricName use manticore_$deprecatedUse\n";
 			}
@@ -25,7 +28,7 @@ final class PrometheusTextRenderer {
 			$result[] = "# TYPE manticore_$metricName $type\n";
 
 			foreach ($metric['data'] as $data) {
-				$label = self::formatLabel($data['label'] ?? null);
+				$label = self::formatLabel($data['label']);
 				$value = self::stringifyValue(self::formatValue($data['value']));
 				$result[] = "manticore_$metricName$label $value\n";
 			}
@@ -35,10 +38,10 @@ final class PrometheusTextRenderer {
 	}
 
 	/**
-	 * @param array<string, float|int|string>|null $label
+	 * @param array<string, float|int|string> $label
 	 */
-	private static function formatLabel(?array $label): string {
-		if ($label === null || $label === []) {
+	private static function formatLabel(array $label): string {
+		if ($label === []) {
 			return '';
 		}
 
@@ -51,15 +54,19 @@ final class PrometheusTextRenderer {
 		return '{' . implode(', ', $parts) . '}';
 	}
 
-	private static function formatValue(mixed $value): mixed {
-		if (in_array($value, ['OFF', '-'], true)) {
+	private static function formatValue(int|float|bool|string|null $value): int|float|bool|string|null {
+		if ($value === 'OFF' || $value === '-') {
 			return 0;
 		}
 
 		return $value;
 	}
 
-	private static function stringifyValue(mixed $value): string {
+	private static function stringifyValue(int|float|bool|string|null $value): string {
+		if ($value === null) {
+			return '0';
+		}
+
 		if (is_int($value) || is_float($value)) {
 			return (string)$value;
 		}

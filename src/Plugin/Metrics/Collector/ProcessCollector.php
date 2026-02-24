@@ -5,8 +5,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Metrics\Collector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricStore;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricsScrapeContext;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
-use Throwable;
 
 final class ProcessCollector implements CollectorInterface {
 
@@ -19,7 +17,7 @@ final class ProcessCollector implements CollectorInterface {
 		$stats = $this->getEmptyProcStats();
 
 		foreach ($this->scanProcPids() as $pid) {
-			$comm = $this->readProcComm($pid);
+			$comm = $this->readFileIfExists("/proc/$pid/comm");
 			$cmdline = $this->readProcCmdline($pid);
 
 			$group = $this->resolveProcGroup($comm, $cmdline);
@@ -30,67 +28,48 @@ final class ProcessCollector implements CollectorInterface {
 			$this->accumulateProcStats($stats[$group], $pid);
 		}
 
-		$store->addDirect(
-			'searchd_processes_count',
-			'gauge',
-			'Number of searchd processes (from /proc)',
-			$stats[self::PROC_GROUP_SEARCHD]['processes']
-		);
-		$store->addDirect(
-			'searchd_anon_rss_bytes',
-			'gauge',
-			'searchd anonymous RSS in bytes (from /proc)',
-			$stats[self::PROC_GROUP_SEARCHD]['anon_rss_bytes']
-		);
-		$store->addDirect(
-			'searchd_rss_bytes',
-			'gauge',
-			'searchd RSS in bytes (from /proc)',
-			$stats[self::PROC_GROUP_SEARCHD]['rss_bytes']
-		);
-		$store->addDirect(
-			'searchd_virt_bytes',
-			'gauge',
-			'searchd virtual memory size in bytes (from /proc)',
-			$stats[self::PROC_GROUP_SEARCHD]['virt_bytes']
-		);
-		$store->addDirect(
-			'searchd_fd_count',
-			'gauge',
-			'searchd file descriptors count (from /proc)',
-			$stats[self::PROC_GROUP_SEARCHD]['fd_count']
-		);
+		$groups = [
+			self::PROC_GROUP_SEARCHD => 'searchd',
+			self::PROC_GROUP_BUDDY => 'buddy',
+		];
+		$metricDefs = [
+			[
+				'name_suffix' => 'processes_count',
+				'help' => 'Number of %s processes (from /proc)',
+				'stats_key' => 'processes',
+			],
+			[
+				'name_suffix' => 'anon_rss_bytes',
+				'help' => '%s anonymous RSS in bytes (from /proc)',
+				'stats_key' => 'anon_rss_bytes',
+			],
+			[
+				'name_suffix' => 'rss_bytes',
+				'help' => '%s RSS in bytes (from /proc)',
+				'stats_key' => 'rss_bytes',
+			],
+			[
+				'name_suffix' => 'virt_bytes',
+				'help' => '%s virtual memory size in bytes (from /proc)',
+				'stats_key' => 'virt_bytes',
+			],
+			[
+				'name_suffix' => 'fd_count',
+				'help' => '%s file descriptors count (from /proc)',
+				'stats_key' => 'fd_count',
+			],
+		];
 
-		$store->addDirect(
-			'buddy_processes_count',
-			'gauge',
-			'Number of buddy processes (from /proc)',
-			$stats[self::PROC_GROUP_BUDDY]['processes']
-		);
-		$store->addDirect(
-			'buddy_anon_rss_bytes',
-			'gauge',
-			'buddy anonymous RSS in bytes (from /proc)',
-			$stats[self::PROC_GROUP_BUDDY]['anon_rss_bytes']
-		);
-		$store->addDirect(
-			'buddy_rss_bytes',
-			'gauge',
-			'buddy RSS in bytes (from /proc)',
-			$stats[self::PROC_GROUP_BUDDY]['rss_bytes']
-		);
-		$store->addDirect(
-			'buddy_virt_bytes',
-			'gauge',
-			'buddy virtual memory size in bytes (from /proc)',
-			$stats[self::PROC_GROUP_BUDDY]['virt_bytes']
-		);
-		$store->addDirect(
-			'buddy_fd_count',
-			'gauge',
-			'buddy file descriptors count (from /proc)',
-			$stats[self::PROC_GROUP_BUDDY]['fd_count']
-		);
+		foreach ($groups as $group => $label) {
+			foreach ($metricDefs as $metricDef) {
+				$store->addDirect(
+					$label . '_' . $metricDef['name_suffix'],
+					'gauge',
+					sprintf($metricDef['help'], $label),
+					$stats[$group][$metricDef['stats_key']]
+				);
+			}
+		}
 	}
 
 	/**
@@ -139,73 +118,31 @@ final class ProcessCollector implements CollectorInterface {
 			$stats['virt_bytes'] += $this->kbToBytes($status['VmSize']);
 		}
 
-		$fdCount = $this->countProcFd($pid);
-		if (!isset($fdCount)) {
-			return;
-		}
-
-		$stats['fd_count'] += $fdCount;
+		$stats['fd_count'] += $this->countDirEntries("/proc/$pid/fd");
 	}
 
 	/**
 	 * @return int[]
 	 */
 	private function scanProcPids(): array {
-		$dir = '/proc';
-		if (!is_dir($dir)) {
-			return [];
-		}
+		return $this->scanDirAndCollect(
+			'/proc', static function (string $item): ?int {
+				if (ctype_digit($item) !== true) {
+					return null;
+				}
 
-		$items = scandir($dir);
-		if (!is_array($items)) {
-			return [];
-		}
-
-		$pids = [];
-		foreach ($items as $item) {
-			if ($item === '.' || $item === '..') {
-				continue;
+				return (int)$item;
 			}
-			if (ctype_digit($item) !== true) {
-				continue;
-			}
-
-			$pids[] = (int)$item;
-		}
-
-		return $pids;
-	}
-
-	private function readProcComm(int $pid): string {
-		$path = "/proc/$pid/comm";
-		if (!is_file($path)) {
-			return '';
-		}
-
-		$content = file_get_contents($path);
-		if (!is_string($content) || $content === '') {
-			return '';
-		}
-
-		return trim($content);
+		);
 	}
 
 	private function readProcCmdline(int $pid): string {
-		$path = "/proc/$pid/cmdline";
-		if (!is_file($path)) {
+		$content = $this->readFileIfExists("/proc/$pid/cmdline");
+		if ($content === '') {
 			return '';
 		}
 
-		try {
-			$content = file_get_contents($path);
-			if (!is_string($content) || $content === '') {
-				return '';
-			}
-			return str_replace("\0", ' ', trim($content));
-		} catch (Throwable $e) {
-			Buddy::debug('Collector fallback (' . self::class . '): ' . $e->getMessage());
-			return '';
-		}
+		return str_replace("\0", ' ', $content);
 	}
 
 	private function findProcGroupSearchd(string $comm, string $cmdline): bool {
@@ -246,17 +183,12 @@ final class ProcessCollector implements CollectorInterface {
 	}
 
 	/**
-	 * @return array<string, int>|null
+	 * @return array<string, int>
 	 */
-	private function readProcStatus(int $pid): ?array {
-		$path = "/proc/$pid/status";
-		if (!is_file($path)) {
-			return null;
-		}
-
-		$content = file_get_contents($path);
-		if (!is_string($content) || $content === '') {
-			return null;
+	private function readProcStatus(int $pid): array {
+		$content = $this->readFileIfExists("/proc/$pid/status");
+		if ($content === '') {
+			return [];
 		}
 
 		$result = [];
@@ -285,15 +217,14 @@ final class ProcessCollector implements CollectorInterface {
 		return $kb * 1024;
 	}
 
-	private function countProcFd(int $pid): ?int {
-		$dir = "/proc/$pid/fd";
+	private function countDirEntries(string $dir): int {
 		if (!is_dir($dir)) {
-			return null;
+			return 0;
 		}
 
 		$items = scandir($dir);
 		if (!is_array($items)) {
-			return null;
+			return 0;
 		}
 
 		$count = 0;
@@ -305,5 +236,50 @@ final class ProcessCollector implements CollectorInterface {
 		}
 
 		return $count;
+	}
+
+	/**
+	 * @template T
+	 * @param callable(string):?T $collector
+	 * @return array<T>
+	 */
+	private function scanDirAndCollect(string $dir, callable $collector): array {
+		if (!is_dir($dir)) {
+			return [];
+		}
+
+		$items = scandir($dir);
+		if (!is_array($items)) {
+			return [];
+		}
+
+		$result = [];
+		foreach ($items as $item) {
+			if ($item === '.' || $item === '..') {
+				continue;
+			}
+
+			$value = $collector($item);
+			if ($value === null) {
+				continue;
+			}
+
+			$result[] = $value;
+		}
+
+		return $result;
+	}
+
+	private function readFileIfExists(string $path): string {
+		if (!is_file($path)) {
+			return '';
+		}
+
+		$content = file_get_contents($path);
+		if (!is_string($content)) {
+			return '';
+		}
+
+		return trim($content);
 	}
 }

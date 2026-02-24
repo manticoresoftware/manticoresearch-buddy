@@ -3,7 +3,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Metrics;
 
 /**
- * @phpstan-type MetricData array{value: mixed, label?: array<string, float|int|string>}
+ * @phpstan-type MetricData array{value: float|int|string|bool|null, label: array<string, float|int|string>}
  * @phpstan-type Metric array{type: string, info: string, data: MetricData[], deprecated_use?: string}
  * @phpstan-type MetricDefinition array{name: string, type: string, description: string, deprecated_use?: string}
  */
@@ -23,9 +23,9 @@ final class MetricStore {
 	}
 
 	/**
-	 * @param array<string, float|int|string>|null $label
+	 * @param array<string, float|int|string> $label
 	 */
-	public function addMapped(string $rawName, string|float|int $value, ?array $label = null): void {
+	public function addMapped(string $rawName, string|float|int $value, array $label = []): void {
 		if (!isset($this->definitions[$rawName]['name'])) {
 			return;
 		}
@@ -45,10 +45,7 @@ final class MetricStore {
 			return;
 		}
 
-		$metricData = ['value' => $value];
-		if (isset($label)) {
-			$metricData['label'] = $label;
-		}
+		$metricData = ['value' => $value, 'label' => $label];
 		$this->metrics[$finalName]['data'][] = $metricData;
 
 		$this->applyDefinition($finalName, $rawName);
@@ -75,13 +72,13 @@ final class MetricStore {
 	}
 
 	/**
-	 * @param array<string, float|int|string>|null $label
+	 * @param array<string, float|int|string> $label
 	 */
 	private function tryAddJsonStats(
 		string $finalName,
 		string $rawName,
 		string|float|int $value,
-		?array $label
+		array $label
 	): bool {
 		if (!is_string($value)) {
 			return false;
@@ -90,7 +87,7 @@ final class MetricStore {
 			return false;
 		}
 
-		$row = json_decode($value, true);
+		$row = simdjson_decode($value, true);
 		if (!is_array($row)) {
 			return false;
 		}
@@ -100,7 +97,11 @@ final class MetricStore {
 				continue;
 			}
 
-			$metricData = ['value' => $v, 'label' => array_merge($label ?? [], ['type' => $k])];
+			if (!is_int($v) && !is_float($v) && !is_string($v) && !is_bool($v) && $v !== null) {
+				throw new \RuntimeException("Unexpected JSON stats metric value type for {$rawName}: {$k}");
+			}
+
+			$metricData = ['value' => $v, 'label' => array_merge($label, ['type' => $k])];
 			$this->metrics[$finalName]['data'][] = $metricData;
 		}
 
@@ -110,7 +111,11 @@ final class MetricStore {
 	private function applyDefinition(string $finalName, string $rawName): void {
 		$this->metrics[$finalName]['type'] = $this->definitions[$rawName]['type'];
 		$this->metrics[$finalName]['info'] = $this->definitions[$rawName]['description'];
-		$deprecatedUse = $this->definitions[$rawName]['deprecated_use'] ?? null;
+		if (!array_key_exists('deprecated_use', $this->definitions[$rawName])) {
+			return;
+		}
+
+		$deprecatedUse = $this->definitions[$rawName]['deprecated_use'];
 		if (!is_string($deprecatedUse) || $deprecatedUse === '') {
 			return;
 		}
@@ -119,19 +124,16 @@ final class MetricStore {
 	}
 
 	/**
-	 * @param array<string, string>|null $label
+	 * @param array<string, float|int|string> $label
 	 */
 	public function addDirect(
 		string $name,
 		string $type,
 		string $info,
 		string|float|int $value,
-		?array $label = null
+		array $label = []
 	): void {
-		$metricData = ['value' => $value];
-		if (isset($label)) {
-			$metricData['label'] = $label;
-		}
+		$metricData = ['value' => $value, 'label' => $label];
 
 		if (!isset($this->metrics[$name])) {
 			$this->metrics[$name] = [
@@ -166,7 +168,11 @@ final class MetricStore {
 				];
 			}
 
-			$deprecatedUse = $def['deprecated_use'] ?? null;
+			if (!array_key_exists('deprecated_use', $def)) {
+				continue;
+			}
+
+			$deprecatedUse = $def['deprecated_use'];
 			if (!is_string($deprecatedUse) || $deprecatedUse === '') {
 				continue;
 			}

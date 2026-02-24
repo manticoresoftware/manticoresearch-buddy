@@ -5,7 +5,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Metrics\Collector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricStore;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricsScrapeContext;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class CrashCollector implements CollectorInterface {
 
@@ -13,13 +12,8 @@ final class CrashCollector implements CollectorInterface {
 	private const CRASH_MARKER = 'FATAL: CRASH DUMP';
 
 	public function collect(Client $client, MetricStore $store, MetricsScrapeContext $context): void {
-		$logPath = '';
-		try {
-			$settings = $client->getSettings();
-			$logPath = (string)($settings->searchdLog ?? '');
-		} catch (\Throwable $e) {
-			Buddy::debug('Collector fallback (' . self::class . '): ' . $e->getMessage());
-		}
+		$settings = $client->getSettings();
+		$logPath = $settings->searchdLog ?? '';
 
 		if ($logPath === '' || !file_exists($logPath)) {
 			$context->searchdCrashesTotal = 0;
@@ -79,24 +73,30 @@ final class CrashCollector implements CollectorInterface {
 	private function resolveStatePath(): string {
 		$cwd = getcwd();
 		if (!is_string($cwd)) {
-			return '/tmp/' . self::STATE_FILENAME;
+			return sys_get_temp_dir() . DIRECTORY_SEPARATOR. self::STATE_FILENAME;
 		}
 
 		return rtrim($cwd, '/') . '/' . self::STATE_FILENAME;
 	}
 
 	private function persistLastSeenCount(string $statePath, int $currentCount): void {
-		$prev = file_get_contents($statePath);
-		if ($prev) {
-			if ((int)$prev === $currentCount) {
+		if (is_file($statePath)) {
+			$prevJson = file_get_contents($statePath);
+			if ($prevJson === false) {
+				throw new \RuntimeException("Failed to read crash state file: {$statePath}");
+			}
+
+			$decoded = simdjson_decode($prevJson, true);
+			if (!is_array($decoded) || !array_key_exists('count', $decoded) || !is_int($decoded['count'])) {
+				throw new \RuntimeException("Invalid crash state file: {$statePath}");
+			}
+
+			if ($decoded['count'] === $currentCount) {
 				return;
 			}
 		}
 
-		try {
-			file_put_contents($statePath, $currentCount . "\n", LOCK_EX);
-		} catch (\Throwable $e) {
-			Buddy::debug('Collector fallback (' . self::class . '): ' . $e->getMessage());
-		}
+		$payload = json_encode(['count' => $currentCount], JSON_THROW_ON_ERROR);
+		file_put_contents($statePath, $payload . "\n", LOCK_EX);
 	}
 }

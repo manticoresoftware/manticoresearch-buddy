@@ -5,32 +5,18 @@ namespace Manticoresearch\Buddy\Base\Plugin\Metrics;
 final class MetricsScrapeContext {
 
 	/**
+	 * Manticore settings snapshot for the scrape.
+	 *
+	 * @var array<string, string>
+	 */
+	public array $settings = [];
+
+	/**
 	 * Table names returned by SHOW TABLES.
 	 *
 	 * @var string[]
 	 */
 	public array $tableNames = [];
-
-	/**
-	 * Parsed output of SHOW STATUS (Counter => Value).
-	 *
-	 * @var array<string, float|int|string>
-	 */
-	public array $status = [];
-
-	/**
-	 * Raw rows from SHOW STATUS (for collectors that need full row data).
-	 *
-	 * @var array<int, array<string, mixed>>
-	 */
-	public array $statusRows = [];
-
-	/**
-	 * Raw rows from SHOW TABLES.
-	 *
-	 * @var array<int, array<string, mixed>>
-	 */
-	public array $tablesRows = [];
 
 	/**
 	 * Raw rows from SHOW THREADS.
@@ -43,4 +29,11 @@ final class MetricsScrapeContext {
 	 * Count of detected searchd crashes (from searchd.log).
 	 */
 	public ?int $searchdCrashesTotal = null;
+
+	/**
+	 * Per-scrape set of unknown build-info components already warned about.
+	 *
+	 * @var array<string, true>
+	 */
+	public array $warnedBuildInfoComponents = [];
 }

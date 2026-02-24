@@ -17,39 +17,18 @@ final class TablesCollector implements CollectorInterface {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function collect(Client $client, MetricStore $store, MetricsScrapeContext $context): void {
-		$tables = $context->tablesRows;
-		if ($tables === []) {
+		if ($context->tableNames === []) {
 			$request = $client->sendRequest('SHOW TABLES');
 			if ($request->hasError()) {
 				ManticoreSearchResponseError::throw((string)$request->getError());
 			}
 
-			$result = $request->getResult();
-			if (!is_array($result[0])) {
-				return;
+			$rows = [];
+			$result = $request->getResult()->toArray();
+			if (is_array($result[0]) && !empty($result[0]['data'])) {
+				$rows = $this->extractTableNamesFromRows($result[0]['data']);
 			}
-
-			$rows = $result[0]['data'] ?? null;
-			if (!is_array($rows)) {
-				return;
-			}
-
-			$tables = $rows;
-			$context->tablesRows = $tables;
-		}
-
-		if ($context->tableNames === []) {
-			$tableNames = [];
-			foreach ($tables as $row) {
-				$tableName = $row['Index'] ?? $row['Table'] ?? null;
-				if (!is_string($tableName) || $tableName === '') {
-					continue;
-				}
-
-				$tableNames[] = $tableName;
-			}
-
-			$context->tableNames = $tableNames;
+			$context->tableNames = $rows;
 		}
 
 		$store->addDirect(
@@ -59,27 +38,42 @@ final class TablesCollector implements CollectorInterface {
 			sizeof($context->tableNames)
 		);
 
-		$this->processTableMetrics($tables, $client, $store);
+		$this->processTableMetrics($context->tableNames, $client, $store);
 	}
 
 	/**
-	 * @param array<int, array<string, string>> $tables
+	 * @param array<int, array{Table?:string,Index?:string}> $rows
+	 *
+	 * @return string[]
+	 */
+	private function extractTableNamesFromRows(array $rows): array {
+		$tableNames = [];
+		foreach ($rows as $row) {
+			$tableName = trim($row['Index'] ?? $row['Table'] ?? '');
+			if ($tableName === '') {
+				continue;
+			}
+
+			$tableNames[] = $tableName;
+		}
+
+		return $tableNames;
+	}
+
+	/**
+	 * @param string[] $tableNames
 	 *
 	 * @throws GenericError
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	private function processTableMetrics(array $tables, Client $client, MetricStore $store): void {
-		foreach ($tables as $row) {
-			$tableName = $row['Index'] ?? $row['Table'] ?? '';
-			if (!is_string($tableName) || $tableName === '') {
-				continue;
-			}
-
+	private function processTableMetrics(
+		array $tableNames,
+		Client $client,
+		MetricStore $store
+	): void {
+		foreach ($tableNames as $tableName) {
 			$statusRows = $this->fetchTableStatusRows($client, $tableName);
-			if ($statusRows === null) {
-				continue;
-			}
 
 			$diskMapped = 0;
 			$diskMappedCached = 0;
@@ -97,38 +91,44 @@ final class TablesCollector implements CollectorInterface {
 				continue;
 			}
 
-			$this->calculateMappedRatioMetric($store, $diskMapped, $diskMappedCached, $tableName);
+			$this->calculateMappedRatioMetric(
+				$store, $diskMapped, $diskMappedCached,
+				$tableName
+			);
 		}
 	}
 
 	/**
-	 * @return array<int, array<string, mixed>>|null
+	 * @return array<int, array<string, mixed>>
 	 *
 	 * @throws GenericError
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	private function fetchTableStatusRows(Client $client, string $tableName): ?array {
+	private function fetchTableStatusRows(
+		Client $client,
+		string $tableName
+	): array {
 		$tableStatus = $client->sendRequest('SHOW TABLE ' . $tableName . ' STATUS');
 		if ($tableStatus->hasError()) {
 			ManticoreSearchResponseError::throw((string)$tableStatus->getError());
 		}
 
-		$result = $tableStatus->getResult();
-		if (!is_array($result[0])) {
-			return null;
-		}
+		$result = $tableStatus->getResult()->toArray();
 
-		$rows = $result[0]['data'] ?? null;
-		if (!is_array($rows)) {
-			return null;
+		if (is_array($result[0]) && !empty($result[0]['data'])) {
+			return $result[0]['data'];
 		}
-
-		return $rows;
+		throw GenericError::create(
+			'Unexpected response format for SHOW TABLE ' . $tableName
+			. ' STATUS (missing result[0])'
+		);
 	}
 
 	/**
 	 * @param array<string, mixed> $row
+	 *
+	 * @throws GenericError
 	 */
 	private function addTableStatusRowMetric(
 		MetricStore $store,
@@ -137,10 +137,21 @@ final class TablesCollector implements CollectorInterface {
 		int &$diskMapped,
 		int &$diskMappedCached
 	): void {
-		$var = $row['Variable_name'] ?? null;
-		$val = $row['Value'] ?? null;
+		if (!array_key_exists('Variable_name', $row)
+			|| !array_key_exists('Value', $row)
+		) {
+			throw GenericError::create(
+				'Unexpected SHOW TABLE STATUS row format (missing Variable_name/Value)'
+			);
+		}
+
+		$var = $row['Variable_name'];
+		$val = $row['Value'];
+
 		if (!is_string($var) || $var === '' || !is_string($val)) {
-			return;
+			throw GenericError::create(
+				'Unexpected SHOW TABLE STATUS row format (invalid Variable_name/Value types)'
+			);
 		}
 
 		if ($var === 'mem_limit_rate') {
@@ -180,6 +191,9 @@ final class TablesCollector implements CollectorInterface {
 			$ratio = ($diskMappedCached / $diskMapped) * 100;
 		}
 
-		$store->addMapped('disk_mapped_cached_ratio_percent', $ratio, ['table' => $tableName]);
+		$store->addMapped(
+			'disk_mapped_cached_ratio_percent', $ratio,
+			['table' => $tableName]
+		);
 	}
 }

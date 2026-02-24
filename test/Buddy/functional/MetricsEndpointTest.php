@@ -65,13 +65,8 @@ final class MetricsEndpointTest extends TestCase {
 	private function extractMetricTypes(string $body): array {
 		$types = [];
 
-		$lines = preg_split("/\\r?\\n/", $body);
-		if (!is_array($lines)) {
-			return [];
-		}
-
-		foreach ($lines as $line) {
-			if (!is_string($line) || !str_starts_with($line, '# TYPE ')) {
+		foreach ($this->lines($body) as $line) {
+			if (!str_starts_with($line, '# TYPE ')) {
 				continue;
 			}
 

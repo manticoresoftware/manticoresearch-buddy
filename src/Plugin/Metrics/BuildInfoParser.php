@@ -2,14 +2,15 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Metrics;
 
-use Manticoresearch\Buddy\Base\Lib\VersionStringParser;
+use Manticoresearch\Buddy\Core\Lib\VersionStringParser;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class BuildInfoParser {
 
 	/**
 	 * @return array<string, string>
 	 */
-	public static function parseLabels(string $version): array {
+	public static function parseLabels(string $version, MetricsScrapeContext $context): array {
 		$version = trim($version);
 		if ($version === '') {
 			return [];
@@ -19,7 +20,7 @@ final class BuildInfoParser {
 
 		$labels = self::getEmptyLabels();
 		self::fillDaemonBuildInfo($labels, $parsed['daemon']);
-		self::fillComponentBuildInfo($labels, $parsed['groups']);
+		self::fillComponentBuildInfo($labels, $parsed['groups'], $context);
 		return $labels;
 	}
 
@@ -47,19 +48,15 @@ final class BuildInfoParser {
 	 * @param array<string, string> $labels
 	 */
 	private static function fillDaemonBuildInfo(array &$labels, string $version): void {
-		if (preg_match('/^([^ ]+)\\s+([^ ]+)/', $version, $matches) !== 1) {
-			return;
-		}
-
-		$labels['daemon_semver'] = self::extractSemver($matches[1]);
-		$labels['daemon_commit'] = self::extractCommit($matches[2]);
+		$labels['daemon_semver'] = self::extractSemver($version);
+		$labels['daemon_commit'] = self::extractCommit($version);
 	}
 
 	/**
 	 * @param array<string, string> $labels
 	 * @param array<int, array{raw:string,name:string,ver:string,build:string}> $groups
 	 */
-	private static function fillComponentBuildInfo(array &$labels, array $groups): void {
+	private static function fillComponentBuildInfo(array &$labels, array $groups, MetricsScrapeContext $context): void {
 		foreach ($groups as $group) {
 			$name = $group['name'];
 			$ver = $group['ver'];
@@ -73,14 +70,20 @@ final class BuildInfoParser {
 				$ver = substr($ver, 1);
 			}
 
-			self::applyComponentLabels($labels, $name, $ver, $build);
+			self::applyComponentLabels($labels, $name, $ver, $build, $context);
 		}
 	}
 
 	/**
 	 * @param array<string, string> $labels
 	 */
-	private static function applyComponentLabels(array &$labels, string $name, string $ver, string $build): void {
+	private static function applyComponentLabels(
+		array &$labels,
+		string $name,
+		string $ver,
+		string $build,
+		MetricsScrapeContext $context
+	): void {
 		switch ($name) {
 			case 'columnar':
 				$labels['columnar_semver'] = self::extractSemver($ver);
@@ -101,6 +104,15 @@ final class BuildInfoParser {
 			case 'buddy':
 				$labels['buddy_semver'] = self::extractSemver($ver);
 				$labels['buddy_commit'] = self::extractBuddyCommit($ver);
+				break;
+			default:
+				if (isset($context->warnedBuildInfoComponents[$name])) {
+					break;
+				}
+
+				$context->warnedBuildInfoComponents[$name] = true;
+				$message = "Metrics: unknown build info component '{$name}' (ver='{$ver}', build='{$build}')";
+				Buddy::debug($message);
 				break;
 		}
 	}
@@ -125,10 +137,7 @@ final class BuildInfoParser {
 			return '';
 		}
 
-		$hash = $value;
-		if (str_contains($hash, '@')) {
-			[$hash] = explode('@', $hash, 2);
-		}
+		$hash = (string)strtok($value, '@');
 
 		$matchesCount = preg_match('/[0-9a-f]{6,40}/i', $hash, $matches);
 		if ($matchesCount !== 1) {

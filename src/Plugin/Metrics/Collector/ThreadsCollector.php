@@ -5,7 +5,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Metrics\Collector;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricStore;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\MetricsScrapeContext;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 final class ThreadsCollector implements CollectorInterface {
 
@@ -31,28 +30,21 @@ final class ThreadsCollector implements CollectorInterface {
 			return $context->threadsRows;
 		}
 
-		try {
-			$request = $client->sendRequest('SHOW THREADS');
-			if ($request->hasError()) {
-				return null;
-			}
 
-			$result = $request->getResult();
-			if (!is_array($result[0])) {
-				return null;
-			}
+		$request = $client->sendRequest('SHOW THREADS');
 
-			$rows = $result[0]['data'] ?? null;
-			if (!is_array($rows)) {
-				return null;
-			}
-
-			$context->threadsRows = $rows;
-			return $rows;
-		} catch (\Throwable $e) {
-			Buddy::debug('Collector fallback (' . self::class . '): ' . $e->getMessage());
+		if ($request->hasError()) {
 			return null;
 		}
+
+		$result = $request->getResult()->toArray();
+
+		if (is_array($result[0]) && !empty($result[0]['data'])) {
+			$context->threadsRows = $result[0]['data'];
+			return $context->threadsRows;
+		}
+
+		return null;
 	}
 
 	/**

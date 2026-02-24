@@ -11,7 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
-use Manticoresearch\Buddy\Base\Lib\VersionStringParser;
+use Manticoresearch\Buddy\Core\Lib\VersionStringParser;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
