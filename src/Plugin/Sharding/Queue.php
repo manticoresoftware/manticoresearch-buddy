@@ -396,9 +396,7 @@ final class Queue {
 
 			foreach ($data[0]['data'] as $runningQuery) {
 				$runningQueryText = preg_replace('/\s+/', ' ', trim($runningQuery['query'] ?? ''));
-				if (stripos($runningQueryText, 'ALTER CLUSTER') !== false
-					&& stripos($runningQueryText, 'ADD') !== false) {
-					// Simple pattern match for ALTER CLUSTER ... ADD queries
+				if (stripos($runningQueryText, $normalizedQuery) !== false) {
 					return true;
 				}
 			}

@@ -485,7 +485,7 @@ final class Table {
 
 			// Mark rebalancing as completed
 			$state->set($rebalanceKey, 'completed');
-			$state->set("rebalance_group:{$this->name}", null); // Clear operation group
+			$state->delete("rebalance_group:{$this->name}"); // Clear operation group
 		} catch (\Throwable $t) {
 			// Enhanced error handling with rollback
 			$this->handleRebalancingFailure($t, $operationGroup, $queue, $state ?? null);
@@ -630,7 +630,7 @@ final class Table {
 		$state = new State($this->client);
 		$rebalanceKey = "rebalance:{$this->name}";
 		$state->set($rebalanceKey, 'idle');
-		$state->set("rebalance_group:{$this->name}", null);
+		$state->delete("rebalance_group:{$this->name}");
 		$this->clearStopSignal();
 		return true;
 	}
@@ -659,7 +659,7 @@ final class Table {
 	 */
 	protected function clearStopSignal(): void {
 		$state = new State($this->client);
-		$state->set("stop_signal:{$this->name}", null);
+		$state->delete("stop_signal:{$this->name}");
 	}
 
 	/**
@@ -690,7 +690,7 @@ final class Table {
 
 			// Mark as failed with rollback info
 			$state->set($rebalanceKey, 'failed');
-			$state->set("rebalance_group:{$this->name}", null);
+			$state->delete("rebalance_group:{$this->name}");
 
 			// Store error information for debugging
 			$errorInfo = [
