@@ -41,15 +41,29 @@ final class State {
 
 
 	/**
+	 * Delete a state key
+	 * @param string $key
+	 * @return static
+	 */
+	public function delete(string $key): static {
+		$table = isset($this->cluster)
+			? $this->cluster->getSystemTableName($this->table)
+			: $this->table
+		;
+		$res = $this->client->sendRequest("DELETE FROM {$table} WHERE `key` = '{$key}'");
+		if ($res->hasError()) {
+			Buddy::debugvv("Sharding: Error while deleting state key '{$key}': " . $res->getError());
+		}
+		return $this;
+	}
+
+	/**
 	 * Set the state key with related value
 	 * @param string $key
 	 * @param mixed  $value
 	 * @return static
 	 */
 	public function set(string $key, mixed $value): static {
-		if (!isset($value)) {
-			throw new RuntimeException('Sharding state value cannot be null');
-		}
 		// If we are in cluster mode or not yet?
 		$table = isset($this->cluster)
 			? $this->cluster->getSystemTableName($this->table)
