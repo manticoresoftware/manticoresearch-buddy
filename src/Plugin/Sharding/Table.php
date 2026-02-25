@@ -70,13 +70,11 @@ final class Table {
 			}
 			/** @var array{node:string,shards:string} $row */
 			$nodes->push(
-				new Map(
-					[
-						'node' => $row['node'],
-						'shards' => $shards,
-						'connections' => $connectedNodes,
-					]
-				)
+				[
+					'node' => $row['node'],
+					'shards' => $shards,
+					'connections' => $connectedNodes,
+				]
 			);
 		}
 		return $nodes;
