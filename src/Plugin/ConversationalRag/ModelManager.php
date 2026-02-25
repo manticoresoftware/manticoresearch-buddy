@@ -188,12 +188,11 @@ class ModelManager {
 
 			// If settings is a JSON string, parse it
 			if ($key === 'settings' && is_string($value)) {
-				$parsedSettings = json_decode($value, true);
-				if (json_last_error() === JSON_ERROR_NONE && is_array($parsedSettings)) {
-					$settings = array_merge($settings, $parsedSettings);
-				} else {
-					$settings[$key] = $value;
+				$parsedSettings = simdjson_decode($value, true);
+				if (!is_array($parsedSettings)) {
+					throw ManticoreSearchClientError::create('Invalid settings JSON');
 				}
+				$settings = array_merge($settings, $parsedSettings);
 			} elseif ($key === 'settings' && is_array($value)) {
 				// If settings is already an array, merge it
 				$settings = array_merge($settings, $value);
@@ -294,18 +293,22 @@ class ModelManager {
 			throw  ManticoreSearchResponseError::create('Failed to get model by UUID/name: ' . $response->getError());
 		}
 
-		$data = $response->getResult();
+			$data = $response->getResult();
 		if (is_array($data[0]) && !empty($data[0]['data'])) {
 			$model = $data[0]['data'][0];
-			if (!empty($model['settings'])) {
-				$decoded = json_decode($model['settings'], true);
-				if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-					$model['settings'] = $decoded;
-				} else {
-					$model['settings'] = [];
-				}
-			} else {
+				$rawSettings = (string)($model['settings'] ?? '');
+			if ($rawSettings === '' || strtoupper($rawSettings) === 'NULL') {
 				$model['settings'] = [];
+			} else {
+				try {
+					$decoded = simdjson_decode($rawSettings, true);
+				} catch (\Throwable $e) {
+					throw ManticoreSearchClientError::create('Invalid model settings JSON: ' . $e->getMessage());
+				}
+				if (!is_array($decoded)) {
+					throw ManticoreSearchClientError::create('Invalid model settings JSON');
+				}
+				$model['settings'] = $decoded;
 			}
 
 			return $model;

@@ -11,8 +11,8 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
-use Exception;
 use Throwable;
+use UnexpectedValueException;
 
 /**
  * LLM provider implemented via the `llm` PHP extension.
@@ -48,18 +48,32 @@ class LlmProvider {
 	 *   k_results?: string|int, similarity_threshold?: string|int,
 	 *   max_document_length?: string|int} $options
 	 *
-	 * @return array{error?:string,success:bool,content:string,
-	 *   metadata?:array{tokens_used:integer, input_tokens:integer,
-	 *   output_tokens:integer, response_time_ms:integer, finish_reason:string}}
+	 * @return (
+	 *   array{
+	 *     success:true,
+	 *     content:string,
+	 *     metadata:array{
+	 *       tokens_used:int,
+	 *       input_tokens:int,
+	 *       output_tokens:int,
+	 *       response_time_ms:int,
+	 *       finish_reason:string
+	 *     }
+	 *   }
+	 * )|(
+	 *   array{
+	 *     success:false,
+	 *     error:string,
+	 *     content:string,
+	 *     provider:string,
+	 *     details?:string|null
+	 *   }
+	 * )
 	 */
 	public function generateResponse(string $prompt, array $options = []): array {
 		try {
-			if (!extension_loaded('llm') || !class_exists('\\Llm')) {
-				return $this->formatError('LLM extension is not available (expected PHP extension: llm)');
-			}
-
-			$provider = $this->getConfig('llm_provider');
-			if (!is_string($provider) || $provider === '') {
+			$provider = $this->getRequiredProvider();
+			if ($provider === null) {
 				return $this->formatError('LLM provider not configured');
 			}
 
@@ -67,32 +81,10 @@ class LlmProvider {
 			$modelId = $this->buildModelId($provider, is_string($model) ? $model : self::DEFAULT_MODEL);
 
 			$settings = $this->getSettings($options);
-			$stylePrompt = $this->getStylePrompt();
 
-			/** @var \Llm $llm */
 			$llm = $this->getClientForModel($modelId);
-
-			if (isset($settings['temperature']) && is_numeric($settings['temperature'])) {
-				$llm->setTemperature((float)$settings['temperature']);
-			}
-			if (isset($settings['max_tokens']) && is_numeric($settings['max_tokens'])) {
-				$llm->setMaxTokens((int)$settings['max_tokens']);
-			}
-			if (isset($settings['top_p']) && is_numeric($settings['top_p'])) {
-				$llm->setTopP((float)$settings['top_p']);
-			}
-			if (isset($settings['frequency_penalty']) && is_numeric($settings['frequency_penalty'])) {
-				$llm->setFrequencyPenalty((float)$settings['frequency_penalty']);
-			}
-			if (isset($settings['presence_penalty']) && is_numeric($settings['presence_penalty'])) {
-				$llm->setPresencePenalty((float)$settings['presence_penalty']);
-			}
-
-			$messages = [];
-			if ($stylePrompt !== '') {
-				$messages[] = \Message::system($stylePrompt);
-			}
-			$messages[] = \Message::user($prompt);
+			$this->applySettingsToClient($llm, $settings);
+			$messages = $this->buildMessages($prompt);
 
 			$startTime = microtime(true);
 			/** @var \Response $response */
@@ -113,8 +105,59 @@ class LlmProvider {
 				]
 			);
 		} catch (Throwable $e) {
+			if ($e instanceof UnexpectedValueException) {
+				throw $e;
+			}
 			return $this->formatError('LLM request failed', $e);
 		}
+	}
+
+	private function getRequiredProvider(): ?string {
+		$provider = $this->getConfig('llm_provider');
+		if (!is_string($provider) || $provider === '') {
+			return null;
+		}
+
+		return $provider;
+	}
+
+	/**
+	 * @return array<int, \Message>
+	 */
+	private function buildMessages(string $prompt): array {
+		$stylePrompt = $this->getStylePrompt();
+
+		$messages = [];
+		if ($stylePrompt !== '') {
+			$messages[] = \Message::system($stylePrompt);
+		}
+		$messages[] = \Message::user($prompt);
+
+		return $messages;
+	}
+
+	/**
+	 * @param \Llm $llm
+	 * @param array<string, mixed> $settings
+	 */
+	private function applySettingsToClient(\Llm $llm, array $settings): void {
+		if (isset($settings['temperature']) && is_numeric($settings['temperature'])) {
+			$llm->setTemperature((float)$settings['temperature']);
+		}
+		if (isset($settings['max_tokens']) && is_numeric($settings['max_tokens'])) {
+			$llm->setMaxTokens((int)$settings['max_tokens']);
+		}
+		if (isset($settings['top_p']) && is_numeric($settings['top_p'])) {
+			$llm->setTopP((float)$settings['top_p']);
+		}
+		if (isset($settings['frequency_penalty']) && is_numeric($settings['frequency_penalty'])) {
+			$llm->setFrequencyPenalty((float)$settings['frequency_penalty']);
+		}
+		if (!isset($settings['presence_penalty']) || !is_numeric($settings['presence_penalty'])) {
+			return;
+		}
+
+		$llm->setPresencePenalty((float)$settings['presence_penalty']);
 	}
 
 	/**
@@ -137,8 +180,11 @@ class LlmProvider {
 		$settings = [];
 
 		if (isset($this->config['settings']) && is_string($this->config['settings'])) {
-			$settings = json_decode($this->config['settings'], true) ?? [];
-			$settings = $this->convertSettingsTypes(is_array($settings) ? $settings : []);
+			$decoded = simdjson_decode($this->config['settings'], true);
+			if (!is_array($decoded)) {
+				throw new UnexpectedValueException('Invalid LLM settings JSON');
+			}
+			$settings = $this->convertSettingsTypes($decoded);
 		} elseif (isset($this->config['settings']) && is_array($this->config['settings'])) {
 			$settings = $this->config['settings'];
 		}
@@ -215,12 +261,13 @@ class LlmProvider {
 	}
 
 	/**
-	 * @return array{success:bool, error:string, details: string|null, provider:string}
+	 * @return array{success:false, error:string, content:string, details?: string|null, provider:string}
 	 */
-	private function formatError(string $message, ?Exception $exception = null): array {
+	private function formatError(string $message, ?Throwable $exception = null): array {
 		return [
 			'success' => false,
 			'error' => $message,
+			'content' => '',
 			'details' => $exception?->getMessage(),
 			'provider' => $this->getName(),
 		];
@@ -236,20 +283,27 @@ class LlmProvider {
 	}
 
 	/**
-	 * @param array<string, mixed> $metadata
-	 * @return array{success:bool, content:string, metadata:array<string, mixed>}
+	 * @param array{
+	 *   tokens_used:int,
+	 *   input_tokens:int,
+	 *   output_tokens:int,
+	 *   response_time_ms:int,
+	 *   finish_reason:string
+	 * } $metadata
+	 *
+	 * @return array{success:true, content:string, metadata:array{
+	 *   tokens_used:int,
+	 *   input_tokens:int,
+	 *   output_tokens:int,
+	 *   response_time_ms:int,
+	 *   finish_reason:string
+	 * }}
 	 */
-	private function formatSuccess(string $content, array $metadata = []): array {
+	private function formatSuccess(string $content, array $metadata): array {
 		return [
 			'success' => true,
 			'content' => $content,
-			'metadata' => array_merge(
-				[
-					'provider' => $this->getName(),
-					'model' => $this->getConfig('llm_model'),
-				],
-				$metadata
-			),
+			'metadata' => $metadata,
 		];
 	}
 
@@ -271,7 +325,7 @@ class LlmProvider {
 	 *
 	 * @return \Llm
 	 */
-	private function getClientForModel(string $modelId): object {
+	private function getClientForModel(string $modelId): \Llm {
 		if ($this->client === null || !$this->client instanceof \Llm || $this->clientModelId !== $modelId) {
 			$this->client = new \Llm($modelId);
 			$this->clientModelId = $modelId;

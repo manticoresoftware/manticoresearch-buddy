@@ -9,6 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\DynamicThresholdManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use PHPUnit\Framework\TestCase;
@@ -31,14 +32,20 @@ class DynamicThresholdManagerTest extends TestCase {
 	public function testCalculateDynamicThresholdNoExpansion(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
+		$mockConversationManager = $this->createMock(ConversationManager::class);
+		$mockConversationManager->method('getRecentUserIntents')->willReturn([]);
+
 		// Provider shouldn't be called when there is no history
 		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->never())->method('generateResponse');
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
 		$result = $thresholdManager->calculateDynamicThreshold(
+			'conv-uuid',
 			'Show me comedies',
 			'', // No history
+			$mockConversationManager,
 			$mockProvider,
 			$modelConfig,
 			0.8
@@ -53,9 +60,13 @@ class DynamicThresholdManagerTest extends TestCase {
 	public function testCalculateDynamicThresholdWithExpansion(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
+		$mockConversationManager = $this->createMock(ConversationManager::class);
+		$mockConversationManager->method('getRecentUserIntents')->willReturn([]);
+
 		// Mock LLM provider that says yes to expansion
 		$mockProvider = $this->createMock(LlmProvider::class);
-		$mockProvider->method('generateResponse')
+		$mockProvider->expects($this->once())
+			->method('generateResponse')
 			->willReturn(
 				[
 				'success' => true,
@@ -67,8 +78,10 @@ class DynamicThresholdManagerTest extends TestCase {
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
 		$result = $thresholdManager->calculateDynamicThreshold(
+			'conv-uuid',
 			'What else do you have?',
 			"user: Show me comedies\nassistant: I recommend The Office\nuser: What else do you have?",
+			$mockConversationManager,
 			$mockProvider,
 			$modelConfig,
 			0.8
@@ -83,9 +96,15 @@ class DynamicThresholdManagerTest extends TestCase {
 	public function testCalculateDynamicThresholdMaxExpansion(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
+		$mockConversationManager = $this->createMock(ConversationManager::class);
+		$mockConversationManager->method('getRecentUserIntents')->willReturn(
+			['ALTERNATIVES', 'ALTERNATIVES', 'ALTERNATIVES', 'ALTERNATIVES']
+		);
+
 		// Mock LLM provider that always says yes
 		$mockProvider = $this->createMock(LlmProvider::class);
-		$mockProvider->method('generateResponse')
+		$mockProvider->expects($this->once())
+			->method('generateResponse')
 			->willReturn(
 				[
 				'success' => true,
@@ -96,16 +115,15 @@ class DynamicThresholdManagerTest extends TestCase {
 
 		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
 
-		// Call multiple times to reach max expansion
-		for ($i = 0; $i < 6; $i++) {
-			$result = $thresholdManager->calculateDynamicThreshold(
-				'What else?',
-				"user: Show me comedies\nassistant: I recommend The Office\nuser: What else?",
-				$mockProvider,
-				$modelConfig,
-				0.8
-			);
-		}
+		$result = $thresholdManager->calculateDynamicThreshold(
+			'conv-uuid',
+			'What else?',
+			"user: Show me comedies\nassistant: I recommend The Office\nuser: What else?",
+			$mockConversationManager,
+			$mockProvider,
+			$modelConfig,
+			0.8
+		);
 
 		$this->assertEquals(5, $result['expansion_level']); // Max expansion level
 		$this->assertTrue($result['expansion_limit_reached']);
@@ -192,6 +210,18 @@ class DynamicThresholdManagerTest extends TestCase {
 	public function testExpansionStateResetOnNewConversation(): void {
 		$thresholdManager = new DynamicThresholdManager();
 
+		$mockConversationManager = $this->createMock(ConversationManager::class);
+		$mockConversationManager->method('getRecentUserIntents')->willReturnCallback(
+			static function (string $conversationUuid, int $limit): array {
+				unset($limit);
+				return match ($conversationUuid) {
+					'conv-1' => ['ALTERNATIVES', 'ALTERNATIVES'],
+					'conv-2' => [],
+					default => [],
+				};
+			}
+		);
+
 		// Mock LLM provider that says yes
 		$mockProvider = $this->createMock(LlmProvider::class);
 		$mockProvider->method('generateResponse')
@@ -207,19 +237,23 @@ class DynamicThresholdManagerTest extends TestCase {
 
 		// First call with one conversation
 		$result1 = $thresholdManager->calculateDynamicThreshold(
+			'conv-1',
 			'What else?',
 			'conversation1: user message',
+			$mockConversationManager,
 			$mockProvider,
 			$modelConfig,
 			0.8
 		);
 
-		$this->assertEquals(1, $result1['expansion_level']);
+		$this->assertEquals(3, $result1['expansion_level']);
 
 		// Second call with different conversation (should reset)
 		$result2 = $thresholdManager->calculateDynamicThreshold(
+			'conv-2',
 			'What else?',
 			'conversation2: different user message',
+			$mockConversationManager,
 			$mockProvider,
 			$modelConfig,
 			0.8
@@ -230,6 +264,12 @@ class DynamicThresholdManagerTest extends TestCase {
 
 	public function testExpansionStateResetOnTopicChange(): void {
 		$thresholdManager = new DynamicThresholdManager();
+
+		$mockConversationManager = $this->createMock(ConversationManager::class);
+		$mockConversationManager->method('getRecentUserIntents')->willReturnOnConsecutiveCalls(
+			[],
+			['TOPIC_CHANGE']
+		);
 
 		// Mock LLM provider - first says yes, then no (topic change)
 		$mockProvider = $this->createMock(LlmProvider::class);
@@ -244,8 +284,10 @@ class DynamicThresholdManagerTest extends TestCase {
 
 		// First call - expansion
 		$result1 = $thresholdManager->calculateDynamicThreshold(
+			'conv-uuid',
 			'What else?',
 			'conversation: user wants comedies',
+			$mockConversationManager,
 			$mockProvider,
 			$modelConfig,
 			0.8
@@ -255,8 +297,10 @@ class DynamicThresholdManagerTest extends TestCase {
 
 		// Second call - no expansion (topic change)
 		$result2 = $thresholdManager->calculateDynamicThreshold(
+			'conv-uuid',
 			'Now show me action movies',
 			'conversation: user wants comedies, now wants action',
+			$mockConversationManager,
 			$mockProvider,
 			$modelConfig,
 			0.8

@@ -10,6 +10,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
+use InvalidArgumentException;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -81,16 +82,16 @@ class ConversationManager {
 		?array $excludedIds = null
 	): void {
 		// Debug: Log message saving
-		Buddy::info("\n[DEBUG CONVERSATION SAVE]");
-		Buddy::info("├─ Conversation UUID: {$conversationUuid}");
-		Buddy::info("├─ Model UUID: {$modelUuid}");
-		Buddy::info("├─ Role: {$role}");
-		Buddy::info('├─ Message: ' . substr($message, 0, 100) . (strlen($message) > 100 ? '...' : ''));
-		Buddy::info("├─ Tokens used: {$tokensUsed}");
-		Buddy::info('├─ Intent: ' . ($intent ?? 'none'));
-		Buddy::info('├─ Search query: ' . ($searchQuery ? substr($searchQuery, 0, 50) . '...' : 'none'));
-		Buddy::info('├─ Exclude query: ' . ($excludeQuery ? substr($excludeQuery, 0, 50) . '...' : 'none'));
-		Buddy::info('└─ Excluded IDs count: ' . ($excludedIds ? sizeof($excludedIds) : 0));
+		Buddy::debugvv("\n[DEBUG CONVERSATION SAVE]");
+		Buddy::debugvv("├─ Conversation UUID: {$conversationUuid}");
+		Buddy::debugvv("├─ Model UUID: {$modelUuid}");
+		Buddy::debugvv("├─ Role: {$role}");
+		Buddy::debugvv('├─ Message: ' . substr($message, 0, 100) . (strlen($message) > 100 ? '...' : ''));
+		Buddy::debugvv("├─ Tokens used: {$tokensUsed}");
+		Buddy::debugvv('├─ Intent: ' . ($intent ?? 'none'));
+		Buddy::debugvv('├─ Search query: ' . ($searchQuery ? substr($searchQuery, 0, 50) . '...' : 'none'));
+		Buddy::debugvv('├─ Exclude query: ' . ($excludeQuery ? substr($excludeQuery, 0, 50) . '...' : 'none'));
+		Buddy::debugvv('└─ Excluded IDs count: ' . ($excludedIds ? sizeof($excludedIds) : 0));
 
 		$currentTime = time();
 		$ttlTime = $currentTime + self::CONVERSATION_TTL_SECONDS;
@@ -127,7 +128,7 @@ class ConversationManager {
 			);
 		}
 
-		Buddy::info('└─ Message saved successfully');
+		Buddy::debugvv('└─ Message saved successfully');
 	}
 
 	/**
@@ -140,15 +141,24 @@ class ConversationManager {
 	 */
 	public function getConversationHistory(string $conversationUuid, int $limit = 100): string {
 		// Debug: Log history retrieval
-		Buddy::info("\n[DEBUG CONVERSATION HISTORY RETRIEVAL]");
-		Buddy::info("├─ Conversation UUID: {$conversationUuid}");
-		Buddy::info("├─ Limit: {$limit}");
+		Buddy::debugvv("\n[DEBUG CONVERSATION HISTORY RETRIEVAL]");
+		Buddy::debugvv("├─ Conversation UUID: {$conversationUuid}");
+		Buddy::debugvv("├─ Limit: {$limit}");
 
-		$sql = /** @lang Manticore */ 'SELECT role, message FROM ' . self::CONVERSATIONS_TABLE . ' '.
-			"WHERE conversation_uuid = '$conversationUuid' ".
-			"ORDER BY created_at ASC LIMIT $limit";
+		$safeLimit = $this->assertPositiveLimit($limit, 'limit');
 
-		Buddy::info("├─ SQL: {$sql}");
+		/** @lang Manticore */
+		$sql = sprintf(
+			'SELECT role, message FROM %s '
+			. 'WHERE conversation_uuid = %s '
+			. 'ORDER BY created_at ASC '
+			. 'LIMIT %d',
+			self::CONVERSATIONS_TABLE,
+			$this->quote($conversationUuid),
+			$safeLimit
+		);
+
+		Buddy::debugvv("├─ SQL: {$sql}");
 
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
@@ -159,7 +169,7 @@ class ConversationManager {
 		$history = '';
 		if (is_array($data[0])) {
 			$rows = $data[0]['data'];
-			Buddy::info('├─ Messages found: ' . $data->count());
+			Buddy::debugvv('├─ Messages found: ' . $data->count());
 			foreach ($rows as $row) {
 				$role = (string)$row['role'];
 				$message = (string)$row['message'];
@@ -168,8 +178,8 @@ class ConversationManager {
 		}
 
 		$historyLength = strlen($history);
-		Buddy::info("├─ History length: {$historyLength} chars");
-		Buddy::info('└─ History preview: ' . substr($history, 0, 150) . ($historyLength > 150 ? '...' : ''));
+		Buddy::debugvv("├─ History length: {$historyLength} chars");
+		Buddy::debugvv('└─ History preview: ' . substr($history, 0, 150) . ($historyLength > 150 ? '...' : ''));
 
 		return $history;
 	}
@@ -186,17 +196,24 @@ class ConversationManager {
 	 */
 	public function getLatestSearchContext(string $conversationUuid): ?array {
 		// Debug: Log search context retrieval
-		Buddy::info("\n[DEBUG SEARCH CONTEXT RETRIEVAL]");
-		Buddy::info("├─ Conversation UUID: {$conversationUuid}");
+		Buddy::debugvv("\n[DEBUG SEARCH CONTEXT RETRIEVAL]");
+		Buddy::debugvv("├─ Conversation UUID: {$conversationUuid}");
 
-		$sql = /** @lang Manticore */ 'SELECT search_query, exclude_query, excluded_ids FROM '
-			. self::CONVERSATIONS_TABLE . ' ' .
-			"WHERE conversation_uuid = '$conversationUuid' " .
-			"AND role = 'user' " .
-			"AND intent != 'CONTENT_QUESTION' " .
-			'ORDER BY created_at DESC LIMIT 1';
+		/** @lang Manticore */
+		$sql = sprintf(
+			'SELECT search_query, exclude_query, excluded_ids FROM %s '
+			. 'WHERE conversation_uuid = %s '
+			. 'AND role = %s '
+			. 'AND intent != %s '
+			. 'ORDER BY created_at DESC '
+			. 'LIMIT 1',
+			self::CONVERSATIONS_TABLE,
+			$this->quote($conversationUuid),
+			$this->quote('user'),
+			$this->quote(Intent::CONTENT_QUESTION)
+		);
 
-		Buddy::info("├─ SQL: {$sql}");
+		Buddy::debugvv("├─ SQL: {$sql}");
 
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
@@ -209,7 +226,7 @@ class ConversationManager {
 			$rows = $data[0]['data'];
 
 			if (empty($rows)) {
-				Buddy::info('└─ No search context found');
+				Buddy::debugvv('└─ No search context found');
 				return null;
 			}
 
@@ -219,14 +236,20 @@ class ConversationManager {
 				'excluded_ids' => (string)$rows[0]['excluded_ids'],
 			];
 
-			/** @var array<int, mixed> $excludedIdsArray */
-			$excludedIdsArray = json_decode($searchContext['excluded_ids'], true) ?? [];
-			Buddy::info('├─ Search query: ' . substr($searchContext['search_query'], 0, 50) . '...');
+			$excludedIdsArray = [];
+			if ($searchContext['excluded_ids'] !== '') {
+				$decoded = simdjson_decode($searchContext['excluded_ids'], true);
+				if (!is_array($decoded)) {
+					throw ManticoreSearchClientError::create('Invalid JSON stored in excluded_ids');
+				}
+				$excludedIdsArray = $decoded;
+			}
+			Buddy::debugvv('├─ Search query: ' . substr($searchContext['search_query'], 0, 50) . '...');
 			$excludePreview = $searchContext['exclude_query']
 				? substr($searchContext['exclude_query'], 0, 50) . '...'
 				: 'none';
-			Buddy::info('├─ Exclude query: ' . $excludePreview);
-			Buddy::info('└─ Excluded IDs count: ' . sizeof($excludedIdsArray));
+			Buddy::debugvv('├─ Exclude query: ' . $excludePreview);
+			Buddy::debugvv('└─ Excluded IDs count: ' . sizeof($excludedIdsArray));
 
 			return $searchContext;
 		}
@@ -245,16 +268,26 @@ class ConversationManager {
 	 */
 	public function getConversationHistoryForQueryGeneration(string $conversationUuid, int $limit = 100): string {
 		// Debug: Log filtered history retrieval for query generation
-		Buddy::info("\n[DEBUG FILTERED HISTORY RETRIEVAL]");
-		Buddy::info("├─ Conversation UUID: {$conversationUuid}");
-		Buddy::info("├─ Limit: {$limit}");
+		Buddy::debugvv("\n[DEBUG FILTERED HISTORY RETRIEVAL]");
+		Buddy::debugvv("├─ Conversation UUID: {$conversationUuid}");
+		Buddy::debugvv("├─ Limit: {$limit}");
 
-		$sql = /** @lang Manticore */ 'SELECT role, message FROM ' . self::CONVERSATIONS_TABLE . ' '.
-			"WHERE conversation_uuid = '$conversationUuid' " .
-			"AND intent != 'CONTENT_QUESTION' " .
-			"ORDER BY created_at ASC LIMIT $limit";
+		$safeLimit = $this->assertPositiveLimit($limit, 'limit');
 
-		Buddy::info("├─ SQL: {$sql}");
+		/** @lang Manticore */
+		$sql = sprintf(
+			'SELECT role, message FROM %s '
+			. 'WHERE conversation_uuid = %s '
+			. 'AND intent != %s '
+			. 'ORDER BY created_at ASC '
+			. 'LIMIT %d',
+			self::CONVERSATIONS_TABLE,
+			$this->quote($conversationUuid),
+			$this->quote(Intent::CONTENT_QUESTION),
+			$safeLimit
+		);
+
+		Buddy::debugvv("├─ SQL: {$sql}");
 
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
@@ -268,7 +301,7 @@ class ConversationManager {
 		if (is_array($data[0])) {
 			$rows = $data[0]['data'];
 
-			Buddy::info('├─ Filtered messages found: ' . sizeof($rows));
+			Buddy::debugvv('├─ Filtered messages found: ' . sizeof($rows));
 			foreach ($rows as $row) {
 				$role = (string)$row['role'];
 				$message = (string)$row['message'];
@@ -277,9 +310,68 @@ class ConversationManager {
 		}
 
 		$historyLength = strlen($history);
-		Buddy::info("├─ Filtered history length: {$historyLength} chars");
-		Buddy::info('└─ Filtered history preview: ' . substr($history, 0, 150) . ($historyLength > 150 ? '...' : ''));
+		Buddy::debugvv("├─ Filtered history length: {$historyLength} chars");
+		$preview = substr($history, 0, 150);
+		if ($historyLength > 150) {
+			$preview .= '...';
+		}
+		Buddy::debugvv('└─ Filtered history preview: ' . $preview);
 
 		return $history;
+	}
+
+	/**
+	 * @param string $conversationUuid
+	 * @param int $limit
+	 * @return array<int, string>
+	 * @throws ManticoreSearchClientError
+	 */
+	public function getRecentUserIntents(string $conversationUuid, int $limit = 20): array {
+		$safeLimit = $this->assertPositiveLimit($limit, 'limit');
+
+		/** @lang Manticore */
+		$sql = sprintf(
+			'SELECT intent FROM %s '
+			. 'WHERE conversation_uuid = %s '
+			. 'AND role = %s '
+			. 'ORDER BY created_at DESC '
+			. 'LIMIT %d',
+			self::CONVERSATIONS_TABLE,
+			$this->quote($conversationUuid),
+			$this->quote('user'),
+			$safeLimit
+		);
+
+		$response = $this->client->sendRequest($sql);
+		if ($response->hasError()) {
+			throw ManticoreSearchClientError::create(
+				'Failed to retrieve conversation intents: ' . $response->getError()
+			);
+		}
+
+		/** @var array<int, array<string, mixed>> $data */
+		$data = $response->getResult()->toArray();
+
+		if (!is_array($data[0])) {
+			throw ManticoreSearchClientError::create('Manticore returned wrong intent structure');
+		}
+
+		/** @var array<int, array{intent: string}> $rows */
+		$rows = $data[0]['data'];
+
+		$intents = [];
+		foreach ($rows as $row) {
+			$intents[] = (string)$row['intent'];
+		}
+
+		return $intents;
+	}
+
+	private function assertPositiveLimit(int $limit, string $name): int {
+		if ($limit <= 0) {
+			throw new InvalidArgumentException("{$name} must be greater than 0");
+		}
+
+		return $limit;
 	}
 }

@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
-use Exception;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
@@ -72,7 +71,7 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 
 			if (!$response['success']) {
 				throw new ManticoreSearchClientError(
-					'Intent classification failed: ' . ($response['error'] ?? 'Unknown error')
+					'Intent classification failed: ' . $response['error']
 				);
 			}
 
@@ -80,14 +79,13 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 			$intent = $this->validateIntent(trim(strtoupper($content)));
 
 			// Debug: Log intent classification
-			Buddy::info("\n[DEBUG INTENT CLASSIFICATION]");
-			Buddy::info("└─ Detected intent: {$intent}");
+			Buddy::debugvv("\n[DEBUG INTENT CLASSIFICATION]");
+			Buddy::debugvv("└─ Detected intent: {$intent}");
 
 			return $intent;
-		} catch (Exception $e) {
-			// Fallback to NEW_SEARCH
+		} catch (ManticoreSearchClientError $e) {
 			Buddy::debug("Error intent classification: {$e->getMessage()}");
-			return 'NEW_SEARCH';
+			return Intent::NEW_SEARCH;
 		}
 	}
 
@@ -118,10 +116,17 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 	 * @return string
 	 */
 	private function validateIntent(string $intent): string {
-		$validIntents = ['REJECTION',
-			'ALTERNATIVES', 'TOPIC_CHANGE',
-			'INTEREST', 'NEW_SEARCH', 'CONTENT_QUESTION',
-			'NEW_QUESTION', 'CLARIFICATION', 'UNCLEAR'];
+		$validIntents = [
+			Intent::REJECTION,
+			Intent::ALTERNATIVES,
+			Intent::TOPIC_CHANGE,
+			Intent::INTEREST,
+			Intent::NEW_SEARCH,
+			Intent::CONTENT_QUESTION,
+			Intent::NEW_QUESTION,
+			Intent::CLARIFICATION,
+			Intent::UNCLEAR,
+		];
 
 		// Extract just the intent word if LLM added explanation
 		foreach ($validIntents as $valid) {
@@ -131,7 +136,7 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 		}
 
 		// Default fallback
-		return 'NEW_SEARCH';
+		return Intent::NEW_SEARCH;
 	}
 
 	/**
@@ -151,9 +156,9 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 		LlmProvider $llmProvider,
 		array $modelConfig
 	): array {
-
 		$searchQuery = '';
 		$excludeQuery = '';
+		$llmResponseContent = '';
 
 		try {
 			// Limit history size for LLM context (conversationHistory is already a formatted string)
@@ -216,14 +221,15 @@ Examples:
   Analysis: Same topic (comedies), The Office rejection is current
   EXCLUDE_QUERY: The Office (same topic context)
 
-Answer ONLY in the format above.";
+	Answer ONLY in the format above.";
 
 			$llmProvider->configure($modelConfig);
 			$response = $llmProvider->generateResponse($queryPrompt, ['temperature' => 0.3, 'max_tokens' => 200]);
+			$llmResponseContent = $response['content'];
 
 			if (!$response['success']) {
 				throw new ManticoreSearchClientError(
-					'Query generation failed: ' . ($response['error'] ?? 'Unknown error')
+					'Query generation failed: ' . $response['error']
 				);
 			}
 
@@ -253,23 +259,22 @@ Answer ONLY in the format above.";
 			return [
 				'search_query' => $searchQuery,
 				'exclude_query' => $excludeQuery,
-				'llm_response' => $response['content'],
+				'llm_response' => $llmResponseContent,
 			];
-		} catch (Exception $e) {
-			// Fallback to safe defaults
+		} catch (ManticoreSearchClientError $e) {
 			$searchQuery = $userQuery;
 
 			// Debug: Log query generation
-			Buddy::info("\n[DEBUG QUERY GENERATION]");
-			Buddy::info("├─ User query: '{$userQuery}'");
-			Buddy::info("├─ Intent: {$intent}");
-			Buddy::info("├─ Generated SEARCH_QUERY: '{$searchQuery}'");
-			Buddy::info("└─ Generated EXCLUDE_QUERY: '{$excludeQuery}'");
+			Buddy::debugvv("\n[DEBUG QUERY GENERATION]");
+			Buddy::debugvv("├─ User query: '{$userQuery}'");
+			Buddy::debugvv("├─ Intent: {$intent}");
+			Buddy::debugvv("├─ Generated SEARCH_QUERY: '{$searchQuery}'");
+			Buddy::debugvv("└─ Generated EXCLUDE_QUERY: '{$excludeQuery}'");
 
 			return [
 				'search_query' => $searchQuery,
 				'exclude_query' => $excludeQuery,
-				'llm_response' => $response['content'] ?? $e->getMessage(),
+				'llm_response' => $llmResponseContent !== '' ? $llmResponseContent : $e->getMessage(),
 			];
 		}
 	}

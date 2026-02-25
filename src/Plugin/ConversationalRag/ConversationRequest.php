@@ -28,4 +28,3 @@ final class ConversationRequest {
 		return $clone;
 	}
 }
-

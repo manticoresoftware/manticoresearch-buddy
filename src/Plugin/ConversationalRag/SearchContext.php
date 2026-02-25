@@ -36,4 +36,3 @@ final class SearchContext {
 		return $clone;
 	}
 }
-

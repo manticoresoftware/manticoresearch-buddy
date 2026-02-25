@@ -189,14 +189,15 @@ class BaseProviderTest extends TestCase {
 		$exception = new Exception('Test exception');
 		$result = $method->invoke($this->provider, 'Test message', $exception);
 
-		$this->assertEquals(
-			[
-			'success' => false,
-			'error' => 'Test message',
-			'details' => 'Test exception',
-			'provider' => 'llm',
-			], $result
-		);
+			$this->assertEquals(
+				[
+				'success' => false,
+				'error' => 'Test message',
+				'content' => '',
+				'details' => 'Test exception',
+				'provider' => 'llm',
+				], $result
+			);
 	}
 
 	public function testFormatSuccess(): void {
@@ -208,16 +209,14 @@ class BaseProviderTest extends TestCase {
 		$this->provider->configure(['llm_model' => 'test-model']);
 		$result = $method->invoke($this->provider, 'Test content', ['tokens' => 100]);
 
-		$this->assertEquals(
-			[
-			'success' => true,
-			'content' => 'Test content',
-			'metadata' => [
-				'provider' => 'llm',
-				'model' => 'test-model',
-				'tokens' => 100,
-			],
-			], $result
-		);
+			$this->assertEquals(
+				[
+				'success' => true,
+				'content' => 'Test content',
+				'metadata' => [
+					'tokens' => 100,
+				],
+				], $result
+			);
 	}
 }

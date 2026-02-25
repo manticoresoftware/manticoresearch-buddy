@@ -129,9 +129,12 @@ final class Payload extends BasePayload {
 		} elseif (preg_match('/^DESCRIBE\s+RAG\s+MODEL\s+[\'"]?([^\'"]+)[\'"]?$/i', $sql, $matches)) {
 			$this->action = self::ACTION_DESCRIBE_MODEL;
 			$this->params = ['model_name_or_uuid' => $matches[1]];
-		} elseif (preg_match('/^DROP\s+RAG\s+MODEL\s+[\'"]?([^\'"]+)[\'"]?$/i', $sql, $matches)) {
+		} elseif (preg_match('/^DROP\s+RAG\s+MODEL\s+(IF\s+EXISTS\s+)?[\'"]?([^\'"]+)[\'"]?$/i', $sql, $matches)) {
 			$this->action = self::ACTION_DROP_MODEL;
-			$this->params = ['model_name_or_uuid' => $matches[1]];
+			$this->params = ['model_name_or_uuid' => $matches[2]];
+			if ($matches[1] !== '') {
+				$this->params['if_exists'] = '1';
+			}
 		} elseif (preg_match('/^CALL\s+CONVERSATIONAL_RAG\s*\((.*)\)$/si', $sql, $matches)) {
 			$this->action = self::ACTION_CONVERSATION;
 			$this->params = $this->parseConversationParams($matches[1]);

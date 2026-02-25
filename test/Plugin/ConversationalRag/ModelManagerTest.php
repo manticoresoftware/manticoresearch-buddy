@@ -493,6 +493,8 @@ class ModelManagerTest extends TestCase {
 	public function testGetModelByUuidOrNameWithInvalidJsonSettings(): void {
 		$modelManager = new ModelManager();
 
+		$this->expectException(ManticoreSearchClientError::class);
+
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
@@ -522,11 +524,7 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
-
-		// Should be empty array due to JSON decode failure
-		$this->assertIsArray($result['settings']);
-		$this->assertEmpty($result['settings']);
+		$modelManager->getModelByUuidOrName($mockClient, 'test_model');
 	}
 
 	public function testGetModelByUuidOrNameWithStringNullSettings(): void {

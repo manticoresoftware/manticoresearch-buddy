@@ -786,16 +786,16 @@ class ConversationHandlerTest extends TestCase {
 						'content' => 'SEARCH_QUERY: action movies\nEXCLUDE_QUERY: none',
 					'success' => true,
 					'metadata' => [],
-				], // generateQueries response
-				['content' => 'YES', 'success' => true, 'metadata' => []], // detectExpansionIntent response
-				[
+					], // generateQueries response
+					['content' => 'YES', 'success' => true, 'metadata' => []], // detectExpansionIntent response
+					[
 					'content' => 'Here are some action movies!',
 					'metadata' => ['tokens_used' => 120],
 					'success' => true,
-				], // generateResponse
-				]
-			)
-		);
+					], // generateResponse
+					]
+				)
+			);
 
 		// Mock the manticore client with all expected calls
 		$mockClient = $this->createMock(HTTPClient::class);
@@ -844,21 +844,7 @@ class ConversationHandlerTest extends TestCase {
 			)
 		);
 
-		// 5: saveMessage (user)
-		$saveUserResponse = $this->createMock(Response::class);
-		$saveUserResponse->method('hasError')->willReturn(false);
-		$saveUserResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-					'total' => 1,
-					'error' => '',
-					'warning' => '',
-					'data' => [],
-				]
-			)
-		);
-
-		// 6: getConversationHistoryForQueryGeneration
+		// 5: getConversationHistoryForQueryGeneration
 		$queryHistoryResponse = $this->createMock(Response::class);
 		$queryHistoryResponse->method('hasError')->willReturn(false);
 		$queryHistoryResponse->method('getResult')->willReturn(
@@ -870,6 +856,19 @@ class ConversationHandlerTest extends TestCase {
 					'warning' => '',
 					'data' => [],
 				],
+				]
+			)
+		);
+
+		// 6: getRecentUserIntents (for dynamic threshold)
+		$intentsResponse = $this->createMock(Response::class);
+		$intentsResponse->method('hasError')->willReturn(false);
+		$intentsResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+					[
+						'data' => [],
+					],
 				]
 			)
 		);
@@ -892,25 +891,25 @@ class ConversationHandlerTest extends TestCase {
 		);
 
 		// 8: getExcludedIds (KNN search for exclusions - but since exclude_query is 'none', this might not be called)
-		// Since exclude_query is 'none', getExcludedIds returns []
-		// So no call here
+			// Since exclude_query is 'none', getExcludedIds returns []
+			// So no call here
 
-		// 9: detectVectorField (DESCRIBE table for main search)
-		$describeResponse2 = $this->createMock(Response::class);
-		$describeResponse2->method('hasError')->willReturn(false);
-		$describeResponse2->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
+			// 9: getVectorFields (DESCRIBE table for result filtering)
+			$describeResponse2 = $this->createMock(Response::class);
+			$describeResponse2->method('hasError')->willReturn(false);
+			$describeResponse2->method('getResult')->willReturn(
+				Struct::fromData(
+					[
+					[
 					'data' => [
 						['Field' => 'id', 'Type' => 'bigint'],
 						['Field' => 'content', 'Type' => 'text'],
 						['Field' => 'embedding', 'Type' => 'FLOAT_VECTOR(1536)'],
 					],
-				],
-				]
-			)
-		);
+					],
+					]
+				)
+			);
 
 
 
@@ -937,20 +936,21 @@ class ConversationHandlerTest extends TestCase {
 		$saveAssistantResponse = $this->createMock(Response::class);
 		$saveAssistantResponse->method('hasError')->willReturn(false);
 
-		$callCounter = 0;
-		$responses = [
-			$initResponse, $initResponse, // initializeTables
-			$modelResponse, // getModelByUuidOrName
-			$historyResponse, // getConversationHistory
-			$saveUserResponse, // saveMessage user initial
-			$queryHistoryResponse, // getConversationHistoryForQueryGeneration
-			$describeResponse, // detectVectorField for main search
-			$searchResponse, // performSearchWithExcludedIds
-			$saveUserContextResponse, // saveMessage user with context
-			$saveAssistantResponse, // saveMessage assistant
-		];
+			$callCounter = 0;
+			$responses = [
+				$initResponse, $initResponse, // initializeTables
+				$modelResponse, // getModelByUuidOrName
+				$historyResponse, // getConversationHistory
+				$queryHistoryResponse, // getConversationHistoryForQueryGeneration
+				$intentsResponse, // getRecentUserIntents
+				$describeResponse, // detectVectorField for main search
+				$searchResponse, // performSearchWithExcludedIds
+				$describeResponse2, // getVectorFields
+				$saveUserContextResponse, // saveMessage user with context
+				$saveAssistantResponse, // saveMessage assistant
+			];
 
-		$mockClient->method('sendRequest')
+			$mockClient->method('sendRequest')
 			->willReturnCallback(
 				function ($sql) use (&$callCounter, $responses) {
 					echo 'DB Call #' . (++$callCounter) . ': ' . substr($sql, 0, 100) . "...\n";
@@ -994,24 +994,24 @@ class ConversationHandlerTest extends TestCase {
 		 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
 		 * @return LlmProvider
 		 */
-		private function createMockLlmProvider(array $responses): LlmProvider {
-			$mockProvider = $this->createMock(LlmProvider::class);
-			$callCount = 0;
-			$mockProvider->method('generateResponse')
-				->willReturnCallback(
-					function ($_prompt, $_options = []) use (&$responses, &$callCount) {
-						unset($_prompt, $_options);
+	private function createMockLlmProvider(array $responses): LlmProvider {
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$callCount = 0;
+		$mockProvider->method('generateResponse')
+			->willReturnCallback(
+				function ($_prompt, $_options = []) use (&$responses, &$callCount) {
+					unset($_prompt, $_options);
 					if ($callCount >= sizeof($responses)) {
 						throw new \Exception(
 							'Too many LLM calls: expected ' . sizeof($responses) . ', got ' . ($callCount + 1)
 						);
 					}
 					$result = $responses[$callCount];
-						$callCount++;
-						return $result;
-					}
-				);
+					$callCount++;
+					return $result;
+				}
+			);
 
-			return $mockProvider;
-		}
+		return $mockProvider;
 	}
+}

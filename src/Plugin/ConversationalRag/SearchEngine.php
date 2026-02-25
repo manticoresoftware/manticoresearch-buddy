@@ -88,17 +88,16 @@ class SearchEngine {
 				WHERE knn({$vectorField}, 15, '{$excludeEscaped}')
 				AND knn_dist < 0.75";
 
-		Buddy::info("\n[DEBUG EXCLUSION QUERY]");
-		Buddy::info("├─ Exclude query: '{$excludeQuery}'");
-		Buddy::info("├─ Table: {$table}");
-		Buddy::info("├─ Vector field: {$vectorField}");
-		Buddy::info('├─ Threshold: 0.75');
-		Buddy::info("├─ Final SQL: {$sql}");
+		Buddy::debugvv("\n[DEBUG EXCLUSION QUERY]");
+		Buddy::debugvv("├─ Exclude query: '{$excludeQuery}'");
+		Buddy::debugvv("├─ Table: {$table}");
+		Buddy::debugvv("├─ Vector field: {$vectorField}");
+		Buddy::debugvv('├─ Threshold: 0.75');
+		Buddy::debugvv("├─ Final SQL: {$sql}");
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
-			Buddy::info('└─ Error: ' . $response->getError());
-			return []; // Return empty array on error
+			throw ManticoreSearchResponseError::create('Exclusion query failed: ' . $response->getError());
 		}
 
 		/** @var array<int, array{data: array<int, array{id: string|int}>}> $result */
@@ -106,8 +105,8 @@ class SearchEngine {
 		$excludeResults = $result[0]['data'] ?? [];
 
 		$excludedIds = array_column($excludeResults, 'id');
-		Buddy::info('├─ Raw results count: ' . sizeof($excludeResults));
-		Buddy::info('└─ Excluded IDs found: [' . implode(', ', $excludedIds) . ']');
+		Buddy::debugvv('├─ Raw results count: ' . sizeof($excludeResults));
+		Buddy::debugvv('└─ Excluded IDs found: [' . implode(', ', $excludedIds) . ']');
 
 		return $excludedIds;
 	}
@@ -204,12 +203,12 @@ class SearchEngine {
 					AND knn_dist < {$threshold}";
 		}
 
-		Buddy::info("\n[DEBUG KNN SEARCH]");
-		Buddy::info("├─ Search query: '{$searchQuery}'");
-		Buddy::info('├─ Excluded IDs: [' . implode(', ', $excludedIds) . ']');
-		Buddy::info("├─ k: {$kResults}");
-		Buddy::info("├─ Threshold: {$threshold}");
-		Buddy::info("├─ Final SQL: {$sql}");
+		Buddy::debugvv("\n[DEBUG KNN SEARCH]");
+		Buddy::debugvv("├─ Search query: '{$searchQuery}'");
+		Buddy::debugvv('├─ Excluded IDs: [' . implode(', ', $excludedIds) . ']');
+		Buddy::debugvv("├─ k: {$kResults}");
+		Buddy::debugvv("├─ Threshold: {$threshold}");
+		Buddy::debugvv("├─ Final SQL: {$sql}");
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
@@ -219,7 +218,7 @@ class SearchEngine {
 		/** @var array<int, array{data: array<int, array<string, mixed>>}> $responseResult */
 		$responseResult = $response->getResult();
 		$result = $responseResult[0]['data'] ?? [];
-		Buddy::info('└─ Results found: ' . sizeof($result));
+		Buddy::debugvv('└─ Results found: ' . sizeof($result));
 
 		return $this->filterVectorFields($result, $table, $client);
 	}
@@ -239,9 +238,15 @@ class SearchEngine {
 
 		// Check settings
 		if (isset($modelConfig['settings'])) {
-			$settings = is_string($modelConfig['settings'])
-				? simdjson_decode($modelConfig['settings'], true) ?? []
-				: $modelConfig['settings'];
+			if (is_string($modelConfig['settings'])) {
+				$decoded = simdjson_decode($modelConfig['settings'], true);
+				if (!is_array($decoded)) {
+					throw ManticoreSearchClientError::create('Invalid model settings JSON');
+				}
+				$settings = $decoded;
+			} else {
+				$settings = $modelConfig['settings'];
+			}
 
 			if (is_array($settings) && isset($settings['k_results'])) {
 				return (int)$settings['k_results'];
@@ -338,9 +343,15 @@ class SearchEngine {
 
 		// Check settings
 		if (isset($modelConfig['settings'])) {
-			$settings = is_string($modelConfig['settings'])
-				? json_decode($modelConfig['settings'], true) ?? []
-				: $modelConfig['settings'];
+			if (is_string($modelConfig['settings'])) {
+				$decoded = simdjson_decode($modelConfig['settings'], true);
+				if (!is_array($decoded)) {
+					throw ManticoreSearchClientError::create('Invalid model settings JSON');
+				}
+				$settings = $decoded;
+			} else {
+				$settings = $modelConfig['settings'];
+			}
 
 			if (is_array($settings) && isset($settings['similarity_threshold'])) {
 				return (float)$settings['similarity_threshold'];
