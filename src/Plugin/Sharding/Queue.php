@@ -357,19 +357,19 @@ final class Queue {
 	protected function handleAlterClusterAddTableError(string $query, Struct $errorResult): string {
 		// First check if query is still running
 		if ($this->checkQueryStillRunning($query)) {
-			Buddy::debugvv("ALTER CLUSTER ADD TABLE still running, will retry later");
+			Buddy::debugvv('ALTER CLUSTER ADD TABLE still running, will retry later');
 			return 'error'; // Will be retried by existing mechanism
 		}
 
 		// Query finished, check if tables are actually in cluster
-		Buddy::debugvv("ALTER CLUSTER ADD TABLE no longer running, verifying cluster status");
-		
+		Buddy::debugvv('ALTER CLUSTER ADD TABLE no longer running, verifying cluster status');
+
 		$clusterName = $this->extractClusterNameFromQuery($query);
 		$tableNames = $this->extractTableNamesFromQuery($query);
-		
+
 		if ($clusterName && !empty($tableNames)) {
 			if ($this->cluster->verifyTablesInCluster($clusterName, $tableNames)) {
-				Buddy::debugvv("Tables verified in cluster, marking as processed");
+				Buddy::debugvv('Tables verified in cluster, marking as processed');
 				return 'processed';
 			}
 		}
@@ -387,23 +387,23 @@ final class Queue {
 			$res = $this->client->sendRequest('SHOW QUERIES')->getResult();
 			/** @var array{0?:array{data?:array<array{query:string}>}} */
 			$data = $res;
-			
+
 			if (!isset($data[0]['data'])) {
 				return false;
 			}
 
 			$normalizedQuery = preg_replace('/\s+/', ' ', trim($query));
-			
+
 			foreach ($data[0]['data'] as $runningQuery) {
 				$runningQueryText = preg_replace('/\s+/', ' ', trim($runningQuery['query'] ?? ''));
-				if (stripos($runningQueryText, 'ALTER CLUSTER') !== false && 
-					stripos($runningQueryText, 'ADD') !== false) {
+				if (stripos($runningQueryText, 'ALTER CLUSTER') !== false
+					&& stripos($runningQueryText, 'ADD') !== false) {
 					// Simple pattern match for ALTER CLUSTER ... ADD queries
 					return true;
 				}
 			}
 		} catch (\Throwable $e) {
-			Buddy::debugvv("Error checking running queries: " . $e->getMessage());
+			Buddy::debugvv('Error checking running queries: ' . $e->getMessage());
 		}
 
 		return false;

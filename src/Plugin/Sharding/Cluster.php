@@ -383,16 +383,16 @@ final class Cluster {
 			$clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
 			/** @var array{0?:array{data?:array<array{cluster:string,tables?:string}>}} */
 			$data = $clusterResult->getResult();
-			
+
 			if (!isset($data[0]['data'])) {
 				return false;
 			}
 
 			foreach ($data[0]['data'] as $cluster) {
 				if ($cluster['cluster'] === $clusterName) {
-					$clusterTables = isset($cluster['tables']) ? 
+					$clusterTables = isset($cluster['tables']) ?
 						array_map('trim', explode(',', $cluster['tables'])) : [];
-					
+
 					// Check if all requested tables are in cluster
 					foreach ($tableNames as $tableName) {
 						if (!in_array($tableName, $clusterTables)) {
@@ -403,7 +403,7 @@ final class Cluster {
 				}
 			}
 		} catch (\Throwable $e) {
-			Buddy::debugvv("Error verifying tables in cluster: " . $e->getMessage());
+			Buddy::debugvv('Error verifying tables in cluster: ' . $e->getMessage());
 		}
 
 		return false;
