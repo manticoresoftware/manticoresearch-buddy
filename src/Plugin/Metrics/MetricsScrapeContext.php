@@ -12,11 +12,18 @@ final class MetricsScrapeContext {
 	public array $settings = [];
 
 	/**
-	 * Table names returned by SHOW TABLES.
+	 * Tables returned by SHOW TABLES (map: name => type, e.g. rt/plain/distributed).
 	 *
-	 * @var string[]
+	 * @var array<string, string>
 	 */
-	public array $tableNames = [];
+	public array $tables = [];
+
+	/**
+	 * Key-value vars extracted from SHOW TABLE <name> STATUS.
+	 *
+	 * @var array<string, array<string, string>>
+	 */
+	public array $tableStatuses = [];
 
 	/**
 	 * Raw rows from SHOW THREADS.

@@ -42,7 +42,7 @@ final class SchemaCollector implements CollectorInterface {
 		$indexNames = array_keys($indexes);
 		sort($indexNames);
 
-		$served = array_flip($context->tableNames);
+		$served = array_fill_keys(array_keys($context->tables), true);
 		$nonServed = [];
 		foreach ($indexNames as $indexName) {
 			if (isset($served[$indexName])) {
