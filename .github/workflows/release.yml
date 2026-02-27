@@ -5,7 +5,7 @@ on:
     tags:
       - 'v*.*.*'
     branches:
-      - main
+      - branch-a871e95
 
 env:
   APP_NAME: 'manticore-buddy'
@@ -25,7 +25,7 @@ jobs:
       deb_suffix: ${{ steps.vars.outputs.deb_suffix }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - id: vars
         run: |
           version=$(<APP_VERSION)
@@ -43,7 +43,7 @@ jobs:
     needs:
       - vars
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Prepare release directory
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
@@ -76,7 +76,7 @@ jobs:
     needs:
       - vars
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build binary
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
@@ -174,7 +174,7 @@ jobs:
       - build-linux-packages
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Generate changelog
@@ -261,35 +261,3 @@ jobs:
           artifact: ${{ matrix.artifact }}
           type: ${{ matrix.type }}
           delimiter: ${{ matrix.delimiter }}
-
-  update-manticoresearch-deps:
-    needs:
-      - vars
-      - deploy
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          repository: "manticoresoftware/manticoresearch"
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update deps.txt
-        id: deps
-        run: |
-          version=${{ needs.vars.outputs.app_version }}
-          date=${{ needs.vars.outputs.app_date }}
-          commit=${{ needs.vars.outputs.app_commit }}
-
-          version_string="$version $date $commit"
-          echo "version_string=${version_string// /-}" >> $GITHUB_OUTPUT
-          sed -i '/^buddy\s/c\buddy '"$version_string" deps.txt
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.PR_TOKEN }}
-          commit-message: "Bump buddy version to: ${{ steps.deps.outputs.version_string }}"
-          title: "Update buddy version"
-          body: "Updating buddy version to ${{ steps.deps.outputs.version_string }}"
-          branch: "update-buddy-version"
-          draft: false
