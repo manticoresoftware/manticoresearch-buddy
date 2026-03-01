@@ -464,6 +464,16 @@ final class Table {
 
 			// Handle different rebalancing scenarios
 			if ($inactiveNodes->count() > 0) {
+				// RF=1 means no replicas exist - dead node's shards are unrecoverable, skip rebalancing
+				if ($this->getReplicationFactor($schema) === 1) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: RF=1 and nodes are inactive"
+						. " ({$inactiveNodes->join(', ')}) - data on failed nodes is unrecoverable"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
+
 				// Existing logic: handle failed nodes
 				$newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
 				$this->handleFailedNodesRebalance($queue, $schema, $newSchema, $inactiveNodes);
