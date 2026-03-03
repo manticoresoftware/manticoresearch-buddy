@@ -74,7 +74,13 @@ class QueryProcessor {
 		/** @var BaseHandler $handler */
 		$handler = new $handlerClassName($pluginPayload);
 		foreach ($handler->getProps() as $prop) {
-			$handler->{'set' . ucfirst($prop)}(static::getObjFromContainer($prop));
+			$value = static::getObjFromContainer($prop);
+			if ($prop === 'manticoreClient') {
+				/** @var HTTPClient $value */
+				$value = clone $value;
+				$value->setDelegatedUser($request->user);
+			}
+			$handler->{'set' . ucfirst($prop)}($value);
 		}
 		return $handler;
 	}
