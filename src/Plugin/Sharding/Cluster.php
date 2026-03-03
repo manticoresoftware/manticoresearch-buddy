@@ -12,10 +12,6 @@ final class Cluster {
 	// Name of the cluster that we use to store meta data
 	// TODO: not in use yet
 	const SYSTEM_NAME = 'system';
-	const GALERA_OPTIONS = 'gmcast.peer_timeout=PT3S;' .
-		'evs.install_timeout=PT5S;' .
-		'evs.delayed_keep_period=PT10S;' .
-		'pc.wait_prim_timeout=PT5S';
 
 	/** @var Set<string> $nodes set of all nodes that belong the the cluster */
 	protected Set $nodes;
@@ -66,8 +62,7 @@ final class Cluster {
 	 */
 	public function create(?Queue $queue = null, ?string $operationGroup = null): int {
 		// TODO: the pass is the subject to remove
-		$galeraOptions = static::GALERA_OPTIONS;
-		$query = "CREATE CLUSTER IF NOT EXISTS {$this->name} '{$this->name}' as path, '{$galeraOptions}' as options";
+		$query = "CREATE CLUSTER IF NOT EXISTS {$this->name} '{$this->name}' as path";
 		$rollback = "DELETE CLUSTER {$this->name}";
 		return $this->runQuery($queue, $query, $rollback, $operationGroup);
 	}
@@ -202,12 +197,11 @@ final class Cluster {
 	 * @return static
 	 */
 	public function addNodeIds(Queue $queue, array $nodeIds, ?string $operationGroup = null): static {
-		$galeraOptions = static::GALERA_OPTIONS;
 		foreach ($nodeIds as $node) {
 			$this->nodes->add($node);
 			// TODO: the pass is the subject to remove
 			$query = "JOIN CLUSTER {$this->name} at '{$this->nodeId}' '{$this->name}' as " .
-				"path, '{$galeraOptions}' as options";
+				"path";
 			$rollback = "DELETE CLUSTER {$this->name}";
 			$queue->add($node, $query, $rollback, $operationGroup);
 		}
