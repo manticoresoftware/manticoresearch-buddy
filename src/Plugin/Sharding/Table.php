@@ -14,6 +14,7 @@ use RuntimeException;
 /** @package Manticoresearch\Buddy\Base\Plugin\Sharding */
 final class Table {
 	public readonly string $table;
+	protected State $state;
 
 	/**
 	 * Initialize with a given client
@@ -29,6 +30,8 @@ final class Table {
 		protected readonly string $extra
 	) {
 		$this->table = 'system.sharding_table';
+		$this->state = new State($this->client);
+		$this->state->setCluster($this->cluster);
 	}
 
 	/**
@@ -430,7 +433,7 @@ final class Table {
 		$state = null;
 		try {
 			// Create state instance for tracking rebalancing operations
-			$state = new State($this->client);
+			$state = $this->state;
 
 			// Prevent concurrent rebalancing operations
 			$rebalanceKey = "rebalance:{$this->name}";
@@ -517,7 +520,7 @@ final class Table {
 	 * } Status information
 	 */
 	public function stopRebalancing(bool $graceful = true): array {
-		$state = new State($this->client);
+		$state = $this->state;
 		$rebalanceKey = "rebalance:{$this->name}";
 		$currentStatus = $state->get($rebalanceKey);
 
@@ -562,7 +565,7 @@ final class Table {
 	 * @return bool Success status
 	 */
 	public function pauseRebalancing(): bool {
-		$state = new State($this->client);
+		$state = $this->state;
 		$rebalanceKey = "rebalance:{$this->name}";
 		$currentStatus = $state->get($rebalanceKey);
 
@@ -579,7 +582,7 @@ final class Table {
 	 * @return bool Success status
 	 */
 	public function resumeRebalancing(): bool {
-		$state = new State($this->client);
+		$state = $this->state;
 		$rebalanceKey = "rebalance:{$this->name}";
 		$currentStatus = $state->get($rebalanceKey);
 
@@ -609,7 +612,7 @@ final class Table {
 	 * } Progress information
 	 */
 	public function getRebalancingProgress(): array {
-		$state = new State($this->client);
+		$state = $this->state;
 		$rebalanceKey = "rebalance:{$this->name}";
 		$status = $state->get($rebalanceKey) ?? 'idle';
 		$operationGroup = $state->get("rebalance_group:{$this->name}");
@@ -637,7 +640,7 @@ final class Table {
 	 * @return bool Success status
 	 */
 	public function resetRebalancingState(): bool {
-		$state = new State($this->client);
+		$state = $this->state;
 		$rebalanceKey = "rebalance:{$this->name}";
 		$state->set($rebalanceKey, 'idle');
 		$state->delete("rebalance_group:{$this->name}");
@@ -650,7 +653,7 @@ final class Table {
 	 * @return bool
 	 */
 	protected function checkStopSignal(): bool {
-		$state = new State($this->client);
+		$state = $this->state;
 		return $state->get("stop_signal:{$this->name}") !== null;
 	}
 
@@ -659,7 +662,7 @@ final class Table {
 	 * @return void
 	 */
 	protected function setStopSignal(): void {
-		$state = new State($this->client);
+		$state = $this->state;
 		$state->set("stop_signal:{$this->name}", time());
 	}
 
@@ -668,7 +671,7 @@ final class Table {
 	 * @return void
 	 */
 	protected function clearStopSignal(): void {
-		$state = new State($this->client);
+		$state = $this->state;
 		$state->delete("stop_signal:{$this->name}");
 	}
 
@@ -687,7 +690,7 @@ final class Table {
 		?State $state = null
 	): void {
 		if (!$state) {
-			$state = new State($this->client);
+			$state = $this->state;
 		}
 		$rebalanceKey = "rebalance:{$this->name}";
 
@@ -1278,7 +1281,7 @@ final class Table {
 	 * @return bool
 	 */
 	public function canStartRebalancing(): bool {
-		$state = new State($this->client);
+		$state = $this->state;
 		$rebalanceKey = "rebalance:{$this->name}";
 		$currentRebalance = $state->get($rebalanceKey);
 
@@ -1291,7 +1294,7 @@ final class Table {
 	 * @return string
 	 */
 	public function getRebalancingStatus(): string {
-		$state = new State($this->client);
+		$state = $this->state;
 		$rebalanceKey = "rebalance:{$this->name}";
 		$status = $state->get($rebalanceKey);
 		return is_string($status) ? $status : 'idle';
