@@ -499,6 +499,7 @@ final class Table {
 			// Mark rebalancing as completed
 			$state->set($rebalanceKey, 'completed');
 			$state->delete("rebalance_group:{$this->name}"); // Clear operation group
+			Buddy::info("Rebalancing completed for table {$this->name}");
 		} catch (\Throwable $t) {
 			// Enhanced error handling with rollback
 			$this->handleRebalancingFailure($t, $operationGroup, $queue, $state ?? null);
