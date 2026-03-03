@@ -461,7 +461,10 @@ final class Util {
 	private static function assignShardsToNodes(Vector $schema, Set $shards): Vector {
 		foreach ($shards as $shard) {
 			$node = self::findNodeWithMinimumShards($schema, $shard);
-		  // It will never happen, but for phpstan
+			// Shard already present on all active nodes (RF >= active node count) — nothing to reassign
+			if ($node === -1) {
+				continue;
+			}
 			if (!isset($schema[$node])) {
 				throw new RuntimeException("Inconsistency with schema node #{$node}");
 			}
@@ -486,6 +489,10 @@ final class Util {
 				fn ($a, $b) =>
 					$a['shards']->count() < $b['shards']->count() ? -1 : 1
 			);
+		// All active nodes already hold this shard — fully replicated, nothing to assign
+		if ($nodesToChoose->isEmpty()) {
+			return -1;
+		}
 		$index = $schema->find($nodesToChoose->first());
 		if (false === $index) {
 			throw new RuntimeException('Failed to find node to use');
