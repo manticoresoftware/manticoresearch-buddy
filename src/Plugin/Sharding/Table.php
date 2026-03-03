@@ -1363,18 +1363,21 @@ final class Table {
 		Set $processedTables
 	): void {
 		if (!$processedTables->contains($table)) {
-			foreach ($connections as $connectedNode) {
-				if ($connectedNode === $nodeId) {
-					continue;
-				}
-				$cluster = new Cluster(
-					$this->client,
-					$clusterName,
-					$connectedNode
-				);
+			// Mark processed BEFORE the operation so no other iteration can duplicate it
+			$processedTables->add($table);
+
+			// Pick ONE alive node (sorted for determinism) — ALTER CLUSTER DROP replicates to all members,
+			// running it on multiple nodes causes "table not in cluster" on the second attempt
+			$aliveNodes = $connections->filter(fn($n) => $n !== $nodeId);
+			$aliveNodes->sort();
+			$aliveNode = $aliveNodes->first();
+
+		if ($aliveNode) {
+				$cluster = new Cluster($this->client, $clusterName, $aliveNode);
+				// Bootstrap the surviving node as primary so it can accept cluster operations
+				// while the dead node is still listed as a member
 				$queueIds[] = $cluster->makePrimary($queue);
 				$queueIds[] = $cluster->removeTables($queue, [$table]);
-				$processedTables->add($table);
 			}
 		}
 
