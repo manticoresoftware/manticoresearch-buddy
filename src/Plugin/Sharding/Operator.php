@@ -313,23 +313,31 @@ final class Operator {
 	 * @return static
 	 */
 	public function checkRebalanceStatus(): static {
-		$list = $this->state->listRegex('rebalance_queue_id:.+');
+		$list = $this->state->listRegex('rebalance_queue_ids:.+');
 		foreach ($list as $row) {
 			[, $name] = explode(':', $row['key']);
-			$queueId = (int)$row['value'];
-			$queueRow = $this->getQueue()->getById($queueId);
-			if (!$queueRow || $queueRow['status'] === 'created' || $queueRow['status'] === 'processing') {
+			/** @var array<string,int> $nodeTailIds */
+			$nodeTailIds = $row['value'];
+			if (!is_array($nodeTailIds)) {
 				continue;
 			}
-			$this->state->delete("rebalance_queue_id:{$name}");
-			if ($queueRow['status'] === 'processed') {
-				$this->state->set("rebalance:{$name}", 'completed');
-				Buddy::info("Rebalancing completed for table {$name}");
-			} else {
-				// Queue item errored — unblock so next topology change can re-trigger rebalance
-				$this->state->set("rebalance:{$name}", 'idle');
-				Buddy::info("Rebalancing failed for table {$name} (queue id: {$queueId}, status: {$queueRow['status']})");
+
+			foreach ($nodeTailIds as $node => $queueId) {
+				$queueRow = $this->getQueue()->getById($queueId);
+				if (!$queueRow || $queueRow['status'] === 'created' || $queueRow['status'] === 'processing') {
+					continue 2;
+				}
+				if ($queueRow['status'] !== 'processed') {
+					$this->state->delete("rebalance_queue_ids:{$name}");
+					$this->state->set("rebalance:{$name}", 'idle');
+					Buddy::info("Rebalancing failed for table {$name}: node {$node} queue id {$queueId} status {$queueRow['status']}");
+					continue 2;
+				}
 			}
+
+			$this->state->delete("rebalance_queue_ids:{$name}");
+			$this->state->set("rebalance:{$name}", 'completed');
+			Buddy::info("Rebalancing completed for table {$name}");
 		}
 		return $this;
 	}

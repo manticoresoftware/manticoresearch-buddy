@@ -188,40 +188,7 @@ final class Cluster {
 		return $status === 'primary';
 	}
 
-	/**
-	 * Check that all clusters on this node are in primary state (not joining/syncing)
-	 * This is critical before processing queue items that may operate on replication clusters
-	 * @param Client $client
-	 * @return bool True if all clusters are primary, false if any is still joining
-	 */
-	public static function areAllActive(Client $client): bool {
-		try {
-			$clusterResult = $client->sendRequest('SHOW CLUSTERS');
-			/** @var array{0?:array{data?:array<array{cluster:string}>}} */
-			$data = $clusterResult->getResult();
 
-			if (!isset($data[0]['data'])) {
-				return true; // No clusters = all synced
-			}
-
-			foreach ($data[0]['data'] as $cluster) {
-				$clusterName = $cluster['cluster'];
-				$statusRes = $client->sendRequest("SHOW STATUS LIKE 'cluster_{$clusterName}_status'");
-				/** @var array{0:array{data:array{0?:array{Value:string}}}} */
-				$statusData = $statusRes->getResult();
-				$status = $statusData[0]['data'][0]['Value'] ?? 'primary';
-				if ($status !== 'primary') {
-					Buddy::debugvv("Cluster '{$clusterName}' is not ready (status: {$status}), skipping queue processing");
-					return false;
-				}
-			}
-		} catch (\Throwable $e) {
-			Buddy::debugvv('Error checking cluster statuses: ' . $e->getMessage());
-			return false;
-		}
-
-		return true;
-	}
 
 	/**
 	 * Create a cluster by using distributed queue with list of nodes
