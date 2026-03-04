@@ -189,7 +189,7 @@ final class Cluster {
 	}
 
 	/**
-	 * Check that ALL sharding-generated clusters on this node are primary.
+	 * Check that ALL sharding-generated clusters on this node are primary and synced.
 	 * Sharding clusters have 32-char lowercase hex names (md5 hash of node set).
 	 * Must be true before processing any queue items, otherwise ALTER CLUSTER
 	 * commands will fail with "cluster is not ready, current state is joining".
@@ -198,17 +198,33 @@ final class Cluster {
 	 */
 	public static function areAllShardingClustersPrimary(Client $client): bool {
 		$res = $client
-			->sendRequest("SHOW STATUS LIKE 'cluster_%_status'")
+			->sendRequest("SHOW STATUS LIKE 'cluster_%'")
 			->getResult();
 		/** @var array{0:array{data:array<array{Counter:string,Value:string}}}} $res */
 		$rows = $res[0]['data'] ?? [];
+		
+		// Track status and node_state per cluster
+		$clusterStates = [];
 		foreach ($rows as $row) {
-			// Counter format: cluster_{name}_status — extract the name
-			if (!preg_match('/^cluster_([a-f0-9]{32})_status$/', $row['Counter'], $m)) {
+			// Match both cluster_{name}_status and cluster_{name}_node_state
+			if (!preg_match('/^cluster_([a-f0-9]{32})_(status|node_state)$/', $row['Counter'], $m)) {
 				continue;
 			}
-			if ($row['Value'] !== 'primary') {
-				Buddy::info("Sharding cluster {$m[1]} is not ready yet (state: {$row['Value']})");
+			$clusterName = $m[1];
+			$field = $m[2];
+			$clusterStates[$clusterName][$field] = $row['Value'];
+		}
+		
+		foreach ($clusterStates as $name => $state) {
+			$status = $state['status'] ?? 'unknown';
+			$nodeState = $state['node_state'] ?? 'unknown';
+			
+			if ($status !== 'primary') {
+				Buddy::info("Sharding cluster {$name} is not ready (status: {$status})");
+				return false;
+			}
+			if ($nodeState !== 'synced') {
+				Buddy::info("Sharding cluster {$name} is not ready (node_state: {$nodeState})");
 				return false;
 			}
 		}
