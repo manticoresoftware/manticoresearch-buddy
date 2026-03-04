@@ -201,7 +201,7 @@ final class Cluster {
 			$this->nodes->add($node);
 			// TODO: the pass is the subject to remove
 			$query = "JOIN CLUSTER {$this->name} at '{$this->nodeId}' '{$this->name}' as " .
-				"path";
+				'path';
 			$rollback = "DELETE CLUSTER {$this->name}";
 			$queue->add($node, $query, $rollback, $operationGroup);
 		}
