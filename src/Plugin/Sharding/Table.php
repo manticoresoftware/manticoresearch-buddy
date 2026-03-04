@@ -506,9 +506,9 @@ final class Table {
 
 			// Mark rebalancing as queued — actual completion tracked via checkRebalanceStatus()
 			$state->set($rebalanceKey, 'queued');
-			$state->set("rebalance_queue_id:{$this->name}", $lastQueueId);
+			$state->set("rebalance_queue_ids:{$this->name}", $lastQueueId);
 			$state->delete("rebalance_group:{$this->name}");
-			Buddy::info("Rebalancing queued for table {$this->name} (last queue ID: {$lastQueueId})");
+			Buddy::info("Rebalancing queued for table {$this->name}");
 		} catch (\Throwable $t) {
 			// Enhanced error handling with rollback
 			$this->handleRebalancingFailure($t, $operationGroup, $queue, $state ?? null);
@@ -955,7 +955,7 @@ final class Table {
 		Vector $schema,
 		Vector $newSchema,
 		Set $inactiveNodes
-	): int {
+	): array {
 		// Initialize cluster map and shard nodes mapping
 		$initData = $this->initializeClusterMap($schema, $inactiveNodes);
 		$shardNodesMap = $initData['shardNodesMap'];
@@ -979,10 +979,9 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
 	 * @param Set<string> $newNodes
-	 * @return void
-	 * @return int Last queue ID
+	 * @return array<string,int> Map of node => last queue ID
 	 */
-	protected function handleNewNodesRebalance(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): int {
+	protected function handleNewNodesRebalance(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): array {
 		$replicationFactor = $this->getReplicationFactor($schema);
 
 		if ($replicationFactor === 1) {
@@ -997,9 +996,9 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
 	 * @param Set<string> $newNodes
-	 * @return void
+	 * @return array<string,int> Map of node => last queue ID
 	 */
-	protected function handleRF1NewNodes(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): int {
+	protected function handleRF1NewNodes(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): array {
 		// For RF=1, we need to move shards from existing nodes to new nodes
 		// This requires careful orchestration with temporary clusters
 
@@ -1025,11 +1024,11 @@ final class Table {
 
 		$this->updateScheme($newSchema);
 
-		$lastQueueId = $this->createDistributedTablesFromSchema($queue, $newSchema);
+		$nodeTailIds = $this->createDistributedTablesFromSchema($queue, $newSchema);
 
 		// Reset wait for id
 		$queue->resetWaitForId();
-		return $lastQueueId;
+		return $nodeTailIds;
 	}
 
 	/**
@@ -1038,9 +1037,9 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
 	 * @param Set<string> $newNodes
-	 * @return void
+	 * @return array<string,int> Map of node => last queue ID
 	 */
-	protected function handleRFNNewNodes(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): int {
+	protected function handleRFNNewNodes(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): array {
 		/** @var Map<string,Cluster> */
 		$clusterMap = new Map;
 		$lastQueueId = 0;
@@ -1088,18 +1087,18 @@ final class Table {
 			$queue->setWaitForId($lastQueueId);
 		}
 		$this->updateScheme($newSchema);
-		$lastQueueId = $this->createDistributedTablesFromSchema($queue, $newSchema);
+		$nodeTailIds = $this->createDistributedTablesFromSchema($queue, $newSchema);
 		$queue->resetWaitForId();
-		return $lastQueueId;
+		return $nodeTailIds;
 	}
 
 	/**
 	 * Create distributed tables from schema
 	 * @param Queue $queue
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
-	 * @return int Last queue ID added
+	 * @return array<string,int> Map of node => last queue ID added for that node
 	 */
-	protected function createDistributedTablesFromSchema(Queue $queue, Vector $newSchema): int {
+	protected function createDistributedTablesFromSchema(Queue $queue, Vector $newSchema): array {
 		/** @var Set<int> */
 		$dropQueueIds = new Set;
 
@@ -1113,6 +1112,8 @@ final class Table {
 		// Then create new distributed tables, waiting for all drops to complete
 		$lastDropId = $dropQueueIds->count() > 0 ? max($dropQueueIds->toArray()) : 0;
 
+		/** @var array<string,int> $nodeTailIds */
+		$nodeTailIds = [];
 		foreach ($newSchema as $row) {
 			// Do nothing when no shards present for this node
 			if (!$row['shards']->count()) {
@@ -1124,14 +1125,14 @@ final class Table {
 				$queue->setWaitForId($lastDropId);
 			}
 
-		// Pass the calculated schema to avoid database timing issues
 			$sql = $this->getCreateShardedTableSQLWithSchema($row['shards'], $newSchema);
 			$lastQueueId = $queue->add($row['node'], $sql, "DROP TABLE IF EXISTS {$this->name}");
+			$nodeTailIds[$row['node']] = $lastQueueId;
 		}
 
 		// Reset wait for id
 		$queue->resetWaitForId();
-		return $lastQueueId ?? 0;
+		return $nodeTailIds;
 	}
 
 	/**
