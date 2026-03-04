@@ -1390,6 +1390,7 @@ final class Table {
 		Set $queueIds,
 		Set $processedTables
 	): void {
+		$removeTablesId = 0;
 		if (!$processedTables->contains($table)) {
 			// Mark processed BEFORE the operation so no other iteration can duplicate it
 			$processedTables->add($table);
@@ -1405,11 +1406,18 @@ final class Table {
 				// Bootstrap the surviving node as primary so it can accept cluster operations
 				// while the dead node is still listed as a member
 				$queueIds[] = $cluster->makePrimary($queue);
-				$queueIds[] = $cluster->removeTables($queue, [$table]);
+				$removeTablesId = $cluster->removeTables($queue, [$table]);
+				$queueIds[] = $removeTablesId;
 			}
 		}
 
+		// Must wait for ALTER CLUSTER DROP to complete before dropping locally —
+		// Manticore rejects DROP TABLE on a table that's still a cluster member
+		if ($removeTablesId > 0) {
+			$queue->setWaitForId($removeTablesId);
+		}
 		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}", '');
+		$queue->resetWaitForId();
 	}
 
 	/**
