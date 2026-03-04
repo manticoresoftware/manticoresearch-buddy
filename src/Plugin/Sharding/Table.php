@@ -440,8 +440,8 @@ final class Table {
 			$rebalanceKey = "rebalance:{$this->name}";
 			$currentRebalance = $state->get($rebalanceKey);
 
-			if ($currentRebalance === 'running') {
-				Buddy::debugvv("Sharding rebalance: operation already running for table {$this->name}, skipping");
+			if ($currentRebalance === 'running' || $currentRebalance === 'queued') {
+				Buddy::debugvv("Sharding rebalance: operation already {$currentRebalance} for table {$this->name}, skipping");
 				return;
 			}
 
