@@ -202,24 +202,18 @@ final class Cluster {
 			->getResult();
 		/** @var array{0:array{data:array<array{Counter:string,Value:string}}}} $res */
 		$rows = $res[0]['data'] ?? [];
-		$found = 0;
 		foreach ($rows as $row) {
 			// Counter format: cluster_{name}_status — extract the name
 			if (!preg_match('/^cluster_([a-f0-9]{32})_status$/', $row['Counter'], $m)) {
 				continue;
 			}
-			$found++;
 			if ($row['Value'] !== 'primary') {
-				Buddy::info("Sharding cluster {$m[1]} not primary yet (state: {$row['Value']}) — blocking queue");
+				Buddy::info("Sharding cluster {$m[1]} is not ready yet (state: {$row['Value']})");
 				return false;
 			}
 		}
-		if ($found === 0) {
-			Buddy::info('No sharding clusters found on this node — proceeding (fresh node or none created yet)');
-		}
 		return true;
 	}
-
 
 
 
