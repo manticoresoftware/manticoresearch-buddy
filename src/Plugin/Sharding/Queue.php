@@ -194,7 +194,8 @@ final class Queue {
 			return true;
 		}
 
-		Buddy::info("[$node->id] Queue query error: {$query['query']}");
+		$error = $res['error'] ?? ($res[0]['error'] ?? 'unknown error');
+		Buddy::info("[$node->id] Queue query error: {$query['query']} ($error)");
 		return false;
 	}
 

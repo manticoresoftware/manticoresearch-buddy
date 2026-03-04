@@ -318,12 +318,18 @@ final class Operator {
 			[, $name] = explode(':', $row['key']);
 			$queueId = (int)$row['value'];
 			$queueRow = $this->getQueue()->getById($queueId);
-			if (!$queueRow || $queueRow['status'] === 'created') {
+			if (!$queueRow || $queueRow['status'] === 'created' || $queueRow['status'] === 'processing') {
 				continue;
 			}
 			$this->state->delete("rebalance_queue_id:{$name}");
-			$this->state->set("rebalance:{$name}", 'completed');
-			Buddy::info("Rebalancing completed for table {$name}");
+			if ($queueRow['status'] === 'processed') {
+				$this->state->set("rebalance:{$name}", 'completed');
+				Buddy::info("Rebalancing completed for table {$name}");
+			} else {
+				// Queue item errored — unblock so next topology change can re-trigger rebalance
+				$this->state->set("rebalance:{$name}", 'idle');
+				Buddy::info("Rebalancing failed for table {$name} (queue id: {$queueId}, status: {$queueRow['status']})");
+			}
 		}
 		return $this;
 	}
