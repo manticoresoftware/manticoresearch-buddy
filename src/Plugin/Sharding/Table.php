@@ -466,7 +466,7 @@ final class Table {
 				return;
 			}
 
-			// Handle different rebalancing scenarios
+		// Handle different rebalancing scenarios
 			if ($inactiveNodes->count() > 0) {
 				// RF=1 means no replicas exist - dead node's shards are unrecoverable, skip rebalancing
 				if ($this->getReplicationFactor($schema) === 1) {
@@ -478,19 +478,21 @@ final class Table {
 					return;
 				}
 
-				// Not enough active nodes to maintain RF - skip, nothing can be rebalanced
 				$rf = $this->getReplicationFactor($schema);
-				if ($activeNodes->count() < $rf) {
+				$totalAvailableNodes = $activeNodes->merge($newNodes);
+
+				// Not enough nodes even counting new arrivals - skip
+				if ($totalAvailableNodes->count() < $rf) {
 					Buddy::info(
-						"Skipping rebalance for table {$this->name}: only {$activeNodes->count()} active nodes"
+						"Skipping rebalance for table {$this->name}: only {$totalAvailableNodes->count()} available nodes"
 						. " cannot maintain RF={$rf} ({$inactiveNodes->join(', ')} inactive)"
 					);
 					$state->set($rebalanceKey, 'idle');
 					return;
 				}
 
-				// Existing logic: handle failed nodes
-				$newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
+				// Rebalance using all available nodes (covers both: dead node replaced by new node, or enough survivors)
+				$newSchema = Util::rebalanceShardingScheme($schema, $totalAvailableNodes);
 				$this->handleFailedNodesRebalance($queue, $schema, $newSchema, $inactiveNodes);
 			} elseif ($newNodes->count() > 0) {
 				// New logic: handle new nodes
@@ -1400,7 +1402,7 @@ final class Table {
 			$aliveNodes->sort();
 			$aliveNode = $aliveNodes->first();
 
-		if ($aliveNode) {
+			if ($aliveNode) {
 				$cluster = new Cluster($this->client, $clusterName, $aliveNode);
 				// Bootstrap the surviving node as primary so it can accept cluster operations
 				// while the dead node is still listed as a member
