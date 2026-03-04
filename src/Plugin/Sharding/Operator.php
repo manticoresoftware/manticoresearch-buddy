@@ -117,6 +117,15 @@ final class Operator {
 			return $this;
 		}
 
+		// Topology changed but sharding clusters may still be joining/syncing.
+		// Rebalancing against a partially-synced cluster produces wrong schema and
+		// queues DROP/CREATE against clusters that don't have the tables yet.
+		// Wait until every sharding cluster on this node is primary before acting.
+		if (!Cluster::areAllShardingClustersPrimary($this->client)) {
+			Buddy::info('Topology changed but sharding clusters not all primary yet — deferring rebalance');
+			return $this;
+		}
+
 		// Topology changed - determine what kind of change
 		if ($inactiveNodes->count() > 0) {
 			Buddy::info("Rebalancing due to inactive nodes: {$inactiveNodes->join(', ')}");
@@ -147,6 +156,8 @@ final class Operator {
 		$this->state->set('cluster_hash', $clusterHash);
 		return $this;
 	}
+
+
 
 	/**
 	 * Make current node as master node
