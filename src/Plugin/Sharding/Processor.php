@@ -60,6 +60,13 @@ final class Processor extends BaseProcessor {
 			return false;
 		}
 
+		// Do nothing if any replication cluster is still joining/syncing
+		// This is critical for queue items that operate on sharded table clusters
+		if (!Cluster::areAllActive($this->client)) {
+			Buddy::info('Replication clusters are syncing');
+			return false;
+		}
+
 		$operator->processQueue();
 
 		// heartbeat and mark current node state
