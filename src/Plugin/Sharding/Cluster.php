@@ -367,6 +367,34 @@ final class Cluster {
 	}
 
 	/**
+	/**
+	 * Check if a cluster exists
+	 * @param string $clusterName
+	 * @return bool
+	 */
+	public function exists(string $clusterName): bool {
+		try {
+			$clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
+			/** @var array{0?:array{data?:array<array{cluster:string}>}} */
+			$data = $clusterResult->getResult();
+
+			if (!isset($data[0]['data'])) {
+				return false;
+			}
+
+			foreach ($data[0]['data'] as $cluster) {
+				if ($cluster['cluster'] === $clusterName) {
+					return true;
+				}
+			}
+		} catch (\Throwable $e) {
+			Buddy::debugvv('Error checking cluster existence: ' . $e->getMessage());
+		}
+
+		return false;
+	}
+
+	/**
 	 * Verify that specified tables are present in the cluster
 	 * @param string $clusterName
 	 * @param array<string> $tableNames

@@ -180,6 +180,11 @@ final class Queue {
 			$status = $this->handleAlterClusterAddTableError($query['query'], $res);
 		}
 
+		// Special handling for ALTER CLUSTER DROP TABLE commands
+		if ($status === 'error' && $this->isAlterClusterDropTableQuery($query['query'])) {
+			$status = $this->handleAlterClusterDropTableError($query['query'], $res);
+		}
+
 		Buddy::debugvv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
 
 		$duration = (int)((microtime(true) - $mt) * 1000);
@@ -340,11 +345,53 @@ final class Queue {
 
 	/**
 	 * Check if query is ALTER CLUSTER ADD TABLE command
+	/**
+	 * Check if query is ALTER CLUSTER ADD TABLE command
 	 * @param string $query
 	 * @return bool
 	 */
 	protected function isAlterClusterAddTableQuery(string $query): bool {
 		return (bool)preg_match('/^\s*ALTER\s+CLUSTER\s+\w+\s+ADD\s+/i', $query);
+	}
+
+	/**
+	 * Check if query is ALTER CLUSTER DROP TABLE command
+	 * @param string $query
+	 * @return bool
+	 */
+	protected function isAlterClusterDropTableQuery(string $query): bool {
+		return (bool)preg_match('/^\s*ALTER\s+CLUSTER\s+\w+\s+DROP\s+/i', $query);
+	}
+
+	/**
+	 * Handle error for ALTER CLUSTER DROP TABLE by checking if table is already not in cluster
+	 * or if cluster doesn't exist (which makes the error acceptable - operation already done)
+	 * @param string $query
+	 * @param Struct $errorResult
+	 * @return string 'processed' if operation is already done, 'error' otherwise
+	 */
+	protected function handleAlterClusterDropTableError(string $query, Struct $errorResult): string {
+		$clusterName = $this->extractClusterNameFromQuery($query);
+		$tableNames = $this->extractTableNamesFromQuery($query);
+
+		if (!$clusterName || empty($tableNames)) {
+			return 'error';
+		}
+
+		// Check if cluster exists - if not, the DROP is effectively done
+		if (!$this->cluster->exists($clusterName)) {
+			Buddy::debugvv("ALTER CLUSTER DROP: cluster '{$clusterName}' doesn't exist, marking as processed");
+			return 'processed';
+		}
+
+		// Check if tables are NOT in cluster - if so, DROP is already done
+		if (!$this->cluster->verifyTablesInCluster($clusterName, $tableNames)) {
+			Buddy::debugvv('ALTER CLUSTER DROP: tables not in cluster, marking as processed');
+			return 'processed';
+		}
+
+		// Tables are still in cluster but DROP failed - this is a real error
+		return 'error';
 	}
 
 	/**
@@ -355,7 +402,6 @@ final class Queue {
 	 * @return string 'processed' if verified successful, 'error' otherwise
 	 */
 	protected function handleAlterClusterAddTableError(string $query, Struct $errorResult): string {
-		// First check if query is still running
 		if ($this->checkQueryStillRunning($query)) {
 			Buddy::debugvv('ALTER CLUSTER ADD TABLE still running, will retry later');
 			return 'error'; // Will be retried by existing mechanism

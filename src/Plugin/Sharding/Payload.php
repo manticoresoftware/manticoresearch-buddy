@@ -61,7 +61,12 @@ final class Payload extends BasePayload {
 		return match ($request->command) {
 			'create', 'alter' => static::fromCreate($request),
 			'drop' => static::fromDrop($request),
-			'desc', 'describe', 'show' => static::fromDesc($request),
+			'show' => match (true) {
+				stripos($request->payload, 'show sharding master') === 0 => static::fromMaster($request),
+				stripos($request->payload, 'show sharding status') === 0 => static::fromStatus($request),
+				default => static::fromDesc($request),
+			},
+			'desc', 'describe' => static::fromDesc($request),
 			default => throw new QueryParseError('Failed to parse query'),
 		};
 	}
@@ -183,6 +188,45 @@ final class Payload extends BasePayload {
 		return $self;
 	}
 
+
+	/**
+	 * @param Request $request
+	 * @return static
+	 */
+	protected static function fromStatus(Request $request): static {
+		// Parse optional cluster:table or just table from SHOW SHARDING STATUS [cluster:]table
+		$pattern = '/^SHOW\s+SHARDING\s+STATUS(?:\s+(?:(?P<cluster>[^:\s]+):)?(?P<table>[^\s]+))?/ius';
+		preg_match($pattern, $request->payload, $matches);
+
+		$self = new static();
+		$self->path = $request->path;
+		$self->type = 'status';
+		$self->cluster = $matches['cluster'] ?? '';
+		$self->table = strtolower($matches['table'] ?? '');
+		$self->structure = '';
+		$self->options = [];
+		$self->quiet = false;
+		$self->extra = '';
+		return $self;
+	}
+
+	/**
+	 * @param Request $request
+	 * @return static
+	 */
+	protected static function fromMaster(Request $request): static {
+		$self = new static();
+		$self->path = $request->path;
+		$self->type = 'master';
+		$self->cluster = '';
+		$self->table = '';
+		$self->structure = '';
+		$self->options = [];
+		$self->quiet = false;
+		$self->extra = '';
+		return $self;
+	}
+
 	/**
 	 * @param Request $request
 	 * @return bool
@@ -194,6 +238,14 @@ final class Payload extends BasePayload {
 		) {
 			return true;
 		}
+
+		if ($request->command === 'show'
+			&& (stripos($request->payload, 'show sharding status') === 0
+				|| stripos($request->payload, 'show sharding master') === 0)
+		) {
+			return true;
+		}
+
 		if ($request->command === 'show' && strpos($request->error, 'error in your query') !== false) {
 			return true;
 		}
@@ -276,6 +328,8 @@ final class Payload extends BasePayload {
 		return match ($this->type) {
 			'create' => CreateHandler::class,
 			'drop' => DropHandler::class,
+			'status' => ShowStatusHandler::class,
+			'master' => ShowMasterHandler::class,
 			'desc', 'describe', 'show' => DescHandler::class,
 			default => throw new \Exception('Unsupported sharding type'),
 		};

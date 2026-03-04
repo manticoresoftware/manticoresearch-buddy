@@ -56,7 +56,7 @@ final class Table {
 
 		// Build shard → nodes map first so we can reconstruct per-shard connections
 		$shardNodesMap = [];
-		foreach ($res[0]['data'] as $row) {
+		foreach ($res[0]['data'] ?? [] as $row) {
 			/** @var array{node:string,shards:string} $row*/
 			$shards = static::parseShards($row['shards']);
 			foreach ($shards as $shard) {
@@ -64,7 +64,7 @@ final class Table {
 			}
 		}
 
-		foreach ($res[0]['data'] as $row) {
+		foreach ($res[0]['data'] ?? [] as $row) {
 			$shards = static::parseShards($row['shards']);
 			// connections = nodes sharing the first shard of this node.
 			// All shards on a node belong to clusters of the same RF size — picking
@@ -1141,7 +1141,7 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @return int
 	 */
-	protected function getReplicationFactor(Vector $schema): int {
+	public function getReplicationFactor(Vector $schema): int {
 		if ($schema->isEmpty()) {
 			return 1;
 		}
@@ -1733,7 +1733,7 @@ final class Table {
 	 * @param  string $shards
 	 * @return Set<int>
 	 */
-	protected static function parseShards(string $shards): Set {
+	public static function parseShards(string $shards): Set {
 		return trim($shards) !== ''
 			? new Set(array_map('intval', explode(',', $shards)))
 			: new Set
@@ -1759,7 +1759,7 @@ final class Table {
 		Map $clusterMap
 	): void {
 		// Calculate original replication factor to ensure safe operations
-		$originalRf = $this->calculateReplicationFactor($oldSchema);
+		$originalRf = $this->getReplicationFactor($oldSchema);
 
 		// Create map of old schema for comparison
 		/** @var Map<string,Set<int>> */
