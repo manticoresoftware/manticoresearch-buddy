@@ -54,23 +54,24 @@ final class Table {
 			)
 			->getResult();
 
-		// Initialize an empty array to hold connections
-		$connections = [];
+		// Build shard → nodes map first so we can reconstruct per-shard connections
+		$shardNodesMap = [];
 		foreach ($res[0]['data'] as $row) {
 			/** @var array{node:string,shards:string} $row*/
 			$shards = static::parseShards($row['shards']);
 			foreach ($shards as $shard) {
-				$connections[$shard][] = $row['node'];
+				$shardNodesMap[$shard][] = $row['node'];
 			}
 		}
 
 		foreach ($res[0]['data'] as $row) {
 			$shards = static::parseShards($row['shards']);
+			// connections = nodes sharing the first shard of this node.
+			// All shards on a node belong to clusters of the same RF size — picking
+			// any single shard gives the correct peer set without inflating it via union.
+			$firstShard = $shards->first();
 			/** @var Set<string> */
-			$connectedNodes = new Set;
-			foreach ($shards as $shard) {
-				$connectedNodes->add(...$connections[$shard]);
-			}
+			$connectedNodes = new Set($shardNodesMap[$firstShard] ?? []);
 			/** @var array{node:string,shards:string} $row */
 			$nodes->push(
 				[
@@ -1134,13 +1135,25 @@ final class Table {
 	}
 
 	/**
-	 * Get replication factor from current schema
+	 * Get replication factor from current schema by counting how many nodes hold each shard
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @return int
 	 */
 	protected function getReplicationFactor(Vector $schema): int {
-		return $this->calculateReplicationFactor($schema);
+		if ($schema->isEmpty()) {
+			return 1;
+		}
+
+		$shardCounts = new Map();
+		foreach ($schema as $row) {
+			foreach ($row['shards'] as $shard) {
+				$shardCounts->put($shard, $shardCounts->get($shard, 0) + 1);
+			}
+		}
+
+		return $shardCounts->isEmpty() ? 1 : max($shardCounts->values()->toArray());
 	}
+
 
 	/**
 	 * Calculate which shards should move for RF=1 rebalancing
@@ -1794,31 +1807,4 @@ final class Table {
 		}
 	}
 
-	/**
-	 * Calculate the original replication factor from the schema
-	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
-	 * @return int
-	 */
-	private function calculateReplicationFactor(Vector $schema): int {
-		if ($schema->isEmpty()) {
-			return 1;
-		}
-
-		// Count how many nodes have each shard
-		$shardCounts = new Map();
-
-		foreach ($schema as $row) {
-			foreach ($row['shards'] as $shard) {
-				$currentCount = $shardCounts->get($shard, 0);
-				$shardCounts->put($shard, $currentCount + 1);
-			}
-		}
-
-		if ($shardCounts->isEmpty()) {
-			return 1;
-		}
-
-		// The replication factor is the maximum count of any shard
-		return max($shardCounts->values()->toArray());
-	}
 }
