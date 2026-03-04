@@ -172,7 +172,7 @@ final class Cluster {
 	 * @return Set<string>
 	 */
 	public function getInactiveNodes(): Set {
-		return $this->getNodes()->xor($this->getActiveNodes());
+		return $this->getNodes()->diff($this->getActiveNodes());
 	}
 
 	/**

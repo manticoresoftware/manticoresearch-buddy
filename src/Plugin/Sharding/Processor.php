@@ -74,6 +74,7 @@ final class Processor extends BaseProcessor {
 		}
 
 		// Next only on master
+		$operator->checkRebalanceStatus();
 		$operator->checkBalance();
 
 		return false;

@@ -145,7 +145,6 @@ final class Operator {
 
 		// Update nodes state and remove inactive once to secure logic
 		$this->state->set('cluster_hash', $clusterHash);
-
 		return $this;
 	}
 
@@ -308,6 +307,27 @@ final class Operator {
 
 		return $isProcessed;
 	}
+
+	/**
+	 * Check if queued rebalance operations have completed and log when done
+	 * @return static
+	 */
+	public function checkRebalanceStatus(): static {
+		$list = $this->state->listRegex('rebalance_queue_id:.+');
+		foreach ($list as $row) {
+			[, $name] = explode(':', $row['key']);
+			$queueId = (int)$row['value'];
+			$queueRow = $this->getQueue()->getById($queueId);
+			if (!$queueRow || $queueRow['status'] === 'created') {
+				continue;
+			}
+			$this->state->delete("rebalance_queue_id:{$name}");
+			$this->state->set("rebalance:{$name}", 'completed');
+			Buddy::info("Rebalancing completed for table {$name}");
+		}
+		return $this;
+	}
+
 	/**
 	 * Wrapper around process queue with current node
 	 * @return static
