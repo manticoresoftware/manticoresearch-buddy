@@ -111,25 +111,6 @@ final class Queue {
 	}
 
 	/**
-	 * Check if there are any pending (non-processed) items for the given node.
-	 * Used to avoid unnecessary SHOW STATUS calls when the queue is empty.
-	 * @param Node $node
-	 * @return bool
-	 */
-	public function hasPending(Node $node): bool {
-		$maxTries = static::MAX_TRIES;
-		$table = $this->cluster->getSystemTableName($this->table);
-		$res = $this->client->sendRequest("
-			SELECT COUNT(*) AS cnt FROM {$table}
-			WHERE `node` = '{$node->id}'
-			  AND `status` <> 'processed'
-			  AND `tries` < {$maxTries}
-			LIMIT 1
-		")->getResult();
-		/** @var array{0?:array{data?:array{0?:array{cnt:int}}}} $res */
-		return ($res[0]['data'][0]['cnt'] ?? 0) > 0;
-	}
-	/**
 	 * Process the queue for node
 	 * @param Node $node
 	 * @return void

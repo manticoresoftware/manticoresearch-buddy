@@ -467,16 +467,34 @@ final class Table {
 			}
 
 		// Handle different rebalancing scenarios
-		if ($inactiveNodes->count() > 0) {
-			// Any inactive schema node means we are in partial state — data is not fully
-			// recovered yet. Never rebalance until ALL original nodes are back.
-			Buddy::info(
-				"Skipping rebalance for table {$this->name}: schema nodes still inactive"
-				. " ({$inactiveNodes->join(', ')}) — waiting for full recovery"
-			);
-			$state->set($rebalanceKey, 'idle');
-			return;
-		} elseif ($newNodes->count() > 0) {
+			if ($inactiveNodes->count() > 0) {
+				// RF=1 means no replicas exist - dead node's shards are unrecoverable, skip rebalancing
+				if ($this->getReplicationFactor($schema) === 1) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: RF=1 and nodes are inactive"
+						. " ({$inactiveNodes->join(', ')}) - data on failed nodes is unrecoverable"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
+
+				$rf = $this->getReplicationFactor($schema);
+				$totalAvailableNodes = $activeNodes->merge($newNodes);
+
+				// Not enough nodes even counting new arrivals - skip
+				if ($totalAvailableNodes->count() < $rf) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: only {$totalAvailableNodes->count()} available nodes"
+						. " cannot maintain RF={$rf} ({$inactiveNodes->join(', ')} inactive)"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
+
+				// Rebalance using all available nodes (covers both: dead node replaced by new node, or enough survivors)
+				$newSchema = Util::rebalanceShardingScheme($schema, $totalAvailableNodes);
+				$lastQueueId = $this->handleFailedNodesRebalance($queue, $schema, $newSchema, $inactiveNodes);
+			} elseif ($newNodes->count() > 0) {
 				$replicationFactor = $this->getReplicationFactor($schema);
 				$newSchema = Util::rebalanceWithNewNodes($schema, $newNodes, $replicationFactor);
 				$lastQueueId = $this->handleNewNodesRebalance($queue, $schema, $newSchema, $newNodes);
@@ -783,8 +801,177 @@ final class Table {
 		];
 	}
 
+	/**
+	 * Initialize cluster map for rebalancing
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @param Set<string> $inactiveNodes
+	 * @return array{shardNodesMap: Map<int,Set<string>>, clusterMap: Map<string,Cluster>}
+	 */
+	private function initializeClusterMap(Vector $schema, Set $inactiveNodes): array {
+		/** @var Map<string,Cluster> */
+		$clusterMap = new Map;
 
+		// Detect shard to nodes map with alive schema
+		$shardNodesMap = $this->getShardNodesMap(
+			$schema->filter(
+				fn ($row) => !$inactiveNodes->contains($row['node'])
+			)
+		);
 
+		// Preload current cluster map with configuration
+		foreach ($shardNodesMap as $connections) {
+			$clusterName = static::getClusterName($connections);
+			$connections->sort();
+			$node = $connections->first();
+			$cluster = new Cluster($this->client, $clusterName, $node);
+			$clusterMap[$clusterName] = $cluster;
+		}
+
+		return ['shardNodesMap' => $shardNodesMap, 'clusterMap' => $clusterMap];
+	}
+
+	/**
+	 * Process affected shards for rebalancing
+	 * @param Queue $queue
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $affectedSchema
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
+	 * @param Map<int,Set<string>> $shardNodesMap
+	 * @param Map<string,Cluster> $clusterMap
+	 * @return Map<string,Cluster>
+	 */
+	private function processAffectedShards(
+		Queue $queue,
+		Vector $affectedSchema,
+		Vector $newSchema,
+		Map $shardNodesMap,
+		Map $clusterMap
+	): Map {
+		/** @var Set<string> */
+		$processedTables = new Set;
+
+		foreach ($affectedSchema as $row) {
+			// First thing first, remove from inactive node using the queue
+			$this->cleanUpNode($queue, $row['node'], $row['shards'], $processedTables);
+
+			// Do real rebalance now
+			$clusterMap = $this->rebalanceShards($queue, $row, $newSchema, $shardNodesMap, $clusterMap);
+		}
+
+		return $clusterMap;
+	}
+
+	/**
+	 * Rebalance shards for a single node
+	 * @param Queue $queue
+	 * @param array{node:string,shards:Set<int>,connections:Set<string>} $row
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
+	 * @param Map<int,Set<string>> $shardNodesMap
+	 * @param Map<string,Cluster> $clusterMap
+	 * @return Map<string,Cluster>
+	 */
+	private function rebalanceShards(
+		Queue $queue,
+		array $row,
+		Vector $newSchema,
+		Map $shardNodesMap,
+		Map $clusterMap
+	): Map {
+		foreach ($row['shards'] as $shard) {
+			/** @var Set<string> */
+			$nodesForShard = new Set;
+
+			foreach ($newSchema as $newRow) {
+				// The case when this shards should not be here
+				if (!$newRow['shards']->contains($shard)) {
+					continue;
+				}
+				$nodesForShard->add($newRow['node']);
+			}
+
+			// This is exception, actually
+			if (!$nodesForShard->count()) {
+				continue;
+			}
+
+			$clusterMap = $this->handleShardReplication($queue, $shard, $nodesForShard, $shardNodesMap, $clusterMap);
+		}
+
+		return $clusterMap;
+	}
+
+	/**
+	 * Handle replication for a single shard
+	 * @param Queue $queue
+	 * @param int $shard
+	 * @param Set<string> $nodesForShard
+	 * @param Map<int,Set<string>> $shardNodesMap
+	 * @param Map<string,Cluster> $clusterMap
+	 * @return Map<string,Cluster>
+	 */
+	private function handleShardReplication(
+		Queue $queue,
+		int $shard,
+		Set $nodesForShard,
+		Map $shardNodesMap,
+		Map $clusterMap
+	): Map {
+		// It's very important here to start replication
+		// From the live node first due to
+		// cluster should be created there first
+		// We use previously generated shard to nodes map
+		/** @var Set<string> */
+		$shardNodes = $shardNodesMap[$shard];
+
+		// If this happens, we have no alive shard, this is critical, but do nothing for now
+		if (!$shardNodes->count()) {
+			return $clusterMap;
+		}
+		$shardNodes->sort();
+		$aliveNode = $shardNodes->first();
+		/** @var Set<string> */
+		$connectedNodes = $nodesForShard->merge($shardNodes);
+
+		// Reconfigure on alive shard
+		// Cuz it's the main shard where we have data already
+		return $this->handleReplication(
+			$aliveNode,
+			$queue,
+			$connectedNodes,
+			$clusterMap,
+			$shard
+		);
+	}
+
+	/**
+	 * Handle rebalancing for failed nodes (existing logic)
+	 * @param Queue $queue
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
+	 * @param Set<string> $inactiveNodes
+	 * @return void
+	 */
+	protected function handleFailedNodesRebalance(
+		Queue $queue,
+		Vector $schema,
+		Vector $newSchema,
+		Set $inactiveNodes
+	): array {
+		// Initialize cluster map and shard nodes mapping
+		$initData = $this->initializeClusterMap($schema, $inactiveNodes);
+		$shardNodesMap = $initData['shardNodesMap'];
+		$clusterMap = $initData['clusterMap'];
+
+		$affectedSchema = $schema->filter(
+			fn ($row) => $inactiveNodes->contains($row['node'])
+		);
+
+		// Process affected shards for rebalancing
+		$this->processAffectedShards($queue, $affectedSchema, $newSchema, $shardNodesMap, $clusterMap);
+
+		// Update schema in database FIRST, then create distributed tables
+		$this->updateScheme($newSchema);
+		return $this->createDistributedTablesFromSchema($queue, $newSchema);
+	}
 
 	/**
 	 * Handle rebalancing for new nodes
