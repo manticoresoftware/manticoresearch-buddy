@@ -477,6 +477,17 @@ final class Table {
 					return;
 				}
 
+				// Not enough active nodes to maintain RF - skip, nothing can be rebalanced
+				$rf = $this->getReplicationFactor($schema);
+				if ($activeNodes->count() < $rf) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: only {$activeNodes->count()} active nodes"
+						. " cannot maintain RF={$rf} ({$inactiveNodes->join(', ')} inactive)"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
+
 				// Existing logic: handle failed nodes
 				$newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
 				$this->handleFailedNodesRebalance($queue, $schema, $newSchema, $inactiveNodes);
@@ -1033,6 +1044,7 @@ final class Table {
 	protected function handleRFNNewNodes(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): void {
 		/** @var Map<string,Cluster> */
 		$clusterMap = new Map;
+		$lastQueueId = 0;
 
 		// For RF>=2, we add new nodes as replicas to existing shards
 		foreach ($newNodes as $newNode) {
@@ -1042,7 +1054,7 @@ final class Table {
 			foreach ($shardsForNewNode as $shard) {
 				// Create shard table on new node
 				$shardName = $this->getShardName($shard);
-				$queue->add($newNode, $this->getCreateTableShardSQL($shard), "DROP TABLE IF EXISTS {$shardName}");
+				$lastQueueId = $queue->add($newNode, $this->getCreateTableShardSQL($shard), "DROP TABLE IF EXISTS {$shardName}");
 
 				// Set up replication from existing nodes
 				$existingNodes = $this->getExistingNodesForShard($schema, $shard);
@@ -1064,9 +1076,21 @@ final class Table {
 			}
 		}
 
-		// Update schema in database FIRST, then create distributed tables
+		// Flush pending ALTER CLUSTER ADD for all new clusters — same pattern as shard()
+		foreach ($clusterMap as $cluster) {
+			$cluster->processPendingTables($queue);
+		}
+
+		// Defer schema update until all queue operations complete so that the next
+		// checkBalance tick does not see the new node in the schema while it is still
+		// inactive (which would trigger a spurious handleFailedNodesRebalance and a
+		// wrong ALTER CLUSTER DROP on the not-yet-existing cluster).
+		if ($lastQueueId > 0) {
+			$queue->setWaitForId($lastQueueId);
+		}
 		$this->updateScheme($newSchema);
 		$this->createDistributedTablesFromSchema($queue, $newSchema);
+		$queue->resetWaitForId();
 	}
 
 	/**
@@ -1115,17 +1139,7 @@ final class Table {
 	 * @return int
 	 */
 	protected function getReplicationFactor(Vector $schema): int {
-		if ($schema->count() === 0) {
-			return 1;
-		}
-
-		// Find the maximum number of connections for any shard
-		$maxConnections = 1;
-		foreach ($schema as $row) {
-			$maxConnections = max($maxConnections, $row['connections']->count());
-		}
-
-		return $maxConnections;
+		return $this->calculateReplicationFactor($schema);
 	}
 
 	/**
