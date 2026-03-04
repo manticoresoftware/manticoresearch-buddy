@@ -1379,7 +1379,6 @@ final class Table {
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 * @throws Exception
-	 * @return void
 	 */
 	private function handleClusteredCleanUp(
 		Queue $queue,
@@ -1390,13 +1389,13 @@ final class Table {
 		Set $queueIds,
 		Set $processedTables
 	): void {
-		$removeTablesId = 0;
+		$aliveRemoveId = 0;
 		if (!$processedTables->contains($table)) {
 			// Mark processed BEFORE the operation so no other iteration can duplicate it
 			$processedTables->add($table);
 
-			// Pick ONE alive node (sorted for determinism) — ALTER CLUSTER DROP replicates to all members,
-			// running it on multiple nodes causes "table not in cluster" on the second attempt
+			// Pick ONE alive node (sorted for determinism) — ALTER CLUSTER DROP replicates to all
+			// alive members; running it on multiple nodes causes "table not in cluster" on the second attempt
 			$aliveNodes = $connections->filter(fn($n) => $n !== $nodeId);
 			$aliveNodes->sort();
 			$aliveNode = $aliveNodes->first();
@@ -1406,16 +1405,23 @@ final class Table {
 				// Bootstrap the surviving node as primary so it can accept cluster operations
 				// while the dead node is still listed as a member
 				$queueIds[] = $cluster->makePrimary($queue);
-				$removeTablesId = $cluster->removeTables($queue, [$table]);
-				$queueIds[] = $removeTablesId;
+				$aliveRemoveId = $cluster->removeTables($queue, [$table]);
+				$queueIds[] = $aliveRemoveId;
 			}
 		}
 
-		// Must wait for ALTER CLUSTER DROP to complete before dropping locally —
-		// Manticore rejects DROP TABLE on a table that's still a cluster member
-		if ($removeTablesId > 0) {
-			$queue->setWaitForId($removeTablesId);
+		// ALTER CLUSTER DROP on the alive node replicates only to alive members — the dead node
+		// was offline and missed it, so it still owns the table as a cluster member when it comes back.
+		// Queue ALTER CLUSTER DROP on the dead node itself (waiting for the alive node's DROP first
+		// so cluster state is consistent), then DROP TABLE waiting on that.
+		$deadNodeCluster = new Cluster($this->client, $clusterName, $nodeId);
+		if ($aliveRemoveId > 0) {
+			$queue->setWaitForId($aliveRemoveId);
 		}
+		$deadNodeRemoveId = $deadNodeCluster->removeTables($queue, [$table]);
+		$queueIds[] = $deadNodeRemoveId;
+
+		$queue->setWaitForId($deadNodeRemoveId);
 		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}", '');
 		$queue->resetWaitForId();
 	}
