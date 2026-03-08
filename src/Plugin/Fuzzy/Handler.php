@@ -94,7 +94,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 					$this->payload->distance
 				);
 				Buddy::debug("Fuzzy: variations for '$phrase' in '$table': " . json_encode($variations));
-				$this->mergeVariations($variations, $variationScores, $words, $scoreMap);
+				$this->mergeVariations($variations, $variationScores->toArray(), $words, $scoreMap);
 			}
 		}
 
