@@ -20,31 +20,31 @@ class FuzzyPayloadTest extends TestCase {
 	public static function parseTableNamesProvider(): array {
 		return [
 			'single table'              => [
-				'SELECT * FROM a WHERE MATCH(\'q\') OPTION fuzzy=1', ['a']
+				'SELECT * FROM a WHERE MATCH(\'q\') OPTION fuzzy=1', ['a'],
 			],
 			'two tables with space'     => [
-				'SELECT * FROM a, b WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b']
+				'SELECT * FROM a, b WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b'],
 			],
 			'two tables no space'       => [
-				'SELECT * FROM a,b WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b']
+				'SELECT * FROM a,b WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b'],
 			],
 			'two tables extra space'    => [
-				'SELECT * FROM a , b WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b']
+				'SELECT * FROM a , b WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b'],
 			],
 			'three tables'              => [
-				'SELECT * FROM a, b, c WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b', 'c']
+				'SELECT * FROM a, b, c WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b', 'c'],
 			],
 			'four tables'               => [
-				'SELECT * FROM a,b,c,d WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b', 'c', 'd']
+				'SELECT * FROM a,b,c,d WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b', 'c', 'd'],
 			],
 			'backtick-quoted tables'    => [
-				'SELECT * FROM `a`, `b` WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b']
+				'SELECT * FROM `a`, `b` WHERE MATCH(\'q\') OPTION fuzzy=1', ['a', 'b'],
 			],
 			'no FROM clause'            => [
-				'SHOW TABLES', []
+				'SHOW TABLES', [],
 			],
 			'subquery without keyword'  => [
-				'SELECT * FROM (SELECT 1)', []
+				'SELECT * FROM (SELECT 1)', [],
 			],
 		];
 	}
