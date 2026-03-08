@@ -2,6 +2,7 @@ vendor/**
 tmp/**
 build/**
 .phpunit.result.cache
+.DS_Store
 /.ptp-sync/
 .ptp-sync-folder
 phar_builder
