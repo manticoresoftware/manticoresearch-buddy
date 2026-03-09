@@ -75,6 +75,37 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals(5, $payload->params['k_results']);
 	}
 
+	public function testSQLCreateModelParsingWithSettingsJson(): void {
+		$query = "CREATE RAG MODEL advanced_assistant (
+			llm_provider='openai',
+			llm_model='gpt-4o',
+			style_prompt='You are a helpful assistant specializing in search technology',
+			settings='{\"temperature\":0.3, \"max_tokens\":2000, \"k_results\":5}'
+		);";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$this->assertEquals('create_model', $payload->action);
+		$this->assertEquals('advanced_assistant', $payload->params['name']);
+		$this->assertEquals('openai', $payload->params['llm_provider']);
+		$this->assertEquals('gpt-4o', $payload->params['llm_model']);
+		$this->assertEquals(
+			'{"temperature":0.3, "max_tokens":2000, "k_results":5}',
+			$payload->params['settings']
+		);
+	}
+
 	public function testSQLShowModelsParsing(): void {
 		$query = 'SHOW RAG MODELS';
 

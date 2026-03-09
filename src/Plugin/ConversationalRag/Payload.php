@@ -119,23 +119,24 @@ final class Payload extends BasePayload {
 	 */
 	private function parseSQLRequest(Request $request): void {
 		$sql = trim($request->payload);
+		$sql = preg_replace('/;\s*\z/', '', $sql) ?? $sql;
 
 		// SQL syntax for model management
-		if (preg_match('/^CREATE\s+RAG\s+MODEL\s+[\'"]?(\w+)[\'"]?\s*\((.*)\)$/si', $sql, $matches)) {
+		if (preg_match('/^CREATE\s+RAG\s+MODEL\s+[\'"]?(\w+)[\'"]?\s*\((.*)\)\s*\z/si', $sql, $matches)) {
 			$this->action = self::ACTION_CREATE_MODEL;
 			$this->params = $this->parseCreateModelParams($matches[1], $matches[2]);
-		} elseif (preg_match('/^SHOW\s+RAG\s+MODELS$/i', $sql)) {
+		} elseif (preg_match('/^SHOW\s+RAG\s+MODELS\s*\z/i', $sql)) {
 			$this->action = self::ACTION_SHOW_MODELS;
-		} elseif (preg_match('/^DESCRIBE\s+RAG\s+MODEL\s+[\'"]?([^\'"]+)[\'"]?$/i', $sql, $matches)) {
+		} elseif (preg_match('/^DESCRIBE\s+RAG\s+MODEL\s+[\'"]?([^\'"]+)[\'"]?\s*\z/i', $sql, $matches)) {
 			$this->action = self::ACTION_DESCRIBE_MODEL;
 			$this->params = ['model_name_or_uuid' => $matches[1]];
-		} elseif (preg_match('/^DROP\s+RAG\s+MODEL\s+(IF\s+EXISTS\s+)?[\'"]?([^\'"]+)[\'"]?$/i', $sql, $matches)) {
+		} elseif (preg_match('/^DROP\s+RAG\s+MODEL\s+(IF\s+EXISTS\s+)?[\'"]?([^\'"]+)[\'"]?\s*\z/i', $sql, $matches)) {
 			$this->action = self::ACTION_DROP_MODEL;
 			$this->params = ['model_name_or_uuid' => $matches[2]];
 			if ($matches[1] !== '') {
 				$this->params['if_exists'] = '1';
 			}
-		} elseif (preg_match('/^CALL\s+CONVERSATIONAL_RAG\s*\((.*)\)$/si', $sql, $matches)) {
+		} elseif (preg_match('/^CALL\s+CONVERSATIONAL_RAG\s*\((.*)\)\s*\z/si', $sql, $matches)) {
 			$this->action = self::ACTION_CONVERSATION;
 			$this->params = $this->parseConversationParams($matches[1]);
 		} else {
@@ -177,23 +178,25 @@ final class Payload extends BasePayload {
 	 *
 	 * @param string $params
 	 * @return array<string, string>
+	 * @throws QueryParseError
 	 */
 	private function parseKeyValueParams(string $params): array {
 		$result = [];
-		$lines = array_map('trim', explode(',', $params));
+		$segments = $this->parseCommaSeparatedParams($params);
 
-		foreach ($lines as $line) {
-			if (empty($line)) {
+		foreach ($segments as $segment) {
+			$segment = trim($segment);
+			if ($segment === '') {
 				continue;
 			}
 
 			// Split on first = sign
-			$parts = explode('=', $line, 2);
+			$parts = explode('=', $segment, 2);
 			if (sizeof($parts) !== 2) {
-				continue;
+				throw QueryParseError::create("Invalid parameter '{$segment}', expected key=value");
 			}
 
-			$key = trim($parts[0]);
+			$key = strtolower(trim($parts[0]));
 			$value = trim($parts[1]);
 			$result[$key] = $value;
 		}
