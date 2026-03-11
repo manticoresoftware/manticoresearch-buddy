@@ -81,6 +81,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-alter-column',
 	'manticoresoftware/buddy-plugin-alter-distributed-table',
 	'manticoresoftware/buddy-plugin-alter-rename-table',
+	'manticoresoftware/buddy-plugin-auth',
 	'manticoresoftware/buddy-plugin-modify-table',
 	'manticoresoftware/buddy-plugin-knn',
 	'manticoresoftware/buddy-plugin-replace',
