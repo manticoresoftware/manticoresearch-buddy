@@ -16,7 +16,6 @@ use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
-use Manticoresearch\Buddy\Core\Tool\KeyboardLayout;
 use Manticoresearch\Buddy\Core\Tool\Strings;
 
 /**
