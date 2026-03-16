@@ -32,8 +32,8 @@ final class Payload extends BasePayload {
 	/** @var string */
 	public string $path;
 
-	/** @var string */
-	public string $table;
+	/** @var array<string> */
+	public array $tables;
 
 	/** @var bool */
 	public bool $fuzzy;
@@ -100,7 +100,7 @@ final class Payload extends BasePayload {
 
 		$self = new static();
 		$self->path = $request->path;
-		$self->table = $payload['table'] ?? $payload['index'];
+		$self->tables = [$payload['table'] ?? $payload['index']];
 		$self->fuzzy = (bool)($payload['options']['fuzzy'] ?? 0);
 		$self->distance = (int)($payload['options']['distance'] ?? 2);
 		$self->layouts = static::parseLayouts($payload['options']['layouts'] ?? null);
@@ -122,8 +122,7 @@ final class Payload extends BasePayload {
 		$query = $request->payload;
 		$additionalQueries = static::extractAdditionalQueries($query);
 
-		preg_match('/\s+FROM\s+`?(\w+)`?\s+(WHERE|INNER|LEFT|JOIN)\s+/ius', $query, $matches);
-		$tableName = $matches[1] ?? '';
+		$tableNames = static::parseTableNames($query);
 
 		// Check that we have match
 		if (!preg_match(static::MATCH_REG_PATTERN, $query, $matches)) {
@@ -182,7 +181,7 @@ final class Payload extends BasePayload {
 
 		$self = new static();
 		$self->path = $request->path;
-		$self->table = $tableName;
+		$self->tables = $tableNames;
 		$self->fuzzy = $fuzzy;
 		$self->distance = $distanceValue;
 		$self->layouts = $layouts;
@@ -192,6 +191,25 @@ final class Payload extends BasePayload {
 		$self->payload = $query;
 		$self->queries = $additionalQueries;
 		return $self;
+	}
+
+
+
+
+	/**
+	 * Extract table names from a SQL query's FROM clause.
+	 * Supports single and multiple comma-separated tables, with optional backticks.
+	 * @param string $query
+	 * @return array<string> List of table names, or empty array if not found
+	 */
+	public static function parseTableNames(string $query): array {
+		if (!preg_match('/\s+FROM\s+((?:`?\w+`?\s*,\s*)*`?\w+`?)\s+(WHERE|INNER|LEFT|JOIN)\s+/ius', $query, $matches)) {
+			return [];
+		}
+		return array_map(
+			static fn(string $t) => trim($t, '` '),
+			explode(',', $matches[1])
+		);
 	}
 
 	/**
