@@ -10,7 +10,6 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\EmptyString;
 
-use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
