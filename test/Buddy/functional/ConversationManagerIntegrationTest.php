@@ -10,6 +10,8 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationManager;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
 use PHPUnit\Framework\TestCase;
@@ -28,7 +30,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 	private Client $client;
 
 
-
 	public function setUp(): void {
 		// Create a real client connected to the test Manticore instance
 		$this->client = new Client('http://127.0.0.1:' . static::getListenHttpPort());
@@ -37,6 +38,10 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 	/**
 	 * Test complete conversation flow with real database
+	 *
+	 * @throws ManticoreSearchClientError
+	 * @throws JsonException
+	 * @throws ManticoreSearchResponseError
 	 */
 	public function testCompleteConversationFlowWithRealDatabase(): void {
 		// Initialize the conversations table
@@ -64,7 +69,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 			'test-model-1',
 			'assistant',
 			'Machine learning is a subset of artificial intelligence that focuses '
-				. 'on algorithms that can learn from data.',
+			. 'on algorithms that can learn from data.',
 			75,
 			'ANSWER',
 			'',
@@ -86,7 +91,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$this->assertIsArray($searchContext);
 		$this->assertEquals('machine learning information', $searchContext['search_query']);
 		$this->assertEquals('', $searchContext['exclude_query']);
-		$this->assertEquals('', $searchContext['excluded_ids']); // Database stores empty array as empty string
+		$this->assertEquals('[]', $searchContext['excluded_ids']); // Empty excluded IDs are stored as JSON
 
 		// Test filtered history for query generation
 		$filteredHistory = $this->conversationManager->getConversationHistoryForQueryGeneration('test-conversation-1');
@@ -95,6 +100,10 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 	/**
 	 * Test conversation with multiple exchanges and search context
+	 *
+	 * @throws ManticoreSearchClientError
+	 * @throws JsonException
+	 * @throws ManticoreSearchResponseError
 	 */
 	public function testMultipleConversationExchangesWithSearchContext(): void {
 		// Initialize the conversations table
@@ -167,6 +176,10 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 	/**
 	 * Test conversation with CONTENT_QUESTION intent filtering
+	 *
+	 * @throws ManticoreSearchClientError
+	 * @throws JsonException
+	 * @throws ManticoreSearchResponseError
 	 */
 	public function testContentQuestionIntentFiltering(): void {
 		// Initialize the conversations table
@@ -245,6 +258,9 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 	/**
 	 * Test empty conversation handling
+	 *
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
 	 */
 	public function testEmptyConversationHandling(): void {
 		// Initialize the conversations table
@@ -267,6 +283,10 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 	/**
 	 * Test conversation with special characters and long messages
+	 *
+	 * @throws ManticoreSearchClientError
+	 * @throws JsonException
+	 * @throws ManticoreSearchResponseError
 	 */
 	public function testSpecialCharactersAndLongMessages(): void {
 		// Initialize the conversations table
@@ -299,6 +319,10 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 	/**
 	 * Test conversation with JSON excluded IDs
+	 *
+	 * @throws ManticoreSearchClientError
+	 * @throws JsonException
+	 * @throws ManticoreSearchResponseError
 	 */
 	public function testJsonExcludedIdsHandling(): void {
 		// Initialize the conversations table
@@ -330,6 +354,10 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 	/**
 	 * Test table creation with real database
+	 *
+	 * @throws ManticoreSearchClientError
+	 * @throws JsonException
+	 * @throws ManticoreSearchResponseError
 	 */
 	public function testTableCreationWithRealDatabase(): void {
 		// This should create the table without errors

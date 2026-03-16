@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use PHPUnit\Framework\TestCase;
+use Random\RandomException;
 
 class ModelManagerTest extends TestCase {
 	/**
@@ -32,6 +33,9 @@ class ModelManagerTest extends TestCase {
 		putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 */
 	public function testInitializeTablesCreatesModelsTable(): void {
 		$modelManager = new ModelManager();
 
@@ -44,12 +48,17 @@ class ModelManagerTest extends TestCase {
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
-			->with($this->stringContains('CREATE TABLE IF NOT EXISTS system.rag_models'))
+			->with($this->stringContains(/** @lang manticore */ 'CREATE TABLE IF NOT EXISTS system.rag_models'))
 			->willReturn($mockResponse);
 
 		$modelManager->initializeTables($mockClient);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 * @throws RandomException
+	 */
 	public function testCreateModelSuccessful(): void {
 		$modelManager = new ModelManager();
 
@@ -86,6 +95,10 @@ class ModelManagerTest extends TestCase {
 		$this->assertNotEmpty($result);
 	}
 
+	/**
+	 * @throws ManticoreSearchResponseError
+	 * @throws RandomException
+	 */
 	public function testCreateModelDuplicateName(): void {
 		$modelManager = new ModelManager();
 
@@ -130,19 +143,19 @@ class ModelManagerTest extends TestCase {
 		$mockResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						[
-							'uuid' => 'test-uuid-123',
-							'name' => 'test_model',
-							'llm_provider' => 'openai',
-							'llm_model' => 'gpt-4',
-							'style_prompt' => 'You are helpful',
-							'settings' => '{"temperature":0.7,"max_tokens":1000}',
-							'created_at' => 1234567890,
+					[
+						'data' => [
+							[
+								'uuid' => 'test-uuid-123',
+								'name' => 'test_model',
+								'llm_provider' => 'openai',
+								'llm_model' => 'gpt-4',
+								'style_prompt' => 'You are helpful',
+								'settings' => '{"temperature":0.7,"max_tokens":1000}',
+								'created_at' => 1234567890,
+							],
 						],
 					],
-				],
 				]
 			)
 		);
@@ -154,7 +167,8 @@ class ModelManagerTest extends TestCase {
 
 		/** @var array{id:string, uuid:string, name:string,llm_provider:string,llm_model:string,
 		 * style_prompt:string,settings:array{ temperature: string, max_tokens: string, k_results?: string,
-		 * similarity_threshold: string, max_document_length: string},created_at:string,updated_at:string} $result */
+		 * similarity_threshold: string, max_document_length: string},created_at:string,updated_at:string} $result
+		 */
 		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
 
 		$this->assertIsArray($result);
@@ -169,6 +183,10 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals(1000, $result['settings']['max_tokens']);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetModelByUuidOrNameFoundByUuid(): void {
 		$modelManager = new ModelManager();
 
@@ -181,15 +199,15 @@ class ModelManagerTest extends TestCase {
 		$mockResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						[
-							'uuid' => 'test-uuid-123',
-							'name' => 'test_model',
-							'llm_provider' => 'openai',
+					[
+						'data' => [
+							[
+								'uuid' => 'test-uuid-123',
+								'name' => 'test_model',
+								'llm_provider' => 'openai',
+							],
 						],
 					],
-				],
 				]
 			)
 		);
@@ -205,18 +223,16 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals('test-uuid-123', $result['uuid']);
 	}
 
+	/**
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetModelByUuidOrNameNotFound(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock response with no data
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => []]])
-		);
+		$mockResponse = $this->createEmptyModelLookupResponse();
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
@@ -226,6 +242,20 @@ class ModelManagerTest extends TestCase {
 		$modelManager->getModelByUuidOrName($mockClient, 'nonexistent');
 	}
 
+	private function createEmptyModelLookupResponse(): Response {
+		$mockResponse = $this->createMock(Response::class);
+		$mockResponse->method('hasError')->willReturn(false);
+		$mockResponse->method('getResult')->willReturn(
+			Struct::fromData([['data' => []]])
+		);
+
+		return $mockResponse;
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testDeleteModelByUuidOrNameSuccessful(): void {
 		$modelManager = new ModelManager();
 
@@ -238,14 +268,14 @@ class ModelManagerTest extends TestCase {
 		$getModelResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						[
-							'uuid' => 'test-uuid-123',
-							'name' => 'test_model',
+					[
+						'data' => [
+							[
+								'uuid' => 'test-uuid-123',
+								'name' => 'test_model',
+							],
 						],
 					],
-				],
 				]
 			)
 		);
@@ -261,18 +291,16 @@ class ModelManagerTest extends TestCase {
 		$modelManager->deleteModelByUuidOrName($mockClient, 'test_model');
 	}
 
+	/**
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testDeleteModelByUuidOrNameModelNotFound(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock getModelByUuidOrName response with no data
-		$getModelResponse = $this->createMock(Response::class);
-		$getModelResponse->method('hasError')->willReturn(false);
-		$getModelResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => []]])
-		);
+		$getModelResponse = $this->createEmptyModelLookupResponse();
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
@@ -283,6 +311,29 @@ class ModelManagerTest extends TestCase {
 		$modelManager->deleteModelByUuidOrName($mockClient, 'nonexistent');
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	public function testDeleteModelByUuidOrNameIfExistsDoesNotThrowWhenModelMissing(): void {
+		$modelManager = new ModelManager();
+
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		$getModelResponse = $this->createEmptyModelLookupResponse();
+
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->willReturn($getModelResponse);
+
+		$modelManager->deleteModelByUuidOrName($mockClient, 'nonexistent', true);
+		$this->addToAssertionCount(1);
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetAllModelsSuccessful(): void {
 		$modelManager = new ModelManager();
 
@@ -295,26 +346,26 @@ class ModelManagerTest extends TestCase {
 		$mockResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						[
-							'id' => 1,
-							'uuid' => 'uuid-1',
-							'name' => 'model1',
-							'llm_provider' => 'openai',
-							'llm_model' => 'gpt-4',
-							'created_at' => 1234567890,
-						],
-						[
-							'id' => 2,
-							'uuid' => 'uuid-2',
-							'name' => 'model2',
-							'llm_provider' => 'openai',
-							'llm_model' => 'gpt-3.5-turbo',
-							'created_at' => 1234567891,
+					[
+						'data' => [
+							[
+								'id' => 1,
+								'uuid' => 'uuid-1',
+								'name' => 'model1',
+								'llm_provider' => 'openai',
+								'llm_model' => 'gpt-4',
+								'created_at' => 1234567890,
+							],
+							[
+								'id' => 2,
+								'uuid' => 'uuid-2',
+								'name' => 'model2',
+								'llm_provider' => 'openai',
+								'llm_model' => 'gpt-3.5-turbo',
+								'created_at' => 1234567891,
+							],
 						],
 					],
-				],
 				]
 			)
 		);
@@ -334,6 +385,9 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals('model2', $result[1]['name']);
 	}
 
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testExtractSettingsFromJsonString(): void {
 		$modelManager = new ModelManager();
 
@@ -348,7 +402,6 @@ class ModelManagerTest extends TestCase {
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($modelManager);
 		$method = $reflection->getMethod('extractSettings');
-		$method->setAccessible(true);
 
 		$result = $method->invoke($modelManager, $config);
 
@@ -359,6 +412,9 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals('custom_value', $result['custom_field']);
 	}
 
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testExtractSettingsFromArray(): void {
 		$modelManager = new ModelManager();
 
@@ -373,7 +429,6 @@ class ModelManagerTest extends TestCase {
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($modelManager);
 		$method = $reflection->getMethod('extractSettings');
-		$method->setAccessible(true);
 
 		$result = $method->invoke($modelManager, $config);
 
@@ -383,6 +438,9 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals(8, $result['k_results']);
 	}
 
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testModelExistsCaseSensitivity(): void {
 		$modelManager = new ModelManager();
 
@@ -404,13 +462,16 @@ class ModelManagerTest extends TestCase {
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($modelManager);
 		$method = $reflection->getMethod('modelExists');
-		$method->setAccessible(true);
 
 		$result = $method->invoke($modelManager, $mockClient, 'TestModel');
 
 		$this->assertTrue($result);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetModelByUuidOrNameWithNullSettings(): void {
 		$modelManager = new ModelManager();
 
@@ -423,19 +484,19 @@ class ModelManagerTest extends TestCase {
 		$mockResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						[
-							'uuid' => 'test-uuid-123',
-							'name' => 'test_model',
-							'llm_provider' => 'openai',
-							'llm_model' => 'gpt-4',
-							'style_prompt' => 'You are helpful',
-							'settings' => null,
-							'created_at' => 1234567890,
+					[
+						'data' => [
+							[
+								'uuid' => 'test-uuid-123',
+								'name' => 'test_model',
+								'llm_provider' => 'openai',
+								'llm_model' => 'gpt-4',
+								'style_prompt' => 'You are helpful',
+								'settings' => null,
+								'created_at' => 1234567890,
+							],
 						],
 					],
-				],
 				]
 			)
 		);
@@ -451,6 +512,10 @@ class ModelManagerTest extends TestCase {
 		$this->assertEmpty($result['settings']);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetModelByUuidOrNameWithEmptyStringSettings(): void {
 		$modelManager = new ModelManager();
 
@@ -463,18 +528,18 @@ class ModelManagerTest extends TestCase {
 		$mockResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						[
-							'uuid' => 'test-uuid-123',
-							'name' => 'test_model',
-							'llm_provider' => 'openai',
-							'llm_model' => 'gpt-4',
-							'settings' => '',
-							'created_at' => 1234567890,
+					[
+						'data' => [
+							[
+								'uuid' => 'test-uuid-123',
+								'name' => 'test_model',
+								'llm_provider' => 'openai',
+								'llm_model' => 'gpt-4',
+								'settings' => '',
+								'created_at' => 1234567890,
+							],
 						],
 					],
-				],
 				]
 			)
 		);
@@ -490,6 +555,9 @@ class ModelManagerTest extends TestCase {
 		$this->assertEmpty($result['settings']);
 	}
 
+	/**
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetModelByUuidOrNameWithInvalidJsonSettings(): void {
 		$modelManager = new ModelManager();
 
@@ -504,18 +572,18 @@ class ModelManagerTest extends TestCase {
 		$mockResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						[
-							'uuid' => 'test-uuid-123',
-							'name' => 'test_model',
-							'llm_provider' => 'openai',
-							'llm_model' => 'gpt-4',
-							'settings' => '{invalid json',
-							'created_at' => 1234567890,
+					[
+						'data' => [
+							[
+								'uuid' => 'test-uuid-123',
+								'name' => 'test_model',
+								'llm_provider' => 'openai',
+								'llm_model' => 'gpt-4',
+								'settings' => '{invalid json',
+								'created_at' => 1234567890,
+							],
 						],
 					],
-				],
 				]
 			)
 		);
@@ -527,6 +595,10 @@ class ModelManagerTest extends TestCase {
 		$modelManager->getModelByUuidOrName($mockClient, 'test_model');
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetModelByUuidOrNameWithStringNullSettings(): void {
 		$modelManager = new ModelManager();
 
@@ -539,18 +611,18 @@ class ModelManagerTest extends TestCase {
 		$mockResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						[
-							'uuid' => 'test-uuid-123',
-							'name' => 'test_model',
-							'llm_provider' => 'openai',
-							'llm_model' => 'gpt-4',
-							'settings' => 'NULL',
-							'created_at' => 1234567890,
+					[
+						'data' => [
+							[
+								'uuid' => 'test-uuid-123',
+								'name' => 'test_model',
+								'llm_provider' => 'openai',
+								'llm_model' => 'gpt-4',
+								'settings' => 'NULL',
+								'created_at' => 1234567890,
+							],
 						],
 					],
-				],
 				]
 			)
 		);

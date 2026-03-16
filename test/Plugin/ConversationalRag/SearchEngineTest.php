@@ -15,6 +15,7 @@ use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Struct;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class SearchEngineTest extends TestCase {
@@ -32,26 +33,21 @@ class SearchEngineTest extends TestCase {
 		putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 	}
 
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testDetectVectorFieldWithFloatVector(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock response with FLOAT_VECTOR field
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
-						['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
-					],
-				],
-				]
-			)
+		$mockResponse = $this->createSchemaResponse(
+			[
+				['Field' => 'id', 'Type' => 'bigint'],
+				['Field' => 'content', 'Type' => 'text'],
+				['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
+			]
 		);
 
 		$mockClient->expects($this->once())
@@ -62,33 +58,46 @@ class SearchEngineTest extends TestCase {
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($searchEngine);
 		$method = $reflection->getMethod('detectVectorField');
-		$method->setAccessible(true);
 
 		$result = $method->invoke($searchEngine, $mockClient, 'test_table');
 
 		$this->assertEquals('embedding', $result);
 	}
 
+	/**
+	 * @param array<int, array{Field:string, Type:string}> $rows
+	 */
+	private function createSchemaResponse(array $rows): Response {
+		$mockResponse = $this->createMock(Response::class);
+		$mockResponse->method('hasError')->willReturn(false);
+		$mockResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+					[
+						'data' => $rows,
+					],
+				]
+			)
+		);
+
+		return $mockResponse;
+	}
+
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testDetectVectorFieldWithCommonNames(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock response with common vector field name
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
-						['Field' => 'content_embedding', 'Type' => 'float_vector(768)'],
-					],
-				],
-				]
-			)
+		$mockResponse = $this->createSchemaResponse(
+			[
+				['Field' => 'id', 'Type' => 'bigint'],
+				['Field' => 'content', 'Type' => 'text'],
+				['Field' => 'content_embedding', 'Type' => 'float_vector(768)'],
+			]
 		);
 
 		$mockClient->expects($this->once())
@@ -99,33 +108,27 @@ class SearchEngineTest extends TestCase {
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($searchEngine);
 		$method = $reflection->getMethod('detectVectorField');
-		$method->setAccessible(true);
 
 		$result = $method->invoke($searchEngine, $mockClient, 'test_table');
 
 		$this->assertEquals('content_embedding', $result);
 	}
 
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testDetectVectorFieldNoVectorFields(): void {
 		$searchEngine = new SearchEngine();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock response without vector fields
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
-						['Field' => 'title', 'Type' => 'string'],
-					],
-				],
-				]
-			)
+		$mockResponse = $this->createSchemaResponse(
+			[
+				['Field' => 'id', 'Type' => 'bigint'],
+				['Field' => 'content', 'Type' => 'text'],
+				['Field' => 'title', 'Type' => 'string'],
+			]
 		);
 
 		$mockClient->expects($this->once())
@@ -136,7 +139,6 @@ class SearchEngineTest extends TestCase {
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($searchEngine);
 		$method = $reflection->getMethod('detectVectorField');
-		$method->setAccessible(true);
 
 		$result = $method->invoke($searchEngine, $mockClient, 'test_table');
 
@@ -144,62 +146,93 @@ class SearchEngineTest extends TestCase {
 	}
 
 	public function testPerformVectorSearchSuccessful(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 
-		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock schema response
-		$schemaResponse = $this->createMock(Response::class);
-		$schemaResponse->method('getResult')->willReturn(
+		$schemaResponse = $this->createDefaultVectorSchemaResponse();
+
+		$exclusionResponse = $this->createExclusionResponse(
+			[
+				['id' => 1, 'knn_dist' => 0.1],
+				['id' => 2, 'knn_dist' => 0.2],
+			]
+		);
+
+		$searchResponse = $this->createDataResponse(
+			[
+				[
+					'id' => 3,
+					'content' => 'Test content',
+					'embedding' => '[0.1, 0.2, 0.3]',
+					'knn_dist' => 0.05,
+				],
+			]
+		);
+
+		$result = $this->performDefaultSearch(
+			$searchEngine,
+			$mockClient,
+			$schemaResponse,
+			$exclusionResponse,
+			$searchResponse
+		);
+
+		$this->assertSingleFilteredSearchResult($result);
+	}
+
+	private function createSearchEngine(): SearchEngine {
+		return new SearchEngine();
+	}
+
+	private function createDefaultVectorSchemaResponse(): Response {
+		return $this->createSchemaResponse(
+			[
+				['Field' => 'id', 'Type' => 'bigint'],
+				['Field' => 'content', 'Type' => 'text'],
+				['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
+			]
+		);
+	}
+
+	/**
+	 * @param array<int, array{id:int, knn_dist:float}> $rows
+	 */
+	private function createExclusionResponse(array $rows): Response {
+		return $this->createDataResponse($rows);
+	}
+
+	/**
+	 * @param array<int, array<string, int|float|string>> $rows
+	 */
+	private function createDataResponse(array $rows): Response {
+		$mockResponse = $this->createMock(Response::class);
+		$mockResponse->method('hasError')->willReturn(false);
+		$mockResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
-						['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
+					[
+						'data' => $rows,
 					],
-				],
 				]
 			)
 		);
 
-		// Mock exclusion response
-		$exclusionResponse = $this->createMock(Response::class);
-		$exclusionResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['id' => 1, 'knn_dist' => 0.1],
-						['id' => 2, 'knn_dist' => 0.2],
-					],
-				],
-				]
-			)
-		);
+		return $mockResponse;
+	}
 
-		// Mock search response
-		$searchResponse = $this->createMock(Response::class);
-		$searchResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						[
-							'id' => 3,
-							'content' => 'Test content',
-							'embedding' => '[0.1, 0.2, 0.3]',
-							'knn_dist' => 0.05,
-						],
-					],
-				],
-				]
-			)
-		);
-
-		$mockClient->expects($this->exactly(5)) // schema, exclusion, schema, search, schema
+	/**
+	 * @param HTTPClient&MockObject $mockClient
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function performDefaultSearch(
+		SearchEngine $searchEngine,
+		HTTPClient $mockClient,
+		Response $schemaResponse,
+		Response $exclusionResponse,
+		Response $searchResponse
+	): array {
+		$mockClient->expects($this->exactly(5))
 			->method('sendRequest')
 			->willReturnOnConsecutiveCalls(
 				$schemaResponse,
@@ -209,98 +242,70 @@ class SearchEngineTest extends TestCase {
 				$schemaResponse
 			);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-3.5-turbo',
-			'k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
-		$result = $searchEngine->performSearch(
+		return $searchEngine->performSearch(
 			$mockClient,
 			'test_table',
 			'test search query',
 			'exclude this',
-			$modelConfig
+			$this->createDefaultModelConfig()
 		);
+	}
 
+	/**
+	 * @return array{llm_provider:string, llm_model:string, k_results:int, settings:array{similarity_threshold:float}}
+	 */
+	private function createDefaultModelConfig(): array {
+		return [
+			'llm_provider' => 'openai',
+			'llm_model' => 'gpt-3.5-turbo',
+			'k_results' => 5,
+			'settings' => ['similarity_threshold' => 0.8],
+		];
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $result
+	 */
+	private function assertSingleFilteredSearchResult(array $result): void {
 		$this->assertIsArray($result);
 		$this->assertCount(1, $result);
 		$this->assertEquals(3, $result[0]['id']);
 		$this->assertEquals('Test content', $result[0]['content']);
-		$this->assertArrayNotHasKey('embedding', $result[0]); // Should be filtered out
+		$this->assertArrayNotHasKey('embedding', $result[0]);
 	}
 
 	public function testPerformVectorSearchWithExclusions(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 
-		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock schema response
-		$schemaResponse = $this->createMock(Response::class);
-		$schemaResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
-						['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
-					],
-				],
-				]
-			)
+		$schemaResponse = $this->createDefaultVectorSchemaResponse();
+
+		$exclusionResponse = $this->createExclusionResponse(
+			[
+				['id' => 1, 'knn_dist' => 0.1],
+				['id' => 2, 'knn_dist' => 0.2],
+				['id' => 4, 'knn_dist' => 0.15],
+			]
 		);
 
-		// Mock exclusion response with multiple exclusions
-		$exclusionResponse = $this->createMock(Response::class);
-		$exclusionResponse->method('getResult')->willReturn(
-			Struct::fromData(
+		$searchResponse = $this->createDataResponse(
+			[
 				[
-				[
-					'data' => [
-						['id' => 1, 'knn_dist' => 0.1],
-						['id' => 2, 'knn_dist' => 0.2],
-						['id' => 4, 'knn_dist' => 0.15],
-					],
+					'id' => 3,
+					'content' => 'Test content',
+					'embedding' => '[0.1, 0.2, 0.3]',
+					'knn_dist' => 0.05,
 				],
-				]
-			)
+			]
 		);
 
-		// Mock search response
-		$searchResponse = $this->createMock(Response::class);
-		$searchResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						[
-							'id' => 3,
-							'content' => 'Test content',
-							'embedding' => '[0.1, 0.2, 0.3]',
-							'knn_dist' => 0.05,
-						],
-					],
-				],
-				]
-			)
-		);
-
-		$mockClient->expects($this->exactly(5)) // schema, exclusion, schema, search, schema
-			->method('sendRequest')
-			->willReturnOnConsecutiveCalls(
-				$schemaResponse,
-				$exclusionResponse,
-				$schemaResponse,
-				$searchResponse,
-				$schemaResponse
-			);
-
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-3.5-turbo',
-			'k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
-		$result = $searchEngine->performSearch(
+		$result = $this->performDefaultSearch(
+			$searchEngine,
 			$mockClient,
-			'test_table',
-			'test search query',
-			'exclude this',
-			$modelConfig
+			$schemaResponse,
+			$exclusionResponse,
+			$searchResponse
 		);
 
 		$this->assertIsArray($result);
@@ -308,7 +313,7 @@ class SearchEngineTest extends TestCase {
 	}
 
 	public function testPerformVectorSearchNoVectorFields(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
@@ -318,12 +323,12 @@ class SearchEngineTest extends TestCase {
 		$schemaResponse->method('getResult')->willReturn(
 			Struct::fromData(
 				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
+					[
+						'data' => [
+							['Field' => 'id', 'Type' => 'bigint'],
+							['Field' => 'content', 'Type' => 'text'],
+						],
 					],
-				],
 				]
 			)
 		);
@@ -346,27 +351,95 @@ class SearchEngineTest extends TestCase {
 		$this->assertEmpty($result);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	public function testPerformVectorSearchWithKResultsOneAddsLimit(): void {
+		$searchEngine = $this->createSearchEngine();
+
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		$schemaResponse = $this->createDefaultVectorSchemaResponse();
+
+		$searchResponse = $this->createMock(Response::class);
+		$searchResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+					[
+						'data' => [
+							[
+								'id' => 1,
+								'content' => 'Test content',
+								'embedding' => '[0.1, 0.2, 0.3]',
+								'knn_dist' => 0.05,
+							],
+							[
+								'id' => 2,
+								'content' => 'Another content',
+								'embedding' => '[0.4, 0.5, 0.6]',
+								'knn_dist' => 0.06,
+							],
+						],
+					],
+				]
+			)
+		);
+
+		$sqlQueries = [];
+		$mockClient->expects($this->exactly(3))
+			->method('sendRequest')
+			->willReturnCallback(
+				function (string $sql) use ($schemaResponse, $searchResponse, &$sqlQueries): Response {
+					$sqlQueries[] = $sql;
+
+					return match (sizeof($sqlQueries)) {
+						1, 3 => $schemaResponse,
+						2 => $searchResponse,
+						default => throw new Exception('Unexpected sendRequest call count'),
+					};
+				}
+			);
+
+		$modelConfig = [
+			'llm_provider' => 'openai',
+			'llm_model' => 'gpt-3.5-turbo',
+			'k_results' => 1,
+			'settings' => ['similarity_threshold' => 0.8],
+		];
+
+		$result = $searchEngine->performSearchWithExcludedIds(
+			$mockClient,
+			'test_table',
+			'test search query',
+			[],
+			$modelConfig,
+			0.8
+		);
+
+		$this->assertSame('DESCRIBE test_table', $sqlQueries[0]);
+		$this->assertStringContainsString('LIMIT 1', $sqlQueries[1]);
+		$this->assertSame('DESCRIBE test_table', $sqlQueries[2]);
+		$this->assertCount(2, $result);
+	}
+
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testGetVectorFieldsSuccessful(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
 		// Mock response with multiple vector fields
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
-						['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
-						['Field' => 'title_embedding', 'Type' => 'float_vector(768)'],
-					],
-				],
-				]
-			)
+		$mockResponse = $this->createSchemaResponse(
+			[
+				['Field' => 'id', 'Type' => 'bigint'],
+				['Field' => 'content', 'Type' => 'text'],
+				['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
+				['Field' => 'title_embedding', 'Type' => 'float_vector(768)'],
+			]
 		);
 
 		$mockClient->expects($this->once())
@@ -377,7 +450,6 @@ class SearchEngineTest extends TestCase {
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($searchEngine);
 		$method = $reflection->getMethod('getVectorFields');
-		$method->setAccessible(true);
 
 		$result = $method->invoke($searchEngine, $mockClient, 'test_table');
 
@@ -387,24 +459,20 @@ class SearchEngineTest extends TestCase {
 		$this->assertContains('title_embedding', $result);
 	}
 
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testFilterVectorFieldsRemovesEmbeddings(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
 		// Mock response with vector fields
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
-					],
-				],
-				]
-			)
+		$mockResponse = $this->createSchemaResponse(
+			[
+				['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
+			]
 		);
 
 		$mockClient->expects($this->once())
@@ -424,7 +492,6 @@ class SearchEngineTest extends TestCase {
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($searchEngine);
 		$method = $reflection->getMethod('filterVectorFields');
-		$method->setAccessible(true);
 
 		$result = $method->invoke($searchEngine, $testResults, 'test_table', $mockClient);
 
@@ -436,13 +503,15 @@ class SearchEngineTest extends TestCase {
 		$this->assertArrayNotHasKey('embedding', $result[0]);
 	}
 
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testEscapeStringHandlesSpecialChars(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($searchEngine);
 		$method = $reflection->getMethod('escapeString');
-		$method->setAccessible(true);
 
 		$result = $method->invoke($searchEngine, "test's string");
 		$this->assertEquals("test''s string", $result);
@@ -451,46 +520,28 @@ class SearchEngineTest extends TestCase {
 		$this->assertEquals('normal string', $result);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetExcludedIdsReturnsCorrectIds(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock schema response
-		$schemaResponse = $this->createMock(Response::class);
-		$schemaResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
-						['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
-					],
-				],
-				]
-			)
-		);
+		$schemaResponse = $this->createDefaultVectorSchemaResponse();
 
-		// Mock exclusion response
-		$exclusionResponse = $this->createMock(Response::class);
-		$exclusionResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['id' => 1, 'knn_dist' => 0.1],
-						['id' => 2, 'knn_dist' => 0.2],
-						['id' => 5, 'knn_dist' => 0.15],
-					],
-				],
-				]
-			)
+		$exclusionResponse = $this->createExclusionResponse(
+			[
+				['id' => 1, 'knn_dist' => 0.1],
+				['id' => 2, 'knn_dist' => 0.2],
+				['id' => 5, 'knn_dist' => 0.15],
+			]
 		);
 
 		$mockClient->expects($this->exactly(2)) // schema, exclusion
-			->method('sendRequest')
+		->method('sendRequest')
 			->willReturnOnConsecutiveCalls($schemaResponse, $exclusionResponse);
 
 		$result = $searchEngine->getExcludedIds(
@@ -503,8 +554,12 @@ class SearchEngineTest extends TestCase {
 		$this->assertEquals([1, 2, 5], $result);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetExcludedIdsNoExclusions(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
@@ -519,57 +574,38 @@ class SearchEngineTest extends TestCase {
 		$this->assertEmpty($result);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testPerformSearchWithExcludedIdsSkipsExclusionSearch(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock schema response
-		$schemaResponse = $this->createMock(Response::class);
-		$schemaResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
-						['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
-					],
-				],
-				]
-			)
-		);
+		$schemaResponse = $this->createDefaultVectorSchemaResponse();
 
-		// Mock search response
-		$searchResponse = $this->createMock(Response::class);
-		$searchResponse->method('getResult')->willReturn(
-			Struct::fromData(
+		$searchResponse = $this->createDataResponse(
+			[
 				[
-				[
-					'data' => [
-						[
-							'id' => 3,
-							'content' => 'Test content',
-							'embedding' => '[0.1, 0.2, 0.3]',
-							'knn_dist' => 0.05,
-						],
-					],
+					'id' => 3,
+					'content' => 'Test content',
+					'embedding' => '[0.1, 0.2, 0.3]',
+					'knn_dist' => 0.05,
 				],
-				]
-			)
+			]
 		);
 
 		$mockClient->expects($this->exactly(3)) // schema, search, schema
-			->method('sendRequest')
+		->method('sendRequest')
 			->willReturnOnConsecutiveCalls(
 				$schemaResponse,
 				$searchResponse,
 				$schemaResponse
 			);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-3.5-turbo',
-			'k_results' => 5, 'settings' => ['similarity_threshold' => 0.8]];
+		$modelConfig = $this->createDefaultModelConfig();
 		$result = $searchEngine->performSearchWithExcludedIds(
 			$mockClient,
 			'test_table',
@@ -590,32 +626,10 @@ class SearchEngineTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testGetExcludedIdsBuildsCorrectSQL(): void {
-		$searchEngine = new SearchEngine();
-
-		// Mock HTTP client
+		$searchEngine = $this->createSearchEngine();
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock schema response
-		$schemaResponse = $this->createMock(Response::class);
-		$schemaResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-					'data' => [
-						['Field' => 'id', 'Type' => 'bigint'],
-						['Field' => 'content', 'Type' => 'text'],
-						['Field' => 'embedding', 'Type' => 'float_vector(1536)'],
-					],
-				],
-				]
-			)
-		);
-
-		// Mock exclusion response
-		$exclusionResponse = $this->createMock(Response::class);
-		$exclusionResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => []]])
-		);
+		$schemaResponse = $this->createDefaultVectorSchemaResponse();
+		$exclusionResponse = $this->createExclusionResponse([]);
 
 		$mockClient->expects($this->exactly(2))
 			->method('sendRequest')
@@ -624,14 +638,14 @@ class SearchEngineTest extends TestCase {
 					if (str_contains($sql, 'DESCRIBE')) {
 						return $schemaResponse;
 					}
-				// Verify the exclusion SQL matches actual implementation
-					if (str_contains($sql, 'SELECT id, knn_dist() as knn_dist FROM test_table')
-					&& str_contains($sql, "WHERE knn(embedding, 15, 'exclude query')")
-					&& str_contains($sql, 'AND knn_dist < 0.75')
+					// Verify the exclusion SQL matches actual implementation
+					if (str_contains($sql, /** @lang manticore */ 'SELECT id, knn_dist() as knn_dist FROM test_table')
+						&& str_contains($sql, "WHERE knn(embedding, 15, 'exclude query')")
+						&& str_contains($sql, 'AND knn_dist < 0.75')
 					) {
 						return $exclusionResponse;
 					}
-					throw new \Exception("Unexpected SQL: $sql");
+					throw new Exception("Unexpected SQL: $sql");
 				}
 			);
 
@@ -645,22 +659,24 @@ class SearchEngineTest extends TestCase {
 		$this->assertEmpty($result);
 	}
 
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
 	public function testGetExcludedIdsGeneratesCorrectSqlWithKnnDist(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock schema response
-		$schemaResponse = $this->createMock(Response::class);
-		$schemaResponse->method('hasError')->willReturn(false);
-		$schemaResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => [['Field' => 'embedding_vector', 'Type' => 'float_vector']]]])
+		$schemaResponse = $this->createSchemaResponse(
+			[
+				['Field' => 'embedding_vector', 'Type' => 'float_vector'],
+			]
 		);
 
-		// Mock exclusion response
-		$exclusionResponse = $this->createMock(Response::class);
-		$exclusionResponse->method('hasError')->willReturn(false);
-		$exclusionResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => [['id' => 1156395647918669832]]]])
+		$exclusionResponse = $this->createDataResponse(
+			[
+				['id' => 1156395647918669832],
+			]
 		);
 
 		$actualSql = '';
@@ -668,7 +684,7 @@ class SearchEngineTest extends TestCase {
 			->method('sendRequest')
 			->willReturnCallback(
 				function ($sql) use ($schemaResponse, $exclusionResponse, &$actualSql) {
-					if (strpos($sql, 'DESCRIBE') !== false) {
+					if (str_contains($sql, 'DESCRIBE')) {
 						return $schemaResponse;
 					}
 					$actualSql = $sql;
@@ -679,7 +695,10 @@ class SearchEngineTest extends TestCase {
 		$result = $searchEngine->getExcludedIds($mockClient, 'docs', 'Stranger Things');
 
 		// Verify the SQL contains knn_dist() in SELECT clause
-		$this->assertStringContainsString('SELECT id, knn_dist() as knn_dist FROM docs', $actualSql);
+		$this->assertStringContainsString(
+			/** @lang manticore */            'SELECT id, knn_dist() as knn_dist FROM docs',
+			$actualSql
+		);
 		$this->assertStringContainsString("WHERE knn(embedding_vector, 15, 'Stranger Things')", $actualSql);
 		$this->assertStringContainsString('AND knn_dist < 0.75', $actualSql);
 
@@ -692,7 +711,7 @@ class SearchEngineTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testPerformSearchWithExcludedIdsActuallyExcludes(): void {
-		$searchEngine = new SearchEngine();
+		$searchEngine = $this->createSearchEngine();
 		$mockClient = $this->createMock(HTTPClient::class);
 		$model = [
 			'llm_provider' => 'openai',
@@ -700,35 +719,28 @@ class SearchEngineTest extends TestCase {
 			'settings' => ['k_results' => 5],
 		];
 
-		// Mock schema response
-		$schemaResponse = $this->createMock(Response::class);
-		$schemaResponse->method('hasError')->willReturn(false);
-		$schemaResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => [['Field' => 'embedding_vector', 'Type' => 'float_vector']]]])
+		$schemaResponse = $this->createSchemaResponse(
+			[
+				['Field' => 'embedding_vector', 'Type' => 'float_vector'],
+			]
 		);
 
-		// Mock exclusion response (should find Stranger Things to exclude)
-		$exclusionResponse = $this->createMock(Response::class);
-		$exclusionResponse->method('hasError')->willReturn(false);
-		$exclusionResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => [['id' => 1156395647918669832]]]])
+		$exclusionResponse = $this->createDataResponse(
+			[
+				['id' => 1156395647918669832],
+			]
 		);
 
-		// Mock search response (should exclude the found ID)
-		$searchResponse = $this->createMock(Response::class);
-		$searchResponse->method('hasError')->willReturn(false);
-		$searchResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[['data' => [
+		$searchResponse = $this->createDataResponse(
+			[
 				['id' => 1001, 'title' => 'Other Show', 'knn_dist' => 0.5],
 				['id' => 1002, 'title' => 'Another Show', 'knn_dist' => 0.6],
-				]]]
-			)
+			]
 		);
 
 		$sqlQueries = [];
 		$mockClient->expects($this->exactly(5)) // schema, exclusion, schema, search, schema
-			->method('sendRequest')
+		->method('sendRequest')
 			->willReturnCallback(
 				function ($sql) use ($schemaResponse, $exclusionResponse, $searchResponse, &$sqlQueries) {
 					$sqlQueries[] = $sql;
@@ -741,7 +753,7 @@ class SearchEngineTest extends TestCase {
 					if (str_contains($sql, 'id NOT IN (1156395647918669832)')) {
 						return $searchResponse;
 					}
-					throw new \Exception("Unexpected SQL: $sql");
+					throw new Exception("Unexpected SQL: $sql");
 				}
 			);
 
@@ -755,7 +767,10 @@ class SearchEngineTest extends TestCase {
 
 		// Verify exclusion SQL was generated correctly
 		$exclusionSql = $sqlQueries[1]; // Second query should be exclusion
-		$this->assertStringContainsString('SELECT id, knn_dist() as knn_dist FROM docs', $exclusionSql);
+		$this->assertStringContainsString(
+			/** @lang manticore */            'SELECT id, knn_dist() as knn_dist FROM docs',
+			$exclusionSql
+		);
 
 		// Verify search SQL excludes the found ID
 		$searchSql = $sqlQueries[3]; // Fourth query should be search

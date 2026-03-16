@@ -42,6 +42,9 @@ class ConversationalPayloadTest extends TestCase {
 		putenv('TEST_ANTHROPIC_API_KEY');
 	}
 
+	/**
+	 * @throws QueryParseError
+	 */
 	public function testSQLCreateModelParsing(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
 			llm_provider = 'openai',
@@ -52,29 +55,54 @@ class ConversationalPayloadTest extends TestCase {
 			k_results = 5
 		)";
 
-		$payload = RagPayload::fromRequest(
+		$payload = $this->parseSqlPayload($query);
+
+		$this->assertCreateModelPayload(
+			$payload,
+			[
+				'name' => 'test_model',
+				'llm_provider' => 'openai',
+				'llm_model' => 'gpt-4',
+				'style_prompt' => 'You are a helpful assistant.',
+				'temperature' => 0.7,
+				'max_tokens' => 1000,
+				'k_results' => 5,
+			]
+		);
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
+	private function parseSqlPayload(string $query): RagPayload {
+		return RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => $query,
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => '',
 				]
 			)
 		);
-
-		$this->assertEquals('create_model', $payload->action);
-		$this->assertEquals('test_model', $payload->params['name']);
-		$this->assertEquals('openai', $payload->params['llm_provider']);
-		$this->assertEquals('gpt-4', $payload->params['llm_model']);
-		$this->assertEquals('You are a helpful assistant.', $payload->params['style_prompt']);
-		$this->assertEquals(0.7, $payload->params['temperature']);
-		$this->assertEquals(1000, $payload->params['max_tokens']);
-		$this->assertEquals(5, $payload->params['k_results']);
 	}
 
+	/**
+	 * @param array<string, int|float|string> $expectedParams
+	 */
+	private function assertCreateModelPayload(RagPayload $payload, array $expectedParams): void {
+		$this->assertEquals('create_model', $payload->action);
+
+		foreach ($expectedParams as $key => $value) {
+			$this->assertEquals($value, $payload->params[$key]);
+		}
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
 	public function testSQLCreateModelParsingWithSettingsJson(): void {
 		$query = "CREATE RAG MODEL advanced_assistant (
 			llm_provider='openai',
@@ -83,89 +111,97 @@ class ConversationalPayloadTest extends TestCase {
 			settings='{\"temperature\":0.3, \"max_tokens\":2000, \"k_results\":5}'
 		);";
 
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$payload = $this->parseSqlPayload($query);
 
-		$this->assertEquals('create_model', $payload->action);
-		$this->assertEquals('advanced_assistant', $payload->params['name']);
-		$this->assertEquals('openai', $payload->params['llm_provider']);
-		$this->assertEquals('gpt-4o', $payload->params['llm_model']);
-		$this->assertEquals(
-			'{"temperature":0.3, "max_tokens":2000, "k_results":5}',
-			$payload->params['settings']
+		$this->assertCreateModelPayload(
+			$payload,
+			[
+				'name' => 'advanced_assistant',
+				'llm_provider' => 'openai',
+				'llm_model' => 'gpt-4o',
+				'settings' => '{"temperature":0.3, "max_tokens":2000, "k_results":5}',
+			]
 		);
 	}
 
+	/**
+	 * @throws QueryParseError
+	 */
 	public function testSQLShowModelsParsing(): void {
 		$query = 'SHOW RAG MODELS';
 
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('show_models', $payload->action);
 	}
 
+	/**
+	 * @throws QueryParseError
+	 */
 	public function testSQLDescribeModelParsing(): void {
 		$query = "DESCRIBE RAG MODEL 'sfa-2742-dshd6'";
 
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('describe_model', $payload->action);
 		$this->assertEquals('sfa-2742-dshd6', $payload->params['model_name_or_uuid']);
 	}
 
+	/**
+	 * @throws QueryParseError
+	 */
 	public function testSQLDropModelParsing(): void {
 		$query = "DROP RAG MODEL 'test_model'";
 
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('drop_model', $payload->action);
 		$this->assertEquals('test_model', $payload->params['model_name_or_uuid']);
 	}
 
+	/**
+	 * @throws QueryParseError
+	 */
+	public function testSQLDropModelIfExistsParsingWithoutQuotes(): void {
+		$query = 'DROP RAG MODEL IF EXISTS advanced_assistant;';
 
+		$payload = $this->parseSqlPayload($query);
+
+		$this->assertEquals('drop_model', $payload->action);
+		$this->assertEquals('advanced_assistant', $payload->params['model_name_or_uuid']);
+		$this->assertEquals('1', $payload->params['if_exists']);
+	}
+
+	public function testSQLDropModelParsingRejectsTrailingTokens(): void {
+		$this->expectException(QueryParseError::class);
+
+		$this->parseSqlPayload('DROP RAG MODEL my_model garbage');
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
+	public function testSQLDropModelQuotedNameDoesNotSetIfExistsFlag(): void {
+		$query = "DROP RAG MODEL 'my IF EXISTS model'";
+
+		$payload = $this->parseSqlPayload($query);
+
+		$this->assertEquals('drop_model', $payload->action);
+		$this->assertEquals('my IF EXISTS model', $payload->params['model_name_or_uuid']);
+		$this->assertArrayNotHasKey('if_exists', $payload->params);
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
+	public function testSQLDropModelUnquotedUuidParsing(): void {
+		$query = 'DROP RAG MODEL 550e8400-e29b-41d4-a716-446655440000';
+
+		$payload = $this->parseSqlPayload($query);
+
+		$this->assertEquals('drop_model', $payload->action);
+		$this->assertEquals('550e8400-e29b-41d4-a716-446655440000', $payload->params['model_name_or_uuid']);
+	}
 
 	public function testHTTPNotSupported(): void {
 		$this->expectException(QueryParseError::class);
@@ -173,60 +209,38 @@ class ConversationalPayloadTest extends TestCase {
 		RagPayload::fromRequest(
 			Request::fromArray(
 				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => (string)json_encode(
-					[
-					'id' => 'test_model',
-					'name' => 'Test Model',
-					'llm_provider' => 'openai',
-					'llm_model' => 'gpt-4o',
-					]
-				),
-				'format' => RequestFormat::JSON,
-				'endpointBundle' => ManticoreEndpoint::Search,
-				'path' => '/rag/models',
-				'httpMethod' => 'POST',
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => (string)json_encode(
+						[
+							'id' => 'test_model',
+							'name' => 'Test Model',
+							'llm_provider' => 'openai',
+							'llm_model' => 'gpt-4o',
+						]
+					),
+					'format' => RequestFormat::JSON,
+					'endpointBundle' => ManticoreEndpoint::Search,
+					'path' => '/rag/models',
 				]
 			)
 		);
 	}
-
-
 
 	public function testInvalidQueryThrowsException(): void {
 		$this->expectException(QueryParseError::class);
 
-		RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => 'INVALID RAG QUERY',
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$this->parseSqlPayload('INVALID RAG QUERY');
 	}
 
+	/**
+	 * @throws QueryParseError
+	 */
 	public function testEscapedQuotesInConversationParams(): void {
-		$query = "CALL CONVERSATIONAL_RAG('I\\'m like programming, ".
+		$query = "CALL CONVERSATIONAL_RAG('I\\'m like programming, " .
 			"lets talk about it', 'docs', 'test_model', 'content', 'conversation_1')";
 
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('conversation', $payload->action);
 		$this->assertEquals("I'm like programming, lets talk about it", $payload->params['query']);
@@ -236,21 +250,13 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals('conversation_1', $payload->params['conversation_uuid']);
 	}
 
+	/**
+	 * @throws QueryParseError
+	 */
 	public function testConversationParsingWithContentFields(): void {
 		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'title,content')";
 
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('conversation', $payload->action);
 		$this->assertEquals('test query', $payload->params['query']);
@@ -259,21 +265,13 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals('title,content', $payload->params['content_fields']);
 	}
 
+	/**
+	 * @throws QueryParseError
+	 */
 	public function testConversationParsingWithSingleCustomField(): void {
 		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'summary')";
 
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('summary', $payload->params['content_fields']);
 	}
@@ -283,18 +281,7 @@ class ConversationalPayloadTest extends TestCase {
 
 		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123')";
 
-		RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$this->parseSqlPayload($query);
 	}
 
 	public function testEmptyContentFieldsThrowsException(): void {
@@ -302,18 +289,7 @@ class ConversationalPayloadTest extends TestCase {
 
 		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', '')";
 
-		RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$this->parseSqlPayload($query);
 	}
 
 	public function testWhitespaceContentFieldsThrowsException(): void {
@@ -321,19 +297,7 @@ class ConversationalPayloadTest extends TestCase {
 
 		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', '   ')";
 
-		RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
+		$this->parseSqlPayload($query);
 	}
-
 
 }

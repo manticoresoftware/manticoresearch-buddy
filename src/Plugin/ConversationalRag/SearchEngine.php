@@ -36,6 +36,7 @@ class SearchEngine {
 	 * @param float|null $threshold
 	 *
 	 * @return array<int, array<string, mixed>>
+	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
 	 */
 	public function performSearch(
 		HTTPClient $client,
@@ -84,16 +85,18 @@ class SearchEngine {
 		}
 
 		$excludeEscaped = $this->escapeString($excludeQuery);
-		$sql = "SELECT id, knn_dist() as knn_dist FROM {$table}
-				WHERE knn({$vectorField}, 15, '{$excludeEscaped}')
+		$sql
+			= /** @lang manticore */
+			"SELECT id, knn_dist() as knn_dist FROM {$table}
+				WHERE knn($vectorField, 15, '$excludeEscaped')
 				AND knn_dist < 0.75";
 
 		Buddy::debugvv("\n[DEBUG EXCLUSION QUERY]");
-		Buddy::debugvv("├─ Exclude query: '{$excludeQuery}'");
-		Buddy::debugvv("├─ Table: {$table}");
-		Buddy::debugvv("├─ Vector field: {$vectorField}");
+		Buddy::debugvv("├─ Exclude query: '$excludeQuery'");
+		Buddy::debugvv("├─ Table: $table");
+		Buddy::debugvv("├─ Vector field: $vectorField");
 		Buddy::debugvv('├─ Threshold: 0.75');
-		Buddy::debugvv("├─ Final SQL: {$sql}");
+		Buddy::debugvv("├─ Final SQL: $sql");
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
@@ -121,8 +124,7 @@ class SearchEngine {
 	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
 	 */
 	private function detectVectorField(HTTPClient $client, string $table): ?string {
-
-		$query = "DESCRIBE {$table}";
+		$query = "DESCRIBE $table";
 		$response = $client->sendRequest($query);
 		if ($response->hasError()) {
 			throw ManticoreSearchResponseError::create(
@@ -147,6 +149,7 @@ class SearchEngine {
 	 * Escape string for SQL safety
 	 *
 	 * @param string $string
+	 *
 	 * @return string
 	 */
 	private function escapeString(string $string): string {
@@ -183,32 +186,29 @@ class SearchEngine {
 		}
 
 		$searchEscaped = $this->escapeString($searchQuery);
-
+		$knnK = $kResults;
+		$excludeClause = '';
 		if (!empty($excludedIds)) {
-			// Use pre-computed excluded IDs - NO additional KNN search needed!
 			$safeExcludeIds = array_map('intval', $excludedIds);
-			$excludeList = implode(',', $safeExcludeIds);
-			$adjustedK = $kResults + sizeof($excludedIds) + 5;
-
-			$sql = "SELECT *, knn_dist() as knn_dist
-					FROM {$table}
-					WHERE knn({$vectorField}, {$adjustedK}, '{$searchEscaped}')
-					AND knn_dist < {$threshold}
-					AND id NOT IN ({$excludeList})
-					LIMIT {$kResults}";
-		} else {
-			$sql = "SELECT *, knn_dist() as knn_dist
-					FROM {$table}
-					WHERE knn({$vectorField}, {$kResults}, '{$searchEscaped}')
-					AND knn_dist < {$threshold}";
+			$excludeClause = 'AND id NOT IN (' . implode(',', $safeExcludeIds) . ')';
+			$knnK += sizeof($excludedIds) + 5;
 		}
+		$sql = $this->buildVectorSearchSql(
+			$table,
+			$vectorField,
+			$searchEscaped,
+			$knnK,
+			$threshold,
+			$kResults,
+			$excludeClause
+		);
 
 		Buddy::debugvv("\n[DEBUG KNN SEARCH]");
-		Buddy::debugvv("├─ Search query: '{$searchQuery}'");
+		Buddy::debugvv("├─ Search query: '$searchQuery'");
 		Buddy::debugvv('├─ Excluded IDs: [' . implode(', ', $excludedIds) . ']');
-		Buddy::debugvv("├─ k: {$kResults}");
-		Buddy::debugvv("├─ Threshold: {$threshold}");
-		Buddy::debugvv("├─ Final SQL: {$sql}");
+		Buddy::debugvv("├─ k: $kResults");
+		Buddy::debugvv("├─ Threshold: $threshold");
+		Buddy::debugvv("├─ Final SQL: $sql");
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
@@ -228,7 +228,9 @@ class SearchEngine {
 	 *
 	 * @param array{llm_provider: string, llm_model: string,
 	 *   settings?: string|array<string, mixed>, k_results?: string|int} $modelConfig
+	 *
 	 * @return int
+	 * @throws ManticoreSearchClientError
 	 */
 	private function getKResults(array $modelConfig): int {
 		// Check direct config
@@ -254,6 +256,24 @@ class SearchEngine {
 		}
 
 		return self::DEFAULT_K_RESULTS;
+	}
+
+	private function buildVectorSearchSql(
+		string $table,
+		string $vectorField,
+		string $searchEscaped,
+		int $knnK,
+		float $threshold,
+		int $limit,
+		string $excludeClause
+	): string {
+		$excludeSql = $excludeClause !== '' ? "\n\t\t\t\t\t$excludeClause" : '';
+
+		return /** @lang manticore */ "SELECT *, knn_dist() as knn_dist
+				FROM {$table}
+				WHERE knn($vectorField, $knnK, '$searchEscaped')
+				AND knn_dist < $threshold{$excludeSql}
+				LIMIT $limit";
 	}
 
 	/**
@@ -298,7 +318,6 @@ class SearchEngine {
 	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
 	 */
 	private function getVectorFields(HTTPClient $client, string $table): array {
-
 		$query = "DESCRIBE $table";
 		$response = $client->sendRequest($query);
 
@@ -333,9 +352,9 @@ class SearchEngine {
 	 *   similarity_threshold?: string|float} $modelConfig
 	 *
 	 * @return float
+	 * @throws ManticoreSearchClientError
 	 */
 	private function getSimilarityThreshold(array $modelConfig): float {
-
 		// Check direct config
 		if (isset($modelConfig['similarity_threshold'])) {
 			return (float)$modelConfig['similarity_threshold'];

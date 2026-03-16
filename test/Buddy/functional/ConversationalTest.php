@@ -16,6 +16,9 @@ class ConversationalTest extends TestCase {
 
 	use TestFunctionalTrait;
 
+	/**
+	 * @throws Exception
+	 */
 	public function testCreateRagModelSuccess(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
 
@@ -42,6 +45,9 @@ class ConversationalTest extends TestCase {
 	}
 
 
+	/**
+	 * @throws Exception
+	 */
 	public function testCreateRagModelInvalidProvider(): void {
 		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'bad_model' (
@@ -53,6 +59,9 @@ class ConversationalTest extends TestCase {
 		);
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testCreateRagModelInvalidTemperature(): void {
 		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'bad_model' (
@@ -65,6 +74,9 @@ class ConversationalTest extends TestCase {
 		);
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testCreateRagModelInvalidMaxTokens(): void {
 		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'bad_model' (
@@ -77,6 +89,9 @@ class ConversationalTest extends TestCase {
 		);
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testCreateRagModelInvalidKResults(): void {
 		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'bad_model' (
@@ -89,6 +104,9 @@ class ConversationalTest extends TestCase {
 		);
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testShowRagModelsEmpty(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model1'");
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model2'");
@@ -97,6 +115,9 @@ class ConversationalTest extends TestCase {
 		$this->assertIsArray($result);
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testShowRagModelsWithData(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model1'");
 
@@ -116,6 +137,9 @@ class ConversationalTest extends TestCase {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model1'");
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testDescribeRagModelSuccess(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
 
@@ -138,6 +162,9 @@ class ConversationalTest extends TestCase {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testDescribeRagModelNotFound(): void {
 		$this->assertQueryResultContainsError(
 			"DESCRIBE RAG MODEL 'non_existent_model'",
@@ -145,6 +172,9 @@ class ConversationalTest extends TestCase {
 		);
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testDropRagModelSuccess(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
 
@@ -160,6 +190,40 @@ class ConversationalTest extends TestCase {
 		$this->assertIsArray($result);
 	}
 
+	/**
+	 * @throws Exception
+	 */
+	public function testDropRagModelIfExistsNotFoundDoesNotError(): void {
+		$output = static::runSqlQuery("DROP RAG MODEL IF EXISTS 'non_existent_model'");
+		$this->assertStringNotContainsString('ERROR', implode(PHP_EOL, $output));
+
+		$output = static::runSqlQuery('DROP RAG MODEL IF EXISTS non_existent_model');
+		$this->assertStringNotContainsString('ERROR', implode(PHP_EOL, $output));
+	}
+
+	/**
+	 * @throws Exception
+	 */
+	public function testDropRagModelRejectsTrailingTokens(): void {
+		$this->assertQueryResultContainsError(
+			'DROP RAG MODEL non_existent_model garbage',
+			'Invalid DROP RAG MODEL syntax'
+		);
+	}
+
+	/**
+	 * @throws Exception
+	 */
+	public function testDropRagModelQuotedNameContainingIfExistsStillErrorsWhenMissing(): void {
+		$this->assertQueryResultContainsError(
+			"DROP RAG MODEL 'my IF EXISTS model'",
+			"RAG model 'my IF EXISTS model' not found"
+		);
+	}
+
+	/**
+	 * @throws Exception
+	 */
 	public function testDropRagModelNotFound(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'non_existent_model'");
 
@@ -169,6 +233,9 @@ class ConversationalTest extends TestCase {
 		);
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testCreateDuplicateRagModel(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'duplicate_model'");
 
@@ -192,6 +259,9 @@ class ConversationalTest extends TestCase {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'duplicate_model'");
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testFullModelLifecycle(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'lifecycle_model'");
 
@@ -225,6 +295,9 @@ class ConversationalTest extends TestCase {
 		);
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testCreateModelWithMinimalParameters(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'minimal_model'");
 
@@ -246,6 +319,9 @@ class ConversationalTest extends TestCase {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'minimal_model'");
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testCreateModelWithAllParameters(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'full_model'");
 
@@ -270,6 +346,9 @@ class ConversationalTest extends TestCase {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'full_model'");
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testTemperatureBoundaryValues(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'temp_min'");
 
@@ -298,6 +377,9 @@ class ConversationalTest extends TestCase {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'temp_max'");
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testMaxTokensBoundaryValues(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'tokens_min'");
 
@@ -311,7 +393,6 @@ class ConversationalTest extends TestCase {
 		);
 		$this->assertIsArray($result1);
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'tokens_min'");
-
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'tokens_max'");
 
 		$result2 = static::runSqlQuery(
@@ -326,6 +407,9 @@ class ConversationalTest extends TestCase {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'tokens_max'");
 	}
 
+	/**
+	 * @throws Exception
+	 */
 	public function testKResultsBoundaryValues(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'k_min'");
 
@@ -338,8 +422,8 @@ class ConversationalTest extends TestCase {
 			)"
 		);
 		$this->assertIsArray($result1);
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'k_min'");
 
+		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'k_min'");
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'k_max'");
 
 		$result2 = static::runSqlQuery(

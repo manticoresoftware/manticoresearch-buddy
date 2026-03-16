@@ -38,6 +38,7 @@ final class Payload extends BasePayload {
 	 * Check if the request matches this plugin
 	 *
 	 * @param Request $request
+	 *
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
@@ -53,6 +54,7 @@ final class Payload extends BasePayload {
 	 * Check if SQL query matches RAG patterns
 	 *
 	 * @param Request $request
+	 *
 	 * @return bool
 	 */
 	private static function matchesSQL(Request $request): bool {
@@ -63,10 +65,8 @@ final class Payload extends BasePayload {
 				'syntax error, unexpected tablename, expecting CLUSTER or FUNCTION or PLUGIN or TABLE near \'RAG MODEL',
 			];
 
-			foreach ($errorBasedPatterns as $errorPattern) {
-				if (str_contains($request->error, $errorPattern)) {
-					return true;
-				}
+			if (array_any($errorBasedPatterns, fn($errorPattern) => str_contains($request->error, $errorPattern))) {
+				return true;
 			}
 		}
 
@@ -80,21 +80,15 @@ final class Payload extends BasePayload {
 			'/^DROP\s+RAG\s+MODEL\s+/i',
 		];
 
-		foreach ($patterns as $pattern) {
-			if (preg_match($pattern, $payload)) {
-				return true;
-			}
-		}
-
-		return false;
+		return array_any($patterns, fn(string $pattern): bool => preg_match($pattern, $payload) === 1);
 	}
-
 
 
 	/**
 	 * Create payload from request
 	 *
 	 * @param Request $request
+	 *
 	 * @return static
 	 * @throws QueryParseError
 	 */
@@ -109,17 +103,20 @@ final class Payload extends BasePayload {
 	}
 
 
-
 	/**
 	 * Parse SQL request
 	 *
 	 * @param Request $request
+	 *
 	 * @return void
 	 * @throws QueryParseError
 	 */
 	private function parseSQLRequest(Request $request): void {
 		$sql = trim($request->payload);
-		$sql = preg_replace('/;\s*\z/', '', $sql) ?? $sql;
+		$withoutTrailingSemicolon = preg_replace('/;\s*\z/', '', $sql);
+		if ($withoutTrailingSemicolon !== null) {
+			$sql = $withoutTrailingSemicolon;
+		}
 
 		// SQL syntax for model management
 		if (preg_match('/^CREATE\s+RAG\s+MODEL\s+[\'"]?(\w+)[\'"]?\s*\((.*)\)\s*\z/si', $sql, $matches)) {
@@ -130,12 +127,9 @@ final class Payload extends BasePayload {
 		} elseif (preg_match('/^DESCRIBE\s+RAG\s+MODEL\s+[\'"]?([^\'"]+)[\'"]?\s*\z/i', $sql, $matches)) {
 			$this->action = self::ACTION_DESCRIBE_MODEL;
 			$this->params = ['model_name_or_uuid' => $matches[1]];
-		} elseif (preg_match('/^DROP\s+RAG\s+MODEL\s+(IF\s+EXISTS\s+)?[\'"]?([^\'"]+)[\'"]?\s*\z/i', $sql, $matches)) {
+		} elseif (preg_match('/^DROP\s+RAG\s+MODEL\s+/i', $sql)) {
 			$this->action = self::ACTION_DROP_MODEL;
-			$this->params = ['model_name_or_uuid' => $matches[2]];
-			if ($matches[1] !== '') {
-				$this->params['if_exists'] = '1';
-			}
+			$this->params = $this->parseDropModelParams($sql);
 		} elseif (preg_match('/^CALL\s+CONVERSATIONAL_RAG\s*\((.*)\)\s*\z/si', $sql, $matches)) {
 			$this->action = self::ACTION_CONVERSATION;
 			$this->params = $this->parseConversationParams($matches[1]);
@@ -144,14 +138,14 @@ final class Payload extends BasePayload {
 		}
 	}
 
-
-
 	/**
 	 * Parse CREATE RAG MODEL parameters
 	 *
 	 * @param string $modelName
 	 * @param string $params
+	 *
 	 * @return array<string, string>
+	 * @throws QueryParseError
 	 */
 	private function parseCreateModelParams(string $modelName, string $params): array {
 		// Parse key=value pairs from CREATE RAG MODEL syntax
@@ -177,6 +171,7 @@ final class Payload extends BasePayload {
 	 * Parse key=value parameters
 	 *
 	 * @param string $params
+	 *
 	 * @return array<string, string>
 	 * @throws QueryParseError
 	 */
@@ -193,7 +188,7 @@ final class Payload extends BasePayload {
 			// Split on first = sign
 			$parts = explode('=', $segment, 2);
 			if (sizeof($parts) !== 2) {
-				throw QueryParseError::create("Invalid parameter '{$segment}', expected key=value");
+				throw QueryParseError::create("Invalid parameter '$segment', expected key=value");
 			}
 
 			$key = strtolower(trim($parts[0]));
@@ -205,67 +200,10 @@ final class Payload extends BasePayload {
 	}
 
 	/**
-	 * Remove quotes from string
-	 *
-	 * @param string $str
-	 * @return string
-	 */
-	private function unquoteString(string $str): string {
-		$str = trim($str);
-
-		if ((str_starts_with($str, '"')
-		&& str_ends_with($str, '"'))
-			|| (str_starts_with($str, "'")
-			&& str_ends_with($str, "'"))) {
-			$unquoted = substr($str, 1, -1);
-			// Handle SQL escaped quotes
-			$unquoted = str_replace("\\'", "'", $unquoted);
-			$unquoted = str_replace('\\"', '"', $unquoted);
-			return $unquoted;
-		}
-
-		return $str;
-	}
-
-	/**
-	 * Parse conversation parameters
-	 *
-	 * @param string $params
-	 * @return array<string, string>
-	 * @throws QueryParseError
-	 */
-	private function parseConversationParams(string $params): array {
-		$parts = $this->parseCommaSeparatedParams($params);
-
-		$result = [
-			'query' => $this->unquoteString($parts[0] ?? ''),
-			'table' => $this->unquoteString($parts[1] ?? ''),
-			'model_uuid' => $this->unquoteString($parts[2] ?? ''),
-		];
-
-		if (!isset($parts[3])) {
-			throw QueryParseError::create('content_fields parameter is required (position 4)');
-		}
-
-		$contentFields = trim($this->unquoteString($parts[3]));
-		if (empty($contentFields)) {
-			throw QueryParseError::create('content_fields parameter cannot be empty');
-		}
-
-		$result['content_fields'] = $contentFields;
-
-		// conversation_uuid is now the 5th parameter and OPTIONAL
-		if (isset($parts[4])) {
-			$result['conversation_uuid'] = $this->unquoteString($parts[4]);
-		}
-
-		return $result;
-	}
-
-	/**
 	 * Parse comma-separated parameters with quote handling
 	 *
 	 * @param string $params
+	 *
 	 * @return array<string>
 	 */
 	private function parseCommaSeparatedParams(string $params): array {
@@ -278,8 +216,6 @@ final class Payload extends BasePayload {
 		$i = 0;
 		while ($i < strlen($params)) {
 			$char = $params[$i];
-			$charsConsumed = 1;
-			$skipAppend = false;
 
 			[$inQuotes, $quoteChar, $current, $charsConsumed, $skipAppend] = $this->handleCharacterInQuotes(
 				$char, $inQuotes, $quoteChar, $current, $params, $i
@@ -321,6 +257,7 @@ final class Payload extends BasePayload {
 	 * @param string $current
 	 * @param string $params
 	 * @param int $i
+	 *
 	 * @return array{0: bool, 1: string, 2: string, 3: int, 4: bool}
 	 */
 	private function handleCharacterInQuotes(
@@ -332,16 +269,13 @@ final class Payload extends BasePayload {
 		int $i
 	): array {
 		$charsConsumed = 1;
-		$skipAppend = false;
-
 		// Check for escaped characters when in quotes
 		if ($inQuotes && $char === '\\' && $i + 1 < strlen($params)) {
 			// Add both the escape and the escaped character
 			$current .= $char;
 			$current .= $params[$i + 1];
 			$charsConsumed = 2;
-			$skipAppend = true;
-			return [$inQuotes, $quoteChar, $current, $charsConsumed, $skipAppend];
+			return [true, $quoteChar, $current, $charsConsumed, true];
 		}
 
 		if (!$inQuotes && ($char === '"' || $char === "'")) {
@@ -352,7 +286,100 @@ final class Payload extends BasePayload {
 			$quoteChar = '';
 		}
 
-		return [$inQuotes, $quoteChar, $current, $charsConsumed, $skipAppend];
+		return [$inQuotes, $quoteChar, $current, $charsConsumed, false];
+	}
+
+	/**
+	 * Remove quotes from string
+	 *
+	 * @param string $str
+	 *
+	 * @return string
+	 */
+	private function unquoteString(string $str): string {
+		$str = trim($str);
+
+		if ((str_starts_with($str, '"')
+				&& str_ends_with($str, '"'))
+			|| (str_starts_with($str, "'")
+				&& str_ends_with($str, "'"))
+		) {
+			$unquoted = substr($str, 1, -1);
+			// Handle SQL escaped quotes
+			$unquoted = str_replace("\\'", "'", $unquoted);
+			return str_replace('\\"', '"', $unquoted);
+		}
+
+		return $str;
+	}
+
+	/**
+	 * @return array{model_name_or_uuid: string, if_exists?: '1'}
+	 * @throws QueryParseError
+	 */
+	private function parseDropModelParams(string $sql): array {
+		if (!preg_match(
+			'/^DROP\s+RAG\s+MODEL\s+(?:(IF\s+EXISTS)\s+)?(?:\'([^\']+)\'|"([^"]+)"|([A-Za-z0-9_-]+))\s*\z/i',
+			$sql,
+			$matches
+		)
+		) {
+			throw QueryParseError::create('Invalid DROP RAG MODEL syntax');
+		}
+
+		$modelNameOrUuid = $matches[2] ?? '';
+		if ($modelNameOrUuid === '') {
+			$modelNameOrUuid = $matches[3] ?? '';
+		}
+		if ($modelNameOrUuid === '') {
+			$modelNameOrUuid = $matches[4] ?? '';
+		}
+		if ($modelNameOrUuid === '') {
+			throw QueryParseError::create('DROP RAG MODEL requires model name or uuid');
+		}
+
+		$params = ['model_name_or_uuid' => $modelNameOrUuid];
+		if (!empty($matches[1])) {
+			$params['if_exists'] = '1';
+		}
+
+		return $params;
+	}
+
+	/**
+	 * Parse conversation parameters
+	 *
+	 * @param string $params
+	 *
+	 * @return array<string, string>
+	 * @throws QueryParseError
+	 */
+	private function parseConversationParams(string $params): array {
+		$parts = $this->parseCommaSeparatedParams($params);
+
+		$result = [
+			'query' => $this->unquoteString($parts[0] ?? ''),
+			'table' => $this->unquoteString($parts[1] ?? ''),
+			'model_uuid' => $this->unquoteString($parts[2] ?? ''),
+		];
+
+		if (!isset($parts[3])) {
+			throw QueryParseError::create('content_fields parameter is required (position 4)');
+		}
+
+		$contentFields = trim($this->unquoteString($parts[3]));
+		if (empty($contentFields)) {
+			throw QueryParseError::create('content_fields parameter cannot be empty');
+		}
+
+		$result['content_fields'] = $contentFields;
+
+		// conversation_uuid is now the 5th parameter and OPTIONAL
+		if (isset($parts[4])) {
+			$result['conversation_uuid'] = $this->unquoteString($parts[4]);
+		}
+
+		return $result;
 	}
 
 

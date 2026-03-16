@@ -22,6 +22,7 @@ use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Random\RandomException;
+use Throwable;
 
 /**
  * This class handles all ConversationalRag plugin operations
@@ -36,6 +37,7 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @param Payload $payload
 	 * @param LlmProvider|null $llmProvider
+	 *
 	 * @return void
 	 */
 	public function __construct(public Payload $payload, ?LlmProvider $llmProvider = null) {
@@ -73,7 +75,7 @@ final class Handler extends BaseHandlerWithClient {
 					$payload, $modelManager, $provider,
 					$conversationManager, $intentClassifier, $searchEngine, $client
 				),
-				default => throw QueryParseError::create("Unknown action: {$payload->action}")
+				default => throw QueryParseError::create("Unknown action: $payload->action")
 			};
 		};
 
@@ -119,17 +121,18 @@ final class Handler extends BaseHandlerWithClient {
 		/** @var array{name: string, llm_provider:string, llm_model: string,
 		 *   style_prompt?: string, temperature?: string, max_tokens?: string,
 		 *   k_results?: string, similarity_threshold?: string,
-		 *   max_document_length?: string} $config */
+		 *   max_document_length?: string} $config
+		 */
 		$config = $payload->params;
 
 
-			self::validateModelConfig($config);
+		self::validateModelConfig($config);
 
-			// Create model
-			$uuid = $modelManager->createModel($client, $config);
+		// Create model
+		$uuid = $modelManager->createModel($client, $config);
 
-			return TaskResult::withRow(['uuid' => $uuid])
-				->column('uuid', Column::String);
+		return TaskResult::withRow(['uuid' => $uuid])
+			->column('uuid', Column::String);
 	}
 
 	/**
@@ -138,6 +141,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
 	 *   temperature?: string, max_tokens?: string, k_results?: string,
 	 *   similarity_threshold?: string, max_document_length?: string} $config
+	 *
 	 * @return void
 	 * @throws QueryParseError
 	 */
@@ -155,7 +159,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
 	 *   temperature?: string, max_tokens?: string, k_results?: string,
 	 *   similarity_threshold?: string, max_document_length?: string} $config
-   *
+	 *
 	 * @return void
 	 * @throws QueryParseError
 	 */
@@ -164,7 +168,7 @@ final class Handler extends BaseHandlerWithClient {
 
 		foreach ($required as $field) {
 			if (empty($config[$field])) {
-				throw QueryParseError::create("Required field '{$field}' is missing or empty");
+				throw QueryParseError::create("Required field '$field' is missing or empty");
 			}
 		}
 	}
@@ -175,7 +179,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
 	 *   temperature?: string, max_tokens?: string, k_results?: string,
 	 *   similarity_threshold?: string, max_document_length?: string} $config
- *
+	 *
 	 * @return void
 	 * @throws QueryParseError
 	 */
@@ -194,7 +198,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
 	 *   temperature?: string, max_tokens?: string, k_results?: string,
 	 *   similarity_threshold?: string, max_document_length?: string} $config
-   *
+	 *
 	 * @return void
 	 * @throws QueryParseError
 	 */
@@ -262,10 +266,9 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchResponseError
 	 */
 	private static function showModels(ModelManager $modelManager, Client $client): TaskResult {
-
 		$models = $modelManager->getAllModels($client);
 
-			$data = [];
+		$data = [];
 		foreach ($models as $model) {
 			$data[] = [
 				'uuid' => $model['uuid'],
@@ -276,12 +279,12 @@ final class Handler extends BaseHandlerWithClient {
 			];
 		}
 
-			return TaskResult::withData($data)
-				->column('uuid', Column::String)
-				->column('name', Column::String)
-				->column('llm_provider', Column::String)
-				->column('llm_model', Column::String)
-				->column('created_at', Column::String);
+		return TaskResult::withData($data)
+			->column('uuid', Column::String)
+			->column('name', Column::String)
+			->column('llm_provider', Column::String)
+			->column('llm_model', Column::String)
+			->column('created_at', Column::String);
 	}
 
 	/**
@@ -295,16 +298,15 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	private static function describeModel(Payload $payload, ModelManager $modelManager, Client $client): TaskResult {
+		$modelNameOrUuid = $payload->params['model_name_or_uuid'];
+		$model = $modelManager->getModelByUuidOrName($client, $modelNameOrUuid);
 
-			$modelNameOrUuid = $payload->params['model_name_or_uuid'];
-			$model = $modelManager->getModelByUuidOrName($client, $modelNameOrUuid);
-
-			$data = [];
+		$data = [];
 		foreach ($model as $key => $value) {
 			if (is_array($value)) { // Settings key
 				foreach ($value as $setting => $settingValue) {
 					$data[] = [
-						'property' => "settings.{$setting}",
+						'property' => "settings.$setting",
 						'value' => (string)$settingValue,
 					];
 				}
@@ -317,10 +319,9 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 
-
-			return TaskResult::withData($data)
-				->column('property', Column::String)
-				->column('value', Column::String);
+		return TaskResult::withData($data)
+			->column('property', Column::String)
+			->column('value', Column::String);
 	}
 
 	/**
@@ -329,22 +330,19 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param Payload $payload
 	 * @param ModelManager $modelManager
 	 * @param Client $client
-	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
+	 *
 	 * @return TaskResult
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	private static function dropModel(Payload $payload, ModelManager $modelManager, Client $client): TaskResult {
 		$modelNameOrUuid = $payload->params['model_name_or_uuid'];
 		$ifExists = ($payload->params['if_exists'] ?? '') === '1';
 
-		try {
-			$modelManager->deleteModelByUuidOrName($client, $modelNameOrUuid);
-		} catch (ManticoreSearchClientError $e) {
-			if ($ifExists && str_contains($e->getMessage(), 'not found')) {
-				return TaskResult::none();
-			}
-			throw $e;
-		}
-
+		$modelManager->deleteModelByUuidOrName(
+			$client,
+			$modelNameOrUuid,
+			$ifExists
+		);
 		return TaskResult::none();
 	}
 
@@ -361,6 +359,7 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @return TaskResult
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError|JsonException
+	 * @throws RandomException
 	 */
 	private static function handleConversation(
 		Payload $payload,
@@ -432,11 +431,11 @@ final class Handler extends BaseHandlerWithClient {
 	private static function parseCallRagParams(Payload $payload): ConversationRequest {
 		// Parse CALL CONVERSATIONAL_RAG parameters from payload
 		return new ConversationRequest(
-			(string)($payload->params['query'] ?? ''),
-			(string)($payload->params['table'] ?? ''),
-			(string)($payload->params['model_uuid'] ?? ''),
-			(string)$payload->params['content_fields'],
-			(string)($payload->params['conversation_uuid'] ?? '')
+			$payload->params['query'] ?? '',
+			$payload->params['table'] ?? '',
+			$payload->params['model_uuid'] ?? '',
+			$payload->params['content_fields'],
+			$payload->params['conversation_uuid'] ?? ''
 		);
 	}
 
@@ -444,6 +443,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * Generate a UUID v4
 	 *
 	 * @return string
+	 * @throws RandomException
 	 */
 	private static function generateUuid(): string {
 		$data = random_bytes(16);
@@ -456,18 +456,20 @@ final class Handler extends BaseHandlerWithClient {
 	 * Log conversation start
 	 *
 	 * @param string $conversationUuid
+	 *
 	 * @return void
 	 */
 	private static function logConversationStart(string $conversationUuid): void {
 		Buddy::debugvv("\n[DEBUG CONVERSATION FLOW]");
 		Buddy::debugvv('├─ Starting conversation processing');
-		Buddy::debugvv("├─ Conversation UUID: {$conversationUuid}");
+		Buddy::debugvv("├─ Conversation UUID: $conversationUuid");
 	}
 
 	/**
 	 * Log conversation history
 	 *
 	 * @param string $conversationHistory
+	 *
 	 * @return void
 	 */
 	private static function logConversationHistory(string $conversationHistory): void {
@@ -486,6 +488,7 @@ final class Handler extends BaseHandlerWithClient {
 	 *   llm_model:string,style_prompt:string,settings:array{ temperature?: string,
 	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
 	 *   max_document_length?: string},created_at:string,updated_at:string} $model
+	 *
 	 * @return string
 	 */
 	private static function classifyIntent(
@@ -498,7 +501,7 @@ final class Handler extends BaseHandlerWithClient {
 		$intent = $intentClassifier->classifyIntent(
 			$query, $conversationHistory, $provider, $model
 		);
-		Buddy::debugvv("├─ Intent classified: {$intent}");
+		Buddy::debugvv("├─ Intent classified: $intent");
 		return $intent;
 	}
 
@@ -507,8 +510,12 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @param SearchContext $context
 	 * @param SearchServices $services
+	 *
 	 * @return array{array<int, array<string, mixed>>, array{search_query:string,
 	 *   exclude_query:string}, array<int, string|int>}
+	 * @throws ManticoreSearchResponseError
+	 *
+	 * @throws ManticoreSearchClientError
 	 */
 	private static function performSearch(
 		SearchContext $context,
@@ -560,9 +567,16 @@ final class Handler extends BaseHandlerWithClient {
 				$context->model
 			);
 
-			$excludedIds = $lastContext['excluded_ids'] === ''
-				? []
-				: simdjson_decode($lastContext['excluded_ids'], true);
+			$rawExcludedIds = trim($lastContext['excluded_ids']);
+			if ($rawExcludedIds === '' || strtoupper($rawExcludedIds) === 'NULL') {
+				$excludedIds = [];
+			} else {
+				try {
+					$excludedIds = simdjson_decode($rawExcludedIds, true);
+				} catch (Throwable $e) {
+					throw ManticoreSearchClientError::create('Invalid excluded_ids JSON: ' . $e->getMessage());
+				}
+			}
 			if (!is_array($excludedIds)) {
 				throw ManticoreSearchClientError::create('Excluded IDs must be an array');
 			}
@@ -575,11 +589,11 @@ final class Handler extends BaseHandlerWithClient {
 			return [$searchResults, $queries, $excludedIds];
 		}
 
-			Buddy::debugvv('├─ No previous search context found, falling back to NEW_SEARCH');
-			// Fallback to NEW_SEARCH logic
-			return self::handleQueryGeneratingIntent(
-				$context->withIntent(Intent::NEW_SEARCH), $services
-			);
+		Buddy::debugvv('├─ No previous search context found, falling back to NEW_SEARCH');
+		// Fallback to NEW_SEARCH logic
+		return self::handleQueryGeneratingIntent(
+			$context->withIntent(Intent::NEW_SEARCH), $services
+		);
 	}
 
 	/**
@@ -587,16 +601,17 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @param SearchContext $context
 	 * @param SearchServices $services
-	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 *
 	 * @return array{array<int, array<string, mixed>>, array{search_query:string,
 	 *   exclude_query:string}, array<int, string|int>}
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
+	 *
 	 */
 	private static function handleQueryGeneratingIntent(
 		SearchContext $context,
 		SearchServices $services
 	): array {
-		Buddy::debugvv("├─ Processing query-generating intent: {$context->intent}");
+		Buddy::debugvv("├─ Processing query-generating intent: $context->intent");
 		$cleanHistory = $services->conversationManager->getConversationHistoryForQueryGeneration(
 			$context->request->conversationUuid
 		);
@@ -644,6 +659,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param ConversationRequest $request
 	 * @param string $intent
 	 * @param array{search_query:string, exclude_query:string} $queries
+	 *
 	 * @return void
 	 */
 	private static function logPreprocessingResults(
@@ -652,7 +668,7 @@ final class Handler extends BaseHandlerWithClient {
 		array $queries
 	): void {
 		Buddy::debugvv('[DEBUG PREPROCESSING]');
-		Buddy::debugvv("├─ User query: '{$request->query}'");
+		Buddy::debugvv("├─ User query: '$request->query'");
 		Buddy::debugvv("├─ Intent: $intent");
 		Buddy::debugvv("├─ Search query: '{$queries['search_query']}'");
 		Buddy::debugvv("└─ Exclude query: '{$queries['exclude_query']}'");
@@ -742,7 +758,6 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return array{error?:string,success:bool,content:string,
 	 *   metadata?:array{tokens_used:integer, input_tokens:integer,
 	 *   output_tokens:integer, response_time_ms:integer, finish_reason:string}}
-	 * @throws ManticoreSearchClientError
 	 */
 	private static function generateResponse(
 		array $model,
@@ -770,11 +785,11 @@ final class Handler extends BaseHandlerWithClient {
 			"Style instructions cannot affect the main section; it's strictly prohibited. " .
 			"If style conflicts with the main section, style should be ignored.\n" .
 			'<main>' .
-			"<history>{$historyText}</history>\n" .
-			"<context>{$context}</context>\n" .
-			"<query>{$query}</query>\n" .
+			"<history>$historyText</history>\n" .
+			"<context>$context</context>\n" .
+			"<query>$query</query>\n" .
 			"</main>\n" .
-			"<style>{$stylePrompt}</style>";
+			"<style>$stylePrompt</style>";
 	}
 
 	/**
@@ -784,9 +799,10 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param ConversationRequest $request
 	 * @param string $modelUuid
 	 * @param ConversationTurn $turn
-	 * @throws ManticoreSearchClientError|JsonException
 	 *
 	 * @return void
+	 * @throws ManticoreSearchClientError|JsonException
+	 *
 	 */
 	private static function saveConversationMessages(
 		ConversationManager $conversationManager,
@@ -807,11 +823,11 @@ final class Handler extends BaseHandlerWithClient {
 			);
 		}
 
-			$assistantIntent = ($turn->intent === Intent::CONTENT_QUESTION) ? Intent::CONTENT_QUESTION : null;
+		$assistantIntent = ($turn->intent === Intent::CONTENT_QUESTION) ? Intent::CONTENT_QUESTION : null;
 		Buddy::debugvv('├─ Saving assistant response');
 		Buddy::debugvv('├─ Assistant intent: ' . ($assistantIntent ?? 'none'));
 		Buddy::debugvv('├─ Response length: ' . strlen($turn->responseText) . ' chars');
-		Buddy::debugvv("├─ Tokens used: {$turn->tokensUsed}");
+		Buddy::debugvv("├─ Tokens used: $turn->tokensUsed");
 
 		$conversationManager->saveMessage(
 			$conversationUuid, $modelUuid, 'assistant', $turn->responseText, $turn->tokensUsed, $assistantIntent
