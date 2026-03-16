@@ -12,6 +12,7 @@
 namespace Manticoresearch\BuddyTest\Network;
 
 use Manticoresearch\Buddy\Base\Plugin\Auth\Exception\AuthError;
+use Manticoresearch\Buddy\Base\Plugin\Auth\Payload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Response;
@@ -20,8 +21,7 @@ use PHPUnit\Framework\TestCase;
 final class EventHandlerLogTest extends TestCase {
 	public function testAuthErrorProducesLogEntityInResponse(): void {
 		$requestId = 'req-1';
-		$originalError = 'P03: syntax error, unexpected tablename, expecting ' .
-			"CLUSTER or FUNCTION or PLUGIN or TABLE near 'USER";
+		$originalError = Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'";
 		$requestPayload = [
 			'type' => 'unknown sql request',
 			'error' => [

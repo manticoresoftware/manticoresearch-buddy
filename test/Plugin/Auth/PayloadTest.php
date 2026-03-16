@@ -33,36 +33,33 @@ class PayloadTest extends TestCase {
 		echo "\nTesting hasMatch for Auth plugin commands\n";
 		$testCases = [
 			[
-				'query' => "CREATE USER 'testuser' IDENTIFIED BY 'testpass'",
-				'error' => 'P03: syntax error, unexpected tablename, expecting '.
-					"CLUSTER or FUNCTION or PLUGIN or TABLE near 'USER",
+				'query' => "CREATE USER 'testuser' IDENTIFIED BY 'testpass' EXTRA",
+				'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 				'expected' => true,
 			],
 			[
-				'query' => "DROP USER 'testuser'",
-				'error' => 'P03: syntax error, unexpected tablename, expecting '.
-					"FUNCTION or PLUGIN or TABLE near 'user",
+				'query' => "DROP USER 'testuser' EXTRA",
+				'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 				'expected' => true,
 			],
 			[
-				'query' => "GRANT read ON * TO 'testuser'",
-				'error' => "P02: syntax error, unexpected identifier near 'GRANT",
+				'query' => "GRANT read ON * TO 'testuser' EXTRA",
+				'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 				'expected' => true,
 			],
 			[
-				'query' => "REVOKE read ON * FROM 'testuser'",
-				'error' => "P02: syntax error, unexpected identifier near 'REVOKE",
+				'query' => "REVOKE read ON * FROM 'testuser' EXTRA",
+				'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 				'expected' => true,
 			],
 			[
 				'query' => 'SHOW MY PERMISSIONS',
-				'error' => 'P01: syntax error, unexpected identifier, '.
-					"expecting VARIABLES near 'MY PERMISSIONS'",
+				'error' => Payload::SHOW_MY_PERMISSIONS_SYNTAX_ERROR . "'",
 				'expected' => true,
 			],
 			[
-				'query' => "SET PASSWORD 'abcdef'",
-				'error' => "P01: syntax error, unexpected string, expecting '=' near",
+				'query' => "SET PASSWORD 'abcdef' EXTRA",
+				'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 				'expected' => true,
 			],
 			[
@@ -99,8 +96,7 @@ class PayloadTest extends TestCase {
 		$request = Request::fromArray(
 			[
 			'version' => Buddy::PROTOCOL_VERSION,
-			'error' => 'P02: syntax error, unexpected '.
-				"identifier near 'GRANT read ON * TO 'testuser''",
+			'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 			'payload' => "GRANT read ON * TO 'testuser'",
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
@@ -130,8 +126,7 @@ class PayloadTest extends TestCase {
 		$request = Request::fromArray(
 			[
 			'version' => Buddy::PROTOCOL_VERSION,
-			'error' => 'P02: syntax error, unexpected '.
-				"identifier near 'REVOKE read ON * FROM 'testuser''",
+			'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 			'payload' => "REVOKE read ON * FROM 'testuser'",
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
@@ -160,7 +155,7 @@ class PayloadTest extends TestCase {
 		$request = Request::fromArray(
 			[
 			'version' => Buddy::PROTOCOL_VERSION,
-			'error' => "P02: syntax error, unexpected identifier near 'GRANT invalid ON * TO 'testuser''",
+			'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 			'payload' => "GRANT invalid ON * TO 'testuser'",
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
@@ -208,8 +203,7 @@ class PayloadTest extends TestCase {
 		$request = Request::fromArray(
 			[
 			'version' => Buddy::PROTOCOL_VERSION,
-			'error' => 'P03: syntax error, unexpected tablename, '.
-				"expecting CLUSTER or FUNCTION or PLUGIN or TABLE near 'USER",
+			'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 			'payload' => "CREATE USER 'newuser' IDENTIFIED BY 'password123'",
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
@@ -233,8 +227,7 @@ class PayloadTest extends TestCase {
 		$request = Request::fromArray(
 			[
 			'version' => Buddy::PROTOCOL_VERSION,
-			'error' => 'P03: syntax error, unexpected tablename, '.
-				"expecting FUNCTION or PLUGIN or TABLE near 'user",
+			'error' => Payload::TRAILING_TOKEN_SYNTAX_ERROR . " 'EXTRA'",
 			'payload' => "DROP USER 'olduser'",
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,
@@ -258,7 +251,7 @@ class PayloadTest extends TestCase {
 		$request = Request::fromArray(
 			[
 			'version' => Buddy::PROTOCOL_VERSION,
-			'error' => "P01: syntax error, unexpected string, expecting '=' near",
+			'error' => "P01: syntax error, unexpected identifier, expecting \$end near 'EXTRA'",
 			'payload' => "SET PASSWORD 'newpass123' FOR 'testuser'",
 			'format' => RequestFormat::SQL,
 			'endpointBundle' => ManticoreEndpoint::Sql,

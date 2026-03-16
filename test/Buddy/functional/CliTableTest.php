@@ -111,7 +111,7 @@ class CliTableTest extends TestCase {
 			"\+-+\+-+\+-+\+-+\+-+\+\n".
 			"(\| \d+\s+\| (SHOW QUERIES|[^\s]+)\s+\| \d+(m|u)s( ago)?\s+\| http\s+\| 127\.0\.0\.1:\d+ \|\n)+?".
 			"\+-+\+-+\+-+\+-+\+-+\+\n".
-			"\d row(s)? in set \(\d\.\d{3} sec\)\n/";
+			"\d+ row(s)? in set \(\d\.\d{3} sec\)\n/";
 		$this->assertMatchesRegularExpression($pattern, $out[0]['columns']);
 	}
 }

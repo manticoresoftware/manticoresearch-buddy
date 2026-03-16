@@ -25,6 +25,9 @@ final class Payload extends BasePayload {
 
 	const AUTH_USERS_TABLE = 'system.auth_users';
 	const AUTH_PERMISSIONS_TABLE = 'system.auth_permissions';
+	const TRAILING_TOKEN_SYNTAX_ERROR = 'P01: syntax error, unexpected identifier, expecting $end near';
+	const SHOW_MY_PERMISSIONS_SYNTAX_ERROR =
+		'P01: syntax error, unexpected identifier, expecting VARIABLES near \'MY PERMISSIONS';
 
 	public string $type;
 	private string $handler;
@@ -127,12 +130,8 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasCreateUser(Request $request): bool {
-		return (str_starts_with(
-			$request->error,
-			'P03: syntax error, unexpected tablename, '.
-				"expecting CLUSTER or FUNCTION or PLUGIN or TABLE near 'USER"
-		)
-			&& stripos($request->payload, 'CREATE USER') !== false);
+		return str_starts_with($request->error, self::TRAILING_TOKEN_SYNTAX_ERROR)
+			&& stripos($request->payload, 'CREATE USER') !== false;
 	}
 
 	/**
@@ -140,21 +139,8 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasDropUser(Request $request): bool {
-		// More robust pattern matching for DROP USER detection
-		$patterns = [
-			'P03: syntax error, unexpected tablename, expecting FUNCTION or PLUGIN or TABLE near',
-			'P03: syntax error, unexpected identifier near',
-		];
-
-		$matchesPattern = false;
-		foreach ($patterns as $pattern) {
-			if (str_starts_with($request->error, $pattern)) {
-				$matchesPattern = true;
-				break;
-			}
-		}
-
-		return $matchesPattern && stripos($request->payload, 'DROP USER') !== false;
+		return str_starts_with($request->error, self::TRAILING_TOKEN_SYNTAX_ERROR)
+			&& stripos($request->payload, 'DROP USER') !== false;
 	}
 
 	/**
@@ -162,10 +148,7 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasGrant(Request $request): bool {
-		return (str_starts_with(
-			$request->error,
-			"P02: syntax error, unexpected identifier near 'GRANT"
-		)
+		return (str_starts_with($request->error, self::TRAILING_TOKEN_SYNTAX_ERROR)
 			&& stripos($request->payload, 'GRANT') !== false);
 	}
 
@@ -174,10 +157,7 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasRevoke(Request $request): bool {
-		return (str_starts_with(
-			$request->error,
-			"P02: syntax error, unexpected identifier near 'REVOKE"
-		)
+		return (str_starts_with($request->error, self::TRAILING_TOKEN_SYNTAX_ERROR)
 			&& stripos($request->payload, 'REVOKE') !== false);
 	}
 
@@ -186,11 +166,7 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasShowMyPermissions(Request $request): bool {
-		return (str_starts_with(
-			$request->error,
-			'P01: syntax error, unexpected identifier, '.
-				"expecting VARIABLES near 'MY PERMISSIONS'"
-		)
+		return (str_starts_with($request->error, self::SHOW_MY_PERMISSIONS_SYNTAX_ERROR)
 			&& stripos($request->payload, 'SHOW MY PERMISSIONS') !== false);
 	}
 
@@ -199,11 +175,7 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	private static function hasSetPassword(Request $request): bool {
-		return (str_starts_with(
-			$request->error,
-			'P01: syntax error, unexpected string, '.
-				"expecting '=' near"
-		)
+		return (str_starts_with($request->error, self::TRAILING_TOKEN_SYNTAX_ERROR)
 			&& stripos($request->payload, 'SET PASSWORD') !== false);
 	}
 
