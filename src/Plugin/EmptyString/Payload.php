@@ -49,12 +49,12 @@ final class Payload extends BasePayload {
 	 */
 	public static function hasMatch(Request $request): bool {
 		$payload = strtolower($request->payload);
-		if ($request->payload === ''
+		/*if ($request->payload === ''
 			&& $request->endpointBundle !== Endpoint::Metrics
 			&& $request->endpointBundle !== Endpoint::Bulk
 			&& $request->endpointBundle !== Endpoint::Elastic) {
 			return true;
-		}
+		}*/
 		if ($request->command === 'set') {
 			$setPatterns = [
 				'sql_quote_show_create',
