@@ -78,7 +78,7 @@ class QueryProcessor {
 			if ($prop === 'manticoreClient') {
 				/** @var HTTPClient $value */
 				$value = clone $value;
-				$value->setDelegatedUser($request->user);
+				$value->setDelegatedUser($request->user ?? null);
 			}
 			$handler->{'set' . ucfirst($prop)}($value);
 		}
