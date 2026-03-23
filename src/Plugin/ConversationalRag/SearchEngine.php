@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
+use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
@@ -21,6 +22,8 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
  * No pattern-based detection - relies on LLM-generated queries and exclusions
  */
 class SearchEngine {
+	use SqlEscapingTrait;
+
 	private const float DEFAULT_SIMILARITY_THRESHOLD = 0.8;
 	private const int DEFAULT_K_RESULTS = 5;
 
@@ -143,17 +146,6 @@ class SearchEngine {
 			}
 		}
 		return null;
-	}
-
-	/**
-	 * Escape string for SQL safety
-	 *
-	 * @param string $string
-	 *
-	 * @return string
-	 */
-	private function escapeString(string $string): string {
-		return str_replace("'", "''", $string);
 	}
 
 	/**

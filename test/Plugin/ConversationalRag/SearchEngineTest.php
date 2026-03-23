@@ -514,7 +514,7 @@ class SearchEngineTest extends TestCase {
 		$method = $reflection->getMethod('escapeString');
 
 		$result = $method->invoke($searchEngine, "test's string");
-		$this->assertEquals("test''s string", $result);
+		$this->assertEquals("test\'s string", $result);
 
 		$result = $method->invoke($searchEngine, 'normal string');
 		$this->assertEquals('normal string', $result);

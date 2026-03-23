@@ -66,10 +66,10 @@ class DynamicThresholdManager {
 		}
 
 		$expansionCount = $this->getConsecutiveExpansionCount($conversationManager, $conversationUuid);
+		$maxThreshold = $baseThreshold * (1 + self::MAX_EXPANSION_PERCENT);
 
 		// Check if we've hit maximum expansions
 		if ($expansionCount >= self::MAX_EXPANSIONS) {
-			$maxThreshold = $baseThreshold * (1 + self::MAX_EXPANSION_PERCENT);
 			return [
 				'threshold' => $maxThreshold,
 				'expansion_level' => $expansionCount,
@@ -81,22 +81,6 @@ class DynamicThresholdManager {
 		}
 
 		$expansionCount++;
-
-		// Check if we've hit maximum expansions
-		if ($expansionCount >= self::MAX_EXPANSIONS) {
-			$maxThreshold = $baseThreshold * (1 + self::MAX_EXPANSION_PERCENT);
-			return [
-				'threshold' => $maxThreshold,
-				'expansion_level' => $expansionCount,
-				'is_expanded' => true,
-				'max_threshold' => $maxThreshold,
-				'expansion_percent' => round((($maxThreshold - $baseThreshold) / $baseThreshold) * 100, 1),
-				'expansion_limit_reached' => true,
-			];
-		}
-
-		// Calculate maximum threshold based on percentage (original logic)
-		$maxThreshold = $baseThreshold * (1 + self::MAX_EXPANSION_PERCENT);
 
 		// Calculate step size: divide expansion range into 4 steps (original logic)
 		$expansionRange = $maxThreshold - $baseThreshold;
@@ -121,7 +105,7 @@ class DynamicThresholdManager {
 			'is_expanded' => true,
 			'max_threshold' => $maxThreshold,
 			'expansion_percent' => round((($threshold - $baseThreshold) / $baseThreshold) * 100, 1),
-			'expansion_limit_reached' => false,
+			'expansion_limit_reached' => $expansionCount >= self::MAX_EXPANSIONS,
 		];
 	}
 

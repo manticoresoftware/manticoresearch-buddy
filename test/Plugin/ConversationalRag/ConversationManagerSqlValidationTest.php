@@ -230,8 +230,8 @@ class ConversationManagerSqlValidationTest extends TestCase {
 				function ($sql) {
 					// Check that special characters are properly escaped
 					$this->assertStringContainsString("O\\'Reilly", $sql);
-					$this->assertStringContainsString("line\nbreak", $sql);
-					$this->assertStringContainsString('quote"test', $sql);
+					$this->assertStringContainsString('line\\nbreak', $sql);
+					$this->assertStringContainsString('quote\\"test', $sql);
 
 					// Validate that the SQL is still syntactically valid
 					$this->assertStringStartsWith('INSERT INTO rag_conversations', $sql);

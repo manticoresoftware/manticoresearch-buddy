@@ -396,40 +396,6 @@ class ConversationHandlerTest extends TestCase {
 		);
 	}
 
-	public function testCreateModelValidationInvalidProvider(): void {
-		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'anthropic',
-			llm_model = 'gpt-4',
-		)";
-
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' =>
-				Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
-
-		$handler = new RagHandler($payload);
-		$mockClient = $this->createMock(HTTPClient::class);
-		$handler->setManticoreClient($mockClient);
-
-		$task = $handler->run();
-		$this->assertFalse($task->isSucceed());
-		$error = $task->getError();
-		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString(
-			"Invalid LLM provider: anthropic. Only 'openai' is supported.",
-			$error->getResponseError()
-		);
-	}
-
 	public function testCreateModelValidationTemperatureTooHigh(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
 			llm_provider = 'openai',

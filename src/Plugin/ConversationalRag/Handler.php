@@ -147,7 +147,6 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private static function validateModelConfig(array $config): void {
 		self::validateRequiredFields($config);
-		self::validateLlmProvider($config);
 		self::validateTemperature($config);
 		self::validateMaxTokens($config);
 		self::validateKResults($config);
@@ -170,25 +169,6 @@ final class Handler extends BaseHandlerWithClient {
 			if (empty($config[$field])) {
 				throw QueryParseError::create("Required field '$field' is missing or empty");
 			}
-		}
-	}
-
-	/**
-	 * Validate LLM provider
-	 *
-	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
-	 *   temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold?: string, max_document_length?: string} $config
-	 *
-	 * @return void
-	 * @throws QueryParseError
-	 */
-	private static function validateLlmProvider(array $config): void {
-		$validProviders = ['openai'];
-		if (!in_array($config['llm_provider'], $validProviders)) {
-			throw QueryParseError::create(
-				"Invalid LLM provider: {$config['llm_provider']}. Only 'openai' is supported."
-			);
 		}
 	}
 

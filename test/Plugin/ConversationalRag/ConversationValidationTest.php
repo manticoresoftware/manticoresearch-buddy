@@ -104,38 +104,6 @@ class ConversationValidationTest extends TestCase {
 		$this->assertStringContainsString("Required field 'llm_model' is missing or empty", $error->getResponseError());
 	}
 
-	public function testInvalidLlmProvider(): void {
-		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'invalid_provider',
-			llm_model = 'gpt-4',
-		)";
-
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
-
-		$handler = new RagHandler($payload);
-		$mockClient = $this->createMock(HTTPClient::class);
-		$handler->setManticoreClient($mockClient);
-
-		$task = $handler->run();
-		$this->assertFalse($task->isSucceed());
-		$error = $task->getError();
-		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString(
-			"Invalid LLM provider: invalid_provider. Only 'openai' is supported.", $error->getResponseError()
-		);
-	}
-
 	public function testTemperatureBelowMinimum(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
 			llm_provider = 'openai',

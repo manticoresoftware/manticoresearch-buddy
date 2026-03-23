@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
+use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Random\RandomException;
 use Throwable;
@@ -21,7 +22,7 @@ use Throwable;
  * Manages RAG model persistence and database operations
  */
 class ModelManager {
-	use SqlEscapeTrait;
+	use SqlEscapingTrait;
 
 	public const string MODELS_TABLE = 'system.rag_models';
 	private bool $tablesInitialized = false;

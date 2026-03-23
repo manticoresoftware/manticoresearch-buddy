@@ -48,20 +48,6 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelInvalidProvider(): void {
-		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'bad_model' (
-				llm_provider = 'invalid_provider',
-				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key'
-			)",
-			"Invalid LLM provider: invalid_provider. Only 'openai' is supported."
-		);
-	}
-
-	/**
-	 * @throws Exception
-	 */
 	public function testCreateRagModelInvalidTemperature(): void {
 		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'bad_model' (

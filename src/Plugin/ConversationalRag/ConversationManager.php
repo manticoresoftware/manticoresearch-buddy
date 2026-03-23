@@ -13,11 +13,12 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 use InvalidArgumentException;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
+use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 class ConversationManager {
-	use SqlEscapeTrait;
+	use SqlEscapingTrait;
 
 	public const string CONVERSATIONS_TABLE = 'rag_conversations';
 	private const int CONVERSATION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
