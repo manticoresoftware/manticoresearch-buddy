@@ -441,6 +441,35 @@ class ModelManagerTest extends TestCase {
 	/**
 	 * @throws ReflectionException
 	 */
+	public function testExtractSettingsExcludesTransportKeysFromModelSettings(): void {
+		$modelManager = new ModelManager();
+
+		$config = [
+			'name' => 'test_model',
+			'llm_provider' => 'openai',
+			'llm_model' => 'gpt-4',
+			'api_key' => 'sk-test',
+			'base_url' => 'http://host.docker.internal:8787/v1',
+			'settings' => ['temperature' => 0.9, 'max_tokens' => 1500],
+			'k_results' => 8,
+		];
+
+		$reflection = new ReflectionClass($modelManager);
+		$method = $reflection->getMethod('extractSettings');
+
+		$result = $method->invoke($modelManager, $config);
+
+		$this->assertIsArray($result);
+		$this->assertEquals(0.9, $result['temperature']);
+		$this->assertEquals(1500, $result['max_tokens']);
+		$this->assertEquals(8, $result['k_results']);
+		$this->assertArrayNotHasKey('api_key', $result);
+		$this->assertArrayNotHasKey('base_url', $result);
+	}
+
+	/**
+	 * @throws ReflectionException
+	 */
 	public function testModelExistsCaseSensitivity(): void {
 		$modelManager = new ModelManager();
 

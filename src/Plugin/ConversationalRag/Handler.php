@@ -285,6 +285,10 @@ final class Handler extends BaseHandlerWithClient {
 		foreach ($model as $key => $value) {
 			if (is_array($value)) { // Settings key
 				foreach ($value as $setting => $settingValue) {
+					if ($setting === 'api_key') {
+						$settingValue = 'HIDDEN';
+					}
+
 					$data[] = [
 						'property' => "settings.$setting",
 						'value' => (string)$settingValue,
@@ -395,10 +399,14 @@ final class Handler extends BaseHandlerWithClient {
 		return TaskResult::withRow(
 			[
 				'conversation_uuid' => $conversationUuid,
+				'user_query' => $request->query,
+				'search_query' => $queries['search_query'],
 				'response' => $responseText,
 				'sources' => json_encode($searchResults),
 			]
 		)->column('conversation_uuid', Column::String)
+			->column('user_query', Column::String)
+			->column('search_query', Column::String)
 			->column('response', Column::String)
 			->column('sources', Column::String);
 	}

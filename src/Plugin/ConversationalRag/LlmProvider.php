@@ -21,6 +21,16 @@ use UnexpectedValueException;
  */
 class LlmProvider {
 	private const string DEFAULT_MODEL = 'gpt-4o-mini';
+	/**
+	 * Transport options accepted by the llm extension constructor.
+	 *
+	 * @var array<int, string>
+	 */
+	private const array CLIENT_OPTIONS = [
+		'api_key',
+		'base_url',
+		'timeout',
+	];
 
 	/**
 	 * @var array<string, mixed>
@@ -81,8 +91,8 @@ class LlmProvider {
 			$modelId = $this->buildModelId($provider, is_string($model) ? $model : self::DEFAULT_MODEL);
 
 			$settings = $this->getSettings($options);
-
-			$llm = $this->getClientForModel($modelId);
+			$clientOptions = $this->extractClientOptions($settings);
+			$llm = $this->getClientForModel($modelId, $clientOptions);
 			$this->applySettingsToClient($llm, $settings);
 			$messages = $this->buildMessages($prompt);
 
@@ -231,6 +241,27 @@ class LlmProvider {
 		return $settings;
 	}
 
+	/**
+	 * Pass through any extension-level options from model settings while excluding values handled by Buddy itself.
+	 *
+	 * @param array<string, mixed> $settings
+	 * @return array<string, mixed>
+	 */
+	private function extractClientOptions(array $settings): array {
+		$clientOptions = [];
+		$allowedKeys = array_flip(self::CLIENT_OPTIONS);
+
+		foreach ($settings as $key => $value) {
+			if (!is_string($key) || !isset($allowedKeys[$key])) {
+				continue;
+			}
+
+			$clientOptions[$key] = $value;
+		}
+
+		return $clientOptions;
+	}
+
 	private function convertToFloat(mixed $value): mixed {
 		if (is_string($value) && is_numeric($value)) {
 			return (float)$value;
@@ -322,12 +353,13 @@ class LlmProvider {
 
 	/**
 	 * @param string $modelId
+	 * @param array<string, mixed> $options
 	 *
 	 * @return \Llm
 	 */
-	private function getClientForModel(string $modelId): \Llm {
+	private function getClientForModel(string $modelId, array $options = []): \Llm {
 		if ($this->client === null || !$this->client instanceof \Llm || $this->clientModelId !== $modelId) {
-			$this->client = new \Llm($modelId);
+			$this->client = new \Llm($modelId, $options);
 			$this->clientModelId = $modelId;
 		}
 

@@ -173,7 +173,7 @@ class ModelManager {
 	 */
 	private function extractSettings(array $config): array {
 		/** @var array<int, string> $coreFields */
-		$coreFields = ['id', 'name', 'llm_provider', 'llm_model', 'llm_api_key', 'style_prompt'];
+		$coreFields = ['id', 'name', 'llm_provider', 'llm_model', 'api_key', 'base_url', 'style_prompt'];
 		/** @var array<string, mixed> $settings */
 		$settings = [];
 

@@ -111,6 +111,80 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals('text', $result['non_numeric']); // Unchanged
 	}
 
+	public function testExtractClientOptionsKeepsOnlySupportedExtensionSettings(): void {
+		$settings = [
+			'api_key' => 'sk-test',
+			'base_url' => 'http://host.docker.internal:8787/v1',
+			'timeout' => 60,
+			'temperature' => 0.7,
+			'max_tokens' => 1000,
+			'k_results' => 5,
+			'similarity_threshold' => 0.8,
+			'max_document_length' => 2000,
+			'custom_header' => 'x-test',
+		];
+
+		$reflection = new ReflectionClass($this->provider);
+		$method = $reflection->getMethod('extractClientOptions');
+		$method->setAccessible(true);
+
+		$result = (array)$method->invoke($this->provider, $settings);
+
+		$this->assertEquals(
+			[
+				'api_key' => 'sk-test',
+				'base_url' => 'http://host.docker.internal:8787/v1',
+				'timeout' => 60,
+			],
+			$result
+		);
+	}
+
+	public function testGetSettingsPreservesTransportOptionsFromModelSettings(): void {
+		$config = [
+			'settings' => [
+				'api_key' => 'sk-test',
+				'base_url' => 'http://host.docker.internal:8787/v1',
+				'timeout' => 60,
+				'temperature' => 0.5,
+			],
+		];
+
+		$this->provider->configure($config);
+
+		$reflection = new ReflectionClass($this->provider);
+		$getSettings = $reflection->getMethod('getSettings');
+		$getSettings->setAccessible(true);
+		$extractClientOptions = $reflection->getMethod('extractClientOptions');
+		$extractClientOptions->setAccessible(true);
+
+		$settings = (array)$getSettings->invoke($this->provider, []);
+		$result = (array)$extractClientOptions->invoke($this->provider, $settings);
+
+		$this->assertEquals(
+			[
+				'api_key' => 'sk-test',
+				'base_url' => 'http://host.docker.internal:8787/v1',
+				'timeout' => 60,
+			],
+			$result
+		);
+	}
+
+	public function testGetClientForModelAcceptsEmptyClientOptions(): void {
+		if (!class_exists('Llm')) {
+			$this->markTestSkipped('llm extension is not available');
+		}
+
+		$reflection = new ReflectionClass($this->provider);
+		$method = $reflection->getMethod('getClientForModel');
+		$method->setAccessible(true);
+
+		$result = $method->invoke($this->provider, 'openai:gpt-4o-mini', []);
+
+		$this->assertInstanceOf(Llm::class, $result);
+	}
+
 	public function testConvertToFloatValidNumeric(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);

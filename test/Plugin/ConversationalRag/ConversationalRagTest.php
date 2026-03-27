@@ -239,7 +239,6 @@ class ConversationalRagTest extends TestCase {
 						'name' => 'functional_test_model',
 						'llm_provider' => 'openai',
 						'llm_model' => 'gpt-4',
-						'llm_api_key' => '', // Empty for security
 						'style_prompt' => 'You are a helpful assistant.',
 						'temperature' => 0.7,
 						'max_tokens' => 1000,

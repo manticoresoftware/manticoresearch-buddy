@@ -26,7 +26,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'test_model' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key-123456789',
+				api_key = 'sk-test-key-123456789',
 				style_prompt = 'You are a helpful assistant.',
 				temperature = 0.7,
 				max_tokens = 1000,
@@ -53,7 +53,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'bad_model' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key',
+				api_key = 'sk-test-key',
 				temperature = 3.0
 			)",
 			'Temperature must be between 0 and 2'
@@ -68,7 +68,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'bad_model' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key',
+				api_key = 'sk-test-key',
 				max_tokens = 50000
 			)",
 			'max_tokens must be between 1 and 32768'
@@ -83,7 +83,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'bad_model' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key',
+				api_key = 'sk-test-key',
 				k_results = 100
 			)",
 			'k_results must be between 1 and 50'
@@ -111,7 +111,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'test_model1' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_api_key = 'sk-test-key-123456789'
+			api_key = 'sk-test-key-123456789'
 		)"
 		);
 
@@ -168,7 +168,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'test_model' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_api_key = 'sk-test-key-123456789'
+			api_key = 'sk-test-key-123456789'
 		)"
 		);
 
@@ -229,7 +229,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'duplicate_model' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_api_key = 'sk-test-key-123456789'
+			api_key = 'sk-test-key-123456789'
 		)"
 		);
 
@@ -237,7 +237,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'duplicate_model' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key-123456789'
+				api_key = 'sk-test-key-123456789'
 			)",
 			"RAG model 'duplicate_model' already exists"
 		);
@@ -255,7 +255,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'lifecycle_model' (
 			llm_provider = 'openai',
 			llm_model = 'gpt-4',
-			llm_api_key = 'sk-test-key-123456789',
+			api_key = 'sk-test-key-123456789',
 			style_prompt = 'You are a helpful assistant.',
 			temperature = 0.7,
 			max_tokens = 1000,
@@ -291,7 +291,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'minimal_model' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key-123456789'
+				api_key = 'sk-test-key-123456789'
 			)"
 		);
 		$this->assertIsArray($result);
@@ -315,7 +315,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'full_model' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key-123456789',
+				api_key = 'sk-test-key-123456789',
 				style_prompt = 'You are a helpful assistant with extensive knowledge.',
 				temperature = 1.5,
 				max_tokens = 2000,
@@ -342,7 +342,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'temp_min' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key',
+				api_key = 'sk-test-key',
 				temperature = 0
 			)"
 		);
@@ -355,7 +355,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'temp_max' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key',
+				api_key = 'sk-test-key',
 				temperature = 2
 			)"
 		);
@@ -373,7 +373,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'tokens_min' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key',
+				api_key = 'sk-test-key',
 				max_tokens = 1
 			)"
 		);
@@ -385,7 +385,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'tokens_max' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key',
+				api_key = 'sk-test-key',
 				max_tokens = 32768
 			)"
 		);
@@ -403,7 +403,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'k_min' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key',
+				api_key = 'sk-test-key',
 				k_results = 1
 			)"
 		);
@@ -416,7 +416,7 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'k_max' (
 				llm_provider = 'openai',
 				llm_model = 'gpt-4',
-				llm_api_key = 'sk-test-key',
+				api_key = 'sk-test-key',
 				k_results = 50
 			)"
 		);

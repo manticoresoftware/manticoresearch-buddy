@@ -249,9 +249,8 @@ class ConversationHandlerTest extends TestCase {
 								'uuid' => 'test-uuid',
 								'name' => 'test_model',
 								'llm_provider' => 'openai',
-								'llm_api_key' => '',
 								'style_prompt' => 'You are a helpful assistant.',
-								'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
+								'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5,"api_key":"sk-test"}',
 								'created_at' => '2023-01-01 00:00:00',
 							],
 						],
@@ -279,6 +278,14 @@ class ConversationHandlerTest extends TestCase {
 		// Should have multiple property-value pairs for the model description
 		$this->assertEquals('uuid', $struct[0]['data'][0]['property']);
 		$this->assertEquals('test-uuid', $struct[0]['data'][0]['value']);
+		$apiKeyRows = array_values(
+			array_filter(
+				$struct[0]['data'],
+				static fn(array $row): bool => $row['property'] === 'settings.api_key'
+			)
+		);
+		$this->assertCount(1, $apiKeyRows);
+		$this->assertSame('HIDDEN', $apiKeyRows[0]['value']);
 	}
 
 	public function testDropModelSuccess(): void {
@@ -328,7 +335,6 @@ class ConversationHandlerTest extends TestCase {
 						'uuid' => 'test-uuid',
 						'name' => 'test_model',
 						'llm_provider' => 'openai',
-						'llm_api_key' => '',
 						'style_prompt' => 'You are a helpful assistant.',
 						'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
 						'created_at' => '2023-01-01 00:00:00',
@@ -609,7 +615,6 @@ class ConversationHandlerTest extends TestCase {
 						'uuid' => 'encrypted-uuid-123',
 						'name' => 'encrypted_test_model',
 						'llm_provider' => 'openai',
-						'llm_api_key' => '',
 						'style_prompt' => 'You are a helpful assistant.',
 						'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
 						'created_at' => '2023-01-01 00:00:00',
@@ -783,7 +788,6 @@ class ConversationHandlerTest extends TestCase {
 							'uuid' => 'model-uuid',
 							'name' => 'test_model',
 							'llm_provider' => 'openai',
-							'llm_api_key' => '',
 							'style_prompt' => 'You are a helpful assistant.',
 							'settings' => '{"temperature":0.7,"max_tokens":1000,"k_results":5}',
 							'created_at' => '2023-01-01 00:00:00',
@@ -944,14 +948,24 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = (array)$result->getStruct();
 		$this->assertIsArray($struct);
-		/** @var array<int, array{data: array<int, array{conversation_uuid: string, sources: mixed}>}> $struct */
+		/** @var array<int, array{data: array<int, array{
+		 *   conversation_uuid: string,
+		 *   user_query: string,
+		 *   search_query: string,
+		 *   sources: mixed
+		 * }>}
+		 *> $struct */
 
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertArrayHasKey('conversation_uuid', $struct[0]['data'][0]);
+		$this->assertArrayHasKey('user_query', $struct[0]['data'][0]);
+		$this->assertArrayHasKey('search_query', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('response', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('sources', $struct[0]['data'][0]);
 		$this->assertEquals('conv-uuid', $struct[0]['data'][0]['conversation_uuid']);
+		$this->assertEquals('Show me action movies', $struct[0]['data'][0]['user_query']);
+		$this->assertStringContainsString('action movies', $struct[0]['data'][0]['search_query']);
 	}
 
 		/**
