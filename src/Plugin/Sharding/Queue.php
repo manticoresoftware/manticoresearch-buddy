@@ -119,13 +119,15 @@ final class Queue {
 	public function hasPending(Node $node): bool {
 		$maxTries = static::MAX_TRIES;
 		$table = $this->cluster->getSystemTableName($this->table);
-		$res = $this->client->sendRequest("
+		$res = $this->client->sendRequest(
+			"
 			SELECT COUNT(*) AS cnt FROM {$table}
 			WHERE `node` = '{$node->id}'
 			  AND `status` <> 'processed'
 			  AND `tries` < {$maxTries}
 			LIMIT 1
-		")->getResult();
+		"
+		)->getResult();
 		/** @var array{0?:array{data?:array{0?:array{cnt:int}}}} $res */
 		return ($res[0]['data'][0]['cnt'] ?? 0) > 0;
 	}
@@ -474,24 +476,24 @@ final class Queue {
 	}
 
 	/**
-	 * Extract cluster name from ALTER CLUSTER ADD TABLE query
+	 * Extract cluster name from ALTER CLUSTER ADD/DROP TABLE query
 	 * @param string $query
 	 * @return string|null
 	 */
 	protected function extractClusterNameFromQuery(string $query): ?string {
-		if (preg_match('/ALTER\s+CLUSTER\s+(\w+)\s+ADD/i', $query, $matches)) {
+		if (preg_match('/ALTER\s+CLUSTER\s+(\w+)\s+(?:ADD|DROP)/i', $query, $matches)) {
 			return $matches[1];
 		}
 		return null;
 	}
 
 	/**
-	 * Extract table names from ALTER CLUSTER ADD TABLE query
+	 * Extract table names from ALTER CLUSTER ADD/DROP TABLE query
 	 * @param string $query
 	 * @return array<string>
 	 */
 	protected function extractTableNamesFromQuery(string $query): array {
-		if (preg_match('/ADD\s+(.+)$/i', $query, $matches)) {
+		if (preg_match('/(?:ADD|DROP)\s+(.+)$/i', $query, $matches)) {
 			$tablesStr = trim($matches[1]);
 			// Split by comma and clean up table names
 			$tables = array_map('trim', explode(',', $tablesStr));
