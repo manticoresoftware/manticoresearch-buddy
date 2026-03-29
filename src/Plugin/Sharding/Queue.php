@@ -206,12 +206,6 @@ final class Queue {
 			$status = $this->handleAlterClusterDropTableError($query['query'], $res);
 		}
 
-		// Handle stale cluster association on DROP TABLE or ALTER CLUSTER ADD
-		if ($status === 'error') {
-			$error = $res['error'] ?? ($res[0]['error'] ?? '');
-			$status = $this->handleStaleClusterAssociation($query['query'], $error, $status);
-		}
-
 		Buddy::debugvv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
 
 		$duration = (int)((microtime(true) - $mt) * 1000);
@@ -221,8 +215,10 @@ final class Queue {
 			return true;
 		}
 
-		$error = $res['error'] ?? ($res[0]['error'] ?? 'unknown error');
-		Buddy::info("[$node->id] Queue query error: {$query['query']} ($error)");
+		/** @var array{error?:string}|array{0?:array{error?:string}} $resArr */
+		$resArr = $res;
+		$error = (string)($resArr['error'] ?? ($resArr[0]['error'] ?? 'unknown error'));
+		Buddy::info("[$node->id] Queue query error: {$query['query']} ({$error})");
 		return false;
 	}
 
@@ -395,7 +391,7 @@ final class Queue {
 	 * Handle error for ALTER CLUSTER DROP TABLE by checking if table is already not in cluster
 	 * or if cluster doesn't exist (which makes the error acceptable - operation already done)
 	 * @param string $query
-	 * @param Struct $errorResult
+	 * @param Struct<int|string, mixed> $errorResult
 	 * @return string 'processed' if operation is already done, 'error' otherwise
 	 */
 	protected function handleAlterClusterDropTableError(string $query, Struct $errorResult): string {
@@ -423,89 +419,10 @@ final class Queue {
 	}
 
 	/**
-	 * Handle stale cluster association errors.
-	 * When a node restarts after a failure, tables may still have local cluster metadata
-	 * from an old per-shard cluster. This causes:
-	 * - DROP TABLE: "unable to drop a cluster table"
-	 * - ALTER CLUSTER ADD: "already part of cluster X"
-	 * Fix: bootstrap the old cluster as primary and remove the table from it.
-	 * @param string $query
-	 * @param string $error
-	 * @param string $currentStatus
-	 * @return string 'processed' if recovery succeeded, original status otherwise
-	 */
-	protected function handleStaleClusterAssociation(string $query, string $error, string $currentStatus): string {
-		// Case 1: DROP TABLE fails because table has a stale cluster association.
-		// The table can't be dropped normally, and we can't find/detach the old cluster
-		// reliably from buddy. Mark as processed so the queue can continue —
-		// the new rebalance will handle the table via ALTER CLUSTER ADD.
-		if (preg_match("/unable to drop a cluster table '([^']+)'/i", $error, $m)) {
-			Buddy::info("Skipping DROP TABLE for stale cluster table '{$m[1]}' — will be handled by rebalance");
-			return 'processed';
-		}
-
-		// Case 2: ALTER CLUSTER ADD fails because table is already in another cluster.
-		// Bootstrap the old cluster as primary on this node and detach the table.
-		if (preg_match("/already part of cluster '([^']+)'/i", $error, $m)) {
-			$oldCluster = $m[1];
-			$tableNames = $this->extractTableNamesFromQuery($query);
-			if ($this->detachTablesFromStaleCluster($tableNames, $oldCluster)) {
-				// Retry the ALTER CLUSTER ADD
-				$retryRes = $this->client->sendRequest($query)->getResult();
-				/** @var array{error?:string}|array{0?:array{error?:string}} $retryRes */
-				$retryError = $retryRes['error'] ?? ($retryRes[0]['error'] ?? '');
-				if (!$retryError) {
-					Buddy::info("Recovered: detached tables from stale cluster '{$oldCluster}' and re-added");
-					return 'processed';
-				}
-				Buddy::info("Detached from '{$oldCluster}' but retry ADD still failed: {$retryError}");
-			}
-		}
-
-		return $currentStatus;
-	}
-
-	/**
-	 * Detach tables from a stale per-shard cluster by bootstrapping it as primary
-	 * and removing the tables.
-	 * @param array<string> $tableNames
-	 * @param string $clusterName
-	 * @return bool success
-	 */
-	protected function detachTablesFromStaleCluster(array $tableNames, string $clusterName): bool {
-		try {
-			// Bootstrap the stale cluster as primary so ALTER CLUSTER DROP
-			// can clear the local metadata for zombie table-to-cluster associations
-			$bootstrapParams = ['request' => "SET CLUSTER {$clusterName} GLOBAL 'pc.bootstrap' = 1"];
-			$bootstrapParams['disableAgentHeader'] = true;
-			$this->client->sendRequest(...$bootstrapParams);
-
-			foreach ($tableNames as $tableName) {
-				$res = $this->client->sendRequest("ALTER CLUSTER {$clusterName} DROP {$tableName}");
-				if ($res->hasError()) {
-					$dropError = $res->getError();
-					if (stripos($dropError, "doesn't belong") !== false) {
-						Buddy::debugvv("Table {$tableName} already detached from {$clusterName}");
-						continue;
-					}
-					Buddy::info("Failed to detach {$tableName} from {$clusterName}: {$dropError}");
-					return false;
-				}
-				Buddy::debugvv("Detached {$tableName} from stale cluster {$clusterName}");
-			}
-
-			return true;
-		} catch (\Throwable $e) {
-			Buddy::info('Error detaching tables from stale cluster: ' . $e->getMessage());
-			return false;
-		}
-	}
-
-	/**
 	 * Handle error for ALTER CLUSTER ADD TABLE by checking if query is still running
 	 * or if tables are already synced in cluster
 	 * @param string $query
-	 * @param Struct $errorResult
+	 * @param Struct<int|string, mixed> $errorResult
 	 * @return string 'processed' if verified successful, 'error' otherwise
 	 */
 	protected function handleAlterClusterAddTableError(string $query, Struct $errorResult): string {
@@ -545,10 +462,12 @@ final class Queue {
 				return false;
 			}
 
+			/** @var string $normalizedQuery */
 			$normalizedQuery = preg_replace('/\s+/', ' ', trim($query));
 
 			foreach ($data[0]['data'] as $runningQuery) {
-				$runningQueryText = preg_replace('/\s+/', ' ', trim($runningQuery['query'] ?? ''));
+				/** @var string $runningQueryText */
+				$runningQueryText = preg_replace('/\s+/', ' ', trim($runningQuery['query']));
 				if (stripos($runningQueryText, $normalizedQuery) !== false) {
 					return true;
 				}
