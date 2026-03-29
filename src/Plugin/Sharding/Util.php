@@ -194,8 +194,17 @@ final class Util {
 			return self::redistributeShardsForRF1($newSchema, $newNodes);
 		}
 
-		// For RF>=2, we can add replicas to new nodes
-		return self::addReplicasToNewNodes($newSchema, $newNodes);
+		// For RF>=2, recalculate a balanced schema across all nodes respecting the RF
+		$allNodes = new Set($newSchema->map(fn($row) => $row['node']));
+		$allNodes->sort();
+		$totalShards = self::getTotalUniqueShards($schema);
+		if ($totalShards > 0) {
+			$balancedSchema = self::initializeSchema($allNodes);
+			$nodeMap = self::initializeNodeMap($allNodes->count());
+			return self::assignNodesToSchema($balancedSchema, $nodeMap, $allNodes, $totalShards, $replicationFactor);
+		}
+
+		return $newSchema;
 	}
 
 	/**
