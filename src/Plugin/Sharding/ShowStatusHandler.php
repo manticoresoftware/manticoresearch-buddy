@@ -43,8 +43,8 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 			$where = static::buildWhere($payload->cluster, $payload->table);
 			$sql = 'SELECT * FROM system.sharding_table' . ($where ? " WHERE {$where}" : '');
 
+			/** @var array{0?:array{data?:array<array{node:string,shards:string,cluster:string,table:string}>}} $res */
 			$res = $client->sendRequest($sql)->getResult();
-			/** @var array<array{node:string,shards:string,cluster:string,table:string}> $rawRows */
 			$rawRows = $res[0]['data'] ?? [];
 
 			$emptyResult = TaskResult::withData([])
@@ -75,45 +75,7 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 				}
 			}
 
-			$outputRows = [];
-			foreach ($rawRows as $row) {
-				$clusterName = $row['cluster'];
-				$tableName   = $row['table'];
-				$node        = $row['node'];
-				$inactive    = $inactiveByCluster[$clusterName] ?? new Set;
-				$isActive    = !$inactive->contains($node);
-
-				foreach (Table::parseShards($row['shards']) as $shard) {
-					$key        = "{$clusterName}\0{$tableName}\0{$shard}";
-					$allNodes   = $shardNodes[$key] ?? new Set;
-					$rf         = $allNodes->count();
-					$aliveCount = $allNodes->filter(fn($n) => !$inactive->contains($n))->count();
-
-					$rfStatus = match (true) {
-						$aliveCount === $rf => 'ok',
-						$aliveCount > 0    => 'degraded',
-						default            => 'broken',
-					};
-					$replicationCluster = Table::getClusterName($allNodes);
-
-					$outputRows[] = [
-						'table'                => $tableName,
-						'shard'               => $shard,
-						'node'                => $node,
-						'status'              => $isActive ? 'active' : 'inactive',
-						'cluster'             => $clusterName,
-						'replication_cluster' => $replicationCluster,
-						'rf'                  => $rf,
-						'rf_status'           => $rfStatus,
-					];
-				}
-			}
-
-			// Sort by table → shard → node for deterministic output
-			usort(
-				$outputRows,
-				fn($a, $b) => [$a['table'], $a['shard'], $a['node']] <=> [$b['table'], $b['shard'], $b['node']]
-			);
+			$outputRows = static::buildOutputRows($rawRows, $shardNodes, $inactiveByCluster);
 
 			return TaskResult::withData($outputRows)
 				->column('table', Column::String)
@@ -159,5 +121,49 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 			$result[$name] = $cluster->getInactiveNodes();
 		}
 		return $result;
+	}
+
+	/**
+	 * Build sorted output rows from raw sharding data
+	 * @param array<array{node:string,shards:string,cluster:string,table:string}> $rawRows
+	 * @param array<string, Set<string>> $shardNodes
+	 * @param array<string, Set<string>> $inactiveByCluster
+	 * @return array<array{table:string,shard:int,node:string,status:string,cluster:string,replication_cluster:string,rf:int,rf_status:string}>
+	 */
+	protected static function buildOutputRows(array $rawRows, array $shardNodes, array $inactiveByCluster): array {
+		$outputRows = [];
+		foreach ($rawRows as $row) {
+			$clusterName = $row['cluster'];
+			$inactive = $inactiveByCluster[$clusterName] ?? new Set;
+			$isActive = !$inactive->contains($row['node']);
+
+			foreach (Table::parseShards($row['shards']) as $shard) {
+				$key = "{$clusterName}\0{$row['table']}\0{$shard}";
+				$allNodes = $shardNodes[$key] ?? new Set;
+				$rf = $allNodes->count();
+				$aliveCount = $allNodes->filter(fn($n) => !$inactive->contains($n))->count();
+
+				$outputRows[] = [
+					'table' => $row['table'],
+					'shard' => $shard,
+					'node' => $row['node'],
+					'status' => $isActive ? 'active' : 'inactive',
+					'cluster' => $clusterName,
+					'replication_cluster' => Table::getClusterName($allNodes),
+					'rf' => $rf,
+					'rf_status' => match (true) {
+						$aliveCount === $rf => 'ok',
+						$aliveCount > 0 => 'degraded',
+						default => 'broken',
+					},
+				];
+			}
+		}
+
+		usort(
+			$outputRows,
+			fn($a, $b) => [$a['table'], $a['shard'], $a['node']] <=> [$b['table'], $b['shard'], $b['node']]
+		);
+		return $outputRows;
 	}
 }

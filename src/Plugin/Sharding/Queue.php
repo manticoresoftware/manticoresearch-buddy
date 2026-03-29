@@ -394,6 +394,7 @@ final class Queue {
 	 * @param Struct<int|string, mixed> $errorResult
 	 * @return string 'processed' if operation is already done, 'error' otherwise
 	 */
+	// phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter, Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
 	protected function handleAlterClusterDropTableError(string $query, Struct $errorResult): string {
 		$clusterName = $this->extractClusterNameFromQuery($query);
 		$tableNames = $this->extractTableNamesFromQuery($query);
@@ -425,6 +426,7 @@ final class Queue {
 	 * @param Struct<int|string, mixed> $errorResult
 	 * @return string 'processed' if verified successful, 'error' otherwise
 	 */
+	// phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter, Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
 	protected function handleAlterClusterAddTableError(string $query, Struct $errorResult): string {
 		if ($this->checkQueryStillRunning($query)) {
 			Buddy::debugvv('ALTER CLUSTER ADD TABLE still running, will retry later');

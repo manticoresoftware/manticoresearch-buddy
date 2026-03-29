@@ -232,35 +232,42 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		// Desc and Show distributed table first
 		if (($request->command === 'desc' || $request->command === 'describe')
 			&& strpos($request->error, 'contains system') !== false
 		) {
 			return true;
 		}
 
-		if ($request->command === 'show'
-			&& (stripos($request->payload, 'show sharding status') === 0
-				|| stripos($request->payload, 'show sharding master') === 0)
-		) {
+		if ($request->command === 'show') {
+			return stripos($request->payload, 'show sharding status') === 0
+				|| stripos($request->payload, 'show sharding master') === 0
+				|| strpos($request->error, 'error in your query') !== false;
+		}
+
+		return static::isShardingCreateOrDrop($request);
+	}
+
+	/**
+	 * Check if request is a sharding CREATE TABLE or DROP command
+	 * @param Request $request
+	 * @return bool
+	 */
+	protected static function isShardingCreateOrDrop(Request $request): bool {
+		$hasShardingError = stripos($request->error, 'contains system table')
+			|| stripos($request->error, 'require Buddy')
+			|| (stripos($request->error, 'syntax error') && stripos($request->error, 'near \':'));
+
+		if (!$hasShardingError) {
+			return false;
+		}
+
+		if (stripos($request->payload, 'drop') === 0) {
 			return true;
 		}
 
-		if ($request->command === 'show' && strpos($request->error, 'error in your query') !== false) {
-			return true;
-		}
-
-		// Create and Drop
-		return (stripos($request->error, 'contains system table')
-			|| stripos($request->error, 'require Buddy') ||
-			(stripos($request->error, 'syntax error') && stripos($request->error, 'near \':'))
-		)
-			&& (
-				(stripos($request->payload, 'create table') === 0
-					&& stripos($request->payload, 'shards') !== false
-					&& preg_match('/(?P<key>rf|shards)\s*=\s*\'(?P<value>[^\']*)\'/ius', $request->payload)
-				) || stripos($request->payload, 'drop') === 0
-			);
+		return stripos($request->payload, 'create table') === 0
+			&& stripos($request->payload, 'shards') !== false
+			&& (bool)preg_match('/(?P<key>rf|shards)\s*=\s*\'(?P<value>[^\']*)\'/ius', $request->payload);
 	}
 
 	/**

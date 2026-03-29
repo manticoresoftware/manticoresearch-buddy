@@ -46,11 +46,13 @@ class ShowMasterHandler extends BaseHandlerWithClient {
 					->column('status', Column::String);
 			}
 
-			$master = (string)$state->get('master');
+			/** @var string $master */
+			$master = $state->get('master') ?? '';
 
 			// Determine whether the master node is currently active.
 			// We use the cluster stored in state to get inactive nodes.
-			$clusterName = (string)$state->get('cluster');
+			/** @var string $clusterName */
+			$clusterName = $state->get('cluster') ?? '';
 			$cluster     = new Cluster($client, $clusterName, '');
 			$inactive    = $cluster->getInactiveNodes();
 			$status      = $inactive->contains($master) ? 'inactive' : 'active';

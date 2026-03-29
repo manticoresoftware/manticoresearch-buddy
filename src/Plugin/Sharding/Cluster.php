@@ -200,19 +200,20 @@ final class Cluster {
 		$res = $client
 			->sendRequest("SHOW STATUS LIKE 'cluster_%'")
 			->getResult();
-		/** @var array{0:array{data:array<array{Counter:string,Value:string}}}} $res */
+		/** @var array{0?:array{data?:array<array{Counter:string,Value:string}>}} $res */
 		$rows = $res[0]['data'] ?? [];
 
 		// Track status and node_state per cluster
+		/** @var array<string,array{status?:string,node_state?:string}> $clusterStates */
 		$clusterStates = [];
 		foreach ($rows as $row) {
 			// Match both cluster_{name}_status and cluster_{name}_node_state
-			if (!preg_match('/^cluster_([a-f0-9]{32})_(status|node_state)$/', $row['Counter'], $m)) {
+			if (!preg_match('/^cluster_([a-f0-9]{32})_(status|node_state)$/', (string)$row['Counter'], $m)) {
 				continue;
 			}
 			$clusterName = $m[1];
 			$field = $m[2];
-			$clusterStates[$clusterName][$field] = $row['Value'];
+			$clusterStates[$clusterName][$field] = (string)$row['Value'];
 		}
 
 		foreach ($clusterStates as $name => $state) {
@@ -445,33 +446,47 @@ final class Cluster {
 	 */
 	public function verifyTablesInCluster(string $clusterName, array $tableNames): bool {
 		try {
-			$clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
-			/** @var array{0?:array{data?:array<array{cluster:string,tables?:string}>}} */
-			$data = $clusterResult->getResult();
-
-			if (!isset($data[0]['data'])) {
+			$clusterTables = $this->getClusterTables($clusterName);
+			if ($clusterTables === null) {
 				return false;
 			}
 
-			foreach ($data[0]['data'] as $cluster) {
-				if ($cluster['cluster'] === $clusterName) {
-					$clusterTables = isset($cluster['tables']) ?
-						array_map('trim', explode(',', $cluster['tables'])) : [];
-
-					// Check if all requested tables are in cluster
-					foreach ($tableNames as $tableName) {
-						if (!in_array($tableName, $clusterTables)) {
-							return false;
-						}
-					}
-					return true;
+			foreach ($tableNames as $tableName) {
+				if (!in_array($tableName, $clusterTables)) {
+					return false;
 				}
 			}
+			return true;
 		} catch (\Throwable $e) {
 			Buddy::debugvv('Error verifying tables in cluster: ' . $e->getMessage());
 		}
 
 		return false;
+	}
+
+	/**
+	 * Get the list of tables in a cluster by name, or null if cluster not found
+	 * @param string $clusterName
+	 * @return array<string>|null
+	 */
+	protected function getClusterTables(string $clusterName): ?array {
+		$clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
+		/** @var array{0?:array{data?:array<array{cluster:string,tables?:string}>}} */
+		$data = $clusterResult->getResult();
+
+		if (!isset($data[0]['data'])) {
+			return null;
+		}
+
+		foreach ($data[0]['data'] as $cluster) {
+			if ($cluster['cluster'] !== $clusterName) {
+				continue;
+			}
+			return isset($cluster['tables'])
+				? array_map('trim', explode(',', $cluster['tables']))
+				: [];
+		}
+		return null;
 	}
 
 }
