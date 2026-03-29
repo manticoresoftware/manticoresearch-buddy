@@ -474,18 +474,16 @@ final class Queue {
 	 */
 	protected function detachTablesFromStaleCluster(array $tableNames, string $clusterName): bool {
 		try {
-			// Bootstrap the stale cluster as primary so we can perform operations on it
-			Buddy::info("Bootstrapping stale cluster '{$clusterName}' as primary for detach");
+			// Bootstrap the stale cluster as primary so ALTER CLUSTER DROP
+			// can clear the local metadata for zombie table-to-cluster associations
 			$bootstrapParams = ['request' => "SET CLUSTER {$clusterName} GLOBAL 'pc.bootstrap' = 1"];
 			$bootstrapParams['disableAgentHeader'] = true;
 			$this->client->sendRequest(...$bootstrapParams);
 
-			// Remove tables from the cluster one by one
 			foreach ($tableNames as $tableName) {
 				$res = $this->client->sendRequest("ALTER CLUSTER {$clusterName} DROP {$tableName}");
 				if ($res->hasError()) {
 					$dropError = $res->getError();
-					// If table doesn't belong to cluster, it's already detached — continue
 					if (stripos($dropError, "doesn't belong") !== false) {
 						Buddy::debugvv("Table {$tableName} already detached from {$clusterName}");
 						continue;
@@ -498,7 +496,7 @@ final class Queue {
 
 			return true;
 		} catch (\Throwable $e) {
-			Buddy::info("Error detaching tables from stale cluster: " . $e->getMessage());
+			Buddy::info('Error detaching tables from stale cluster: ' . $e->getMessage());
 			return false;
 		}
 	}
