@@ -202,7 +202,7 @@ final class Cluster {
 			->getResult();
 		/** @var array{0:array{data:array<array{Counter:string,Value:string}}}} $res */
 		$rows = $res[0]['data'] ?? [];
-		
+
 		// Track status and node_state per cluster
 		$clusterStates = [];
 		foreach ($rows as $row) {
@@ -214,11 +214,11 @@ final class Cluster {
 			$field = $m[2];
 			$clusterStates[$clusterName][$field] = $row['Value'];
 		}
-		
+
 		foreach ($clusterStates as $name => $state) {
 			$status = $state['status'] ?? 'unknown';
 			$nodeState = $state['node_state'] ?? 'unknown';
-			
+
 			if ($status !== 'primary') {
 				Buddy::info("Sharding cluster {$name} is not ready (status: {$status})");
 				return false;

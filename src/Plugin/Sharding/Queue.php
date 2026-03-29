@@ -206,6 +206,12 @@ final class Queue {
 			$status = $this->handleAlterClusterDropTableError($query['query'], $res);
 		}
 
+		// Handle stale cluster association on DROP TABLE or ALTER CLUSTER ADD
+		if ($status === 'error') {
+			$error = $res['error'] ?? ($res[0]['error'] ?? '');
+			$status = $this->handleStaleClusterAssociation($query['query'], $error, $status);
+		}
+
 		Buddy::debugvv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
 
 		$duration = (int)((microtime(true) - $mt) * 1000);
@@ -414,6 +420,87 @@ final class Queue {
 
 		// Tables are still in cluster but DROP failed - this is a real error
 		return 'error';
+	}
+
+	/**
+	 * Handle stale cluster association errors.
+	 * When a node restarts after a failure, tables may still have local cluster metadata
+	 * from an old per-shard cluster. This causes:
+	 * - DROP TABLE: "unable to drop a cluster table"
+	 * - ALTER CLUSTER ADD: "already part of cluster X"
+	 * Fix: bootstrap the old cluster as primary and remove the table from it.
+	 * @param string $query
+	 * @param string $error
+	 * @param string $currentStatus
+	 * @return string 'processed' if recovery succeeded, original status otherwise
+	 */
+	protected function handleStaleClusterAssociation(string $query, string $error, string $currentStatus): string {
+		// Case 1: DROP TABLE fails because table has a stale cluster association.
+		// The table can't be dropped normally, and we can't find/detach the old cluster
+		// reliably from buddy. Mark as processed so the queue can continue —
+		// the new rebalance will handle the table via ALTER CLUSTER ADD.
+		if (preg_match("/unable to drop a cluster table '([^']+)'/i", $error, $m)) {
+			Buddy::info("Skipping DROP TABLE for stale cluster table '{$m[1]}' — will be handled by rebalance");
+			return 'processed';
+		}
+
+		// Case 2: ALTER CLUSTER ADD fails because table is already in another cluster.
+		// Bootstrap the old cluster as primary on this node and detach the table.
+		if (preg_match("/already part of cluster '([^']+)'/i", $error, $m)) {
+			$oldCluster = $m[1];
+			$tableNames = $this->extractTableNamesFromQuery($query);
+			if ($this->detachTablesFromStaleCluster($tableNames, $oldCluster)) {
+				// Retry the ALTER CLUSTER ADD
+				$retryRes = $this->client->sendRequest($query)->getResult();
+				/** @var array{error?:string}|array{0?:array{error?:string}} $retryRes */
+				$retryError = $retryRes['error'] ?? ($retryRes[0]['error'] ?? '');
+				if (!$retryError) {
+					Buddy::info("Recovered: detached tables from stale cluster '{$oldCluster}' and re-added");
+					return 'processed';
+				}
+				Buddy::info("Detached from '{$oldCluster}' but retry ADD still failed: {$retryError}");
+			}
+		}
+
+		return $currentStatus;
+	}
+
+	/**
+	 * Detach tables from a stale per-shard cluster by bootstrapping it as primary
+	 * and removing the tables.
+	 * @param array<string> $tableNames
+	 * @param string $clusterName
+	 * @return bool success
+	 */
+	protected function detachTablesFromStaleCluster(array $tableNames, string $clusterName): bool {
+		try {
+			// Bootstrap the stale cluster as primary so we can perform operations on it
+			Buddy::info("Bootstrapping stale cluster '{$clusterName}' as primary for detach");
+			$bootstrapParams = ['request' => "SET CLUSTER {$clusterName} GLOBAL 'pc.bootstrap' = 1"];
+			$bootstrapParams['disableAgentHeader'] = true;
+			$this->client->sendRequest(...$bootstrapParams);
+
+			// Remove tables from the cluster one by one
+			foreach ($tableNames as $tableName) {
+				$res = $this->client->sendRequest("ALTER CLUSTER {$clusterName} DROP {$tableName}");
+				if ($res->hasError()) {
+					$dropError = $res->getError();
+					// If table doesn't belong to cluster, it's already detached — continue
+					if (stripos($dropError, "doesn't belong") !== false) {
+						Buddy::debugvv("Table {$tableName} already detached from {$clusterName}");
+						continue;
+					}
+					Buddy::info("Failed to detach {$tableName} from {$clusterName}: {$dropError}");
+					return false;
+				}
+				Buddy::debugvv("Detached {$tableName} from stale cluster {$clusterName}");
+			}
+
+			return true;
+		} catch (\Throwable $e) {
+			Buddy::info("Error detaching tables from stale cluster: " . $e->getMessage());
+			return false;
+		}
 	}
 
 	/**

@@ -467,44 +467,44 @@ final class Table {
 			}
 
 		// Handle different rebalancing scenarios
-		if ($inactiveNodes->count() > 0) {
-			// We're in partial state - some nodes are down.
-			// Do NOT rebalance to new nodes during partial state - wait for recovery first.
-			if ($newNodes->count() > 0) {
-				Buddy::info(
-					"Skipping rebalance for table {$this->name}: new nodes arrived during partial state"
-					. " ({$inactiveNodes->join(', ')} inactive) - waiting for full recovery"
-				);
-				$state->set($rebalanceKey, 'idle');
-				return;
-			}
+			if ($inactiveNodes->count() > 0) {
+				// We're in partial state - some nodes are down.
+				// Do NOT rebalance to new nodes during partial state - wait for recovery first.
+				if ($newNodes->count() > 0) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: new nodes arrived during partial state"
+						. " ({$inactiveNodes->join(', ')} inactive) - waiting for full recovery"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
 
-			// RF=1 means no replicas exist - dead node's shards are unrecoverable, skip rebalancing
-			if ($this->getReplicationFactor($schema) === 1) {
-				Buddy::info(
-					"Skipping rebalance for table {$this->name}: RF=1 and nodes are inactive"
-					. " ({$inactiveNodes->join(', ')}) - data on failed nodes is unrecoverable"
-				);
-				$state->set($rebalanceKey, 'idle');
-				return;
-			}
+				// RF=1 means no replicas exist - dead node's shards are unrecoverable, skip rebalancing
+				if ($this->getReplicationFactor($schema) === 1) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: RF=1 and nodes are inactive"
+						. " ({$inactiveNodes->join(', ')}) - data on failed nodes is unrecoverable"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
 
-			$rf = $this->getReplicationFactor($schema);
+				$rf = $this->getReplicationFactor($schema);
 
-			// Not enough nodes to maintain RF - skip
-			if ($activeNodes->count() < $rf) {
-				Buddy::info(
-					"Skipping rebalance for table {$this->name}: only {$activeNodes->count()} active nodes"
-					. " cannot maintain RF={$rf} ({$inactiveNodes->join(', ')} inactive)"
-				);
-				$state->set($rebalanceKey, 'idle');
-				return;
-			}
+				// Not enough nodes to maintain RF - skip
+				if ($activeNodes->count() < $rf) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: only {$activeNodes->count()} active nodes"
+						. " cannot maintain RF={$rf} ({$inactiveNodes->join(', ')} inactive)"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
 
-			// Rebalance using active nodes only (no new nodes during partial state)
-			$newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
-			$lastQueueId = $this->handleFailedNodesRebalance($queue, $schema, $newSchema, $inactiveNodes);
-		} elseif ($newNodes->count() > 0) {
+				// Rebalance using active nodes only (no new nodes during partial state)
+				$newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
+				$lastQueueId = $this->handleFailedNodesRebalance($queue, $schema, $newSchema, $inactiveNodes);
+			} elseif ($newNodes->count() > 0) {
 				$replicationFactor = $this->getReplicationFactor($schema);
 				$newSchema = Util::rebalanceWithNewNodes($schema, $newNodes, $replicationFactor);
 				$lastQueueId = $this->handleNewNodesRebalance($queue, $schema, $newSchema, $newNodes);
