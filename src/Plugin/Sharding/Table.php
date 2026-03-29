@@ -441,7 +441,9 @@ final class Table {
 			$currentRebalance = $state->get($rebalanceKey);
 
 			if ($currentRebalance === 'running' || $currentRebalance === 'queued') {
-				Buddy::debugvv("Sharding rebalance: operation already {$currentRebalance} for table {$this->name}, skipping");
+				Buddy::debugvv(
+					"Sharding rebalance: operation already {$currentRebalance} for table {$this->name}, skipping"
+				);
 				return;
 			}
 
@@ -521,7 +523,7 @@ final class Table {
 			Buddy::info("Rebalancing queued for table {$this->name}");
 		} catch (\Throwable $t) {
 			// Enhanced error handling with rollback
-			$this->handleRebalancingFailure($t, $operationGroup, $queue, $state ?? null);
+			$this->handleRebalancingFailure($t, $operationGroup, $queue, $state);
 		}
 	}
 
@@ -958,7 +960,7 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
 	 * @param Set<string> $inactiveNodes
-	 * @return void
+	 * @return array<string,int> Map of node => last queue ID
 	 */
 	protected function handleFailedNodesRebalance(
 		Queue $queue,
@@ -1062,7 +1064,8 @@ final class Table {
 			foreach ($shardsForNewNode as $shard) {
 				// Create shard table on new node
 				$shardName = $this->getShardName($shard);
-				$lastQueueId = $queue->add($newNode, $this->getCreateTableShardSQL($shard), "DROP TABLE IF EXISTS {$shardName}");
+				$rollback = "DROP TABLE IF EXISTS {$shardName}";
+				$lastQueueId = $queue->add($newNode, $this->getCreateTableShardSQL($shard), $rollback);
 
 				// Set up replication from existing nodes
 				$existingNodes = $this->getExistingNodesForShard($schema, $shard);

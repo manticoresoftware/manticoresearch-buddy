@@ -330,7 +330,8 @@ final class Operator {
 				if ($queueRow['status'] !== 'processed') {
 					$this->state->delete("rebalance_queue_ids:{$name}");
 					$this->state->set("rebalance:{$name}", 'idle');
-					Buddy::info("Rebalancing failed for table {$name}: node {$node} queue id {$queueId} status {$queueRow['status']}");
+					$qStatus = $queueRow['status'];
+					Buddy::info("Rebalancing failed for table {$name}: node {$node} id {$queueId} status {$qStatus}");
 					continue 2;
 				}
 			}
