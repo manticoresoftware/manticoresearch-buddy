@@ -126,16 +126,19 @@ class SimpleQueueCommandTest extends TestCase {
 		$this->assertNotNull($node3Shards, 'Node3 shards should not be null');
 		$this->assertGreaterThan(0, $node3Shards->count(), 'Node3 should have some shards for load balancing');
 
-		// For RF>=2, new node should get all shards for load balancing
-		$this->assertEquals(4, $node3Shards->count(), 'Node3 should have all shards for RF=2 load balancing');
+		// For RF=2 with 3 nodes, each shard is on exactly 2 nodes.
+		// Node3 gets a balanced share of shards (not all of them).
+		$this->assertGreaterThanOrEqual(2, $node3Shards->count(), 'Node3 should have balanced shard share');
 
-		// Verify connections are updated properly
+		// Verify RF=2 constraint: each shard on exactly 2 nodes
+		$shardCounts = [];
 		foreach ($newSchema as $row) {
-			if ($row['shards']->count() <= 0) {
-				continue;
+			foreach ($row['shards'] as $shard) {
+				$shardCounts[$shard] = ($shardCounts[$shard] ?? 0) + 1;
 			}
-
-			$this->assertGreaterThanOrEqual(2, $row['connections']->count(), 'RF=2 should have multiple connections');
+		}
+		foreach ($shardCounts as $shard => $count) {
+			$this->assertEquals(2, $count, "Shard {$shard} should be on exactly 2 nodes for RF=2");
 		}
 	}
 
