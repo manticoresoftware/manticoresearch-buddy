@@ -160,9 +160,12 @@ final class Queue {
 	 * @return bool
 	 */
 	protected function shouldSkipQuery(array $query): bool {
-		// Skip items from uncommitted operation groups (master died mid-queuing)
-		if (!empty($query['operation_group']) && !$this->isGroupCommitted($query['operation_group'])) {
-			Buddy::debugvv("Sharding queue: skip {$query['id']} — group {$query['operation_group']} not committed");
+		// Skip rebalance items from uncommitted operation groups (master died mid-queuing).
+		// Only rebalance groups (prefixed "rebalance_") use the commit flag gate —
+		// initial shard creation groups are committed implicitly.
+		$group = $query['operation_group'];
+		if ($group !== '' && str_starts_with($group, 'rebalance_') && !$this->isGroupCommitted($group)) {
+			Buddy::debugvv("Sharding queue: skip {$query['id']} — group {$group} not committed");
 			return true;
 		}
 
