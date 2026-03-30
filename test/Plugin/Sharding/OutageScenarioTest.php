@@ -185,8 +185,8 @@ class OutageScenarioTest extends TestCase {
 
 		$newSchema = Util::rebalanceShardingScheme($initialSchema, $activeNodes);
 
-		// For RF=1, if we can't maintain proper distribution, we should:
-		// Put all orphaned shards on remaining node (degraded but functional)
+		// For RF=1, orphaned shards are unrecoverable — no replica data exists.
+		// The surviving node keeps only its own shards.
 
 		$this->assertEquals(1, $newSchema->count(), 'Should have 1 remaining node');
 
@@ -194,15 +194,13 @@ class OutageScenarioTest extends TestCase {
 		$this->assertNotNull($remainingNode, 'Remaining node should not be null');
 		$this->assertEquals('node1', $remainingNode['node'], 'Remaining node should be node1');
 
-		// The remaining node should have all orphaned shards assigned to it
-		// This is degraded mode but keeps the system functional
+		// node1 keeps only its own shards — dead node's shards are lost
 		$this->assertTrue($remainingNode['shards']->contains(0), 'Should have original shard 0');
 		$this->assertTrue($remainingNode['shards']->contains(1), 'Should have original shard 1');
-		$this->assertTrue($remainingNode['shards']->contains(2), 'Should have orphaned shard 2');
-		$this->assertTrue($remainingNode['shards']->contains(3), 'Should have orphaned shard 3');
+		$this->assertFalse($remainingNode['shards']->contains(2), 'Shard 2 is lost — no replica');
+		$this->assertFalse($remainingNode['shards']->contains(3), 'Shard 3 is lost — no replica');
 
-		// All shards should be accounted for
-		$this->assertEquals(4, $remainingNode['shards']->count(), 'All shards should be on remaining node');
+		$this->assertEquals(2, $remainingNode['shards']->count(), 'Only original shards remain');
 	}
 
 	/**
