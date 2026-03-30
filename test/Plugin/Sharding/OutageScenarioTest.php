@@ -237,14 +237,8 @@ class OutageScenarioTest extends TestCase {
 		// Should have 2 remaining nodes
 		$this->assertEquals(2, $newSchema->count(), 'Should have 2 remaining nodes');
 
-		// All shards should still be available
-		$allShards = new Set();
-		foreach ($newSchema as $row) {
-			$allShards->add(...$row['shards']);
-		}
-		$this->assertEquals(new Set([0, 1, 2, 3]), $allShards, 'All shards should be redistributed');
-
-		// Orphaned shard 2 should be redistributed to one of the remaining nodes
+		// RF=1: orphaned shards are unrecoverable — no replica data exists.
+		// Only surviving nodes' own shards remain.
 		$node1Shards = null;
 		$node3Shards = null;
 		foreach ($newSchema as $row) {
@@ -258,14 +252,15 @@ class OutageScenarioTest extends TestCase {
 		$this->assertNotNull($node1Shards, 'Node1 should be in schema');
 		$this->assertNotNull($node3Shards, 'Node3 should be in schema');
 
-		// One of the nodes should have picked up the orphaned shard 2
-		$this->assertTrue(
-			$node1Shards->contains(2) || $node3Shards->contains(2),
-			'Orphaned shard 2 should be assigned to one of the remaining nodes'
-		);
+		// Each node keeps only its own shards — shard 2 is lost
+		$this->assertTrue($node1Shards->contains(0), 'Node1 keeps shard 0');
+		$this->assertTrue($node1Shards->contains(1), 'Node1 keeps shard 1');
+		$this->assertFalse($node1Shards->contains(2), 'Shard 2 lost — no replica');
+		$this->assertTrue($node3Shards->contains(3), 'Node3 keeps shard 3');
+		$this->assertFalse($node3Shards->contains(2), 'Shard 2 lost — no replica');
 
-		// Verify RF=1 constraint (each shard on exactly one node)
-		foreach ([0, 1, 2, 3] as $shard) {
+		// Verify RF=1 constraint (each surviving shard on exactly one node)
+		foreach ([0, 1, 3] as $shard) {
 			$nodeCount = 0;
 			if ($node1Shards->contains($shard)) {
 				$nodeCount++;
