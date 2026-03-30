@@ -55,9 +55,9 @@ SHOW CLUSTERS;
 SELECT * FROM cluster_name:table_name LIMIT 1;
 
 -- Check queue status for the operation
-SELECT id, query, status, tries, created_at, updated_at 
-FROM system.sharding_queue 
-WHERE query LIKE '%ALTER CLUSTER%ADD%table_name%' 
+SELECT id, query, status, tries, created_at, updated_at
+FROM system.sharding_queue
+WHERE query LIKE '%ALTER CLUSTER%ADD%table_name%'
 ORDER BY created_at DESC;
 ```
 
@@ -359,7 +359,53 @@ function removeDuplicateShards(array $extraShards): void {
 $table->createDistributedTablesFromSchema($queue, $schema);
 ```
 
-### 5. Queue Commands Failing
+### 5. Queue Items Stuck Due to Uncommitted Operation Group
+
+**Symptoms:**
+- Queue has pending items but they are never executed
+- Items all belong to the same `operation_group`
+- Rebalancing state shows `running` but nothing progresses
+- Typically occurs after a master node failure during rebalance queuing
+
+**Root Cause:**
+The master node died after inserting queue items but before setting the `rebalance_committed:{table}` state key. The commit flag gate in `shouldSkipQuery()` prevents execution of any items whose operation group has not been committed.
+
+**Diagnosis:**
+```sql
+-- Check for pending items with an operation_group
+SELECT id, node, query, operation_group, status
+FROM system.sharding_queue
+WHERE status = 'pending' AND operation_group != ''
+ORDER BY created_at ASC LIMIT 20;
+
+-- Check if the committed flag exists for the table
+-- (replace {table} with the actual table name)
+SELECT * FROM system.sharding_state WHERE key = 'rebalance_committed:{table}';
+
+-- Check if the group key exists
+SELECT * FROM system.sharding_state WHERE key = 'rebalance_group:{table}';
+```
+
+If `rebalance_group:{table}` exists but `rebalance_committed:{table}` does not, the group is orphaned.
+
+**Resolution:**
+
+1. **Wait for automatic cleanup**: When a new master is elected, `becomeMaster()` calls `cleanupUncommittedRebalances()`, which detects uncommitted groups and purges their queue items. The next rebalance cycle will re-queue everything correctly.
+
+2. **Manual resolution** (if automatic cleanup hasn't triggered):
+```sql
+-- Option A: Manually set the committed flag to unblock execution
+-- (only if you are confident all items were fully queued)
+REPLACE INTO system.sharding_state (key, value) VALUES ('rebalance_committed:{table}', '1');
+
+-- Option B: Purge the orphaned items and reset state
+DELETE FROM system.sharding_queue WHERE operation_group = '{group_id}';
+DELETE FROM system.sharding_state WHERE key = 'rebalance_group:{table}';
+REPLACE INTO system.sharding_state (key, value) VALUES ('rebalance:{table}', '"failed"');
+-- The next rebalance cycle will start fresh
+```
+
+### 6. Queue Commands Failing
 
 **Symptoms:**
 - Queue depth keeps growing
@@ -431,7 +477,7 @@ SHOW STATUS LIKE 'cluster_%';
 -- Ensure nodes can create/modify clusters
 ```
 
-### 6. Performance Issues During Rebalancing
+### 7. Performance Issues During Rebalancing
 
 **Symptoms:**
 - Rebalancing takes extremely long time

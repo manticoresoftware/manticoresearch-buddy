@@ -50,15 +50,19 @@ if ($this->cluster->verifyTablesInCluster($clusterName, $tableNames)) {
 protected function isAlterClusterAddTableQuery(string $query): bool {
     return (bool)preg_match('/^\s*ALTER\s+CLUSTER\s+\w+\s+ADD\s+/i', $query);
 }
+
+// handleAlterClusterDropTableError uses the same extraction helpers as the ADD
+// handler. extractClusterNameFromQuery() and extractTableNamesFromQuery() now
+// match both ADD and DROP via /(?:ADD|DROP)/i, so DROP queries are parsed correctly.
 ```
 
 #### Running Query Check
 ```php
 protected function checkQueryStillRunning(string $query): bool {
     $res = $this->client->sendRequest('SHOW QUERIES')->getResult();
-    
+
     foreach ($res[0]['data'] as $runningQuery) {
-        if (stripos($runningQuery['query'], 'ALTER CLUSTER') !== false && 
+        if (stripos($runningQuery['query'], 'ALTER CLUSTER') !== false &&
             stripos($runningQuery['query'], 'ADD') !== false) {
             return true; // Still running
         }
@@ -72,11 +76,11 @@ protected function checkQueryStillRunning(string $query): bool {
 public function verifyTablesInCluster(string $clusterName, array $tableNames): bool {
     $clusterResult = $this->client->sendRequest('SHOW CLUSTERS');
     $data = $clusterResult->getResult();
-    
+
     foreach ($data[0]['data'] as $cluster) {
         if ($cluster['cluster'] === $clusterName) {
             $clusterTables = array_map('trim', explode(',', $cluster['tables']));
-            
+
             // Check if all requested tables are in cluster
             foreach ($tableNames as $tableName) {
                 if (!in_array($tableName, $clusterTables)) {
@@ -133,7 +137,7 @@ The system provides detailed logging for troubleshooting:
 
 ```
 [DEBUG] ALTER CLUSTER ADD TABLE still running, will retry later
-[DEBUG] ALTER CLUSTER ADD TABLE no longer running, verifying cluster status  
+[DEBUG] ALTER CLUSTER ADD TABLE no longer running, verifying cluster status
 [DEBUG] Tables verified in cluster, marking as processed
 [INFO] Queue query error: ALTER CLUSTER cluster1 ADD table1,table2
 ```
@@ -145,6 +149,39 @@ No additional configuration is required. The feature:
 - Uses existing retry mechanisms and timeouts
 - Maintains backward compatibility with all other command types
 - Integrates seamlessly with existing error handling
+
+## Master Takeover and Orphaned Queue Cleanup
+
+When a master node dies mid-rebalance, the new master must clean up orphaned queue items that were never committed.
+
+### `becomeMaster()` Cleanup
+
+```php
+public function becomeMaster(): void {
+    // ... existing master election logic ...
+
+    // Purge queue items from the dead master's uncommitted rebalance groups
+    $this->cleanupUncommittedRebalances();
+}
+```
+
+`cleanupUncommittedRebalances()` iterates over all `rebalance_group:{table}` state keys and checks for a matching `rebalance_committed:{table}` key. Groups without a committed flag are purged from the queue (see State Management docs for implementation details).
+
+### Rebalance Completion/Failure Cleanup
+
+`checkRebalanceStatus()` cleans up both state keys when a rebalance finishes (success or failure):
+
+```php
+protected function checkRebalanceStatus(string $table): void {
+    // ... status check logic ...
+
+    if ($status === 'completed' || $status === 'failed') {
+        $state = new State($this->client);
+        $state->set("rebalance_committed:{$table}", null);
+        $state->set("rebalance_group:{$table}", null);
+    }
+}
+```
 
 ## Rollback System
 

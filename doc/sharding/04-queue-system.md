@@ -359,6 +359,11 @@ public function process(Node $node): void {
             continue; // Skip until dependency is satisfied
         }
 
+        // Skip items belonging to uncommitted operation groups
+        if (!empty($command['operation_group']) && !$this->shouldProcessQuery($command)) {
+            continue;
+        }
+
         try {
             $this->executeCommand($command);
             $this->markCommandCompleted($command['id']);
@@ -367,6 +372,58 @@ public function process(Node $node): void {
             throw $e;
         }
     }
+}
+```
+
+### Commit Flag Gate (`shouldSkipQuery`)
+
+Items with an `operation_group` are skipped during processing until the group is explicitly committed. The master sets the state key `rebalance_committed:{table}` after all rebalance items for that table have been queued. Until that key exists, `shouldSkipQuery()` returns `true` for items in the group, preventing premature execution.
+
+```php
+protected function shouldSkipQuery(array $item): bool {
+    if (empty($item['operation_group'])) {
+        return false; // No group — always process
+    }
+
+    return !$this->isGroupCommitted($item['operation_group']);
+}
+```
+
+### Operation Group Commit Check
+
+```php
+/**
+ * Check if an operation group has been committed (all items queued).
+ * Uses a local cache to avoid repeated state lookups.
+ */
+public function isGroupCommitted(string $operationGroup): bool {
+    // Local cache avoids repeated state reads within a single tick
+    static $cache = [];
+    if (isset($cache[$operationGroup])) {
+        return $cache[$operationGroup];
+    }
+
+    $state = new State($this->client);
+    // The table name is embedded in the operation group
+    $committed = $state->get("rebalance_committed:{$this->extractTableFromGroup($operationGroup)}");
+    $cache[$operationGroup] = (bool)$committed;
+    return $cache[$operationGroup];
+}
+```
+
+### Purging Uncommitted Groups
+
+When a master dies before committing a group, the new master purges orphaned items:
+
+```php
+/**
+ * Delete all queue items belonging to an uncommitted operation group.
+ */
+public function purgeOperationGroup(string $operationGroup): void {
+    $this->client->sendRequest(
+        "DELETE FROM system.sharding_queue WHERE operation_group = '{$operationGroup}'"
+    );
+    Buddy::debugvv("Purged uncommitted operation group: {$operationGroup}");
 }
 ```
 
@@ -528,7 +585,7 @@ $failureRate = $queue->getFailureRate();
 `ALTER CLUSTER ADD TABLE` commands present unique challenges in distributed environments:
 
 - **Blocking Operations**: Commands can block for extended periods during table synchronization
-- **Network Intensive**: Large tables require significant time to sync across cluster nodes  
+- **Network Intensive**: Large tables require significant time to sync across cluster nodes
 - **Timeout Issues**: Client timeouts may occur while background synchronization continues
 - **False Failures**: Commands may appear to fail but tables sync successfully
 
@@ -558,15 +615,17 @@ protected function handleAlterClusterAddTableError(string $query, Struct $errorR
     if ($this->checkQueryStillRunning($query)) {
         return 'error'; // Will retry with existing mechanism
     }
-    
+
     // Verify cluster status
+    // extractClusterNameFromQuery and extractTableNamesFromQuery match both
+    // ADD and DROP queries (regex: /(?:ADD|DROP)/i)
     $clusterName = $this->extractClusterNameFromQuery($query);
     $tableNames = $this->extractTableNamesFromQuery($query);
-    
+
     if ($this->cluster->verifyTablesInCluster($clusterName, $tableNames)) {
         return 'processed'; // Success despite timeout
     }
-    
+
     return 'error'; // Genuine failure
 }
 ```

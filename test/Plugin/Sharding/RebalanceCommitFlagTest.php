@@ -32,18 +32,26 @@ final class RebalanceCommitFlagTest extends TestCase {
 		$group = 'rebalance_t_' . time();
 
 		// Simulate rebalancing: cleanup + create distributed tables
-		$this->queue->add('node1', 'DROP TABLE IF EXISTS t OPTION force=1', '', $group);
+		$create = 'CREATE TABLE IF NOT EXISTS system.t_s0 (id bigint)';
+		$drop = 'DROP TABLE IF EXISTS system.t_s0';
+		$dropDist = 'DROP TABLE IF EXISTS t OPTION force=1';
+
+		$this->queue->add('node1', $dropDist, '', $group);
 		$this->queue->add('node1', 'ALTER CLUSTER abc DROP system.t_s0', 'ALTER CLUSTER abc ADD system.t_s0', $group);
-		$this->queue->add('node1', 'DROP TABLE IF EXISTS system.t_s0', '', $group);
-		$this->queue->add('node2', 'CREATE TABLE IF NOT EXISTS system.t_s0 (id bigint)', 'DROP TABLE IF EXISTS system.t_s0', $group);
-		$this->queue->add('node1', 'DROP TABLE IF EXISTS t OPTION force=1', '', $group);
-		$this->queue->add('node1', "CREATE TABLE t type='distributed' local='system.t_s0'", 'DROP TABLE IF EXISTS t', $group);
+		$this->queue->add('node1', $drop, '', $group);
+		$this->queue->add('node2', $create, $drop, $group);
+		$this->queue->add('node1', $dropDist, '', $group);
+		$distCreate = "CREATE TABLE t type='distributed' local='system.t_s0'";
+		$this->queue->add('node1', $distCreate, 'DROP TABLE IF EXISTS t', $group);
 
 		$commands = $this->queue->getCapturedCommands();
 		$this->assertCount(6, $commands);
 
 		foreach ($commands as $cmd) {
-			$this->assertEquals($group, $cmd['operation_group'], 'All rebalance items must share the same operation_group');
+			$this->assertEquals(
+				$group, $cmd['operation_group'],
+				'All rebalance items must share the same operation_group'
+			);
 		}
 	}
 
@@ -56,8 +64,10 @@ final class RebalanceCommitFlagTest extends TestCase {
 		$group = 'rebalance_t_' . time();
 
 		// Master queues items (phase 1)
+		$create = 'CREATE TABLE IF NOT EXISTS system.t_s0 (id bigint)';
+		$drop = 'DROP TABLE IF EXISTS system.t_s0';
 		$this->queue->add('node1', 'DROP TABLE IF EXISTS t OPTION force=1', '', $group);
-		$this->queue->add('node2', 'CREATE TABLE IF NOT EXISTS system.t_s0 (id bigint)', 'DROP TABLE IF EXISTS system.t_s0', $group);
+		$this->queue->add('node2', $create, $drop, $group);
 
 		// Master dies here — no committed flag set
 
@@ -77,9 +87,12 @@ final class RebalanceCommitFlagTest extends TestCase {
 	public function testRebalanceRollbackCommandsPresent(): void {
 		$group = 'rebalance_t_' . time();
 
-		$this->queue->add('node2', 'CREATE TABLE IF NOT EXISTS system.t_s0 (id bigint)', 'DROP TABLE IF EXISTS system.t_s0', $group);
+		$create = 'CREATE TABLE IF NOT EXISTS system.t_s0 (id bigint)';
+		$drop = 'DROP TABLE IF EXISTS system.t_s0';
+		$this->queue->add('node2', $create, $drop, $group);
 		$this->queue->add('node1', 'ALTER CLUSTER abc ADD system.t_s0', 'ALTER CLUSTER abc DROP system.t_s0', $group);
-		$this->queue->add('node1', "CREATE TABLE t type='distributed' local='system.t_s0'", 'DROP TABLE IF EXISTS t', $group);
+		$distCreate = "CREATE TABLE t type='distributed' local='system.t_s0'";
+		$this->queue->add('node1', $distCreate, 'DROP TABLE IF EXISTS t', $group);
 
 		$commands = $this->queue->getCapturedCommands();
 
@@ -151,12 +164,16 @@ final class RebalanceCommitFlagTest extends TestCase {
 		// Step 4: New master re-runs rebalance with new group
 		$newGroup = 'rebalance_t_5678';
 		$newQueue = new TestableQueue();
-		$newQueue->add('node1', 'DROP TABLE IF EXISTS t OPTION force=1', '', $newGroup);
+		$create = 'CREATE TABLE IF NOT EXISTS system.t_s0 (id bigint)';
+		$drop = 'DROP TABLE IF EXISTS system.t_s0';
+		$dropDist = 'DROP TABLE IF EXISTS t OPTION force=1';
+		$newQueue->add('node1', $dropDist, '', $newGroup);
 		$newQueue->add('node1', 'ALTER CLUSTER abc DROP system.t_s0', '', $newGroup);
-		$newQueue->add('node1', 'DROP TABLE IF EXISTS system.t_s0', '', $newGroup);
-		$newQueue->add('node2', 'CREATE TABLE IF NOT EXISTS system.t_s0 (id bigint)', 'DROP TABLE IF EXISTS system.t_s0', $newGroup);
-		$newQueue->add('node1', "CREATE TABLE t type='distributed'", 'DROP TABLE IF EXISTS t', $newGroup);
-		$newQueue->add('node2', "CREATE TABLE t type='distributed'", 'DROP TABLE IF EXISTS t', $newGroup);
+		$newQueue->add('node1', $drop, '', $newGroup);
+		$newQueue->add('node2', $create, $drop, $newGroup);
+		$dist = "CREATE TABLE t type='distributed'";
+		$newQueue->add('node1', $dist, 'DROP TABLE IF EXISTS t', $newGroup);
+		$newQueue->add('node2', $dist, 'DROP TABLE IF EXISTS t', $newGroup);
 
 		$newCommands = $newQueue->getCapturedCommands();
 		$this->assertCount(6, $newCommands, 'Complete rebalance: all 6 items queued');
