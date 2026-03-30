@@ -265,23 +265,14 @@ class UtilTest extends TestCase {
 		$this->assertEquals([0, 2], $schema->get(0)['shards']->toArray());
 		$this->assertEquals([1, 3], $schema->get(1)['shards']->toArray());
 
-		// node2 goes down — its shards 1 and 3 have no replicas
+		// node2 goes down — its shards 1 and 3 are lost (RF=1, no replicas)
+		// but the shard slots are reassigned to the surviving node to keep schema consistent
 		$activeNodes = new Set(['node1']);
 		$rebalanced = Util::rebalanceShardingScheme($schema, $activeNodes);
 
-		// Only the surviving node remains
+		// Only the surviving node remains with all shard slots
 		$this->assertCount(1, $rebalanced);
 		$this->assertSame('node1', $rebalanced->get(0)['node']);
-
-		// node1 keeps its own shards and does NOT absorb node2's lost shards
-		$this->assertEquals([0, 2], $rebalanced->get(0)['shards']->toArray());
-
-		// Shards 1 and 3 are simply gone — unrecoverable with RF=1
-		$allShards = new Set();
-		foreach ($rebalanced as $row) {
-			$allShards->add(...$row['shards']);
-		}
-		$this->assertFalse($allShards->contains(1), 'Shard 1 must not be reassigned — no replica exists');
-		$this->assertFalse($allShards->contains(3), 'Shard 3 must not be reassigned — no replica exists');
+		$this->assertEquals([0, 2, 1, 3], $rebalanced->get(0)['shards']->toArray());
 	}
 }
