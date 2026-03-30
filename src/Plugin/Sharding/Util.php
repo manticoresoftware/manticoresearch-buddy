@@ -170,7 +170,12 @@ final class Util {
 			}
 		}
 
-		// For node failures only (no new nodes), use the original logic
+		// For node failures only (no new nodes):
+		// RF=1 shards on dead nodes are unrecoverable — don't reassign them
+		if (!$hasNewNodes && self::calculateReplicationFactor($schema) === 1) {
+			return $newSchema;
+		}
+
 		return self::assignShardsToNodes($newSchema, $inactiveShards);
 	}
 
