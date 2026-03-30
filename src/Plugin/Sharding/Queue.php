@@ -30,6 +30,9 @@ final class Queue {
 
 	protected int $waitForId = 0;
 
+	/** @var array<string,bool> Cache of committed operation groups */
+	protected array $committedGroups = [];
+
 	/**
 	 * Initialize the state with current client that used to get all data
 	 * @param Client $client
@@ -157,6 +160,12 @@ final class Queue {
 	 * @return bool
 	 */
 	protected function shouldSkipQuery(array $query): bool {
+		// Skip items from uncommitted operation groups (master died mid-queuing)
+		if (!empty($query['operation_group']) && !$this->isGroupCommitted($query['operation_group'])) {
+			Buddy::debugvv("Sharding queue: skip {$query['id']} — group {$query['operation_group']} not committed");
+			return true;
+		}
+
 		if ($query['wait_for_id']) {
 			$waitFor = $this->getById($query['wait_for_id']);
 			if ($waitFor && $waitFor['status'] !== 'processed') {
@@ -587,5 +596,48 @@ final class Queue {
 		}
 
 		return $allSuccess;
+	}
+
+	/**
+	 * Check if an operation group has been committed by the master.
+	 * Uses a local cache to avoid repeated state queries.
+	 * @param string $operationGroup
+	 * @return bool
+	 */
+	protected function isGroupCommitted(string $operationGroup): bool {
+		if (isset($this->committedGroups[$operationGroup])) {
+			return $this->committedGroups[$operationGroup];
+		}
+
+		// Query state table for rebalance_committed:* keys matching this group
+		$stateTable = $this->cluster->getSystemTableName('system.sharding_state');
+		$query = "SELECT `value` FROM {$stateTable} WHERE `key` LIKE 'rebalance_committed:%' LIMIT 100";
+		/** @var array{0?:array{data?:array<array{value:string}>}} */
+		$res = $this->client->sendRequest($query)->getResult();
+
+		foreach ($res[0]['data'] ?? [] as $row) {
+			/** @var string $decoded */
+			$decoded = json_decode(trim((string)$row['value'], '[]'), true);
+			if ($decoded === $operationGroup) {
+				$this->committedGroups[$operationGroup] = true;
+				return true;
+			}
+		}
+
+		$this->committedGroups[$operationGroup] = false;
+		return false;
+	}
+
+	/**
+	 * Delete all queue items for an uncommitted operation group
+	 * @param string $operationGroup
+	 * @return void
+	 */
+	public function purgeOperationGroup(string $operationGroup): void {
+		$table = $this->cluster->getSystemTableName($this->table);
+		$this->client->sendRequest(
+			"DELETE FROM {$table} WHERE operation_group = '{$operationGroup}'"
+		);
+		Buddy::debugvv("Purged uncommitted operation group: {$operationGroup}");
 	}
 }

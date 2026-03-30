@@ -155,7 +155,30 @@ final class Operator {
 	protected function becomeMaster(): static {
 		Buddy::info('becoming master');
 		$this->state->set('master', $this->node->id);
+		$this->cleanupUncommittedRebalances();
 		return $this;
+	}
+
+	/**
+	 * Purge queue items from rebalances where the master died before committing.
+	 * Detects rebalance_group:* without a matching rebalance_committed:*.
+	 * @return void
+	 */
+	protected function cleanupUncommittedRebalances(): void {
+		$groups = $this->state->listRegex('rebalance_group:.+');
+		foreach ($groups as $row) {
+			[, $name] = explode(':', $row['key']);
+			/** @var string $group */
+			$group = $row['value'];
+			$committed = $this->state->get("rebalance_committed:{$name}");
+			if ($committed === $group) {
+				continue;
+			}
+			Buddy::info("Cleaning up uncommitted rebalance for table {$name}, group {$group}");
+			$this->getQueue()->purgeOperationGroup($group);
+			$this->state->delete("rebalance_group:{$name}");
+			$this->state->set("rebalance:{$name}", 'idle');
+		}
 	}
 
 	/**
@@ -329,6 +352,8 @@ final class Operator {
 				}
 				if ($queueRow['status'] !== 'processed') {
 					$this->state->delete("rebalance_queue_ids:{$name}");
+					$this->state->delete("rebalance_committed:{$name}");
+					$this->state->delete("rebalance_group:{$name}");
 					$this->state->set("rebalance:{$name}", 'idle');
 					$qStatus = $queueRow['status'];
 					Buddy::info("Rebalancing failed for table {$name}: node {$node} id {$queueId} status {$qStatus}");
@@ -337,6 +362,8 @@ final class Operator {
 			}
 
 			$this->state->delete("rebalance_queue_ids:{$name}");
+			$this->state->delete("rebalance_committed:{$name}");
+			$this->state->delete("rebalance_group:{$name}");
 			$this->state->set("rebalance:{$name}", 'completed');
 			Buddy::info("Rebalancing completed for table {$name}");
 		}
