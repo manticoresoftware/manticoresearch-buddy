@@ -259,13 +259,13 @@ class UtilTest extends TestCase {
 	 * but the schema returned here must reflect reality: dead shards are gone.
 	 */
 	public function testRebalanceRf1NodeWithShardsGoesDown(): void {
-		// 2 nodes, 4 shards, RF=1: node1→[0,1], node2→[2,3]
+		// 2 nodes, 4 shards, RF=1: round-robin assignment → node1→[0,2], node2→[1,3]
 		$schema = Util::createShardingSchema(new Set(['node1', 'node2']), 4, 1);
 
-		$this->assertEquals([0, 1], $schema->get(0)['shards']->toArray());
-		$this->assertEquals([2, 3], $schema->get(1)['shards']->toArray());
+		$this->assertEquals([0, 2], $schema->get(0)['shards']->toArray());
+		$this->assertEquals([1, 3], $schema->get(1)['shards']->toArray());
 
-		// node2 goes down — its shards 2 and 3 have no replicas
+		// node2 goes down — its shards 1 and 3 have no replicas
 		$activeNodes = new Set(['node1']);
 		$rebalanced = Util::rebalanceShardingScheme($schema, $activeNodes);
 
@@ -274,14 +274,14 @@ class UtilTest extends TestCase {
 		$this->assertSame('node1', $rebalanced->get(0)['node']);
 
 		// node1 keeps its own shards and does NOT absorb node2's lost shards
-		$this->assertEquals([0, 1], $rebalanced->get(0)['shards']->toArray());
+		$this->assertEquals([0, 2], $rebalanced->get(0)['shards']->toArray());
 
-		// Shards 2 and 3 are simply gone — unrecoverable with RF=1
+		// Shards 1 and 3 are simply gone — unrecoverable with RF=1
 		$allShards = new Set();
 		foreach ($rebalanced as $row) {
 			$allShards->add(...$row['shards']);
 		}
-		$this->assertFalse($allShards->contains(2), 'Shard 2 must not be reassigned — no replica exists');
+		$this->assertFalse($allShards->contains(1), 'Shard 1 must not be reassigned — no replica exists');
 		$this->assertFalse($allShards->contains(3), 'Shard 3 must not be reassigned — no replica exists');
 	}
 }
