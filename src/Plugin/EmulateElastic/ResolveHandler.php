@@ -46,15 +46,21 @@ class ResolveHandler extends BaseEntityHandler {
 			/** @var array{0?:array{data?:array<int,array{Table:string}>}} $queryResult */
 			$queryResult = $manticoreClient->sendRequest($query)->getResult();
 			if (!isset($queryResult[0]) || !isset($queryResult[0]['data'])) {
-				return TaskResult::raw([]);
+				//return TaskResult::raw([]);
+				$tables = [$tableName];
+			} else {
+				$tables = [];
+				foreach ($queryResult[0]['data'] as $row) {
+					$tables[] = $row['Table'];
+				}
 			}
-
-			$tables = [];
-			foreach ($queryResult[0]['data'] as $row) {
-				$tables[] = $row['Table'];
-			}
+			$query = match (true) {
+				($tableName === '%') => '',
+				(strlen($tableName) === 2) => $tableName[0],
+				default => '*' . $payload->table,
+			};
 			/** @var array<array{index: string, alias: string}> $aliasData */
-			$aliasData = self::getAliasData($manticoreClient, $tables);
+			$aliasData = self::getAliasData($manticoreClient, $query);
 			return TaskResult::raw(
 				self::buildResolveResponse($tables, $aliasData)
 			);
@@ -66,6 +72,25 @@ class ResolveHandler extends BaseEntityHandler {
 	}
 
 	/**
+	 *
+	 * @param string $table
+	 * @param array<string,string> $aliasData
+	 * @return array<mixed>
+	 */
+	protected static function buildTableInfo(string $table, array $aliasData): array {
+		$tableInfo = [
+			'name' => $table,
+			'attributes' => ['open'],
+		];
+		$tableAliases = array_keys($aliasData, $table);
+		if ($tableAliases) {
+			$tableInfo['aliases'] = $tableAliases;
+		}
+
+		return $tableInfo;
+	}
+
+	/**
 	 * @param array<string> $tables
 	 * @param array<array{index:string,alias:string}> $aliasData
 	 * @return array<mixed>
@@ -73,8 +98,8 @@ class ResolveHandler extends BaseEntityHandler {
 	protected static function buildResolveResponse(array $tables, array $aliasData = []): array {
 		if ($aliasData) {
 			$aliasData = array_combine(
-				array_column($aliasData, 'index'),
-				array_column($aliasData, 'alias')
+				array_column($aliasData, 'alias'),
+				array_column($aliasData, 'index')
 			);
 		}
 		$res = [
@@ -83,20 +108,18 @@ class ResolveHandler extends BaseEntityHandler {
 			'data_streams' => [],
 		];
 		foreach ($tables as $table) {
-			$index = [
-				'name' => $table,
-				'attributes' => 'open',
-			];
-			$alias = null;
-			if (isset($aliasData[$table])) {
-				$index['alias'] = $aliasData[$table];
-				$alias = [
-					'name' => $aliasData[$table],
-					'indices' => [$table],
-				];
-				$res['aliases'][] = $alias;
+			$res['indices'][] = self::buildTableInfo($table, $aliasData);
+		}
+		foreach ($aliasData as $alias => $table) {
+			if (!in_array($table, $tables)) {
+				$res['indices'][] = self::buildTableInfo($table, $aliasData);
+				$tables[] = $table;
 			}
-			$res['indices'][] = $index;
+			$aliasInfo = [
+				'name' => $alias,
+				'indices' => [$table],
+			];
+			$res['aliases'][] = $aliasInfo;
 		}
 
 		return $res;

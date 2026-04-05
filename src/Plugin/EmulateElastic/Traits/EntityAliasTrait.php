@@ -39,18 +39,19 @@ trait EntityAliasTrait {
 		if (!isset($aliasTable)) {
 			$aliasTable = self::$defaulAliasTable;
 		}
-		$query = "CREATE TABLE IF NOT EXISTS $aliasTable (index string, alias string)";
+		$query = "CREATE TABLE IF NOT EXISTS $aliasTable (index text, alias text) min_infix_len='2'";
 		$manticoreClient->sendRequest($query);
-
-		$query = "SELECT 1 FROM $aliasTable WHERE index='{$index}'";
-		/** @var array{0:array{data:array<mixed>}} $queryResult */
+		$query = "SELECT id FROM $aliasTable WHERE MATCH('@index {$index}')";
+		/** @var array{0:array{data:array<array{id:int}>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
 		$isExistingIndex = (bool)$queryResult[0]['data'];
+		$id = $isExistingIndex ? $queryResult[0]['data'][0]['id'] : null;
 		$query = $isExistingIndex
-			? "UPDATE {$aliasTable} SET alias='{$alias}' WHERE index='{$index}'"
+			? "REPLACE INTO {$aliasTable} VALUES($id, '{$index}', '{$alias}')"
 			: "INSERT INTO $aliasTable (index, alias) VALUES('{$index}', '{$alias}')";
 		/** @var array{error?:string,0:array{data?:array<mixed>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		
 		if (isset($queryResult['error'])) {
 			throw new \Exception('Unknown error on template creation');
 		}
@@ -63,26 +64,18 @@ trait EntityAliasTrait {
 	/**
 	 *
 	 * @param HTTPClient $manticoreClient
-	 * @param array<string> $tables
+	 * @param string $query
 	 * @return array<mixed>
 	 */
-	protected static function getAliasData(HTTPClient $manticoreClient, array $tables = []): array {
-		$query = "SHOW TABLES LIKE '" . self::$defaulAliasTable . "'";
+	protected static function getAliasData(HTTPClient $manticoreClient, string $query): array {
+		$showQuery = "SHOW TABLES LIKE '" . self::$defaulAliasTable . "'";
 		/** @var array{0?:array{data?:array<mixed>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $manticoreClient->sendRequest($showQuery)->getResult();
 		if (!isset($queryResult[0])) {
 			return [];
 		}
 
-		$query = 'SELECT index, alias FROM ' . self::$defaulAliasTable;
-		if ($tables) {
-			array_walk(
-				$tables,
-				fn(&$value) => $value = "'" . $value . "'"
-			);
-			$tablesExpr = implode(',', $tables);
-			$query .= " WHERE index IN ({$tablesExpr})";
-		}
+		$query = 'SELECT index, alias FROM ' . self::$defaulAliasTable . " WHERE MATCH('{$query}')";
 		/** @var array{0:array{data?:array<array{index:string,alias:string}>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
 		if (!isset($queryResult[0]['data']) || !$queryResult[0]['data']) {

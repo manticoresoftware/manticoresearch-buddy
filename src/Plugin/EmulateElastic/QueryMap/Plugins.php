@@ -13,6 +13,7 @@ return [
 	'_plugins/_security/api/account' => [
 		'error' => 'no handler found for uri [/_plugins/_security/api/account] and method [GET]',
 	],
+	'_plugins/_ism/policies' => [],
 	'_plugins/_query/_datasources' => [],
 	'_plugins' => [
 		[

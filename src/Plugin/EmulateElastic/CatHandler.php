@@ -46,6 +46,7 @@ class CatHandler extends BaseHandlerWithClient {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			$pathParts = explode('/', $payload->path);
+			throw new \Exception('Cannot parse request ' . json_encode($pathParts));
 			if (!isset($pathParts[1], $pathParts[2])
 				&& !in_array($pathParts[1], self::CAT_ENTITIES) && !str_ends_with($pathParts[1], '*')) {
 				throw new \Exception('Cannot parse request');
