@@ -26,7 +26,7 @@ class CatHandler extends BaseHandlerWithClient {
 	use Traits\KibanaVersionTrait;
 	use Traits\QueryMapLoaderTrait;
 
-	const CAT_ENTITIES = ['templates', 'plugins'];
+	const CAT_ENTITIES = ['templates', 'plugins', 'indices'];
 
 	/**
 	 *  Initialize the executor
@@ -46,23 +46,26 @@ class CatHandler extends BaseHandlerWithClient {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			$pathParts = explode('/', $payload->path);
-			throw new \Exception('Cannot parse request ' . json_encode($pathParts));
 			if (!isset($pathParts[1], $pathParts[2])
 				&& !in_array($pathParts[1], self::CAT_ENTITIES) && !str_ends_with($pathParts[1], '*')) {
-				throw new \Exception('Cannot parse request');
+					throw new \Exception('Cannot parse request');
 			}
 			$entityTable = "_{$pathParts[1]}";
-
-			if (in_array($pathParts[1], self::CAT_ENTITIES) && !isset($pathParts[2])) {
-				$queryMapName = 'Plugins';
-				self::initQueryMap($queryMapName);
-				/** @var array{name:string,patterns:string,content:string} $entityInfo */
-				$entityInfo = self::$queryMap[$queryMapName][$entityTable];
-				$catInfo = self::getVersionedEntity($entityInfo, $manticoreClient);
-
-				return TaskResult::raw($catInfo);
+			return TaskResult::raw(['TEST' => 1]);
+			if (in_array($pathParts[1], self::CAT_ENTITIES)) {
+				if (!isset($pathParts[2])) {
+					$queryMapName = 'Plugins';
+					self::initQueryMap($queryMapName);
+					/** @var array{name:string,patterns:string,content:string} $entityInfo */
+					$entityInfo = self::$queryMap[$queryMapName][$entityTable];
+					$catInfo = self::getVersionedEntity($entityInfo, $manticoreClient);
+					
+					return TaskResult::raw($catInfo);
+				} elseif ($pathParts[1] == 'indices') {
+					return TaskResult::raw(self::buildCatIndicesInfo($manticoreClient, $pathParts[2]));
+				}
 			}
-
+			
 			$entityNamePattern = $pathParts[2];
 			$query = "SELECT * FROM {$entityTable} WHERE MATCH('{$entityNamePattern}')";
 			/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string}>}} $queryResult */
@@ -85,6 +88,74 @@ class CatHandler extends BaseHandlerWithClient {
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
 		)->run();
+	}
+
+	/**
+	 * @return array<int,array{docs.count:string,docs.deleted:string,health:string,index:string,pri:string,rep:string,status:string}>
+	 */
+	private static function buildCatIndicesInfo(HTTPClient $manticoreClient, string $tablePattern): array {
+		/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string}>}} $queryResult */
+		$queryResult = $manticoreClient->sendRequest('SHOW TABLES')->getResult;
+		if (!isset($queryResult[0]['data']) || !is_array($queryResult[0]['data'])) {
+			return [];
+		}
+
+		$catInfo = [];
+		foreach ($queryResult[0]['data'] as $tableRow) {
+			$tableName = $tableRow['name'];
+			$statusMap = self::getTableStatusMap($manticoreClient, $tableName);
+			$catInfo[] = self::buildCatIndicesRow($tableName, $statusMap);
+		}
+
+		return $catInfo;
+	}
+
+	/**
+	 *
+	 * @param HTTPClient $manticoreClient
+	 * @param string $tableName
+	 * @return array<string,mixed>
+	 */
+	private static function getTableStatusMap(HTTPClient $manticoreClient, string $tableName): array {
+		$query = 'SHOW TABLE `' . str_replace('`', '``', $tableName) . '` STATUS';
+		$response = $manticoreClient->sendRequest($query);
+		if ($response->hasError()) {
+			return [];
+		}
+
+		$queryResult = $response->getResult();
+		if (!isset($queryResult[0]['data']) || !is_array($queryResult[0]['data'])) {
+			return [];
+		}
+
+		$statusMap = [];
+		foreach ($queryResult[0]['data'] as $statusRow) {
+			if (!isset($statusRow['Variable_name'], $statusRow['Value']) || !is_string($statusRow['Variable_name'])) {
+				continue;
+			}
+			$statusMap[$statusRow['Variable_name']] = (string)$statusRow['Value'];
+		}
+
+		return $statusMap;
+	}
+
+	/**
+	 * @param array<string,mixed> $statusMap
+	 * @return array<mixed>
+	 */
+	private static function buildCatIndicesRow(string $tableName, array $statusMap): array {
+		$docsCount = $statusMap['indexed_documents'] ?? 0;
+		$docsDeleted = $statusMap['killed_documents'] ?? 0;);
+
+		return [
+			'docs.count' => $docsCount,
+			'docs.deleted' => $docsDeleted,
+			'health' => 'green',
+			'index' => $tableName,
+			'pri' => '1',
+			'rep' => '1',
+			'status' => 'open',
+		];
 	}
 
 	/**
