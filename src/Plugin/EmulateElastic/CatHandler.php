@@ -51,7 +51,7 @@ class CatHandler extends BaseHandlerWithClient {
 					throw new \Exception('Cannot parse request');
 			}
 			$entityTable = "_{$pathParts[1]}";
-			return TaskResult::raw(['TEST' => 1]);
+
 			if (in_array($pathParts[1], self::CAT_ENTITIES)) {
 				if (!isset($pathParts[2])) {
 					$queryMapName = 'Plugins';
@@ -95,14 +95,14 @@ class CatHandler extends BaseHandlerWithClient {
 	 */
 	private static function buildCatIndicesInfo(HTTPClient $manticoreClient, string $tablePattern): array {
 		/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string}>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest('SHOW TABLES')->getResult;
+		$queryResult = $manticoreClient->sendRequest('SHOW TABLES')->getResult();
 		if (!isset($queryResult[0]['data']) || !is_array($queryResult[0]['data'])) {
 			return [];
 		}
 
 		$catInfo = [];
 		foreach ($queryResult[0]['data'] as $tableRow) {
-			$tableName = $tableRow['name'];
+			$tableName = $tableRow['Table'];
 			$statusMap = self::getTableStatusMap($manticoreClient, $tableName);
 			$catInfo[] = self::buildCatIndicesRow($tableName, $statusMap);
 		}
@@ -145,7 +145,7 @@ class CatHandler extends BaseHandlerWithClient {
 	 */
 	private static function buildCatIndicesRow(string $tableName, array $statusMap): array {
 		$docsCount = $statusMap['indexed_documents'] ?? 0;
-		$docsDeleted = $statusMap['killed_documents'] ?? 0;);
+		$docsDeleted = $statusMap['killed_documents'] ?? 0;
 
 		return [
 			'docs.count' => $docsCount,

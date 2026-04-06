@@ -25,7 +25,17 @@ final class Payload extends BasePayload {
 
 	// Endpoint position in Kibana request path
 	const KIBANA_ENDPOINT_PATH_POS = [
-		0 => ['_aliases', '_alias', '_cat', '_field_caps', '_template', '_index_template', '_plugins', '_resolve'],
+		0 => [
+			'_aliases',
+			'_alias',
+			'_cat',
+			'_data_stream',
+			'_field_caps',
+			'_template',
+			'_index_template',
+			'_plugins',
+			'_resolve'
+		],
 		1 => ['_create', '_doc', '_update', '_field_caps'],
 	];
 
@@ -127,7 +137,7 @@ final class Payload extends BasePayload {
 					[
 						'_cat', '_count', '_license', '_nodes', '_xpack', '.kibana', '.kibana_task_manager',
 						'_update_by_query', 'metric', 'config', 'space', 'index-pattern', '_plugins', '_resolve',
-						'settings', 'telemetry', 'stats',
+						'settings', 'telemetry', 'stats', '_data_stream',
 					]
 				)) {
 					throw new Exception("Unsupported request type in {$request->path}: " . static::$requestTarget);
@@ -242,6 +252,7 @@ final class Payload extends BasePayload {
 			'telemetry' => 'TelemetryKibanaHandler',
 			'_template' => 'AddTemplateHandler',
 			'_update' => 'UpdateEntityHandler',
+			'_data_stream' => 'DataStreamKibanaHandler',
 			'_search' => self::getKibanaSearchRequestHandler(),
 			default => throw new Exception('Cannot find handler for request type: ' . static::$requestTarget),
 		};
