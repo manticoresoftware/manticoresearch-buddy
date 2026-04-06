@@ -42,14 +42,12 @@ class ModelManagerTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock successful response
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
+		$createResponse = $this->createMock(Response::class);
+		$createResponse->method('hasError')->willReturn(false);
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
-			->with($this->stringContains(/** @lang manticore */ 'CREATE TABLE IF NOT EXISTS system.rag_models'))
-			->willReturn($mockResponse);
+			->willReturn($createResponse);
 
 		$modelManager->initializeTables($mockClient);
 	}
@@ -81,12 +79,11 @@ class ModelManagerTest extends TestCase {
 
 		$config = [
 			'name' => 'test_model',
-			'llm_provider' => 'openai',
-			'llm_model' => 'gpt-4',
+			'model' => 'openai:gpt-4',
 			'style_prompt' => 'You are helpful',
-			'temperature' => '0.7',
-			'max_tokens' => '1000',
-			'k_results' => '5',
+			'api_key' => 'sk-test',
+			'base_url' => 'http://host.docker.internal:8787/v1',
+			'retrieval_limit' => '5',
 		];
 
 		$result = $modelManager->createModel($mockClient, $config);
@@ -118,8 +115,7 @@ class ModelManagerTest extends TestCase {
 
 		$config = [
 			'name' => 'existing_model',
-			'llm_provider' => 'openai',
-			'llm_model' => 'gpt-4',
+			'model' => 'openai:gpt-4',
 		];
 
 		$this->expectException(ManticoreSearchClientError::class);
@@ -148,10 +144,17 @@ class ModelManagerTest extends TestCase {
 							[
 								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
-								'llm_provider' => 'openai',
-								'llm_model' => 'gpt-4',
+								'description' => 'Test RAG Model',
+								'model' => 'openai:gpt-4',
 								'style_prompt' => 'You are helpful',
-								'settings' => '{"temperature":0.7,"max_tokens":1000}',
+								'settings' => json_encode(
+									[
+										'api_key' => 'sk-test',
+										'base_url' => 'http://host.docker.internal:8787/v1',
+										'retrieval_limit' => 5,
+										'max_document_length' => 2000,
+									]
+								),
 								'created_at' => 1234567890,
 							],
 						],
@@ -165,22 +168,25 @@ class ModelManagerTest extends TestCase {
 			->with($this->stringContains('WHERE (name = \'test_model\' OR uuid = \'test_model\')'))
 			->willReturn($mockResponse);
 
-		/** @var array{id:string, uuid:string, name:string,llm_provider:string,llm_model:string,
-		 * style_prompt:string,settings:array{ temperature: string, max_tokens: string, k_results?: string,
-		 * similarity_threshold: string, max_document_length: string},created_at:string,updated_at:string} $result
+		/** @var array{id:string, uuid:string, name:string,model:string,
+		 * style_prompt:string,
+		 * description:string,
+		 * settings:array{api_key:string, base_url:string, retrieval_limit:int, max_document_length:int},
+		 * created_at:string,updated_at:string} $result
 		 */
 		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
 
 		$this->assertIsArray($result);
 		$this->assertEquals('test-uuid-123', $result['uuid']);
 		$this->assertEquals('test_model', $result['name']);
-		$this->assertEquals('openai', $result['llm_provider']);
+		$this->assertEquals('Test RAG Model', $result['description']);
+		$this->assertEquals('openai:gpt-4', $result['model']);
 		// Verify settings were properly parsed from JSON
 		$this->assertIsArray($result['settings']);
-		$this->assertNotEmpty($result['settings']['temperature']);
-		$this->assertNotEmpty($result['settings']['max_tokens']);
-		$this->assertEquals(0.7, $result['settings']['temperature']);
-		$this->assertEquals(1000, $result['settings']['max_tokens']);
+		$this->assertEquals('sk-test', $result['settings']['api_key']);
+		$this->assertEquals('http://host.docker.internal:8787/v1', $result['settings']['base_url']);
+		$this->assertEquals(5, $result['settings']['retrieval_limit']);
+		$this->assertEquals(2000, $result['settings']['max_document_length']);
 	}
 
 	/**
@@ -204,7 +210,7 @@ class ModelManagerTest extends TestCase {
 							[
 								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
-								'llm_provider' => 'openai',
+								'settings' => '{}',
 							],
 						],
 					],
@@ -273,6 +279,7 @@ class ModelManagerTest extends TestCase {
 							[
 								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
+								'settings' => '{}',
 							],
 						],
 					],
@@ -352,16 +359,16 @@ class ModelManagerTest extends TestCase {
 								'id' => 1,
 								'uuid' => 'uuid-1',
 								'name' => 'model1',
-								'llm_provider' => 'openai',
-								'llm_model' => 'gpt-4',
+								'description' => 'Model One',
+								'model' => 'openai:gpt-4',
 								'created_at' => 1234567890,
 							],
 							[
 								'id' => 2,
 								'uuid' => 'uuid-2',
 								'name' => 'model2',
-								'llm_provider' => 'openai',
-								'llm_model' => 'gpt-3.5-turbo',
+								'description' => 'Model Two',
+								'model' => 'openai:gpt-3.5-turbo',
 								'created_at' => 1234567891,
 							],
 						],
@@ -372,7 +379,7 @@ class ModelManagerTest extends TestCase {
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
-			->with($this->stringContains('SELECT id, uuid, name, llm_provider, llm_model, created_at'))
+			->with($this->stringContains('SELECT id, uuid, name, description, model, created_at'))
 			->willReturn($mockResponse);
 
 		$result = $modelManager->getAllModels($mockClient);
@@ -388,70 +395,73 @@ class ModelManagerTest extends TestCase {
 	/**
 	 * @throws ReflectionException
 	 */
-	public function testExtractSettingsFromJsonString(): void {
+	public function testExtractSettingsFromFlatFields(): void {
 		$modelManager = new ModelManager();
 
 		$config = [
 			'name' => 'test_model',
-			'llm_provider' => 'openai',
-			'llm_model' => 'gpt-4',
-			'settings' => '{"temperature":0.8,"max_tokens":2000,"k_results":10}',
-			'custom_field' => 'custom_value',
-		];
-
-		// Use reflection to access private method
-		$reflection = new ReflectionClass($modelManager);
-		$method = $reflection->getMethod('extractSettings');
-
-		$result = $method->invoke($modelManager, $config);
-
-		$this->assertIsArray($result);
-		$this->assertEquals(0.8, $result['temperature']);
-		$this->assertEquals(2000, $result['max_tokens']);
-		$this->assertEquals(10, $result['k_results']);
-		$this->assertEquals('custom_value', $result['custom_field']);
-	}
-
-	/**
-	 * @throws ReflectionException
-	 */
-	public function testExtractSettingsFromArray(): void {
-		$modelManager = new ModelManager();
-
-		$config = [
-			'name' => 'test_model',
-			'llm_provider' => 'openai',
-			'llm_model' => 'gpt-4',
-			'settings' => ['temperature' => 0.9, 'max_tokens' => 1500],
-			'k_results' => 8,
-		];
-
-		// Use reflection to access private method
-		$reflection = new ReflectionClass($modelManager);
-		$method = $reflection->getMethod('extractSettings');
-
-		$result = $method->invoke($modelManager, $config);
-
-		$this->assertIsArray($result);
-		$this->assertEquals(0.9, $result['temperature']);
-		$this->assertEquals(1500, $result['max_tokens']);
-		$this->assertEquals(8, $result['k_results']);
-	}
-
-	/**
-	 * @throws ReflectionException
-	 */
-	public function testExtractSettingsExcludesTransportKeysFromModelSettings(): void {
-		$modelManager = new ModelManager();
-
-		$config = [
-			'name' => 'test_model',
-			'llm_provider' => 'openai',
-			'llm_model' => 'gpt-4',
+			'model' => 'openai:gpt-4',
+			'description' => 'Test RAG Model',
 			'api_key' => 'sk-test',
 			'base_url' => 'http://host.docker.internal:8787/v1',
-			'settings' => ['temperature' => 0.9, 'max_tokens' => 1500],
-			'k_results' => 8,
+			'timeout' => 60,
+			'retrieval_limit' => 10,
+		];
+
+		// Use reflection to access private method
+		$reflection = new ReflectionClass($modelManager);
+		$method = $reflection->getMethod('extractSettings');
+
+		$result = $method->invoke($modelManager, $config);
+
+		$this->assertIsArray($result);
+		$this->assertEquals('sk-test', $result['api_key']);
+		$this->assertEquals('http://host.docker.internal:8787/v1', $result['base_url']);
+		$this->assertEquals(60, $result['timeout']);
+		$this->assertEquals(10, $result['retrieval_limit']);
+		$this->assertEquals(2000, $result['max_document_length']);
+	}
+
+	/**
+	 * @throws ReflectionException
+	 */
+	public function testExtractSettingsKeepsFlatFieldsOnly(): void {
+		$modelManager = new ModelManager();
+
+		$config = [
+			'name' => 'test_model',
+			'model' => 'openai:gpt-4',
+			'api_key' => 'sk-test',
+			'base_url' => 'http://host.docker.internal:8787/v1',
+			'retrieval_limit' => 8,
+		];
+
+		// Use reflection to access private method
+		$reflection = new ReflectionClass($modelManager);
+		$method = $reflection->getMethod('extractSettings');
+
+		$result = $method->invoke($modelManager, $config);
+
+		$this->assertIsArray($result);
+		$this->assertEquals('sk-test', $result['api_key']);
+		$this->assertEquals('http://host.docker.internal:8787/v1', $result['base_url']);
+		$this->assertEquals(8, $result['retrieval_limit']);
+		$this->assertEquals(2000, $result['max_document_length']);
+	}
+
+	/**
+	 * @throws ReflectionException
+	 */
+	public function testExtractSettingsExcludesCoreFields(): void {
+		$modelManager = new ModelManager();
+
+		$config = [
+			'name' => 'test_model',
+			'model' => 'openai:gpt-4',
+			'style_prompt' => 'You are helpful',
+			'api_key' => 'sk-test',
+			'base_url' => 'http://host.docker.internal:8787/v1',
+			'retrieval_limit' => 8,
 		];
 
 		$reflection = new ReflectionClass($modelManager);
@@ -460,11 +470,55 @@ class ModelManagerTest extends TestCase {
 		$result = $method->invoke($modelManager, $config);
 
 		$this->assertIsArray($result);
-		$this->assertEquals(0.9, $result['temperature']);
-		$this->assertEquals(1500, $result['max_tokens']);
-		$this->assertEquals(8, $result['k_results']);
-		$this->assertArrayNotHasKey('api_key', $result);
-		$this->assertArrayNotHasKey('base_url', $result);
+		$this->assertEquals('sk-test', $result['api_key']);
+		$this->assertEquals('http://host.docker.internal:8787/v1', $result['base_url']);
+		$this->assertEquals(8, $result['retrieval_limit']);
+		$this->assertEquals(2000, $result['max_document_length']);
+		$this->assertArrayNotHasKey('name', $result);
+		$this->assertArrayNotHasKey('model', $result);
+		$this->assertArrayNotHasKey('style_prompt', $result);
+	}
+
+	/**
+	 * @throws ReflectionException
+	 */
+	public function testExtractSettingsNormalizesMaxDocumentLength(): void {
+		$modelManager = new ModelManager();
+
+		$reflection = new ReflectionClass($modelManager);
+		$method = $reflection->getMethod('extractSettings');
+
+		/** @var array{max_document_length:int} $defaulted */
+		$defaulted = $method->invoke(
+			$modelManager,
+			[
+				'name' => 'test_model',
+				'model' => 'openai:gpt-4',
+			]
+		);
+		$this->assertEquals(2000, $defaulted['max_document_length']);
+
+		/** @var array{max_document_length:int} $invalid */
+		$invalid = $method->invoke(
+			$modelManager,
+			[
+				'name' => 'test_model',
+				'model' => 'openai:gpt-4',
+				'max_document_length' => 0,
+			]
+		);
+		$this->assertEquals(2000, $invalid['max_document_length']);
+
+		/** @var array{max_document_length:int} $disabled */
+		$disabled = $method->invoke(
+			$modelManager,
+			[
+				'name' => 'test_model',
+				'model' => 'openai:gpt-4',
+				'max_document_length' => -1,
+			]
+		);
+		$this->assertEquals(-1, $disabled['max_document_length']);
 	}
 
 	/**
@@ -501,8 +555,9 @@ class ModelManagerTest extends TestCase {
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetModelByUuidOrNameWithNullSettings(): void {
+	public function testGetModelByUuidOrNameWithNullSettingsFailsFast(): void {
 		$modelManager = new ModelManager();
+		$this->expectException(ManticoreSearchClientError::class);
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
@@ -518,8 +573,7 @@ class ModelManagerTest extends TestCase {
 							[
 								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
-								'llm_provider' => 'openai',
-								'llm_model' => 'gpt-4',
+								'model' => 'openai:gpt-4',
 								'style_prompt' => 'You are helpful',
 								'settings' => null,
 								'created_at' => 1234567890,
@@ -534,19 +588,16 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
-
-		// Should be empty array due to empty() check
-		$this->assertIsArray($result['settings']);
-		$this->assertEmpty($result['settings']);
+		$modelManager->getModelByUuidOrName($mockClient, 'test_model');
 	}
 
 	/**
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetModelByUuidOrNameWithEmptyStringSettings(): void {
+	public function testGetModelByUuidOrNameWithEmptyStringSettingsFailsFast(): void {
 		$modelManager = new ModelManager();
+		$this->expectException(ManticoreSearchClientError::class);
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
@@ -562,8 +613,7 @@ class ModelManagerTest extends TestCase {
 							[
 								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
-								'llm_provider' => 'openai',
-								'llm_model' => 'gpt-4',
+								'model' => 'openai:gpt-4',
 								'settings' => '',
 								'created_at' => 1234567890,
 							],
@@ -577,11 +627,7 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
-
-		// Should be empty array due to empty() check
-		$this->assertIsArray($result['settings']);
-		$this->assertEmpty($result['settings']);
+		$modelManager->getModelByUuidOrName($mockClient, 'test_model');
 	}
 
 	/**
@@ -606,8 +652,7 @@ class ModelManagerTest extends TestCase {
 							[
 								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
-								'llm_provider' => 'openai',
-								'llm_model' => 'gpt-4',
+								'model' => 'openai:gpt-4',
 								'settings' => '{invalid json',
 								'created_at' => 1234567890,
 							],
@@ -628,8 +673,9 @@ class ModelManagerTest extends TestCase {
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetModelByUuidOrNameWithStringNullSettings(): void {
+	public function testGetModelByUuidOrNameWithStringNullSettingsFailsFast(): void {
 		$modelManager = new ModelManager();
+		$this->expectException(ManticoreSearchClientError::class);
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
@@ -645,8 +691,7 @@ class ModelManagerTest extends TestCase {
 							[
 								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
-								'llm_provider' => 'openai',
-								'llm_model' => 'gpt-4',
+								'model' => 'openai:gpt-4',
 								'settings' => 'NULL',
 								'created_at' => 1234567890,
 							],
@@ -660,10 +705,6 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
-
-		// Should be empty array - 'NULL' is not empty but JSON decode fails
-		$this->assertIsArray($result['settings']);
-		$this->assertEmpty($result['settings']);
+		$modelManager->getModelByUuidOrName($mockClient, 'test_model');
 	}
 }

@@ -17,10 +17,16 @@ final class SearchContext {
 	 * @param string $intent
 	 * @param ConversationRequest $request
 	 * @param string $conversationHistory
-	 * @param array{id:string, uuid:string, name:string,llm_provider:string,
-	 *   llm_model:string,style_prompt:string,settings:array{ temperature?: string,
-	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
-	 *   max_document_length?: string},created_at:string,updated_at:string} $model
+	 * @param array{
+	 *   id:string,
+	 *   uuid:string,
+	 *   name:string,
+	 *   model:string,
+	 *   style_prompt:string,
+	 *   settings:array<string, mixed>,
+	 *   created_at:string,
+	 *   updated_at:string
+	 * } $model
 	 */
 	public function __construct(
 		public string $intent,

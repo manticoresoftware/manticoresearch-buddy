@@ -39,7 +39,7 @@ class DynamicThresholdManagerTest extends TestCase {
 		$mockProvider = $this->createMock(LlmProvider::class);
 		$mockProvider->expects($this->never())->method('generateResponse');
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+		$modelConfig = ['model' => 'openai:gpt-4'];
 
 		$result = $thresholdManager->calculateDynamicThreshold(
 			'conv-uuid',
@@ -75,7 +75,7 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+		$modelConfig = ['model' => 'openai:gpt-4'];
 
 		$result = $thresholdManager->calculateDynamicThreshold(
 			'conv-uuid',
@@ -113,7 +113,7 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+		$modelConfig = ['model' => 'openai:gpt-4'];
 
 		$result = $thresholdManager->calculateDynamicThreshold(
 			'conv-uuid',
@@ -135,7 +135,7 @@ class DynamicThresholdManagerTest extends TestCase {
 
 		$mockProvider = $this->createMock(LlmProvider::class);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+		$modelConfig = ['model' => 'openai:gpt-4'];
 
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($thresholdManager);
@@ -161,7 +161,7 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+		$modelConfig = ['model' => 'openai:gpt-4'];
 
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($thresholdManager);
@@ -191,7 +191,7 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+		$modelConfig = ['model' => 'openai:gpt-4'];
 
 		// Use reflection to access private method
 		$reflection = new ReflectionClass($thresholdManager);
@@ -233,7 +233,7 @@ class DynamicThresholdManagerTest extends TestCase {
 				]
 			);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+		$modelConfig = ['model' => 'openai:gpt-4'];
 
 		// First call with one conversation
 		$result1 = $thresholdManager->calculateDynamicThreshold(
@@ -280,7 +280,7 @@ class DynamicThresholdManagerTest extends TestCase {
 				['success' => true, 'content' => 'no', 'metadata' => []]
 			);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+		$modelConfig = ['model' => 'openai:gpt-4'];
 
 		// First call - expansion
 		$result1 = $thresholdManager->calculateDynamicThreshold(

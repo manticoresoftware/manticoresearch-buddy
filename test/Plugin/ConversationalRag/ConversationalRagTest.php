@@ -19,6 +19,7 @@ use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -52,12 +53,9 @@ class ConversationalRagTest extends TestCase {
 
 	public function testCreateModelEndToEnd(): void {
 		$query = "CREATE RAG MODEL 'functional_test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
+			model = 'openai:gpt-4',
 			style_prompt = 'You are a helpful assistant.',
-			temperature = 0.7,
-			max_tokens = 1000,
-			k_results = 5
+			retrieval_limit = 5
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -77,31 +75,9 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock responses for initializeTables (2 calls) + modelExists (1 call) + createModel (1 call)
-		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$modelExistsResponse = $this->createMock(Response::class);
-		$modelExistsResponse->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$insertResponse = $this->createMock(Response::class);
-		$insertResponse->method('getResult')->willReturn(
-			Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']])
-		);
-
-		$mockClient->expects($this->exactly(4))
-			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $modelExistsResponse, $insertResponse);
+		$modelExistsResponse = $this->createResponse([['data' => [['count' => 0]]]]);
+		$insertResponse = $this->createResponse([['total' => 1, 'error' => '', 'warning' => '']]);
+		$this->configureClientWithInitialization($mockClient, [$modelExistsResponse, $insertResponse]);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -141,26 +117,8 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock responses for initializeTables (2 calls) + getAllModels (1 call)
-		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$selectResponse = $this->createMock(Response::class);
-		$selectResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => [], 'total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$mockClient->expects($this->exactly(3))
-			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $selectResponse);
+		$selectResponse = $this->createResponse([['data' => [], 'total' => 0, 'error' => '', 'warning' => '']]);
+		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -190,7 +148,7 @@ class ConversationalRagTest extends TestCase {
 
 		$this->assertArrayHasKey('uuid', $data[0]);
 		$this->assertArrayHasKey('name', $data[0]);
-		$this->assertArrayHasKey('llm_provider', $data[0]);
+		$this->assertArrayHasKey('model', $data[0]);
 	}
 
 	public function testDescribeModelEndToEnd(): void {
@@ -213,46 +171,21 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock responses for initializeTables (2 calls) + getModelByUuidOrName (1 call)
-		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$selectResponse = $this->createMock(Response::class);
-		$selectResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
+		$selectResponse = $this->createResponse(
+			[[
 				'total' => 1,
 				'error' => '',
 				'warning' => '',
-				'data' => [
-					[
-						'uuid' => 'test-uuid-123',
-						'name' => 'functional_test_model',
-						'llm_provider' => 'openai',
-						'llm_model' => 'gpt-4',
-						'style_prompt' => 'You are a helpful assistant.',
-						'temperature' => 0.7,
-						'max_tokens' => 1000,
-						'k_results' => 5,
-					],
-				],
-				],
-				]
-			)
+				'data' => [[
+					'uuid' => 'test-uuid-123',
+					'name' => 'functional_test_model',
+					'model' => 'openai:gpt-4',
+					'style_prompt' => 'You are a helpful assistant.',
+					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
+				]],
+			]]
 		);
-
-		$mockClient->expects($this->exactly(3))
-			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $selectResponse);
+		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -295,45 +228,26 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock responses for initializeTables (2) + getModel (1) + delete model (1)
-		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$getModelResponse = $this->createMock(Response::class);
-		$getModelResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
+		$getModelResponse = $this->createResponse(
+			[[
 				'total' => 1,
 				'error' => '',
 				'warning' => '',
-				'data' => [
-					[
-						'uuid' => 'test-uuid-123',
-						'name' => 'functional_test_model',
-					],
-				],
-				],
-				]
-			)
+				'data' => [[
+					'id' => '1',
+					'uuid' => 'test-uuid-123',
+					'name' => 'functional_test_model',
+					'description' => '',
+					'model' => 'openai:gpt-4',
+					'style_prompt' => '',
+					'settings' => '{"max_document_length":2000}',
+					'created_at' => '1234567890',
+					'updated_at' => '1234567890',
+				]],
+			]]
 		);
-
-		$deleteModelResponse = $this->createMock(Response::class);
-		$deleteModelResponse->method('getResult')->willReturn(
-			Struct::fromData([['total' => 1, 'error' => '', 'warning' => '']])
-		);
-
-		$mockClient->expects($this->exactly(4))
-			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $getModelResponse, $deleteModelResponse);
+		$deleteModelResponse = $this->createResponse([['total' => 1, 'error' => '', 'warning' => '']]);
+		$this->configureClientWithInitialization($mockClient, [$getModelResponse, $deleteModelResponse]);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -350,7 +264,7 @@ class ConversationalRagTest extends TestCase {
 
 	public function testCreateModelValidationErrorEndToEnd(): void {
 		$query = "CREATE RAG MODEL 'invalid_model' (
-			llm_model = 'gpt-4',
+			model = 'gpt-4',
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -368,13 +282,14 @@ class ConversationalRagTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
 
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(\Manticoresearch\Buddy\Core\Error\QueryParseError::class, $error);
-		$this->assertStringContainsString("Required field 'llm_provider' is missing", $error->getResponseError());
+		$this->assertStringContainsString("model must use 'provider:model' format", $error->getResponseError());
 	}
 
 	public function testDescribeNonExistentModelEndToEnd(): void {
@@ -397,26 +312,8 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock responses for initializeTables (2 calls) + getModelByUuidOrName (1 call that returns no results)
-		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$selectResponse = $this->createMock(Response::class);
-		$selectResponse->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$mockClient->expects($this->exactly(3))
-			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $selectResponse);
+		$selectResponse = $this->createResponse([['total' => 0, 'error' => '', 'warning' => '']]);
+		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -446,26 +343,8 @@ class ConversationalRagTest extends TestCase {
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock responses for initializeTables (2 calls) + getModel (1 call that returns no results)
-		$initResponse1 = $this->createMock(Response::class);
-		$initResponse1->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$initResponse2 = $this->createMock(Response::class);
-		$initResponse2->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$getModelResponse = $this->createMock(Response::class);
-		$getModelResponse->method('getResult')->willReturn(
-			Struct::fromData([['total' => 0, 'error' => '', 'warning' => '']])
-		);
-
-		$mockClient->expects($this->exactly(3))
-			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($initResponse1, $initResponse2, $getModelResponse);
+		$getModelResponse = $this->createResponse([['total' => 0, 'error' => '', 'warning' => '']]);
+		$this->configureClientWithInitialization($mockClient, [$getModelResponse]);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -473,5 +352,33 @@ class ConversationalRagTest extends TestCase {
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(\Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError::class, $error);
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $result
+	 */
+	private function createResponse(
+		array $result = [['total' => 0, 'error' => '', 'warning' => '']],
+		bool $hasError = false
+	): Response {
+		$response = $this->createMock(Response::class);
+		$response->method('hasError')->willReturn($hasError);
+		$response->method('getResult')->willReturn(Struct::fromData($result));
+
+		return $response;
+	}
+
+	/**
+	 * @param MockObject&HTTPClient $mockClient
+	 * @param array<int, Response> $extraResponses
+	 */
+	private function configureClientWithInitialization(HTTPClient $mockClient, array $extraResponses = []): void {
+		$mockClient->expects($this->exactly(2 + sizeof($extraResponses)))
+			->method('sendRequest')
+			->willReturnOnConsecutiveCalls(
+				$this->createResponse(),
+				$this->createResponse(),
+				...$extraResponses
+			);
 	}
 }

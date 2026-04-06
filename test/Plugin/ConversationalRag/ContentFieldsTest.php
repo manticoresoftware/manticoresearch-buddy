@@ -42,32 +42,30 @@ class ContentFieldsTest extends TestCase {
 			],
 		];
 
-		$settings = ['max_document_length' => 1000];
-
 		// Test reflection to access private method
 		$reflection = new ReflectionClass(Handler::class);
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
 		// Test single field (backward compatibility)
-		$context = $method->invoke(null, $searchResults, $settings, 'content');
+		$context = $method->invoke(null, $searchResults, 'content', 1000);
 		$this->assertIsString($context);
 		$this->assertStringContainsString('This is the main content.', $context);
 		$this->assertStringContainsString('Complex SQL queries explained.', $context);
 
 		// Test multiple fields with comma separator
-		$context = $method->invoke(null, $searchResults, $settings, 'title,content');
+		$context = $method->invoke(null, $searchResults, 'title,content', 1000);
 		$expected = "Database Basics, This is the main content.\nAdvanced Queries, Complex SQL queries explained.";
 		$this->assertEquals($expected, $context);
 
 		// Test three fields
-		$context = $method->invoke(null, $searchResults, $settings, 'title,summary,content');
+		$context = $method->invoke(null, $searchResults, 'title,summary,content', 1000);
 		$expected = "Database Basics, A quick overview of databases., This is the main content.\n" .
 			'Advanced Queries, Learn advanced database techniques., Complex SQL queries explained.';
 		$this->assertEquals($expected, $context);
 
 		// Test missing field (should skip gracefully)
-		$context = $method->invoke(null, $searchResults, $settings, 'title,nonexistent,content');
+		$context = $method->invoke(null, $searchResults, 'title,nonexistent,content', 1000);
 		$expected = "Database Basics, This is the main content.\nAdvanced Queries, Complex SQL queries explained.";
 		$this->assertEquals($expected, $context);
 	}
@@ -82,13 +80,11 @@ class ContentFieldsTest extends TestCase {
 			],
 		];
 
-		$settings = [];
-
 		$reflection = new ReflectionClass(Handler::class);
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, $settings, 'title,content,summary');
+		$context = $method->invoke(null, $searchResults, 'title,content,summary', 1000);
 		$expected = 'Test, Summary text';  // Empty content should be excluded
 		$this->assertEquals($expected, $context);
 	}
@@ -103,26 +99,22 @@ class ContentFieldsTest extends TestCase {
 			],
 		];
 
-		$settings = [];
-
 		$reflection = new ReflectionClass(Handler::class);
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, $settings, 'title,content,summary');
+		$context = $method->invoke(null, $searchResults, 'title,content,summary', 1000);
 		$expected = 'Test Title, Valid summary';  // Whitespace-only content should be excluded
 		$this->assertEquals($expected, $context);
 	}
 
 	public function testBuildContextWithEmptyResults(): void {
 		$searchResults = [];
-		$settings = [];
-
 		$reflection = new ReflectionClass(Handler::class);
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, $settings, 'title,content');
+		$context = $method->invoke(null, $searchResults, 'title,content', 1000);
 		$this->assertEquals('', $context);
 	}
 
@@ -134,14 +126,12 @@ class ContentFieldsTest extends TestCase {
 			],
 		];
 
-		$settings = [];
-
 		$reflection = new ReflectionClass(Handler::class);
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
 		// Test explicit single field
-		$context = $method->invoke(null, $searchResults, $settings, 'content');
+		$context = $method->invoke(null, $searchResults, 'content', 1000);
 		$expected = 'Single content field';
 		$this->assertEquals($expected, $context);
 	}
@@ -151,19 +141,45 @@ class ContentFieldsTest extends TestCase {
 			[
 				'id' => 1,
 				'title' => 'Short Title',
-				'content' => str_repeat('A very long content string. ', 50), // Create long content
+				'content' => str_repeat('A very long content string. ', 120), // Exceeds the internal 2000-char limit
 			],
 		];
-
-		$settings = ['max_document_length' => 50];
 
 		$reflection = new ReflectionClass(Handler::class);
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, $settings, 'title,content');
+		$context = $method->invoke(null, $searchResults, 'title,content', 50);
 		$this->assertIsString($context);
 		$this->assertStringEndsWith('...', $context);
-		$this->assertLessThanOrEqual(53, strlen($context)); // Allow for "..." and separator
+		$this->assertLessThanOrEqual(53, strlen($context));
+	}
+
+	public function testBuildContextWithoutTruncationWhenDisabled(): void {
+		$searchResults = [
+			[
+				'id' => 1,
+				'title' => 'Short Title',
+				'content' => str_repeat('A very long content string. ', 120),
+			],
+		];
+
+		$reflection = new ReflectionClass(Handler::class);
+		$method = $reflection->getMethod('buildContext');
+		$method->setAccessible(true);
+
+		$context = $method->invoke(null, $searchResults, 'title,content', -1);
+		$this->assertIsString($context);
+		$this->assertStringNotContainsString('...', $context);
+	}
+
+	public function testGetLlmRequestOptionsUsesFixedResponseLimit(): void {
+		$reflection = new ReflectionClass(Handler::class);
+		$method = $reflection->getMethod('getLlmRequestOptions');
+		$method->setAccessible(true);
+
+		/** @var array<string, int|float> $options */
+		$options = $method->invoke(null);
+		$this->assertSame(4096, $options['max_tokens']);
 	}
 }

@@ -22,18 +22,12 @@ Supported SQL commands:
 
 Supported model storage and runtime behavior:
 
-- `llm_provider` and `llm_model` are required
+- `model` is required and must use `provider:model` format
 - `style_prompt` is optional
-- Buddy-specific settings:
-  - `k_results`
-  - `similarity_threshold`
-  - `max_document_length`
-- completion settings handled directly by Buddy:
-  - `temperature`
-  - `max_tokens`
-  - `top_p`
-  - `frequency_penalty`
-  - `presence_penalty`
+- Buddy-specific setting:
+  - `retrieval_limit`
+- `max_document_length` controls per-document context truncation
+- response tuning is internal to the plugin; final answers are capped at 4096 tokens
 - extension-level transport options are passed through from model settings to `new Llm($model, $options)`
   - supported keys are `api_key`, `base_url`, and `timeout`
 
@@ -83,8 +77,7 @@ Minimal model:
 
 ```sql
 CREATE RAG MODEL test_assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o-mini'
+    model='openai:gpt-4o-mini'
 );
 ```
 
@@ -92,17 +85,13 @@ Model with proxy and custom LLM options:
 
 ```sql
 CREATE RAG MODEL proxy_assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o-mini',
+    model='openai:gpt-4o-mini',
     style_prompt='You are a helpful assistant specializing in search technology',
-    settings='{
-        "api_key":"sk-proxy-or-openai-key",
-        "base_url":"http://host.docker.internal:8787/v1",
-        "timeout":60,
-        "temperature":0.3,
-        "max_tokens":2000,
-        "k_results":5
-    }'
+    api_key='sk-proxy-or-openai-key',
+    base_url='http://host.docker.internal:8787/v1',
+    timeout=60,
+    retrieval_limit=5,
+    max_document_length=3000
 );
 ```
 
@@ -170,81 +159,61 @@ The extension README documents support for multiple providers, including:
 Buddy passes model options to the extension like this:
 
 1. It loads model `settings`
-2. It extracts Buddy-managed fields such as `k_results`
+2. It extracts Buddy-managed fields such as `retrieval_limit`
 3. It forwards the remaining settings to the extension constructor
-
-That means the recommended place for provider-specific transport options is `settings`.
 
 ### API key
 
 You can provide the API key in either of these ways:
 
 - via the extension's environment variable support, such as `OPENAI_API_KEY`
-- via model `settings.api_key`
+- via model `api_key`
 
 Example:
 
 ```sql
 CREATE RAG MODEL api_key_assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o-mini',
-    settings='{"api_key":"sk-..."}'
+    model='openai:gpt-4o-mini',
+    api_key='sk-...'
 );
 ```
 
 ### Custom base URL
 
-Use `settings.base_url`.
+Use `base_url`.
 
 Example for an OpenAI-compatible proxy:
 
 ```sql
 CREATE RAG MODEL local_proxy_assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o-mini',
-    settings='{
-        "api_key":"local-proxy-key",
-        "base_url":"http://host.docker.internal:8787/v1"
-    }'
+    model='openai:gpt-4o-mini',
+    api_key='local-proxy-key',
+    base_url='http://host.docker.internal:8787/v1'
 );
 ```
 
 ### Timeout
 
-Use `settings.timeout`.
+Use `timeout`.
 
 Example:
 
 ```sql
 CREATE RAG MODEL slow_backend_assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o-mini',
-    settings='{
-        "base_url":"http://host.docker.internal:8787/v1",
-        "timeout":60
-    }'
+    model='openai:gpt-4o-mini',
+    base_url='http://host.docker.internal:8787/v1',
+    timeout=60
 );
 ```
 
 ## Model Identifier Format
 
-Buddy stores `llm_provider` and `llm_model` separately, then builds the extension model id.
+Buddy stores the full model id from `model` and validates `provider:model` format on create.
 
-Supported patterns:
-
-- `llm_provider='openai', llm_model='gpt-4o-mini'`
-- `llm_provider='openai', llm_model='openai:gpt-4o-mini'`
-
-Runtime behavior:
-
-- if `llm_model` does not contain `:`, Buddy builds `provider:model`
-- if `llm_model` already contains `:`, Buddy uses it as-is
-
-The recommended SQL form is still:
+Supported pattern:
 
 ```sql
-llm_provider='openai',
-llm_model='gpt-4o-mini'
+model='openai:gpt-4o-mini'
 ```
 
 Examples in this document use `openai`, but provider support is defined by the installed `llm` extension rather than by a hardcoded provider whitelist in Buddy.
@@ -253,66 +222,37 @@ Examples in this document use `openai`, but provider support is defined by the i
 
 ### Required fields
 
-- `llm_provider`
-- `llm_model`
+- `model`
 
 ### Common optional fields
 
+- `description`
 - `style_prompt`
-- `temperature`
-- `max_tokens`
-- `top_p`
-- `frequency_penalty`
-- `presence_penalty`
-- `k_results`
-- `similarity_threshold`
+- `api_key`
+- `base_url`
+- `timeout`
+- `retrieval_limit`
 - `max_document_length`
-- `settings`
 
-### Recommended syntax
-
-Put provider transport options and other extension constructor options into `settings`.
+The model identifier always comes from `CREATE RAG MODEL <identifier>`. Use `description` for descriptive text inside the body. `name` inside the body is not supported.
 
 ```sql
 CREATE RAG MODEL advanced_assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o',
+    model='openai:gpt-4o',
     style_prompt='You are a helpful assistant specializing in search technology',
-    settings='{
-        "api_key":"sk-...",
-        "base_url":"http://host.docker.internal:8787/v1",
-        "timeout":60,
-        "temperature":0.3,
-        "max_tokens":2000,
-        "top_p":0.9,
-        "frequency_penalty":0.1,
-        "presence_penalty":0.0,
-        "k_results":5,
-        "similarity_threshold":0.8,
-        "max_document_length":3000
-    }'
-);
-```
-
-### Top-level numeric convenience fields
-
-These fields can also be provided directly:
-
-```sql
-CREATE RAG MODEL simple_assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o-mini',
-    temperature=0.7,
-    max_tokens=1000,
-    k_results=5
+    api_key='sk-...',
+    base_url='http://host.docker.internal:8787/v1',
+    timeout=60,
+    retrieval_limit=5,
+    max_document_length=3000
 );
 ```
 
 Validation enforced by Buddy:
 
-- `temperature`: `0..2`
-- `max_tokens`: `1..32768`
-- `k_results`: `1..50`
+- `retrieval_limit`: `1..50`
+- `max_document_length`: `-1` or `> 0`
+  invalid or missing values are normalized to the default `2000` during model creation
 
 ### Returned result
 
@@ -330,8 +270,7 @@ Returned columns:
 
 - `uuid`
 - `name`
-- `llm_provider`
-- `llm_model`
+- `model`
 - `created_at`
 
 ## DESCRIBE RAG MODEL
@@ -355,9 +294,8 @@ Returned columns:
 
 Settings are flattened as:
 
-- `settings.temperature`
-- `settings.max_tokens`
-- `settings.k_results`
+- `settings.retrieval_limit`
+- `settings.max_document_length`
 - `settings.base_url`
 - `settings.timeout`
 - `settings.api_key`
@@ -447,9 +385,14 @@ Conversation flow includes:
 
 Buddy-specific search settings:
 
-- `k_results`: number of documents retrieved for KNN
-- `similarity_threshold`: KNN distance threshold
-- `max_document_length`: per-document context truncation size
+- `retrieval_limit`: number of documents retrieved for KNN
+- `max_document_length`: per-document context budget; `-1` disables truncation
+
+`max_document_length` directly affects result quality and cost:
+
+- smaller values reduce prompt size and spend, but can hide useful context
+- larger values improve context completeness, but increase token usage
+- `-1` disables truncation entirely and should be used carefully with large documents
 
 ## Tested Examples
 
@@ -458,7 +401,7 @@ The basic end-to-end flow covered by CLT includes:
 1. create a vectorized `docs` table
 2. insert documents
 3. create a minimal RAG model
-4. create an advanced RAG model with `settings`
+4. create an advanced RAG model with transport options
 5. run `SHOW RAG MODELS`
 6. run `DESCRIBE RAG MODEL`
 7. run `CALL CONVERSATIONAL_RAG`
@@ -468,17 +411,19 @@ Representative examples from that flow:
 
 ```sql
 CREATE RAG MODEL test_assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o-mini'
+    model='openai:gpt-4o-mini'
 );
 ```
 
 ```sql
 CREATE RAG MODEL advanced_assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o',
+    model='openai:gpt-4o',
     style_prompt='You are a helpful assistant specializing in search technology',
-    settings='{"temperature":0.3, "max_tokens":2000, "k_results":5}'
+    api_key='proxy-key',
+    base_url='http://host.docker.internal:8787/v1',
+    timeout=60,
+    retrieval_limit=5,
+    max_document_length=3000
 );
 ```
 
@@ -497,19 +442,13 @@ For production usage with an OpenAI-compatible proxy, prefer this pattern:
 
 ```sql
 CREATE RAG MODEL assistant (
-    llm_provider='openai',
-    llm_model='gpt-4o-mini',
+    model='openai:gpt-4o-mini',
     style_prompt='You answer only from the provided context.',
-    settings='{
-        "api_key":"proxy-key",
-        "base_url":"http://host.docker.internal:8787/v1",
-        "timeout":60,
-        "temperature":0.2,
-        "max_tokens":1024,
-        "k_results":5,
-        "similarity_threshold":0.8,
-        "max_document_length":2000
-    }'
+    api_key='proxy-key',
+    base_url='http://host.docker.internal:8787/v1',
+    timeout=60,
+    retrieval_limit=5,
+    max_document_length=-1
 );
 ```
 

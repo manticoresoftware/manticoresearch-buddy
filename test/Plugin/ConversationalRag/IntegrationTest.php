@@ -44,12 +44,9 @@ class IntegrationTest extends TestCase {
 
 	public function testFullCreateModelFlow(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
+			model = 'openai:gpt-4',
 			style_prompt = 'You are a helpful assistant.',
-			temperature = 0.7,
-			max_tokens = 1000,
-			k_results = 5
+			retrieval_limit = 5
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -66,13 +63,10 @@ class IntegrationTest extends TestCase {
 		);
 
 		$this->assertEquals('create_model', $payload->action);
-		$this->assertEquals('test_model', $payload->params['name']);
-		$this->assertEquals('openai', $payload->params['llm_provider']);
-		$this->assertEquals('gpt-4', $payload->params['llm_model']);
+		$this->assertEquals('test_model', $payload->params['identifier']);
+		$this->assertEquals('openai:gpt-4', $payload->params['model']);
 		$this->assertEquals('You are a helpful assistant.', $payload->params['style_prompt']);
-		$this->assertEquals(0.7, $payload->params['temperature']);
-		$this->assertEquals(1000, $payload->params['max_tokens']);
-		$this->assertEquals(5, $payload->params['k_results']);
+		$this->assertEquals(5, $payload->params['retrieval_limit']);
 	}
 
 
@@ -235,12 +229,9 @@ class IntegrationTest extends TestCase {
 
 		// 1. Create model
 		$createQuery = "CREATE RAG MODEL 'lifecycle_test' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4o-mini',
+			model = 'openai:gpt-4o-mini',
 			style_prompt = 'You are a test assistant.',
-			temperature = 0.8,
-			max_tokens = 1500,
-			k_results = 3
+			retrieval_limit = 3
 		)";
 
 		$createPayload = RagPayload::fromRequest(
@@ -257,13 +248,10 @@ class IntegrationTest extends TestCase {
 		);
 
 		$this->assertEquals('create_model', $createPayload->action);
-		$this->assertEquals('lifecycle_test', $createPayload->params['name']);
-		$this->assertEquals('openai', $createPayload->params['llm_provider']);
-		$this->assertEquals('gpt-4o-mini', $createPayload->params['llm_model']);
+		$this->assertEquals('lifecycle_test', $createPayload->params['identifier']);
+		$this->assertEquals('openai:gpt-4o-mini', $createPayload->params['model']);
 		$this->assertEquals('You are a test assistant.', $createPayload->params['style_prompt']);
-		$this->assertEquals(0.8, $createPayload->params['temperature']);
-		$this->assertEquals(1500, $createPayload->params['max_tokens']);
-		$this->assertEquals(3, $createPayload->params['k_results']);
+		$this->assertEquals(3, $createPayload->params['retrieval_limit']);
 
 		// 2. Show models
 		$showPayload = RagPayload::fromRequest(

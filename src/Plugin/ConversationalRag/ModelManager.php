@@ -25,6 +25,7 @@ class ModelManager {
 	use SqlEscapingTrait;
 
 	public const string MODELS_TABLE = 'system.rag_models';
+	private const int DEFAULT_MAX_DOCUMENT_LENGTH = 2000;
 	private bool $tablesInitialized = false;
 
 	/**
@@ -59,8 +60,8 @@ class ModelManager {
 			'CREATE TABLE IF NOT EXISTS ' . self::MODELS_TABLE . ' (
 			uuid string,
 			name string,
-			llm_provider text,
-			llm_model text,
+			description text,
+			model text,
 			style_prompt text,
 			settings json,
 			created_at bigint,
@@ -78,10 +79,9 @@ class ModelManager {
 	 * Create a new RAG model
 	 *
 	 * @param HTTPClient $client
-	 * @param array{name: string, llm_provider: string, llm_model: string, style_prompt?:string,
-	 *   settings?: string|array<string, mixed>, temperature?: string,
-	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
-	 *   max_document_length?: string} $config
+	 * @param array{name: string, model: string, description?: string, style_prompt?:string, api_key?: string,
+	 *   base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+	 *   max_document_length?: string|int} $config
 	 *
 	 * @return string Model ID
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError|RandomException
@@ -101,13 +101,13 @@ class ModelManager {
 		// Insert model
 		$currentTime = time();
 		$sql = sprintf(
-			'INSERT INTO %s (uuid, name, llm_provider, llm_model, style_prompt, settings, created_at, updated_at) ' .
+			'INSERT INTO %s (uuid, name, description, model, style_prompt, settings, created_at, updated_at) ' .
 			'VALUES (%s, %s, %s, %s, %s, %s, %d, %d)',
 			self::MODELS_TABLE,
 			$this->quote($modelUuid),
 			$this->quote($config['name']),
-			$this->quote($config['llm_provider']),
-			$this->quote($config['llm_model']),
+			$this->quote($config['description'] ?? ''),
+			$this->quote($config['model']),
 			$this->quote($config['style_prompt'] ?? ''),
 			$this->quote($this->encodeSettings($settings)),
 			$currentTime,
@@ -173,7 +173,7 @@ class ModelManager {
 	 */
 	private function extractSettings(array $config): array {
 		/** @var array<int, string> $coreFields */
-		$coreFields = ['id', 'name', 'llm_provider', 'llm_model', 'api_key', 'base_url', 'style_prompt'];
+		$coreFields = ['id', 'name', 'description', 'model', 'style_prompt'];
 		/** @var array<string, mixed> $settings */
 		$settings = [];
 
@@ -182,22 +182,30 @@ class ModelManager {
 				continue;
 			}
 
-			// If settings is a JSON string, parse it
-			if ($key === 'settings' && is_string($value)) {
-				$parsedSettings = simdjson_decode($value, true);
-				if (!is_array($parsedSettings)) {
-					throw ManticoreSearchClientError::create('Invalid settings JSON');
-				}
-				$settings = array_merge($settings, $parsedSettings);
-			} elseif ($key === 'settings' && is_array($value)) {
-				// If settings is already an array, merge it
-				$settings = array_merge($settings, $value);
-			} else {
-				$settings[$key] = $value;
-			}
+			$settings[$key] = $value;
 		}
 
+		$maxDocumentLength = $settings['max_document_length'] ?? null;
+		if (!is_int($maxDocumentLength) && !is_string($maxDocumentLength) && $maxDocumentLength !== null) {
+			$maxDocumentLength = null;
+		}
+
+		$settings['max_document_length'] = $this->normalizeMaxDocumentLength($maxDocumentLength);
+
 		return $settings;
+	}
+
+	private function normalizeMaxDocumentLength(int|string|null $value): int {
+		if ($value === null) {
+			return self::DEFAULT_MAX_DOCUMENT_LENGTH;
+		}
+
+		$maxDocumentLength = (int)$value;
+		if ($maxDocumentLength === -1 || $maxDocumentLength > 0) {
+			return $maxDocumentLength;
+		}
+
+		return self::DEFAULT_MAX_DOCUMENT_LENGTH;
 	}
 
 	/**
@@ -222,14 +230,14 @@ class ModelManager {
 	 * @param HTTPClient $client
 	 *
 	 * @return array<int, array{id: string, uuid: string, name: string,
-	 *   llm_provider: string, llm_model: string, created_at: string}>
+	 *   description: string, model: string, created_at: string}>
 	 * @throws ManticoreSearchResponseError
 	 * @throws ManticoreSearchClientError
 	 */
 	public function getAllModels(HTTPClient $client): array {
 		$sql
 			= /** @lang manticore */
-			'SELECT id, uuid, name, llm_provider, llm_model, created_at
+			'SELECT id, uuid, name, description, model, created_at
 				FROM ' . self::MODELS_TABLE . '
 				ORDER BY created_at DESC';
 
@@ -239,10 +247,10 @@ class ModelManager {
 		}
 
 		/** @var array<int, array{data: array<int, array{id: string, uuid: string, name: string,
-		 *   llm_provider: string, llm_model: string, created_at: string}>}> $result
+		 *   description: string, model: string, created_at: string}>}> $result
 		 */
 		$result = $response->getResult();
-		return $result[0]['data'] ?? [];
+		return $result[0]['data'];
 	}
 
 	/**
@@ -287,15 +295,24 @@ class ModelManager {
 	 * @param HTTPClient $client
 	 * @param string $modelNameOrUuid
 	 *
-	 * @return array{id:string, uuid:string, name:string,llm_provider:string,llm_model:string,
-	 *   style_prompt:string,settings:array{ temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold: string, max_document_length: string},created_at:string,updated_at:string}|null
+	 * @return array{
+	 *   id:string,
+	 *   uuid:string,
+	 *   name:string,
+	 *   description:string,
+	 *   model:string,
+	 *   style_prompt:string,
+	 *   settings:array{max_document_length:int}&array<string, mixed>,
+	 *   created_at:string,
+	 *   updated_at:string
+	 * }|null
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	private function findModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): ?array {
 		$sql
 			= /** @lang Manticore */
-			'SELECT * FROM ' . self::MODELS_TABLE .
+			'SELECT id, uuid, name, description, model, style_prompt, settings, created_at, updated_at FROM '
+			. self::MODELS_TABLE .
 			' WHERE (name = ' . $this->quote($modelNameOrUuid) . ' OR uuid = ' . $this->quote($modelNameOrUuid) . ')';
 
 		$response = $client->sendRequest($sql);
@@ -303,28 +320,64 @@ class ModelManager {
 			throw  ManticoreSearchResponseError::create('Failed to get model by UUID/name: ' . $response->getError());
 		}
 
+		/** @var array<int, array{data: array<int, array{
+		 *   id:string,
+		 *   uuid:string,
+		 *   name:string,
+		 *   description:string,
+		 *   model:string,
+		 *   style_prompt:string,
+		 *   settings:mixed,
+		 *   created_at:string,
+		 *   updated_at:string
+		 * }>}> $data
+		 */
 		$data = $response->getResult();
-		if (is_array($data[0]) && !empty($data[0]['data'])) {
-			$model = $data[0]['data'][0];
-			$rawSettings = (string)($model['settings'] ?? '');
-			if ($rawSettings === '' || strtoupper($rawSettings) === 'NULL') {
-				$model['settings'] = [];
-			} else {
-				try {
-					$decoded = simdjson_decode($rawSettings, true);
-				} catch (Throwable $e) {
-					throw ManticoreSearchClientError::create('Invalid model settings JSON: ' . $e->getMessage());
-				}
-				if (!is_array($decoded)) {
-					throw ManticoreSearchClientError::create('Invalid model settings JSON');
-				}
-				$model['settings'] = $decoded;
-			}
-
-			return $model;
+		if (empty($data[0]['data'])) {
+			return null;
 		}
 
-		return null;
+		/** @var array{
+		 *   id:string,
+		 *   uuid:string,
+		 *   name:string,
+		 *   description:string,
+		 *   model:string,
+		 *   style_prompt:string,
+		 *   settings:array{max_document_length:int}&array<string, mixed>,
+		 *   created_at:string,
+		 *   updated_at:string
+		 * } $model
+		 */
+		$model = $data[0]['data'][0];
+		$model['settings'] = $this->decodeModelSettings($model);
+
+		return $model;
+	}
+
+	/**
+	 * @param array<string, mixed> $model
+	 *
+	 * @return array{max_document_length:int}&array<string, mixed>
+	 * @throws ManticoreSearchClientError
+	 */
+	private function decodeModelSettings(array $model): array {
+		if (!array_key_exists('settings', $model) || !is_string($model['settings'])) {
+			throw ManticoreSearchClientError::create('Invalid model settings JSON: settings must be a JSON string');
+		}
+
+		try {
+			$decoded = simdjson_decode($model['settings'], true);
+		} catch (Throwable $e) {
+			throw ManticoreSearchClientError::create('Invalid model settings JSON: ' . $e->getMessage());
+		}
+
+		if (!is_array($decoded)) {
+			throw ManticoreSearchClientError::create('Invalid model settings JSON');
+		}
+
+		/** @var array{max_document_length:int}&array<string, mixed> $decoded */
+		return $decoded;
 	}
 
 	/**
@@ -333,9 +386,17 @@ class ModelManager {
 	 * @param HTTPClient $client
 	 * @param string $modelNameOrUuid Model name or UUID
 	 *
-	 * @return array{id:string, uuid:string, name:string,llm_provider:string,llm_model:string,
-	 *   style_prompt:string,settings:array{ temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold: string, max_document_length: string},created_at:string,updated_at:string}
+	 * @return array{
+	 *   id:string,
+	 *   uuid:string,
+	 *   name:string,
+	 *   description:string,
+	 *   model:string,
+	 *   style_prompt:string,
+	 *   settings:array{max_document_length:int}&array<string, mixed>,
+	 *   created_at:string,
+	 *   updated_at:string
+	 * }
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	public function getModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): array {

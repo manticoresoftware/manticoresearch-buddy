@@ -46,12 +46,9 @@ class ConversationalRagSqlTest extends TestCase {
 		// Test RAG model creation (this should create the conversations table)
 		$result = static::runSqlQuery(
 			"CREATE RAG MODEL '{$modelName}' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				style_prompt = 'You are a helpful assistant.',
-				temperature = 0.7,
-				max_tokens = 1000,
-				k_results = 5
+				retrieval_limit = 5
 			)"
 		);
 		$this->assertNotEmpty($result); // CREATE RAG MODEL returns UUID table
@@ -96,12 +93,9 @@ class ConversationalRagSqlTest extends TestCase {
 		// Create RAG model to ensure conversations table exists
 		$result = static::runSqlQuery(
 			"CREATE RAG MODEL '{$modelName}' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				style_prompt = 'Test assistant',
-				temperature = 0.5,
-				max_tokens = 500,
-				k_results = 3
+				retrieval_limit = 3
 			)"
 		);
 		$this->assertNotEmpty($result); // CREATE RAG MODEL returns UUID table
@@ -151,12 +145,9 @@ class ConversationalRagSqlTest extends TestCase {
 		// Create RAG model
 		$result = static::runSqlQuery(
 			"CREATE RAG MODEL '{$modelName}' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				style_prompt = 'Security test assistant',
-				temperature = 0.5,
-				max_tokens = 500,
-				k_results = 3
+				retrieval_limit = 3
 			)"
 		);
 		$this->assertNotEmpty($result); // CREATE RAG MODEL returns UUID table
@@ -199,12 +190,9 @@ class ConversationalRagSqlTest extends TestCase {
 		// Create RAG model
 		$result = static::runSqlQuery(
 			"CREATE RAG MODEL '{$modelName}' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				style_prompt = 'History test assistant',
-				temperature = 0.5,
-				max_tokens = 500,
-				k_results = 3
+				retrieval_limit = 3
 			)"
 		);
 		$this->assertNotEmpty($result); // CREATE RAG MODEL returns UUID table
@@ -311,12 +299,9 @@ class ConversationalRagSqlTest extends TestCase {
 		// Create RAG model
 		$result = static::runSqlQuery(
 			"CREATE RAG MODEL '{$modelName}' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				style_prompt = 'Concurrent test assistant',
-				temperature = 0.5,
-				max_tokens = 500,
-				k_results = 3
+				retrieval_limit = 3
 			)"
 		);
 		$this->assertNotEmpty($result); // CREATE RAG MODEL returns UUID table

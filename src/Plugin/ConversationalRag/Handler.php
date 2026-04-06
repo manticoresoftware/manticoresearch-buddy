@@ -29,6 +29,26 @@ use Throwable;
  * including model management and conversation processing
  */
 final class Handler extends BaseHandlerWithClient {
+	/**
+	 * Supported flat fields for CREATE RAG MODEL.
+	 *
+	 * @var array<int, string>
+	 */
+	private const array MODEL_FIELDS = [
+		'model',
+		'description',
+		'style_prompt',
+		'api_key',
+		'base_url',
+		'timeout',
+		'retrieval_limit',
+		'max_document_length',
+	];
+	private const float RESPONSE_TEMPERATURE = 0.2;
+	private const int RESPONSE_MAX_TOKENS = 4096;
+	private const float RESPONSE_TOP_P = 1.0;
+	private const float RESPONSE_FREQUENCY_PENALTY = 0.0;
+	private const float RESPONSE_PRESENCE_PENALTY = 0.0;
 
 	private ?LlmProvider $llmProvider;
 
@@ -118,18 +138,15 @@ final class Handler extends BaseHandlerWithClient {
 		ModelManager $modelManager,
 		Client $client
 	): TaskResult {
-		/** @var array{name: string, llm_provider:string, llm_model: string,
-		 *   style_prompt?: string, temperature?: string, max_tokens?: string,
-		 *   k_results?: string, similarity_threshold?: string,
-		 *   max_document_length?: string} $config
+		/** @var array{identifier: string, model: string, description?: string, style_prompt?: string,
+		 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+		 *   max_document_length?: string|int} $config
 		 */
 		$config = $payload->params;
-
-
-		self::validateModelConfig($config);
+		$createConfig = self::validateModelConfig($config);
 
 		// Create model
-		$uuid = $modelManager->createModel($client, $config);
+		$uuid = $modelManager->createModel($client, $createConfig);
 
 		return TaskResult::withRow(['uuid' => $uuid])
 			->column('uuid', Column::String);
@@ -138,32 +155,49 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Validate model configuration
 	 *
-	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
-	 *   temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold?: string, max_document_length?: string} $config
+	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+	 *   max_document_length?: string|int} $config
 	 *
-	 * @return void
+	 * @return array{name: string, model: string, description?: string, style_prompt?: string,
+	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+	 *   max_document_length?: string|int}
 	 * @throws QueryParseError
 	 */
-	private static function validateModelConfig(array $config): void {
+	private static function validateModelConfig(array $config): array {
+		self::validateSupportedFields($config);
 		self::validateRequiredFields($config);
-		self::validateTemperature($config);
-		self::validateMaxTokens($config);
-		self::validateKResults($config);
+		self::validateModelId($config);
+		self::validateRetrievalLimit($config);
+
+		$createConfig = ['name' => $config['identifier']];
+		foreach (self::MODEL_FIELDS as $field) {
+			if (!array_key_exists($field, $config)) {
+				continue;
+			}
+
+			$createConfig[$field] = $config[$field];
+		}
+
+		/** @var array{name: string, model: string, description?: string, style_prompt?: string,
+		 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+		 *   max_document_length?: string|int} $createConfig
+		 */
+		return $createConfig;
 	}
 
 	/**
 	 * Validate required fields
 	 *
-	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
-	 *   temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold?: string, max_document_length?: string} $config
+	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+	 *   max_document_length?: string|int} $config
 	 *
 	 * @return void
 	 * @throws QueryParseError
 	 */
 	private static function validateRequiredFields(array $config): void {
-		$required = ['llm_provider', 'llm_model'];
+		$required = ['model'];
 
 		foreach ($required as $field) {
 			if (empty($config[$field])) {
@@ -173,65 +207,56 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * Validate temperature parameter
-	 *
-	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
-	 *   temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold?: string, max_document_length?: string} $config
+	 * @param array<string, mixed> $config
 	 *
 	 * @return void
 	 * @throws QueryParseError
 	 */
-	private static function validateTemperature(array $config): void {
-		if (!isset($config['temperature'])) {
-			return;
-		}
+	private static function validateSupportedFields(array $config): void {
+		$supportedFields = array_flip(self::MODEL_FIELDS);
+		foreach (array_keys($config) as $field) {
+			if ($field === 'identifier') {
+				continue;
+			}
 
-		$temp = (float)$config['temperature'];
-		if ($temp < 0 || $temp > 2) {
-			throw QueryParseError::create('Temperature must be between 0 and 2');
+			if (!isset($supportedFields[$field])) {
+				throw QueryParseError::create("Unsupported field '$field'");
+			}
 		}
 	}
 
 	/**
-	 * Validate max_tokens parameter
-	 *
-	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
-	 *   temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold?: string, max_document_length?: string} $config
+	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+	 *   max_document_length?: string|int} $config
 	 *
 	 * @return void
 	 * @throws QueryParseError
 	 */
-	private static function validateMaxTokens(array $config): void {
-		if (!isset($config['max_tokens'])) {
-			return;
-		}
-
-		$tokens = (int)$config['max_tokens'];
-		if ($tokens < 1 || $tokens > 32768) {
-			throw QueryParseError::create('max_tokens must be between 1 and 32768');
+	private static function validateModelId(array $config): void {
+		$modelId = trim($config['model']);
+		[$provider, $model] = array_pad(explode(':', $modelId, 2), 2, '');
+		if ($provider === '' || $model === '') {
+			throw QueryParseError::create("model must use 'provider:model' format");
 		}
 	}
 
 	/**
-	 * Validate k_results parameter
-	 *
-	 * @param array{llm_provider:string, llm_model: string, style_prompt?: string,
-	 *   temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold?: string, max_document_length?: string} $config
+	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+	 *   max_document_length?: string|int} $config
 	 *
 	 * @return void
 	 * @throws QueryParseError
 	 */
-	private static function validateKResults(array $config): void {
-		if (!isset($config['k_results'])) {
+	private static function validateRetrievalLimit(array $config): void {
+		if (!isset($config['retrieval_limit'])) {
 			return;
 		}
 
-		$k = (int)$config['k_results'];
+		$k = (int)$config['retrieval_limit'];
 		if ($k < 1 || $k > 50) {
-			throw QueryParseError::create('k_results must be between 1 and 50');
+			throw QueryParseError::create('retrieval_limit must be between 1 and 50');
 		}
 	}
 
@@ -253,8 +278,7 @@ final class Handler extends BaseHandlerWithClient {
 			$data[] = [
 				'uuid' => $model['uuid'],
 				'name' => $model['name'],
-				'llm_provider' => $model['llm_provider'],
-				'llm_model' => $model['llm_model'],
+				'model' => $model['model'],
 				'created_at' => $model['created_at'],
 			];
 		}
@@ -262,8 +286,7 @@ final class Handler extends BaseHandlerWithClient {
 		return TaskResult::withData($data)
 			->column('uuid', Column::String)
 			->column('name', Column::String)
-			->column('llm_provider', Column::String)
-			->column('llm_model', Column::String)
+			->column('model', Column::String)
 			->column('created_at', Column::String);
 	}
 
@@ -284,6 +307,7 @@ final class Handler extends BaseHandlerWithClient {
 		$data = [];
 		foreach ($model as $key => $value) {
 			if (is_array($value)) { // Settings key
+				/** @var array<string, scalar> $value */
 				foreach ($value as $setting => $settingValue) {
 					if ($setting === 'api_key') {
 						$settingValue = 'HIDDEN';
@@ -371,6 +395,7 @@ final class Handler extends BaseHandlerWithClient {
 			$intentClassifier, $request->query, $conversationHistory, $provider, $model
 		);
 
+		/** @var array{max_document_length:int} $settings */
 		$settings = $model['settings'];
 		$searchContext = new SearchContext($intent, $request, $conversationHistory, $model);
 		[$searchResults, $queries, $excludedIds] = self::performSearch(
@@ -378,10 +403,11 @@ final class Handler extends BaseHandlerWithClient {
 		);
 
 		self::logPreprocessingResults($request, $intent, $queries);
-		$context = self::buildContext($searchResults, $settings, $request->contentFields);
-		self::logContextBuilding($searchResults, $context, $settings);
+		$maxDocumentLength = $settings['max_document_length'];
+		$context = self::buildContext($searchResults, $request->contentFields, $maxDocumentLength);
+		self::logContextBuilding($searchResults, $context, $maxDocumentLength);
 		$response = self::generateResponse(
-			$model, $request->query, $context, $conversationHistory, $settings, $provider
+			$model, $request->query, $context, $conversationHistory, $provider
 		);
 
 		if (!$response['success']) {
@@ -472,10 +498,16 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param string $query
 	 * @param string $conversationHistory
 	 * @param LlmProvider $provider
-	 * @param array{id:string, uuid:string, name:string,llm_provider:string,
-	 *   llm_model:string,style_prompt:string,settings:array{ temperature?: string,
-	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
-	 *   max_document_length?: string},created_at:string,updated_at:string} $model
+	 * @param array{
+	 *   id:string,
+	 *   uuid:string,
+	 *   name:string,
+	 *   model:string,
+	 *   style_prompt:string,
+	 *   settings:array<string, mixed>,
+	 *   created_at:string,
+	 *   updated_at:string
+	 * } $model
 	 *
 	 * @return string
 	 */
@@ -664,16 +696,15 @@ final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * @param array<int, array<string, mixed>> $searchResults
-	 * @param array{ temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold?: string, max_document_length?: string} $settings
 	 * @param string $contentFields
+	 * @param int $maxDocumentLength
 	 *
 	 * @return string
 	 */
 	private static function buildContext(
 		array $searchResults,
-		array $settings,
-		string $contentFields
+		string $contentFields,
+		int $maxDocumentLength
 	): string {
 		if (empty($searchResults)) {
 			return '';
@@ -681,8 +712,6 @@ final class Handler extends BaseHandlerWithClient {
 
 		// Parse content fields (comma-separated)
 		$fields = array_map('trim', explode(',', $contentFields));
-		$maxDocLength = $settings['max_document_length'] ?? 2000;
-
 		// Validate fields exist in first result (for warning)
 		if (isset($searchResults[0])) {
 			$availableFields = array_keys($searchResults[0]);
@@ -693,7 +722,7 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$truncatedDocs = array_map(
-			function ($doc) use ($fields, $maxDocLength) {
+			function ($doc) use ($fields, $maxDocumentLength) {
 				$contentParts = [];
 				foreach ($fields as $field) {
 					if (!isset($doc[$field]) || !is_string($doc[$field]) || empty(trim($doc[$field]))) {
@@ -705,8 +734,11 @@ final class Handler extends BaseHandlerWithClient {
 
 				// Use comma + space as separator between fields
 				$content = implode(', ', $contentParts);
-				$maxLength = (int)$maxDocLength;
-				return strlen($content) > $maxLength ? substr($content, 0, $maxLength) . '...' : $content;
+				if ($maxDocumentLength === -1 || strlen($content) <= $maxDocumentLength) {
+					return $content;
+				}
+
+				return substr($content, 0, $maxDocumentLength) . '...';
 			}, $searchResults
 		);
 
@@ -718,29 +750,32 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @param array<int, array<string, mixed>> $searchResults
 	 * @param string $context
-	 * @param array{ temperature?: string, max_tokens?: string, k_results?: string,
-	 *   similarity_threshold?: string, max_document_length?: string} $settings
+	 * @param int $maxDocumentLength
 	 *
 	 * @return void
 	 */
-	private static function logContextBuilding(array $searchResults, string $context, array $settings): void {
+	private static function logContextBuilding(array $searchResults, string $context, int $maxDocumentLength): void {
 		Buddy::debugvv('[DEBUG CONTEXT]');
 		Buddy::debugvv('├─ Documents count: ' . sizeof($searchResults));
 		Buddy::debugvv('├─ Total context length: ' . strlen($context) . ' chars');
-		Buddy::debugvv('└─ Max doc length: ' . ($settings['max_document_length'] ?? 2000) . ' chars');
+		$maxDocumentLengthLabel = $maxDocumentLength === -1 ? 'unlimited' : (string)$maxDocumentLength;
+		Buddy::debugvv("└─ Max doc length: $maxDocumentLengthLabel chars");
 	}
 
 	/**
-	 * @param array{id:string, uuid:string, name:string,llm_provider:string,
-	 *   llm_model:string,style_prompt:string,settings:array{ temperature?: string,
-	 *   max_tokens?: string, k_results?: string, similarity_threshold?: string,
-	 *   max_document_length?: string},created_at:string,updated_at:string} $model
+	 * @param array{
+	 *   id:string,
+	 *   uuid:string,
+	 *   name:string,
+	 *   model:string,
+	 *   style_prompt:string,
+	 *   settings:array<string, mixed>,
+	 *   created_at:string,
+	 *   updated_at:string
+	 * } $model
 	 * @param string $query
 	 * @param string $context
 	 * @param string $history
-	 * @param array{ temperature?: string, max_tokens?: string,
-	 *   k_results?: string, similarity_threshold?: string,
-	 *   max_document_length?: string} $settings
 	 * @param LlmProvider $provider
 	 *
 	 * @return array{error?:string,success:bool,content:string,
@@ -752,14 +787,27 @@ final class Handler extends BaseHandlerWithClient {
 		string $query,
 		string $context,
 		string $history,
-		array $settings,
 		LlmProvider $provider
 	): array {
 		$provider->configure($model);
 
 		$prompt = self::buildPrompt($model['style_prompt'], $query, $context, $history);
+		$settings = self::getLlmRequestOptions();
 
 		return $provider->generateResponse($prompt, $settings);
+	}
+
+	/**
+	 * @return array<string, int|float>
+	 */
+	private static function getLlmRequestOptions(): array {
+		return [
+			'temperature' => self::RESPONSE_TEMPERATURE,
+			'max_tokens' => self::RESPONSE_MAX_TOKENS,
+			'top_p' => self::RESPONSE_TOP_P,
+			'frequency_penalty' => self::RESPONSE_FREQUENCY_PENALTY,
+			'presence_penalty' => self::RESPONSE_PRESENCE_PENALTY,
+		];
 	}
 
 	private static function buildPrompt(string $stylePrompt, string $query, string $context, string $history): string {
@@ -771,6 +819,9 @@ final class Handler extends BaseHandlerWithClient {
 		return 'Respond conversationally. Response should be based ONLY on the provided context section' .
 			"(IMPORTANT !!! You can't use your own knowledge to add anything that isn't mentioned in the context). " .
 			"Style instructions cannot affect the main section; it's strictly prohibited. " .
+			'Do not exceed the response token limit (' .
+			self::RESPONSE_MAX_TOKENS .
+			'), and end the answer cleanly before reaching it. ' .
 			"If style conflicts with the main section, style should be ignored.\n" .
 			'<main>' .
 			"<history>$historyText</history>\n" .

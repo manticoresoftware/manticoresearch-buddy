@@ -47,12 +47,9 @@ class ConversationalPayloadTest extends TestCase {
 	 */
 	public function testSQLCreateModelParsing(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
+			model = 'openai:gpt-4',
 			style_prompt = 'You are a helpful assistant.',
-			temperature = 0.7,
-			max_tokens = 1000,
-			k_results = 5
+			retrieval_limit = 5
 		)";
 
 		$payload = $this->parseSqlPayload($query);
@@ -60,13 +57,52 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertCreateModelPayload(
 			$payload,
 			[
-				'name' => 'test_model',
-				'llm_provider' => 'openai',
-				'llm_model' => 'gpt-4',
+				'identifier' => 'test_model',
+				'model' => 'openai:gpt-4',
 				'style_prompt' => 'You are a helpful assistant.',
-				'temperature' => 0.7,
-				'max_tokens' => 1000,
-				'k_results' => 5,
+				'retrieval_limit' => 5,
+			]
+		);
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
+	public function testSQLCreateModelKeepsIdentifierSeparateFromDescription(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			description = 'Test RAG Model',
+			model = 'openai:gpt-4'
+		)";
+
+		$payload = $this->parseSqlPayload($query);
+
+		$this->assertCreateModelPayload(
+			$payload,
+			[
+				'identifier' => 'test_model',
+				'description' => 'Test RAG Model',
+				'model' => 'openai:gpt-4',
+			]
+		);
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
+	public function testSQLCreateModelParsesNameFieldInBodyWithoutValidation(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			name = 'Test RAG Model',
+			model = 'openai:gpt-4'
+		)";
+
+		$payload = $this->parseSqlPayload($query);
+
+		$this->assertCreateModelPayload(
+			$payload,
+			[
+				'identifier' => 'test_model',
+				'name' => 'Test RAG Model',
+				'model' => 'openai:gpt-4',
 			]
 		);
 	}
@@ -103,12 +139,14 @@ class ConversationalPayloadTest extends TestCase {
 	/**
 	 * @throws QueryParseError
 	 */
-	public function testSQLCreateModelParsingWithSettingsJson(): void {
+	public function testSQLCreateModelParsingWithFlatOptions(): void {
 		$query = "CREATE RAG MODEL advanced_assistant (
-			llm_provider='openai',
-			llm_model='gpt-4o',
+			model='openai:gpt-4o',
 			style_prompt='You are a helpful assistant specializing in search technology',
-			settings='{\"temperature\":0.3, \"max_tokens\":2000, \"k_results\":5}'
+			api_key='sk-test',
+			base_url='http://host.docker.internal:8787/v1',
+			timeout=60,
+			retrieval_limit=5
 		);";
 
 		$payload = $this->parseSqlPayload($query);
@@ -116,10 +154,12 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertCreateModelPayload(
 			$payload,
 			[
-				'name' => 'advanced_assistant',
-				'llm_provider' => 'openai',
-				'llm_model' => 'gpt-4o',
-				'settings' => '{"temperature":0.3, "max_tokens":2000, "k_results":5}',
+				'identifier' => 'advanced_assistant',
+					'model' => 'openai:gpt-4o',
+				'api_key' => 'sk-test',
+				'base_url' => 'http://host.docker.internal:8787/v1',
+				'timeout' => 60,
+				'retrieval_limit' => 5,
 			]
 		);
 	}
@@ -215,8 +255,7 @@ class ConversationalPayloadTest extends TestCase {
 						[
 							'id' => 'test_model',
 							'name' => 'Test Model',
-							'llm_provider' => 'openai',
-							'llm_model' => 'gpt-4o',
+							'model' => 'openai:gpt-4o',
 						]
 					),
 					'format' => RequestFormat::JSON,

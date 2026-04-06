@@ -149,19 +149,11 @@ final class Payload extends BasePayload {
 	 */
 	private function parseCreateModelParams(string $modelName, string $params): array {
 		// Parse key=value pairs from CREATE RAG MODEL syntax
-		$config = ['name' => $modelName];
+		$config = ['identifier' => $modelName];
 		$paramPairs = $this->parseKeyValueParams($params);
 
 		foreach ($paramPairs as $key => $value) {
-			if ($key === 'name') {
-				$config['display_name'] = $this->unquoteString($value);
-			} else {
-				$config[$key] = $this->unquoteString($value);
-			}
-		}
-
-		if (!isset($config['name'])) {
-			$config['name'] = $modelName;
+			$config[$key] = $this->unquoteString($value);
 		}
 
 		return $config;

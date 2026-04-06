@@ -15,8 +15,11 @@ use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Network\Struct;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class ConversationValidationTest extends TestCase {
@@ -44,9 +47,9 @@ class ConversationValidationTest extends TestCase {
 		putenv('TEST_ANTHROPIC_API_KEY');
 	}
 
-	public function testMissingRequiredFieldLlmProvider(): void {
+	public function testInvalidModelFormat(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_model = 'gpt-4',
+			model = 'gpt-4',
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -64,20 +67,20 @@ class ConversationValidationTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
-		$this->assertFalse($task->isSucceed(), 'Task should fail for missing llm_provider');
+		$this->assertFalse($task->isSucceed(), 'Task should fail for invalid model format');
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error, 'Error should be QueryParseError');
 		$this->assertStringContainsString(
-			"Required field 'llm_provider' is missing or empty", $error->getResponseError()
+			"model must use 'provider:model' format", $error->getResponseError()
 		);
 	}
 
-	public function testMissingRequiredFieldLlmModel(): void {
+	public function testMissingRequiredFieldModel(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -95,20 +98,20 @@ class ConversationValidationTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString("Required field 'llm_model' is missing or empty", $error->getResponseError());
+		$this->assertStringContainsString("Required field 'model' is missing or empty", $error->getResponseError());
 	}
 
-	public function testTemperatureBelowMinimum(): void {
+	public function testSettingsFieldIsRejected(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			temperature = -0.1
+			model = 'openai:gpt-4',
+			settings = '{\"temperature\":0.3}'
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -126,20 +129,20 @@ class ConversationValidationTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('Temperature must be between 0 and 2', $error->getResponseError());
+		$this->assertStringContainsString("Unsupported field 'settings'", $error->getResponseError());
 	}
 
-	public function testTemperatureAboveMaximum(): void {
+	public function testUnknownFieldIsRejected(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			temperature = 2.1
+			model = 'openai:gpt-4',
+			ololol = '123'
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -157,20 +160,42 @@ class ConversationValidationTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('Temperature must be between 0 and 2', $error->getResponseError());
+		$this->assertStringContainsString("Unsupported field 'ololol'", $error->getResponseError());
 	}
 
-	public function testMaxTokensBelowMinimum(): void {
+	public function testDescriptionFieldIsAccepted(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			max_tokens = 0
+			description = 'Test RAG Model',
+			model = 'openai:gpt-4'
+		)";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$this->assertSame('Test RAG Model', $payload->params['description']);
+	}
+
+	public function testNameFieldIsRejected(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			name = 'Test RAG Model',
+			model = 'openai:gpt-4'
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -188,20 +213,20 @@ class ConversationValidationTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('max_tokens must be between 1 and 32768', $error->getResponseError());
+		$this->assertStringContainsString("Unsupported field 'name'", $error->getResponseError());
 	}
 
-	public function testMaxTokensAboveMaximum(): void {
+	public function testTemperatureFieldIsRejected(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			max_tokens = 32769
+			model = 'openai:gpt-4',
+			temperature = 0.3
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -219,20 +244,51 @@ class ConversationValidationTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('max_tokens must be between 1 and 32768', $error->getResponseError());
+		$this->assertStringContainsString("Unsupported field 'temperature'", $error->getResponseError());
+	}
+
+	public function testMaxTokensFieldIsRejected(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			max_tokens = 1000
+		)";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString("Unsupported field 'max_tokens'", $error->getResponseError());
 	}
 
 	public function testKResultsBelowMinimum(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			k_results = 0
+			model = 'openai:gpt-4',
+			retrieval_limit = 0
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -250,20 +306,20 @@ class ConversationValidationTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('k_results must be between 1 and 50', $error->getResponseError());
+		$this->assertStringContainsString('retrieval_limit must be between 1 and 50', $error->getResponseError());
 	}
 
 	public function testKResultsAboveMaximum(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			k_results = 51
+			model = 'openai:gpt-4',
+			retrieval_limit = 51
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -281,23 +337,22 @@ class ConversationValidationTest extends TestCase {
 
 		$handler = new RagHandler($payload);
 		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('k_results must be between 1 and 50', $error->getResponseError());
+		$this->assertStringContainsString('retrieval_limit must be between 1 and 50', $error->getResponseError());
 	}
 
 	public function testValidModelConfiguration(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
+			model = 'openai:gpt-4',
 			style_prompt = 'You are a helpful assistant.',
-			temperature = 0.7,
-			max_tokens = 1000,
-			k_results = 5
+			retrieval_limit = 5,
+			max_document_length = 4000
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -314,16 +369,36 @@ class ConversationValidationTest extends TestCase {
 		);
 
 		$this->assertEquals('create_model', $payload->action);
-		$this->assertEquals('test_model', $payload->params['name']);
-		$this->assertEquals('openai', $payload->params['llm_provider']);
-		$this->assertEquals('gpt-4', $payload->params['llm_model']);
+		$this->assertEquals('test_model', $payload->params['identifier']);
+		$this->assertEquals('openai:gpt-4', $payload->params['model']);
 	}
 
-	public function testValidTemperatureEdgeCases(): void {
+	public function testInvalidMaxDocumentLengthStillParses(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			max_document_length = 0
+		)";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$this->assertEquals(0, $payload->params['max_document_length']);
+	}
+
+	public function testValidMaxDocumentLengthEdgeCases(): void {
 		$query1 = "CREATE RAG MODEL 'test_model1' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			temperature = 0
+			model = 'openai:gpt-4',
+			max_document_length = -1
 		)";
 
 		$payload1 = RagPayload::fromRequest(
@@ -339,12 +414,11 @@ class ConversationValidationTest extends TestCase {
 			)
 		);
 
-		$this->assertEquals(0, $payload1->params['temperature']);
+		$this->assertEquals(-1, $payload1->params['max_document_length']);
 
 		$query2 = "CREATE RAG MODEL 'test_model2' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			temperature = 2
+			model = 'openai:gpt-4',
+			max_document_length = 2000
 		)";
 
 		$payload2 = RagPayload::fromRequest(
@@ -360,58 +434,13 @@ class ConversationValidationTest extends TestCase {
 			)
 		);
 
-		$this->assertEquals(2, $payload2->params['temperature']);
-	}
-
-	public function testValidMaxTokensEdgeCases(): void {
-		$query1 = "CREATE RAG MODEL 'test_model1' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			max_tokens = 1
-		)";
-
-		$payload1 = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query1,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
-
-		$this->assertEquals(1, $payload1->params['max_tokens']);
-
-		$query2 = "CREATE RAG MODEL 'test_model2' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			max_tokens = 32768
-		)";
-
-		$payload2 = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query2,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
-
-		$this->assertEquals(32768, $payload2->params['max_tokens']);
+		$this->assertEquals(2000, $payload2->params['max_document_length']);
 	}
 
 	public function testValidKResultsEdgeCases(): void {
 		$query1 = "CREATE RAG MODEL 'test_model1' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			k_results = 1
+			model = 'openai:gpt-4',
+			retrieval_limit = 1
 		)";
 
 		$payload1 = RagPayload::fromRequest(
@@ -427,12 +456,11 @@ class ConversationValidationTest extends TestCase {
 			)
 		);
 
-		$this->assertEquals(1, $payload1->params['k_results']);
+		$this->assertEquals(1, $payload1->params['retrieval_limit']);
 
 		$query2 = "CREATE RAG MODEL 'test_model2' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
-			k_results = 50
+			model = 'openai:gpt-4',
+			retrieval_limit = 50
 		)";
 
 		$payload2 = RagPayload::fromRequest(
@@ -448,6 +476,32 @@ class ConversationValidationTest extends TestCase {
 			)
 		);
 
-		$this->assertEquals(50, $payload2->params['k_results']);
+		$this->assertEquals(50, $payload2->params['retrieval_limit']);
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $result
+	 */
+	private function createResponse(
+		array $result = [['total' => 0, 'error' => '', 'warning' => '']],
+		bool $hasError = false
+	): Response {
+		$response = $this->createMock(Response::class);
+		$response->method('hasError')->willReturn($hasError);
+		$response->method('getResult')->willReturn(Struct::fromData($result));
+
+		return $response;
+	}
+
+	/**
+	 * @param MockObject&HTTPClient $mockClient
+	 */
+	private function configureClientWithInitialization(HTTPClient $mockClient): void {
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->willReturnOnConsecutiveCalls(
+				$this->createResponse(),
+				$this->createResponse()
+			);
 	}
 }

@@ -32,7 +32,7 @@ class IntentClassifierTest extends TestCase {
 	public function testClassifyIntentRejection(): void {
 		$intentClassifier = new IntentClassifier();
 
-			$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+			$modelConfig = ['model' => 'openai:gpt-4'];
 
 			// Mock LLM provider
 			/** @var MockObject&LlmProvider $mockProvider */
@@ -62,7 +62,7 @@ class IntentClassifierTest extends TestCase {
 	public function testClassifyIntentAlternatives(): void {
 		$intentClassifier = new IntentClassifier();
 
-			$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+			$modelConfig = ['model' => 'openai:gpt-4'];
 
 			// Mock LLM provider
 			/** @var MockObject&LlmProvider $mockProvider */
@@ -92,7 +92,7 @@ class IntentClassifierTest extends TestCase {
 	public function testClassifyIntentNewSearch(): void {
 		$intentClassifier = new IntentClassifier();
 
-			$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+			$modelConfig = ['model' => 'openai:gpt-4'];
 
 			// Mock LLM provider
 			/** @var MockObject&LlmProvider $mockProvider */
@@ -122,7 +122,7 @@ class IntentClassifierTest extends TestCase {
 	public function testClassifyIntentLLMFailure(): void {
 		$intentClassifier = new IntentClassifier();
 
-			$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+			$modelConfig = ['model' => 'openai:gpt-4'];
 
 			// Mock LLM provider that fails
 			/** @var MockObject&LlmProvider $mockProvider */
@@ -153,7 +153,7 @@ class IntentClassifierTest extends TestCase {
 	public function testGenerateQueriesWithExclusions(): void {
 		$intentClassifier = new IntentClassifier();
 
-			$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+			$modelConfig = ['model' => 'openai:gpt-4'];
 
 			// Mock LLM provider
 			/** @var MockObject&LlmProvider $mockProvider */
@@ -185,7 +185,7 @@ class IntentClassifierTest extends TestCase {
 	public function testGenerateQueriesNoExclusions(): void {
 		$intentClassifier = new IntentClassifier();
 
-			$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+			$modelConfig = ['model' => 'openai:gpt-4'];
 
 			// Mock LLM provider
 			/** @var MockObject&LlmProvider $mockProvider */
@@ -217,7 +217,7 @@ class IntentClassifierTest extends TestCase {
 	public function testGenerateQueriesIntentBased(): void {
 		$intentClassifier = new IntentClassifier();
 
-			$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+			$modelConfig = ['model' => 'openai:gpt-4'];
 
 			// Mock LLM provider
 			/** @var MockObject&LlmProvider $mockProvider */

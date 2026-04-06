@@ -24,7 +24,7 @@ class BaseProviderTest extends TestCase {
 	}
 
 	public function testConfigureResetsClient(): void {
-		$config = ['llm_provider' => 'openai', 'llm_model' => 'gpt-4'];
+		$config = ['model' => 'openai:gpt-4'];
 
 		// Configure once
 		$this->provider->configure($config);
@@ -44,9 +44,7 @@ class BaseProviderTest extends TestCase {
 
 	public function testGetSettingsMergesOverrides(): void {
 		$config = [
-			'settings' => ['temperature' => 0.5, 'max_tokens' => 500],
-			'temperature' => 0.7,
-			'top_p' => 0.9,
+			'settings' => ['api_key' => 'sk-test', 'timeout' => 30, 'temperature' => 0.5, 'max_tokens' => 500],
 		];
 
 		$this->provider->configure($config);
@@ -59,16 +57,16 @@ class BaseProviderTest extends TestCase {
 		$overrides = ['temperature' => 0.8, 'frequency_penalty' => 0.1];
 		$result = (array)$method->invoke($this->provider, $overrides);
 
-		$this->assertEquals(0.8, $result['temperature']); // Override takes precedence
-		$this->assertEquals(500, $result['max_tokens']); // From settings
-		$this->assertEquals(0.9, $result['top_p']); // From config
-		$this->assertEquals(0.1, $result['frequency_penalty']); // From overrides
+		$this->assertEquals('sk-test', $result['api_key']);
+		$this->assertEquals(30, $result['timeout']);
+		$this->assertEquals(0.8, $result['temperature']);
+		$this->assertEquals(500, $result['max_tokens']);
+		$this->assertEquals(0.1, $result['frequency_penalty']);
 	}
 
 	public function testGetSettingsFromJsonString(): void {
 		$config = [
 			'settings' => '{"temperature":0.6,"max_tokens":600}',
-			'temperature' => 0.7, // This should override the JSON
 		];
 
 		$this->provider->configure($config);
@@ -80,15 +78,15 @@ class BaseProviderTest extends TestCase {
 
 		$result = (array)$method->invoke($this->provider, []);
 
-		$this->assertEquals(0.7, $result['temperature']); // Direct config overrides JSON
-		$this->assertEquals(600, $result['max_tokens']); // From JSON
+		$this->assertEquals(0.6, $result['temperature']);
+		$this->assertEquals(600, $result['max_tokens']);
 	}
 
 	public function testConvertSettingsTypesNumericStrings(): void {
 		$settings = [
 			'temperature' => '0.7',
 			'max_tokens' => '1000',
-			'k_results' => '5',
+			'retrieval_limit' => '5',
 			'top_p' => '0.9',
 			'non_numeric' => 'text',
 		];
@@ -104,8 +102,8 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals(0.7, $result['temperature']);
 		$this->assertIsInt($result['max_tokens']);
 		$this->assertEquals(1000, $result['max_tokens']);
-		$this->assertIsInt($result['k_results']);
-		$this->assertEquals(5, $result['k_results']);
+		$this->assertIsInt($result['retrieval_limit']);
+		$this->assertEquals(5, $result['retrieval_limit']);
 		$this->assertIsFloat($result['top_p']);
 		$this->assertEquals(0.9, $result['top_p']);
 		$this->assertEquals('text', $result['non_numeric']); // Unchanged
@@ -118,9 +116,7 @@ class BaseProviderTest extends TestCase {
 			'timeout' => 60,
 			'temperature' => 0.7,
 			'max_tokens' => 1000,
-			'k_results' => 5,
-			'similarity_threshold' => 0.8,
-			'max_document_length' => 2000,
+			'retrieval_limit' => 5,
 			'custom_header' => 'x-test',
 		];
 
@@ -146,7 +142,6 @@ class BaseProviderTest extends TestCase {
 				'api_key' => 'sk-test',
 				'base_url' => 'http://host.docker.internal:8787/v1',
 				'timeout' => 60,
-				'temperature' => 0.5,
 			],
 		];
 
@@ -280,7 +275,7 @@ class BaseProviderTest extends TestCase {
 		$method = $reflection->getMethod('formatSuccess');
 		$method->setAccessible(true);
 
-		$this->provider->configure(['llm_model' => 'test-model']);
+		$this->provider->configure(['model' => 'test-model']);
 		$result = $method->invoke($this->provider, 'Test content', ['tokens' => 100]);
 
 			$this->assertEquals(

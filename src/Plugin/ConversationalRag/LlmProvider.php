@@ -54,9 +54,7 @@ class LlmProvider {
 	 * Generate a response from the LLM
 	 *
 	 * @param string $prompt
-	 * @param array{ temperature?: string|float, max_tokens?: string|int,
-	 *   k_results?: string|int, similarity_threshold?: string|int,
-	 *   max_document_length?: string|int} $options
+	 * @param array<string, string|int|float> $options
 	 *
 	 * @return (
 	 *   array{
@@ -82,13 +80,7 @@ class LlmProvider {
 	 */
 	public function generateResponse(string $prompt, array $options = []): array {
 		try {
-			$provider = $this->getRequiredProvider();
-			if ($provider === null) {
-				return $this->formatError('LLM provider not configured');
-			}
-
-			$model = $this->getConfig('llm_model', self::DEFAULT_MODEL);
-			$modelId = $this->buildModelId($provider, is_string($model) ? $model : self::DEFAULT_MODEL);
+			$modelId = $this->getModelId();
 
 			$settings = $this->getSettings($options);
 			$clientOptions = $this->extractClientOptions($settings);
@@ -120,15 +112,6 @@ class LlmProvider {
 			}
 			return $this->formatError('LLM request failed', $e);
 		}
-	}
-
-	private function getRequiredProvider(): ?string {
-		$provider = $this->getConfig('llm_provider');
-		if (!is_string($provider) || $provider === '') {
-			return null;
-		}
-
-		return $provider;
 	}
 
 	/**
@@ -199,22 +182,6 @@ class LlmProvider {
 			$settings = $this->config['settings'];
 		}
 
-		$directSettings = [
-			'temperature' => $this->convertToFloat($this->getConfig('temperature')),
-			'max_tokens' => $this->convertToInt($this->getConfig('max_tokens')),
-			'top_p' => $this->convertToFloat($this->getConfig('top_p')),
-			'frequency_penalty' => $this->convertToFloat($this->getConfig('frequency_penalty')),
-			'presence_penalty' => $this->convertToFloat($this->getConfig('presence_penalty')),
-		];
-
-		foreach ($directSettings as $key => $value) {
-			if ($value === null) {
-				continue;
-			}
-
-			$settings[$key] = $value;
-		}
-
 		$overrides = $this->convertSettingsTypes($overrides);
 		return array_merge($settings, $overrides);
 	}
@@ -224,18 +191,23 @@ class LlmProvider {
 	 * @return array<string, mixed>
 	 */
 	private function convertSettingsTypes(array $settings): array {
-		$numericFields = ['temperature', 'max_tokens', 'top_p', 'frequency_penalty', 'presence_penalty', 'k_results'];
+		$intFields = ['timeout', 'max_tokens', 'retrieval_limit'];
+		$floatFields = ['temperature', 'top_p', 'frequency_penalty', 'presence_penalty'];
 
-		foreach ($numericFields as $field) {
-			if (!isset($settings[$field]) || !is_string($settings[$field]) || !is_numeric($settings[$field])) {
+		foreach ($intFields as $field) {
+			if (!isset($settings[$field])) {
 				continue;
 			}
 
-			if (in_array($field, ['max_tokens', 'k_results'])) {
-				$settings[$field] = (int)$settings[$field];
-			} else {
-				$settings[$field] = (float)$settings[$field];
+			$settings[$field] = $this->convertToInt($settings[$field]);
+		}
+
+		foreach ($floatFields as $field) {
+			if (!isset($settings[$field])) {
+				continue;
 			}
+
+			$settings[$field] = $this->convertToFloat($settings[$field]);
 		}
 
 		return $settings;
@@ -305,9 +277,12 @@ class LlmProvider {
 	}
 
 	private function getName(): string {
-		$provider = $this->getConfig('llm_provider');
-		if (is_string($provider) && $provider !== '') {
-			return $provider;
+		$model = $this->getConfig('model');
+		if (is_string($model) && str_contains($model, ':')) {
+			[$provider, $modelName] = array_pad(explode(':', trim($model), 2), 2, '');
+			if ($provider !== '' && $modelName !== '') {
+				return $provider;
+			}
 		}
 
 		return 'llm';
@@ -338,17 +313,15 @@ class LlmProvider {
 		];
 	}
 
-	private function buildModelId(string $provider, string $model): string {
-		$model = trim($model);
-		if ($model === '') {
-			$model = self::DEFAULT_MODEL;
+	private function getModelId(): string {
+		$model = $this->getConfig('model', self::DEFAULT_MODEL);
+		$modelId = is_string($model) ? trim($model) : self::DEFAULT_MODEL;
+		[$provider, $modelName] = array_pad(explode(':', $modelId, 2), 2, '');
+		if ($provider !== '' && $modelName !== '') {
+			return $modelId;
 		}
 
-		if (str_contains($model, ':')) {
-			return $model;
-		}
-
-		return $provider . ':' . $model;
+		throw new UnexpectedValueException("model must use 'provider:model' format");
 	}
 
 	/**

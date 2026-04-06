@@ -24,13 +24,11 @@ class ConversationalTest extends TestCase {
 
 		$result = static::runSqlQuery(
 			"CREATE RAG MODEL 'test_model' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789',
 				style_prompt = 'You are a helpful assistant.',
-				temperature = 0.7,
-				max_tokens = 1000,
-				k_results = 5
+				retrieval_limit = 5,
+				max_document_length = 3000
 			)"
 		);
 		$this->assertIsArray($result);
@@ -44,34 +42,45 @@ class ConversationalTest extends TestCase {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
 	}
 
+	/**
+	 * @throws Exception
+	 */
+	public function testCreateRagModelRejectsNameFieldInBody(): void {
+		$this->assertQueryResultContainsError(
+			"CREATE RAG MODEL 'test_model' (
+				name = 'Test RAG Model',
+				model = 'openai:gpt-4'
+			)",
+			"Unsupported field 'name'"
+		);
+	}
+
 
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelInvalidTemperature(): void {
+	public function testCreateRagModelRejectsTemperatureField(): void {
 		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'bad_model' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
-				temperature = 3.0
+				temperature = 0.3
 			)",
-			'Temperature must be between 0 and 2'
+			"Unsupported field 'temperature'"
 		);
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelInvalidMaxTokens(): void {
+	public function testCreateRagModelRejectsMaxTokensField(): void {
 		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'bad_model' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
-				max_tokens = 50000
+				max_tokens = 500
 			)",
-			'max_tokens must be between 1 and 32768'
+			"Unsupported field 'max_tokens'"
 		);
 	}
 
@@ -81,13 +90,35 @@ class ConversationalTest extends TestCase {
 	public function testCreateRagModelInvalidKResults(): void {
 		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'bad_model' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
-				k_results = 100
+				retrieval_limit = 100
 			)",
-			'k_results must be between 1 and 50'
+			'retrieval_limit must be between 1 and 50'
 		);
+	}
+
+	/**
+	 * @throws Exception
+	 */
+	public function testCreateRagModelInvalidMaxDocumentLengthUsesDefault(): void {
+		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'bad_model'");
+
+		$result = static::runSqlQuery(
+			"CREATE RAG MODEL 'bad_model' (
+				model = 'openai:gpt-4',
+				api_key = 'sk-test-key',
+				max_document_length = 0
+			)"
+		);
+		$this->assertIsArray($result);
+
+		$this->assertQueryResult(
+			"DESCRIBE RAG MODEL 'bad_model'",
+			['settings.max_document_length', '2000']
+		);
+
+		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'bad_model'");
 	}
 
 	/**
@@ -109,8 +140,7 @@ class ConversationalTest extends TestCase {
 
 		static::runSqlQuery(
 			"CREATE RAG MODEL 'test_model1' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
+			model = 'openai:gpt-4',
 			api_key = 'sk-test-key-123456789'
 		)"
 		);
@@ -131,18 +161,16 @@ class ConversationalTest extends TestCase {
 
 		static::runSqlQuery(
 			"CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
+			model = 'openai:gpt-4',
 			style_prompt = 'You are a helpful assistant.',
-			temperature = 0.7,
-			max_tokens = 1000,
-			k_results = 5
+			retrieval_limit = 5,
+			max_document_length = -1
 		)"
 		);
 
 		$this->assertQueryResult(
 			"DESCRIBE RAG MODEL 'test_model'",
-			['test_model', 'openai', 'gpt-4']
+			['test_model', 'openai:gpt-4', '-1']
 		);
 
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
@@ -166,8 +194,7 @@ class ConversationalTest extends TestCase {
 
 		static::runSqlQuery(
 			"CREATE RAG MODEL 'test_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
+			model = 'openai:gpt-4',
 			api_key = 'sk-test-key-123456789'
 		)"
 		);
@@ -227,16 +254,14 @@ class ConversationalTest extends TestCase {
 
 		static::runSqlQuery(
 			"CREATE RAG MODEL 'duplicate_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
+			model = 'openai:gpt-4',
 			api_key = 'sk-test-key-123456789'
 		)"
 		);
 
 		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'duplicate_model' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789'
 			)",
 			"RAG model 'duplicate_model' already exists"
@@ -253,13 +278,10 @@ class ConversationalTest extends TestCase {
 
 		static::runSqlQuery(
 			"CREATE RAG MODEL 'lifecycle_model' (
-			llm_provider = 'openai',
-			llm_model = 'gpt-4',
+			model = 'openai:gpt-4',
 			api_key = 'sk-test-key-123456789',
 			style_prompt = 'You are a helpful assistant.',
-			temperature = 0.7,
-			max_tokens = 1000,
-			k_results = 5
+			retrieval_limit = 5
 		)"
 		);
 
@@ -289,8 +311,7 @@ class ConversationalTest extends TestCase {
 
 		$result = static::runSqlQuery(
 			"CREATE RAG MODEL 'minimal_model' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789'
 			)"
 		);
@@ -313,13 +334,10 @@ class ConversationalTest extends TestCase {
 
 		$result = static::runSqlQuery(
 			"CREATE RAG MODEL 'full_model' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789',
 				style_prompt = 'You are a helpful assistant with extensive knowledge.',
-				temperature = 1.5,
-				max_tokens = 2000,
-				k_results = 10
+				retrieval_limit = 10
 			)"
 		);
 		$this->assertIsArray($result);
@@ -335,76 +353,14 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testTemperatureBoundaryValues(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'temp_min'");
-
-		$result1 = static::runSqlQuery(
-			"CREATE RAG MODEL 'temp_min' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
-				api_key = 'sk-test-key',
-				temperature = 0
-			)"
-		);
-		$this->assertIsArray($result1);
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'temp_min'");
-
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'temp_max'");
-
-		$result2 = static::runSqlQuery(
-			"CREATE RAG MODEL 'temp_max' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
-				api_key = 'sk-test-key',
-				temperature = 2
-			)"
-		);
-		$this->assertIsArray($result2);
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'temp_max'");
-	}
-
-	/**
-	 * @throws Exception
-	 */
-	public function testMaxTokensBoundaryValues(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'tokens_min'");
-
-		$result1 = static::runSqlQuery(
-			"CREATE RAG MODEL 'tokens_min' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
-				api_key = 'sk-test-key',
-				max_tokens = 1
-			)"
-		);
-		$this->assertIsArray($result1);
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'tokens_min'");
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'tokens_max'");
-
-		$result2 = static::runSqlQuery(
-			"CREATE RAG MODEL 'tokens_max' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
-				api_key = 'sk-test-key',
-				max_tokens = 32768
-			)"
-		);
-		$this->assertIsArray($result2);
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'tokens_max'");
-	}
-
-	/**
-	 * @throws Exception
-	 */
-	public function testKResultsBoundaryValues(): void {
+	public function testRetrievalLimitBoundaryValues(): void {
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'k_min'");
 
 		$result1 = static::runSqlQuery(
 			"CREATE RAG MODEL 'k_min' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
-				k_results = 1
+				retrieval_limit = 1
 			)"
 		);
 		$this->assertIsArray($result1);
@@ -414,10 +370,9 @@ class ConversationalTest extends TestCase {
 
 		$result2 = static::runSqlQuery(
 			"CREATE RAG MODEL 'k_max' (
-				llm_provider = 'openai',
-				llm_model = 'gpt-4',
+				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
-				k_results = 50
+				retrieval_limit = 50
 			)"
 		);
 		$this->assertIsArray($result2);

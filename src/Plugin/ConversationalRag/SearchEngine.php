@@ -25,7 +25,7 @@ class SearchEngine {
 	use SqlEscapingTrait;
 
 	private const float DEFAULT_SIMILARITY_THRESHOLD = 0.8;
-	private const int DEFAULT_K_RESULTS = 5;
+	private const int DEFAULT_RETRIEVAL_LIMIT = 5;
 
 	/**
 	 * Perform enhanced KNN search with exclusions (based on original enhancedKNNSearch)
@@ -34,8 +34,7 @@ class SearchEngine {
 	 * @param string $table
 	 * @param string $searchQuery
 	 * @param string $excludeQuery
-	 * @param array{llm_provider: string, llm_model: string, settings?: string|array<string, mixed>,
-	 *   k_results?: string|int, similarity_threshold?: string|float} $modelConfig
+	 * @param array{model: string, settings:array<string, mixed>} $modelConfig
 	 * @param float|null $threshold
 	 *
 	 * @return array<int, array<string, mixed>>
@@ -59,7 +58,7 @@ class SearchEngine {
 			$searchQuery,
 			$excludedIds,
 			$modelConfig,
-			$threshold ?? $this->getSimilarityThreshold($modelConfig)
+			$threshold ?? $this->getSimilarityThreshold()
 		);
 	}
 
@@ -155,8 +154,7 @@ class SearchEngine {
 	 * @param string $table
 	 * @param string $searchQuery
 	 * @param array<int, string|int> $excludedIds
-	 * @param array{llm_provider: string, llm_model: string, settings?: string|array<string, mixed>,
-	 *   k_results?: string|int, similarity_threshold?: string|float} $modelConfig
+	 * @param array{model: string, settings:array<string, mixed>} $modelConfig
 	 * @param float $threshold
 	 *
 	 * @return array<int, array<string, mixed>>
@@ -170,7 +168,7 @@ class SearchEngine {
 		array $modelConfig,
 		float $threshold
 	): array {
-		$kResults = $this->getKResults($modelConfig);
+		$retrievalLimit = $this->getRetrievalLimit($modelConfig);
 		$vectorField = $this->detectVectorField($client, $table);
 
 		if (!$vectorField) {
@@ -178,7 +176,7 @@ class SearchEngine {
 		}
 
 		$searchEscaped = $this->escapeString($searchQuery);
-		$knnK = $kResults;
+		$knnK = $retrievalLimit;
 		$excludeClause = '';
 		if (!empty($excludedIds)) {
 			$safeExcludeIds = array_map('intval', $excludedIds);
@@ -191,14 +189,14 @@ class SearchEngine {
 			$searchEscaped,
 			$knnK,
 			$threshold,
-			$kResults,
+			$retrievalLimit,
 			$excludeClause
 		);
 
 		Buddy::debugvv("\n[DEBUG KNN SEARCH]");
 		Buddy::debugvv("├─ Search query: '$searchQuery'");
 		Buddy::debugvv('├─ Excluded IDs: [' . implode(', ', $excludedIds) . ']');
-		Buddy::debugvv("├─ k: $kResults");
+		Buddy::debugvv("├─ retrieval_limit: $retrievalLimit");
 		Buddy::debugvv("├─ Threshold: $threshold");
 		Buddy::debugvv("├─ Final SQL: $sql");
 
@@ -216,38 +214,18 @@ class SearchEngine {
 	}
 
 	/**
-	 * Get K results from configuration
-	 *
-	 * @param array{llm_provider: string, llm_model: string,
-	 *   settings?: string|array<string, mixed>, k_results?: string|int} $modelConfig
+	 * @param array{model: string, settings:array<string, mixed>} $modelConfig
 	 *
 	 * @return int
-	 * @throws ManticoreSearchClientError
 	 */
-	private function getKResults(array $modelConfig): int {
-		// Check direct config
-		if (isset($modelConfig['k_results'])) {
-			return (int)$modelConfig['k_results'];
+	private function getRetrievalLimit(array $modelConfig): int {
+		if (!isset($modelConfig['settings']['retrieval_limit'])) {
+			return self::DEFAULT_RETRIEVAL_LIMIT;
 		}
 
-		// Check settings
-		if (isset($modelConfig['settings'])) {
-			if (is_string($modelConfig['settings'])) {
-				$decoded = simdjson_decode($modelConfig['settings'], true);
-				if (!is_array($decoded)) {
-					throw ManticoreSearchClientError::create('Invalid model settings JSON');
-				}
-				$settings = $decoded;
-			} else {
-				$settings = $modelConfig['settings'];
-			}
-
-			if (is_array($settings) && isset($settings['k_results'])) {
-				return (int)$settings['k_results'];
-			}
-		}
-
-		return self::DEFAULT_K_RESULTS;
+		/** @var int|string $retrievalLimit */
+		$retrievalLimit = $modelConfig['settings']['retrieval_limit'];
+		return (int)$retrievalLimit;
 	}
 
 	private function buildVectorSearchSql(
@@ -337,38 +315,9 @@ class SearchEngine {
 	}
 
 	/**
-	 * Get similarity threshold from configuration
-	 *
-	 * @param array{llm_provider: string, llm_model: string,
-	 *   settings?: string|array<string, mixed>,
-	 *   similarity_threshold?: string|float} $modelConfig
-	 *
 	 * @return float
-	 * @throws ManticoreSearchClientError
 	 */
-	private function getSimilarityThreshold(array $modelConfig): float {
-		// Check direct config
-		if (isset($modelConfig['similarity_threshold'])) {
-			return (float)$modelConfig['similarity_threshold'];
-		}
-
-		// Check settings
-		if (isset($modelConfig['settings'])) {
-			if (is_string($modelConfig['settings'])) {
-				$decoded = simdjson_decode($modelConfig['settings'], true);
-				if (!is_array($decoded)) {
-					throw ManticoreSearchClientError::create('Invalid model settings JSON');
-				}
-				$settings = $decoded;
-			} else {
-				$settings = $modelConfig['settings'];
-			}
-
-			if (is_array($settings) && isset($settings['similarity_threshold'])) {
-				return (float)$settings['similarity_threshold'];
-			}
-		}
-
+	private function getSimilarityThreshold(): float {
 		return self::DEFAULT_SIMILARITY_THRESHOLD;
 	}
 }

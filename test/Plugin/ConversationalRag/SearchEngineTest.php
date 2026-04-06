@@ -252,14 +252,12 @@ class SearchEngineTest extends TestCase {
 	}
 
 	/**
-	 * @return array{llm_provider:string, llm_model:string, k_results:int, settings:array{similarity_threshold:float}}
+	 * @return array{model:string, settings:array{retrieval_limit:int}}
 	 */
 	private function createDefaultModelConfig(): array {
 		return [
-			'llm_provider' => 'openai',
-			'llm_model' => 'gpt-3.5-turbo',
-			'k_results' => 5,
-			'settings' => ['similarity_threshold' => 0.8],
+			'model' => 'openai:gpt-3.5-turbo',
+			'settings' => ['retrieval_limit' => 5],
 		];
 	}
 
@@ -338,7 +336,7 @@ class SearchEngineTest extends TestCase {
 			->with('DESCRIBE test_table')
 			->willReturn($schemaResponse);
 
-		$modelConfig = ['llm_provider' => 'openai', 'llm_model' => 'gpt-3.5-turbo', 'k_results' => 5];
+		$modelConfig = ['model' => 'openai:gpt-3.5-turbo', 'settings' => ['retrieval_limit' => 5]];
 		$result = $searchEngine->performSearch(
 			$mockClient,
 			'test_table',
@@ -402,10 +400,8 @@ class SearchEngineTest extends TestCase {
 			);
 
 		$modelConfig = [
-			'llm_provider' => 'openai',
-			'llm_model' => 'gpt-3.5-turbo',
-			'k_results' => 1,
-			'settings' => ['similarity_threshold' => 0.8],
+			'model' => 'openai:gpt-3.5-turbo',
+			'settings' => ['retrieval_limit' => 1],
 		];
 
 		$result = $searchEngine->performSearchWithExcludedIds(
@@ -714,9 +710,8 @@ class SearchEngineTest extends TestCase {
 		$searchEngine = $this->createSearchEngine();
 		$mockClient = $this->createMock(HTTPClient::class);
 		$model = [
-			'llm_provider' => 'openai',
-			'llm_model' => 'gpt-4',
-			'settings' => ['k_results' => 5],
+			'model' => 'openai:gpt-4',
+			'settings' => ['retrieval_limit' => 5],
 		];
 
 		$schemaResponse = $this->createSchemaResponse(
