@@ -25,29 +25,21 @@ class AutoSchemaSupportTest extends TestCase {
 		static::runSqlQuery("DROP TABLE IF EXISTS {$this->testTable}");
 	}
 
-	protected function tearDown(): void {
-		static::$manticoreConf = '';
-	}
-
 	/**
 	 * Helper to setup auto schema
 	 * @param int $value can be 0 or 1
 	 * @return void
 	 */
 	protected function setUpAutoSchema(int $value): void {
-		// Adding the auto schema option to manticore config
+		static::stopSearchd();
+		static::initConfig();
 		$conf = str_replace(
 			'searchd {' . PHP_EOL,
 			'searchd {' . PHP_EOL . "    auto_schema = $value" . PHP_EOL,
 			static::$manticoreConf
 		);
 		self::updateManticoreConf((string)$conf);
-		echo $conf . PHP_EOL;
-
-		// Restart manticore
-		static::tearDownAfterClass();
-		sleep(5); // <- give 5 secs to protect from any kind of lags
-		static::setUpBeforeClass();
+		static::startSearchd();
 	}
 
 	public function testAutoSchemaOptionDisabled(): void {

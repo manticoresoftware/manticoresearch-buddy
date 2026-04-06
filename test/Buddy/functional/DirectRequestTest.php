@@ -29,8 +29,8 @@ final class DirectRequestTest extends TestCase {
 
 	public function testBackupAll(): void {
 		static::runSqlQuery('CREATE TABLE test (name text)');
-		static::runSqlQuery('INSERT INTO test (name) values ("some data")');
-		$response = static::runHttpBuddyRequest('BACKUP TO /tmp');
+		static::runSqlQuery('INSERT INTO test (name) values (\'some data\')');
+		$response = static::runHttpBuddyRequest('BACKUP TO /tmp', ['message' => ''], false);
 		$this->assertBasicChecks($response);
 		$this->assertDataChecks($response);
 		$this->assertEquals(true, isset($response['message'][0]['data'][0]['Path']));

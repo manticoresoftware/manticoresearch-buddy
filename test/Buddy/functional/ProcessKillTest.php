@@ -9,7 +9,7 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
+use Manticoresearch\BuddyTest\Trait\RerunSearchdPerTestTrait;
 use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\RecursionContext\InvalidArgumentException;
@@ -17,23 +17,7 @@ use Swoole\Process;
 
 final class ProcessKillTest extends TestCase {
 
-	use TestFunctionalTrait;
-
-	/**
-	 * Launch daemon as as setup stage
-	 * @return void
-	 */
-	public function setUp(): void {
-		self::setUpBeforeClass();
-	}
-
-	/**
-	 *
-	 * @return void
-	 */
-	public function tearDown(): void {
-		self::tearDownAfterClass();
-	}
+	use RerunSearchdPerTestTrait;
 
 	/**
 	 *

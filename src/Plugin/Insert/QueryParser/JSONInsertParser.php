@@ -15,6 +15,11 @@ use Manticoresearch\Buddy\Core\Error\QueryParseError;
 
 class JSONInsertParser extends JSONParser implements InsertQueryParserInterface {
 
+	/**
+	 * @var array<int,string>
+	 */
+	private const SUPPORTED_OPERATIONS = ['insert', 'replace'];
+
 	use CheckInsertDataTrait;
 
 	/**
@@ -51,14 +56,9 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 	 * @throws QueryParseError
 	 */
 	protected function extractRow(array $query): array {
-		if ($this->isNdJSON) {
-			if (!array_key_exists('insert', $query)) {
-				throw new QueryParseError("Operation name 'insert' is missing");
-			}
-			$query = $query['insert'];
-		}
+		$query = $this->unwrapOperationIfNeeded($query);
 		if (!is_array($query)) {
-			throw new QueryParseError("Mandatory request field 'insert' must be an object");
+			throw new QueryParseError('Mandatory request body must be an object');
 		}
 		$key = array_key_exists('index', $query) ? 'index' : 'table';
 		if (!isset($query[$key])) {
@@ -75,6 +75,43 @@ class JSONInsertParser extends JSONParser implements InsertQueryParserInterface 
 			throw new QueryParseError("Mandatory request field 'doc' must be an object");
 		}
 		return $query['doc'];
+	}
+
+	/**
+	 * @param array<string,mixed> $query
+	 * @return array<string,mixed>
+	 * @throws QueryParseError
+	 */
+	protected function unwrapOperationIfNeeded(array $query): array {
+		$operation = self::detectOperation($query);
+		if ($operation === null) {
+			if ($this->isNdJSON) {
+				throw new QueryParseError("Operation name 'insert' or 'replace' is missing");
+			}
+
+			return $query;
+		}
+
+		$struct = $query[$operation];
+		if (!is_array($struct)) {
+			throw new QueryParseError("Mandatory request field '$operation' must be an object");
+		}
+
+		return $struct;
+	}
+
+	/**
+	 * @param array<string,mixed> $query
+	 * @return string|null
+	 */
+	protected static function detectOperation(array $query): ?string {
+		foreach (self::SUPPORTED_OPERATIONS as $operation) {
+			if (array_key_exists($operation, $query)) {
+				return $operation;
+			}
+		}
+
+		return null;
 	}
 
 	/**

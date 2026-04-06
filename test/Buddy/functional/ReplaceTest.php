@@ -148,4 +148,40 @@ class ReplaceTest extends TestCase {
 
 		static::runSqlQuery('DROP TABLE IF EXISTS elastic_replace_test');
 	}
+
+	public function testReplaceAutoSchemaViaSQL(): void {
+		echo "\nTesting REPLACE with a non-existing table and a SQL query\n";
+
+		static::runSqlQuery('DROP TABLE IF EXISTS replace_test');
+		static::runSqlQuery(
+			'REPLACE INTO replace_test (id, title, content) VALUES '.
+			"(1, 'Original', 'Original Content')"
+		);
+
+		$result = static::runSqlQuery('SELECT * FROM replace_test WHERE id = 1');
+		$this->assertStringContainsString('Original', implode(PHP_EOL, $result));
+
+		static::runSqlQuery('DROP TABLE IF EXISTS replace_test');
+	}
+
+	public function testReplaceAutoSchemaViaJSON(): void {
+		echo "\nTesting REPLACE with a non-existing table and a JSON HTTP query\n";
+
+		static::runSqlQuery('DROP TABLE IF EXISTS replace_test');
+		$payload = json_encode(
+			[
+				'table' => 'replace_test',
+				'id' => 1,
+				'doc' => ['title' => 'Original', 'content' => 'Original Content'],
+			],
+			JSON_THROW_ON_ERROR
+		);
+		static::runHttpQuery((string)$payload, true, 'replace');
+
+		$result = static::runSqlQuery('SELECT * FROM replace_test WHERE id = 1');
+		$this->assertStringContainsString('Original', implode(PHP_EOL, $result));
+
+		static::runSqlQuery('DROP TABLE IF EXISTS replace_test');
+	}
+
 }

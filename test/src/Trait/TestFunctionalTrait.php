@@ -58,26 +58,36 @@ trait TestFunctionalTrait {
 	protected static array $searchdArgs = [];
 
 	/**
-	 * Launch daemon as as setup stage
+	 * Hook: override in tests that need to set $configFileName, $searchdArgs, etc.
+	 * Called at the start of initConfig() before the template is loaded.
 	 * @return void
 	 */
-	public static function setUpBeforeClass(): void {
-		// Setting the absolute path to the Manticore config file
-		if (static::$manticoreConf === '' || static::$manticoreConfigFilePath === '') {
-			self::setManticoreConfigFile(static::$configFileName);
-		}
+	protected static function configure(): void {
+	}
 
-		self::setConfWithBuddyPath();
+	/**
+	 * Load config from template, apply buddy path and searchd args.
+	 * Always starts from fresh template.
+	 * @return void
+	 */
+	protected static function initConfig(): void {
+		static::configure();
+		self::setManticoreConfigFile(static::$configFileName);
 		self::applySearchdArgs();
+	}
+
+	/**
+	 * Start daemon, wait for buddy readiness, detect ports, clean tables.
+	 * @return void
+	 */
+	protected static function startSearchd(): void {
 		self::checkManticorePathes();
-		system('rm -f /var/log/manticore-test/searchd.pid');
-		system('rm -f /var/log/manticore-test/searchd.log');
+		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $logMatches);
+		$logPath = $logMatches[1] ?? '/var/log/manticore-test/searchd.log';
+		system('rm -f ' . escapeshellarg($logPath));
 		system('searchd --config ' . static::$manticoreConfigFilePath);
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
-		sleep(5); // <- give 5 secs to protect from any kind of lags
-
-		static::$listenBuddyPort = (int)system("ss -nlp | grep 'manticore-execu' | cut -d: -f2 | cut -d' ' -f1");
-		static::loadBuddyPid();
+		self::waitForBuddyReady();
 
 		// Clean up all tables and run fresh instance
 		$output = static::runSqlQuery('show tables');
@@ -96,14 +106,80 @@ trait TestFunctionalTrait {
 	}
 
 	/**
+	 * Stop searchd and executor processes.
+	 * @return void
+	 */
+	protected static function stopSearchd(): void {
+		system('pgrep -f searchd | xargs kill -9 2> /dev/null');
+		system('pgrep -f manticore-executor | xargs kill -9 2> /dev/null');
+		// Wait for processes to fully terminate before returning
+		usleep(500_000);
+	}
+
+	/**
+	 * Convenience method: stop then start searchd.
+	 * @return void
+	 */
+	protected static function restartSearchd(): void {
+		static::stopSearchd();
+		static::startSearchd();
+	}
+
+	/**
+	 * Poll the searchd log for buddy readiness.
+	 * The log is deleted before each searchd start, so any match is from the current run.
 	 *
+	 * @param int $timeoutSeconds
+	 * @return void
+	 * @throws Exception
+	 */
+	protected static function waitForBuddyReady(int $timeoutSeconds = 30): void {
+		preg_match('/log = (.*?)[\r\n]/', static::$manticoreConf, $matches);
+		$logPath = $matches[1] ?? '/var/log/manticore-test/searchd.log';
+
+		$log = '';
+		$deadline = time() + $timeoutSeconds;
+		while (time() < $deadline) {
+			$log = (string)file_get_contents($logPath);
+			$matches = [];
+			if (preg_match_all(
+				'/\\[(?<pid>[0-9]+)\\]\\s+\\[BUDDY\\]\\s+started.*?at\\s+http:\\/\\/127\\.0\\.0\\.1:(?<port>[0-9]+)/',
+				$log,
+				$matches,
+				PREG_SET_ORDER
+			)) {
+				$last = $matches[sizeof($matches) - 1];
+				static::$buddyPid = (int)$last['pid'];
+				static::$listenBuddyPort = (int)$last['port'];
+				return;
+			}
+			usleep(500_000); // poll every 0.5s
+		}
+		throw new Exception("Buddy did not start within {$timeoutSeconds}s\nLog ({$logPath}):\n{$log}");
+	}
+
+	/**
+	 * Launch daemon as setup stage
+	 * @return void
+	 */
+	public static function setUpBeforeClass(): void {
+		static::initConfig();
+		static::startSearchd();
+	}
+
+	/**
 	 * @return void
 	 */
 	public static function tearDownAfterClass(): void {
-		system('pgrep -f searchd | xargs kill -9');
-		system('pgrep -f manticore-executor | xargs kill -9 2> /dev/null');
-		// system('kill -9 ' . self::$manticorePid . ' 2> /dev/null');
-		// system('kill -9 ' . self::$buddyPid . ' 2> /dev/null');
+		static::cleanUp();
+		static::stopSearchd();
+	}
+
+	/**
+	 * Hook: override in tests that need cleanup before searchd stops
+	 * @return void
+	 */
+	protected static function cleanUp(): void {
 	}
 
 	/**
@@ -167,8 +243,7 @@ trait TestFunctionalTrait {
 		$random = bin2hex(random_bytes(8));
 		$configTplFilePath = dirname((string)$refCls->getFileName()) . "/config/$configTplFileName";
 		static::$manticoreConfigFilePath = \sys_get_temp_dir() . "/config-$random-$configTplFileName";
-		system("cp -r $configTplFilePath " . static::$manticoreConfigFilePath, $res);
-		if ($res !== 0) {
+		if (!copy($configTplFilePath, static::$manticoreConfigFilePath)) {
 			throw new Exception('Cannot create Manticore config file at `' . static::$manticoreConfigFilePath . '`');
 		}
 		static::$manticoreConf = (string)file_get_contents(static::$manticoreConfigFilePath);
@@ -430,22 +505,6 @@ trait TestFunctionalTrait {
 				throw new Exception("Cannot create Manticore `$prop` dir at $checkDir");
 			}
 		}
-	}
-
-	/**
-	 * Helper that sets the `buddy_path` config option relative to the current Buddy root folder
-	 *
-	 * @return void
-	 */
-	protected static function setConfWithBuddyPath(): void {
-		$buddyPath = __DIR__ . '/../../..';
-		$configFile = static::$manticoreConfigFilePath;
-		$conf = file_get_contents($configFile);
-		if ($conf === false) {
-			throw new Exception("Invalid Manticore config found at $configFile");
-		}
-		$conf = str_replace('%BUDDY%', $buddyPath, $conf);
-		self::updateManticoreConf((string)$conf);
 	}
 
 	/**

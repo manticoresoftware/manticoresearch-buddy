@@ -145,6 +145,25 @@ class JSONInsertParserTest extends TestCase {
 			'colTypes' => ['int', 'text'],
 		];
 		$this->assertEquals($res, self::$parser->parse($query));
+
+		$parser = new JSONInsertParser();
+		$query = '{"replace" : { "index" : "test", "doc": { "col1" : 30 } } }';
+		$res = [
+			'name' => 'test',
+			'cols' => ['col1'],
+			'colTypes' => ['int'],
+		];
+		$this->assertEquals($res, $parser->parse($query));
+
+		$query = '{ "replace" : { "index" : "test", "doc": { "col1" : 10, "col2": "a" } } }'
+			. "\n"
+			. '{ "replace" : { "index" : "test", "doc": { "col1" : 20, "col2": "b" } } }';
+		$res = [
+			'name' => 'test',
+			'cols' => ['col1', 'col2'],
+			'colTypes' => ['int', 'text'],
+		];
+		$this->assertEquals($res, $parser->parse($query));
 	}
 
 	public function testParseFail(): void {
@@ -161,7 +180,7 @@ class JSONInsertParserTest extends TestCase {
 		$query = '{ "update" : { "index" : "test", "id" : 1, "doc": { "col1" : 10, "col2": "a" } } }';
 		[$exCls, $exMsg] = self::getExceptionInfo(self::$parser, 'parse', [$query]);
 		$this->assertEquals(QueryParseError::class, $exCls);
-		$this->assertEquals("Operation name 'insert' is missing", $exMsg);
+		$this->assertEquals("Operation name 'insert' or 'replace' is missing", $exMsg);
 	}
 
 	public function testElasticParseOk(): void {

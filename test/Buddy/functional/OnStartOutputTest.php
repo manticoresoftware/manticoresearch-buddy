@@ -38,8 +38,7 @@ class OnStartOutputTest extends TestCase {
 	public function testConnectionAddressOutput(): void {
 		echo "\nTesting if connection address info is passed from Buddy to daemon correctly\n";
 		// Restart buddy with a new connection address
-		self::tearDownAfterClass();
-		self::setUpBeforeClass();
+		self::restartSearchd();
 		// Checking the log part corresponding to the latest searchd start
 		$logUpdate = $this->getLogUpdate();
 		$matches = [];
@@ -51,8 +50,7 @@ class OnStartOutputTest extends TestCase {
 		$addr1 = $matches[2];
 
 		// Checking if Buddy passes a refreshed connection address on restart
-		self::tearDownAfterClass();
-		self::setUpBeforeClass();
+		self::restartSearchd();
 		$logUpdate = $this->getLogUpdate();
 		preg_match('/\[BUDDY\] started (.*) at (.*?)$/s', $logUpdate, $matches);
 		if (!$matches) {
@@ -69,8 +67,7 @@ class OnStartOutputTest extends TestCase {
 		// Setting debug mode in Manticore config
 		$conf = preg_replace('/buddy_path(.*?)(\r|\n)/', 'buddy_path$1 --log-level=debugv$2', self::$manticoreConf);
 		self::updateManticoreConf((string)$conf);
-		self::tearDownAfterClass();
-		self::setUpBeforeClass();
+		self::restartSearchd();
 		// Unsetting debug mode in manticore config
 		$conf = str_replace(' --log-level=debug', '', self::$manticoreConf);
 		self::updateManticoreConf((string)$conf);
