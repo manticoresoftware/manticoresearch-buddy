@@ -16,7 +16,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
  * @phpstan-extends BasePayload<array>

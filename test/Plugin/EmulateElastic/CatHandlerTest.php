@@ -117,9 +117,11 @@ final class CatHandlerTest extends TestCase {
 				),
 			);
 
+		/** @var array<array{index:string}> $result **/
 		$result = self::invokeMethod(CatHandler::class, 'buildCatIndicesInfo', [$client, 'prod*']);
-		$this->assertSame(1, count($result));
+		$this->assertSame(1, sizeof($result));
 		$this->assertSame('products', $result[0]['index']);
+		/** @phpstan-ignore-next-line */
 		$this->assertSame('10', $result[0]['docs.count']);
 		$this->assertSame('0', $result[0]['docs.deleted']);
 	}
@@ -134,4 +136,3 @@ final class CatHandlerTest extends TestCase {
 		return $response;
 	}
 }
-

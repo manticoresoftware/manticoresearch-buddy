@@ -34,7 +34,7 @@ final class Payload extends BasePayload {
 			'_template',
 			'_index_template',
 			'_plugins',
-			'_resolve'
+			'_resolve',
 		],
 		1 => ['_create', '_doc', '_update', '_field_caps'],
 	];

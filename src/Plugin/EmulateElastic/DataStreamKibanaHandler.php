@@ -40,7 +40,7 @@ class DataStreamKibanaHandler extends BaseHandler {
 		$taskFn = static function (): TaskResult {
 			return TaskResult::raw(
 				[
-					"data_streams" => [],
+					'data_streams' => [],
 				]
 			);
 		};

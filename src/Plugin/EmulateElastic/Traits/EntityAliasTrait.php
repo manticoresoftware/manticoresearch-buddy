@@ -51,7 +51,7 @@ trait EntityAliasTrait {
 			: "INSERT INTO $aliasTable (index, alias) VALUES('{$index}', '{$alias}')";
 		/** @var array{error?:string,0:array{data?:array<mixed>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
-		
+
 		if (isset($queryResult['error'])) {
 			throw new \Exception('Unknown error on template creation');
 		}

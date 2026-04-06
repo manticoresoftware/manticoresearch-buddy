@@ -46,10 +46,7 @@ class CatHandler extends BaseHandlerWithClient {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			$pathParts = explode('/', $payload->path);
-			if (!isset($pathParts[1], $pathParts[2])
-				&& !in_array($pathParts[1], self::CAT_ENTITIES) && !str_ends_with($pathParts[1], '*')) {
-					throw new \Exception('Cannot parse request');
-			}
+			self::checkRequestValidity($pathParts);
 			$entityTable = "_{$pathParts[1]}";
 
 			if (in_array($pathParts[1], self::CAT_ENTITIES)) {
@@ -59,13 +56,16 @@ class CatHandler extends BaseHandlerWithClient {
 					/** @var array{name:string,patterns:string,content:string} $entityInfo */
 					$entityInfo = self::$queryMap[$queryMapName][$entityTable];
 					$catInfo = self::getVersionedEntity($entityInfo, $manticoreClient);
-					
+
 					return TaskResult::raw($catInfo);
-				} elseif ($pathParts[1] == 'indices') {
-					return TaskResult::raw(self::buildCatIndicesInfo($manticoreClient, $pathParts[2]));
+				}
+				if ($pathParts[1] === 'indices') {
+					return TaskResult::raw(
+						self::buildCatIndicesInfo($manticoreClient, $pathParts[2])
+					);
 				}
 			}
-			
+
 			$entityNamePattern = $pathParts[2];
 			$query = "SELECT * FROM {$entityTable} WHERE MATCH('{$entityNamePattern}')";
 			/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string}>}} $queryResult */
@@ -91,12 +91,30 @@ class CatHandler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @return array<int,array{docs.count:string,docs.deleted:string,health:string,index:string,pri:string,rep:string,status:string}>
+	 *
+	 * @param array<string> $pathParts
+	 */
+	private static function checkRequestValidity(array $pathParts): void {
+		if (!isset($pathParts[1], $pathParts[2])
+			&& !in_array($pathParts[1], self::CAT_ENTITIES) && !str_ends_with($pathParts[1], '*')) {
+			throw new \Exception('Cannot parse request');
+		}
+	}
+
+	/**
+	 *
+	 * @param HTTPClient $manticoreClient
+	 * @param string $tablePattern
+	 * @return array<int,array<string,mixed>>
 	 */
 	private static function buildCatIndicesInfo(HTTPClient $manticoreClient, string $tablePattern): array {
-		/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string}>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest('SHOW TABLES')->getResult();
-		if (!isset($queryResult[0]['data']) || !is_array($queryResult[0]['data'])) {
+		$query = 'SHOW TABLES';
+		if ($tablePattern !== '*') {
+			$query .= " LIKE $tablePattern";
+		}
+		/** @var array{0:array{data?:array<array{Table:string,patterns:string,content:string}>}} $queryResult */
+		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		if (!isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
 			return [];
 		}
 
@@ -123,17 +141,18 @@ class CatHandler extends BaseHandlerWithClient {
 			return [];
 		}
 
+		/** @var array{0:array{data?:array<array{Variable_name?:string,Value?:mixed}>}} $queryResult */
 		$queryResult = $response->getResult();
-		if (!isset($queryResult[0]['data']) || !is_array($queryResult[0]['data'])) {
+		if (!isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
 			return [];
 		}
 
 		$statusMap = [];
 		foreach ($queryResult[0]['data'] as $statusRow) {
-			if (!isset($statusRow['Variable_name'], $statusRow['Value']) || !is_string($statusRow['Variable_name'])) {
+			if (!isset($statusRow['Variable_name'], $statusRow['Value']) || !$statusRow['Variable_name']) {
 				continue;
 			}
-			$statusMap[$statusRow['Variable_name']] = (string)$statusRow['Value'];
+			$statusMap[$statusRow['Variable_name']] = $statusRow['Value'];
 		}
 
 		return $statusMap;
