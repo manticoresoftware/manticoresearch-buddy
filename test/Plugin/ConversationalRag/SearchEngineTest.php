@@ -832,7 +832,7 @@ class SearchEngineTest extends TestCase {
 
 		$searchEngine->performSearchWithExcludedIds(
 			$mockClient,
-			"docs WHERE 1=1",
+			'docs WHERE 1=1',
 			'test search query',
 			[],
 			$this->createDefaultModelConfig(),

@@ -313,7 +313,10 @@ class ConversationValidationTest extends TestCase {
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('retrieval_limit must be an integer between 1 and 50', $error->getResponseError());
+		$this->assertStringContainsString(
+			'retrieval_limit must be an integer between 1 and 50',
+			$error->getResponseError()
+		);
 	}
 
 	public function testKResultsAboveMaximum(): void {
@@ -344,7 +347,10 @@ class ConversationValidationTest extends TestCase {
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('retrieval_limit must be an integer between 1 and 50', $error->getResponseError());
+		$this->assertStringContainsString(
+			'retrieval_limit must be an integer between 1 and 50',
+			$error->getResponseError()
+		);
 	}
 
 	public function testKResultsRejectsNonIntegerValue(): void {
@@ -375,7 +381,10 @@ class ConversationValidationTest extends TestCase {
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('retrieval_limit must be an integer between 1 and 50', $error->getResponseError());
+		$this->assertStringContainsString(
+			'retrieval_limit must be an integer between 1 and 50',
+			$error->getResponseError()
+		);
 	}
 
 	public function testTimeoutBelowMinimum(): void {
