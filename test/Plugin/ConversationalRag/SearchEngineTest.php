@@ -232,6 +232,11 @@ class SearchEngineTest extends TestCase {
 		Response $exclusionResponse,
 		Response $searchResponse
 	): array {
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('test_table')
+			->willReturn(true);
+
 		$mockClient->expects($this->exactly(5))
 			->method('sendRequest')
 			->willReturnOnConsecutiveCalls(
@@ -331,10 +336,17 @@ class SearchEngineTest extends TestCase {
 			)
 		);
 
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('test_table')
+			->willReturn(true);
+
 		$mockClient->expects($this->exactly(2))
 			->method('sendRequest')
-			->with('DESCRIBE test_table')
-			->willReturn($schemaResponse);
+			->willReturnOnConsecutiveCalls(
+				$schemaResponse,
+				$schemaResponse
+			);
 
 		$modelConfig = ['model' => 'openai:gpt-3.5-turbo', 'settings' => ['retrieval_limit' => 5]];
 		$result = $searchEngine->performSearch(
@@ -385,6 +397,11 @@ class SearchEngineTest extends TestCase {
 		);
 
 		$sqlQueries = [];
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('test_table')
+			->willReturn(true);
+
 		$mockClient->expects($this->exactly(3))
 			->method('sendRequest')
 			->willReturnCallback(
@@ -536,8 +553,13 @@ class SearchEngineTest extends TestCase {
 			]
 		);
 
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('test_table')
+			->willReturn(true);
+
 		$mockClient->expects($this->exactly(2)) // schema, exclusion
-		->method('sendRequest')
+			->method('sendRequest')
 			->willReturnOnConsecutiveCalls($schemaResponse, $exclusionResponse);
 
 		$result = $searchEngine->getExcludedIds(
@@ -559,6 +581,11 @@ class SearchEngineTest extends TestCase {
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
+
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('test_table')
+			->willReturn(true);
 
 		$result = $searchEngine->getExcludedIds(
 			$mockClient,
@@ -593,8 +620,13 @@ class SearchEngineTest extends TestCase {
 			]
 		);
 
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('test_table')
+			->willReturn(true);
+
 		$mockClient->expects($this->exactly(3)) // schema, search, schema
-		->method('sendRequest')
+			->method('sendRequest')
 			->willReturnOnConsecutiveCalls(
 				$schemaResponse,
 				$searchResponse,
@@ -626,6 +658,11 @@ class SearchEngineTest extends TestCase {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$schemaResponse = $this->createDefaultVectorSchemaResponse();
 		$exclusionResponse = $this->createExclusionResponse([]);
+
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('test_table')
+			->willReturn(true);
 
 		$mockClient->expects($this->exactly(2))
 			->method('sendRequest')
@@ -676,6 +713,11 @@ class SearchEngineTest extends TestCase {
 		);
 
 		$actualSql = '';
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('docs')
+			->willReturn(true);
+
 		$mockClient->expects($this->exactly(2))
 			->method('sendRequest')
 			->willReturnCallback(
@@ -734,8 +776,13 @@ class SearchEngineTest extends TestCase {
 		);
 
 		$sqlQueries = [];
+		$mockClient->expects($this->exactly(2))
+			->method('hasTable')
+			->with('docs')
+			->willReturn(true);
+
 		$mockClient->expects($this->exactly(5)) // schema, exclusion, schema, search, schema
-		->method('sendRequest')
+			->method('sendRequest')
 			->willReturnCallback(
 				function ($sql) use ($schemaResponse, $exclusionResponse, $searchResponse, &$sqlQueries) {
 					$sqlQueries[] = $sql;
@@ -761,19 +808,56 @@ class SearchEngineTest extends TestCase {
 		);
 
 		// Verify exclusion SQL was generated correctly
-		$exclusionSql = $sqlQueries[1]; // Second query should be exclusion
+		$exclusionSql = $sqlQueries[1];
 		$this->assertStringContainsString(
 			/** @lang manticore */            'SELECT id, knn_dist() as knn_dist FROM docs',
 			$exclusionSql
 		);
 
 		// Verify search SQL excludes the found ID
-		$searchSql = $sqlQueries[3]; // Fourth query should be search
+		$searchSql = $sqlQueries[3];
 		$this->assertStringContainsString('id NOT IN (1156395647918669832)', $searchSql);
 
 		// Verify results don't contain the excluded ID
 		$this->assertCount(2, $result);
 		$this->assertEquals(1001, $result[0]['id']);
 		$this->assertEquals(1002, $result[1]['id']);
+	}
+
+	public function testPerformSearchRejectsInvalidTableIdentifier(): void {
+		$searchEngine = $this->createSearchEngine();
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		$this->expectException(ManticoreSearchClientError::class);
+
+		$searchEngine->performSearchWithExcludedIds(
+			$mockClient,
+			"docs WHERE 1=1",
+			'test search query',
+			[],
+			$this->createDefaultModelConfig(),
+			0.8
+		);
+	}
+
+	public function testPerformSearchFailsWhenTableDoesNotExist(): void {
+		$searchEngine = $this->createSearchEngine();
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('missing_table')
+			->willReturn(false);
+
+		$this->expectException(ManticoreSearchClientError::class);
+
+		$searchEngine->performSearchWithExcludedIds(
+			$mockClient,
+			'missing_table',
+			'test search query',
+			[],
+			$this->createDefaultModelConfig(),
+			0.8
+		);
 	}
 }

@@ -10,6 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Handler as RagHandler;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Intent;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Payload as RagPayload;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
@@ -396,13 +397,13 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('retrieval_limit must be between 1 and 50', $error->getResponseError());
+		$this->assertStringContainsString('retrieval_limit must be an integer between 1 and 50', $error->getResponseError());
 	}
 
-	public function testCreateModelInvalidMaxDocumentLengthUsesDefault(): void {
+	public function testCreateModelInvalidMaxDocumentLength(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
 			model = 'openai:gpt-4',
-			max_document_length = 0
+			max_document_length = -2
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -422,43 +423,17 @@ class ConversationHandlerTest extends TestCase {
 		$handler = new RagHandler($payload);
 
 		$mockClient = $this->createMock(HTTPClient::class);
-		$modelExistsResponse = $this->createResponse([['data' => [['count' => 0]]]]);
-		$insertResponse = $this->createResponse([['total' => 1, 'error' => '', 'warning' => '']]);
-
-		$capturedQuery = '';
-		$mockClient->expects($this->exactly(4))
-			->method('sendRequest')
-			->willReturnCallback(
-				function (string $sql) use (
-					$modelExistsResponse,
-					$insertResponse,
-					&$capturedQuery
-				): Response {
-					static $call = 0;
-					$call++;
-					if ($call === 4) {
-						$capturedQuery = $sql;
-					}
-
-					if ($call <= 2) {
-						return $this->createInitializationResponses()[$call - 1];
-					}
-					if ($call === 3) {
-						return $modelExistsResponse;
-					}
-					if ($call === 4) {
-						return $insertResponse;
-					}
-
-					throw new Exception("Unexpected database call #$call");
-				}
-			);
+		$this->configureClientWithInitialization($mockClient);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
-		$this->assertTrue($task->isSucceed());
-		$this->assertStringContainsString('max_document_length', $capturedQuery);
-		$this->assertStringContainsString('2000', $capturedQuery);
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString(
+			'max_document_length must be an integer between -1 and 65536',
+			$error->getResponseError()
+		);
 	}
 
 	public function testCreateModelWithEncryptionIntegration(): void {
@@ -698,10 +673,6 @@ class ConversationHandlerTest extends TestCase {
 			]]
 		);
 
-		// 6: getRecentUserIntents (for dynamic threshold)
-		$intentsResponse = $this->createResponse([['data' => []]]);
-
-		// 7: detectVectorField (DESCRIBE table for main search)
 		$describeResponse = $this->createResponse(
 			[[
 			'data' => [
@@ -749,13 +720,16 @@ class ConversationHandlerTest extends TestCase {
 				$modelResponse, // getModelByUuidOrName
 				$historyResponse, // getConversationHistory
 				$queryHistoryResponse, // getConversationHistoryForQueryGeneration
-				$intentsResponse, // getRecentUserIntents
 				$describeResponse, // detectVectorField for main search
 				$searchResponse, // performSearchWithExcludedIds
 				$describeResponse2, // getVectorFields
 				$saveUserContextResponse, // saveMessage user with context
 				$saveAssistantResponse, // saveMessage assistant
 			];
+
+			$mockClient->method('hasTable')
+			->with('movies')
+			->willReturn(true);
 
 			$mockClient->method('sendRequest')
 			->willReturnCallback(
@@ -803,6 +777,117 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertEquals('conv-uuid', $struct[0]['data'][0]['conversation_uuid']);
 		$this->assertEquals('Show me action movies', $struct[0]['data'][0]['user_query']);
 		$this->assertStringContainsString('action movies', $struct[0]['data'][0]['search_query']);
+	}
+
+	public function testContentQuestionWithoutContextFallsBackToNewSearchIntent(): void {
+		$query = "CALL CONVERSATIONAL_RAG('What about comedies?', 'movies', 'model-uuid', 'content', 'conv-uuid')";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => $query,
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler(
+			$payload,
+			$this->createMockLlmProvider(
+				[
+					['content' => Intent::CONTENT_QUESTION, 'success' => true, 'metadata' => []],
+					[
+						'content' => 'SEARCH_QUERY: comedy movies' . "\n" . 'EXCLUDE_QUERY: none',
+						'success' => true,
+						'metadata' => [],
+					],
+					['content' => 'YES', 'success' => true, 'metadata' => []],
+					[
+						'content' => 'Here are some comedies!',
+						'metadata' => ['tokens_used' => 99],
+						'success' => true,
+					],
+				]
+			)
+		);
+
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		$initResponses = $this->createInitializationResponses();
+		$modelResponse = $this->createResponse(
+			[[
+				'data' => [[
+					'uuid' => 'model-uuid',
+					'name' => 'test_model',
+					'style_prompt' => 'You are a helpful assistant.',
+					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
+					'created_at' => '2023-01-01 00:00:00',
+				]],
+			]]
+		);
+		$historyResponse = $this->createResponse([['data' => []]]);
+		$latestContextResponse = $this->createResponse([['data' => []]]);
+		$queryHistoryResponse = $this->createResponse([['data' => []]]);
+		$describeResponse = $this->createResponse(
+			[[ 'data' => [
+				['Field' => 'id', 'Type' => 'bigint'],
+				['Field' => 'content', 'Type' => 'text'],
+				['Field' => 'embedding', 'Type' => 'FLOAT_VECTOR(1536)'],
+			] ]]
+		);
+		$searchResponse = $this->createResponse(
+			[[ 'data' => [['id' => 7, 'content' => 'Funny movie', 'knn_dist' => 0.1]] ]]
+		);
+		$describeResponse2 = $this->createResponse(
+			[[ 'data' => [
+				['Field' => 'id', 'Type' => 'bigint'],
+				['Field' => 'content', 'Type' => 'text'],
+				['Field' => 'embedding', 'Type' => 'FLOAT_VECTOR(1536)'],
+			] ]]
+		);
+		$saveUserResponse = $this->createResponse();
+		$saveAssistantResponse = $this->createResponse();
+
+		$queries = [];
+		$responses = [
+			...$initResponses,
+			$modelResponse,
+			$historyResponse,
+			$latestContextResponse,
+			$queryHistoryResponse,
+			$describeResponse,
+			$searchResponse,
+			$describeResponse2,
+			$saveUserResponse,
+			$saveAssistantResponse,
+		];
+		$callCounter = 0;
+
+		$mockClient->method('hasTable')
+			->with('movies')
+			->willReturn(true);
+
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $sql) use (&$callCounter, &$queries, $responses): Response {
+					$queries[] = $sql;
+					$response = $responses[$callCounter];
+					$callCounter++;
+					return $response;
+				}
+			);
+
+		$handler->setManticoreClient($mockClient);
+		$task = $handler->run();
+
+		$this->assertTrue($task->isSucceed());
+		$userInsert = $queries[9];
+		$this->assertStringContainsString("'NEW_SEARCH'", $userInsert);
+		$this->assertStringContainsString("'comedy movies'", $userInsert);
 	}
 
 		/**

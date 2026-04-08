@@ -283,7 +283,7 @@ class ConversationManagerSqlValidationTest extends TestCase {
 					// Validate SELECT SQL structure
 					$this->assertStringStartsWith('SELECT role, message FROM rag_conversations', $sql);
 					$this->assertStringContainsString("WHERE conversation_uuid = 'conv-123'", $sql);
-					$this->assertStringContainsString('ORDER BY created_at ASC', $sql);
+					$this->assertStringContainsString('ORDER BY created_at ASC, id ASC', $sql);
 					$this->assertStringContainsString('LIMIT 100', $sql);
 
 					return true;
@@ -335,7 +335,7 @@ class ConversationManagerSqlValidationTest extends TestCase {
 					$this->assertStringContainsString("WHERE conversation_uuid = 'conv-123'", $sql);
 					$this->assertStringContainsString("AND role = 'user'", $sql);
 					$this->assertStringContainsString("AND intent != 'CONTENT_QUESTION'", $sql);
-					$this->assertStringContainsString('ORDER BY created_at DESC', $sql);
+					$this->assertStringContainsString('ORDER BY created_at DESC, id DESC', $sql);
 					$this->assertStringContainsString('LIMIT 1', $sql);
 
 					return true;
@@ -381,7 +381,7 @@ class ConversationManagerSqlValidationTest extends TestCase {
 					$this->assertStringStartsWith('SELECT role, message FROM rag_conversations', $sql);
 					$this->assertStringContainsString("WHERE conversation_uuid = 'conv-123'", $sql);
 					$this->assertStringContainsString("AND intent != 'CONTENT_QUESTION'", $sql);
-					$this->assertStringContainsString('ORDER BY created_at ASC', $sql);
+					$this->assertStringContainsString('ORDER BY created_at ASC, id ASC', $sql);
 					$this->assertStringContainsString('LIMIT 50', $sql);
 
 					return true;

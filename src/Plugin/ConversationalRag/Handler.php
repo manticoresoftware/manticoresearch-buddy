@@ -29,21 +29,6 @@ use Throwable;
  * including model management and conversation processing
  */
 final class Handler extends BaseHandlerWithClient {
-	/**
-	 * Supported flat fields for CREATE RAG MODEL.
-	 *
-	 * @var array<int, string>
-	 */
-	private const array MODEL_FIELDS = [
-		'model',
-		'description',
-		'style_prompt',
-		'api_key',
-		'base_url',
-		'timeout',
-		'retrieval_limit',
-		'max_document_length',
-	];
 	private const float RESPONSE_TEMPERATURE = 0.2;
 	private const int RESPONSE_MAX_TOKENS = 4096;
 	private const float RESPONSE_TOP_P = 1.0;
@@ -143,121 +128,13 @@ final class Handler extends BaseHandlerWithClient {
 		 *   max_document_length?: string|int} $config
 		 */
 		$config = $payload->params;
-		$createConfig = self::validateModelConfig($config);
+		$createConfig = (new ModelConfigValidator())->validate($config);
 
 		// Create model
 		$uuid = $modelManager->createModel($client, $createConfig);
 
 		return TaskResult::withRow(['uuid' => $uuid])
 			->column('uuid', Column::String);
-	}
-
-	/**
-	 * Validate model configuration
-	 *
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
-	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
-	 *
-	 * @return array{name: string, model: string, description?: string, style_prompt?: string,
-	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int}
-	 * @throws QueryParseError
-	 */
-	private static function validateModelConfig(array $config): array {
-		self::validateSupportedFields($config);
-		self::validateRequiredFields($config);
-		self::validateModelId($config);
-		self::validateRetrievalLimit($config);
-
-		$createConfig = ['name' => $config['identifier']];
-		foreach (self::MODEL_FIELDS as $field) {
-			if (!array_key_exists($field, $config)) {
-				continue;
-			}
-
-			$createConfig[$field] = $config[$field];
-		}
-
-		/** @var array{name: string, model: string, description?: string, style_prompt?: string,
-		 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-		 *   max_document_length?: string|int} $createConfig
-		 */
-		return $createConfig;
-	}
-
-	/**
-	 * Validate required fields
-	 *
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
-	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
-	 *
-	 * @return void
-	 * @throws QueryParseError
-	 */
-	private static function validateRequiredFields(array $config): void {
-		$required = ['model'];
-
-		foreach ($required as $field) {
-			if (empty($config[$field])) {
-				throw QueryParseError::create("Required field '$field' is missing or empty");
-			}
-		}
-	}
-
-	/**
-	 * @param array<string, mixed> $config
-	 *
-	 * @return void
-	 * @throws QueryParseError
-	 */
-	private static function validateSupportedFields(array $config): void {
-		$supportedFields = array_flip(self::MODEL_FIELDS);
-		foreach (array_keys($config) as $field) {
-			if ($field === 'identifier') {
-				continue;
-			}
-
-			if (!isset($supportedFields[$field])) {
-				throw QueryParseError::create("Unsupported field '$field'");
-			}
-		}
-	}
-
-	/**
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
-	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
-	 *
-	 * @return void
-	 * @throws QueryParseError
-	 */
-	private static function validateModelId(array $config): void {
-		$modelId = trim($config['model']);
-		[$provider, $model] = array_pad(explode(':', $modelId, 2), 2, '');
-		if ($provider === '' || $model === '') {
-			throw QueryParseError::create("model must use 'provider:model' format");
-		}
-	}
-
-	/**
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
-	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
-	 *
-	 * @return void
-	 * @throws QueryParseError
-	 */
-	private static function validateRetrievalLimit(array $config): void {
-		if (!isset($config['retrieval_limit'])) {
-			return;
-		}
-
-		$k = (int)$config['retrieval_limit'];
-		if ($k < 1 || $k > 50) {
-			throw QueryParseError::create('retrieval_limit must be between 1 and 50');
-		}
 	}
 
 	/**
@@ -398,7 +275,7 @@ final class Handler extends BaseHandlerWithClient {
 		/** @var array{max_document_length:int} $settings */
 		$settings = $model['settings'];
 		$searchContext = new SearchContext($intent, $request, $conversationHistory, $model);
-		[$searchResults, $queries, $excludedIds] = self::performSearch(
+		[$effectiveIntent, $searchResults, $queries, $excludedIds] = self::performSearch(
 			$searchContext, $services
 		);
 
@@ -417,7 +294,7 @@ final class Handler extends BaseHandlerWithClient {
 		$responseText = $response['content'];
 		$tokensUsed = $response['metadata']['tokens_used'] ?? 0;
 
-		$turn = new ConversationTurn($intent, $queries, $excludedIds, $responseText, $tokensUsed);
+		$turn = new ConversationTurn($effectiveIntent, $queries, $excludedIds, $responseText, $tokensUsed);
 		self::saveConversationMessages(
 			$conversationManager, $request, $model['uuid'], $turn
 		);
@@ -531,7 +408,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param SearchContext $context
 	 * @param SearchServices $services
 	 *
-	 * @return array{array<int, array<string, mixed>>, array{search_query:string,
+	 * @return array{string, array<int, array<string, mixed>>, array{search_query:string,
 	 *   exclude_query:string}, array<int, string|int>}
 	 * @throws ManticoreSearchResponseError
 	 *
@@ -558,7 +435,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param SearchContext $context
 	 * @param SearchServices $services
 	 *
-	 * @return array{array<int, array<string, mixed>>, array{search_query: string,
+	 * @return array{string, array<int, array<string, mixed>>, array{search_query: string,
 	 *   exclude_query: string}, array<int, string|int>}
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
@@ -606,7 +483,7 @@ final class Handler extends BaseHandlerWithClient {
 				$context->model, $thresholdInfo['threshold']
 			);
 			Buddy::debugvv('├─ CONTENT_QUESTION performed KNN search with previous query parameters');
-			return [$searchResults, $queries, $excludedIds];
+			return [$context->intent, $searchResults, $queries, $excludedIds];
 		}
 
 		Buddy::debugvv('├─ No previous search context found, falling back to NEW_SEARCH');
@@ -622,7 +499,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param SearchContext $context
 	 * @param SearchServices $services
 	 *
-	 * @return array{array<int, array<string, mixed>>, array{search_query:string,
+	 * @return array{string, array<int, array<string, mixed>>, array{search_query:string,
 	 *   exclude_query:string}, array<int, string|int>}
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 *
@@ -670,7 +547,7 @@ final class Handler extends BaseHandlerWithClient {
 			$context->model, $thresholdInfo['threshold']
 		);
 
-		return [$searchResults, $queries, $excludedIds];
+		return [$context->intent, $searchResults, $queries, $excludedIds];
 	}
 
 	/**

@@ -313,7 +313,7 @@ class ConversationValidationTest extends TestCase {
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('retrieval_limit must be between 1 and 50', $error->getResponseError());
+		$this->assertStringContainsString('retrieval_limit must be an integer between 1 and 50', $error->getResponseError());
 	}
 
 	public function testKResultsAboveMaximum(): void {
@@ -344,7 +344,173 @@ class ConversationValidationTest extends TestCase {
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
-		$this->assertStringContainsString('retrieval_limit must be between 1 and 50', $error->getResponseError());
+		$this->assertStringContainsString('retrieval_limit must be an integer between 1 and 50', $error->getResponseError());
+	}
+
+	public function testKResultsRejectsNonIntegerValue(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			retrieval_limit = 1.5
+		)";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString('retrieval_limit must be an integer between 1 and 50', $error->getResponseError());
+	}
+
+	public function testTimeoutBelowMinimum(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			timeout = 0
+		)";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString('timeout must be an integer between 1 and 65536', $error->getResponseError());
+	}
+
+	public function testTimeoutAboveMaximum(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			timeout = 65537
+		)";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString('timeout must be an integer between 1 and 65536', $error->getResponseError());
+	}
+
+	public function testTimeoutRejectsNonIntegerValue(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			timeout = 1.5
+		)";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString('timeout must be an integer between 1 and 65536', $error->getResponseError());
+	}
+
+	public function testValidTimeoutEdgeCases(): void {
+		$query1 = "CREATE RAG MODEL 'test_model1' (
+			model = 'openai:gpt-4',
+			timeout = 1
+		)";
+
+		$payload1 = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query1,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$this->assertEquals(1, $payload1->params['timeout']);
+
+		$query2 = "CREATE RAG MODEL 'test_model2' (
+			model = 'openai:gpt-4',
+			timeout = 65536
+		)";
+
+		$payload2 = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query2,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$this->assertEquals(65536, $payload2->params['timeout']);
 	}
 
 	public function testValidModelConfiguration(): void {
@@ -373,10 +539,10 @@ class ConversationValidationTest extends TestCase {
 		$this->assertEquals('openai:gpt-4', $payload->params['model']);
 	}
 
-	public function testInvalidMaxDocumentLengthStillParses(): void {
+	public function testMaxDocumentLengthBelowMinimum(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
 			model = 'openai:gpt-4',
-			max_document_length = 0
+			max_document_length = -2
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -392,7 +558,87 @@ class ConversationValidationTest extends TestCase {
 			)
 		);
 
-		$this->assertEquals(0, $payload->params['max_document_length']);
+		$handler = new RagHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString(
+			'max_document_length must be an integer between -1 and 65536',
+			$error->getResponseError()
+		);
+	}
+
+	public function testMaxDocumentLengthAboveMaximum(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			max_document_length = 65537
+		)";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString(
+			'max_document_length must be an integer between -1 and 65536',
+			$error->getResponseError()
+		);
+	}
+
+	public function testMaxDocumentLengthRejectsNonIntegerValue(): void {
+		$query = "CREATE RAG MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			max_document_length = 1.5
+		)";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString(
+			'max_document_length must be an integer between -1 and 65536',
+			$error->getResponseError()
+		);
 	}
 
 	public function testValidMaxDocumentLengthEdgeCases(): void {
@@ -418,7 +664,7 @@ class ConversationValidationTest extends TestCase {
 
 		$query2 = "CREATE RAG MODEL 'test_model2' (
 			model = 'openai:gpt-4',
-			max_document_length = 2000
+			max_document_length = 65536
 		)";
 
 		$payload2 = RagPayload::fromRequest(
@@ -434,7 +680,7 @@ class ConversationValidationTest extends TestCase {
 			)
 		);
 
-		$this->assertEquals(2000, $payload2->params['max_document_length']);
+		$this->assertEquals(65536, $payload2->params['max_document_length']);
 	}
 
 	public function testValidKResultsEdgeCases(): void {

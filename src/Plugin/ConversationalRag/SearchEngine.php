@@ -26,6 +26,7 @@ class SearchEngine {
 
 	private const float DEFAULT_SIMILARITY_THRESHOLD = 0.8;
 	private const int DEFAULT_RETRIEVAL_LIMIT = 5;
+	private const string TABLE_IDENTIFIER_PATTERN = '/^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?$/';
 
 	/**
 	 * Perform enhanced KNN search with exclusions (based on original enhancedKNNSearch)
@@ -48,11 +49,13 @@ class SearchEngine {
 		array $modelConfig,
 		?float $threshold = null
 	): array {
+		$this->assertSearchableTable($client, $table);
+
 		// Get excluded IDs first
-		$excludedIds = $this->getExcludedIds($client, $table, $excludeQuery);
+		$excludedIds = $this->getExcludedIdsForValidatedTable($client, $table, $excludeQuery);
 
 		// Use optimized search with pre-computed excluded IDs
-		return $this->performSearchWithExcludedIds(
+		return $this->performSearchWithExcludedIdsForValidatedTable(
 			$client,
 			$table,
 			$searchQuery,
@@ -73,6 +76,23 @@ class SearchEngine {
 	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
 	 */
 	public function getExcludedIds(
+		HTTPClient $client,
+		string $table,
+		string $excludeQuery
+	): array {
+		$this->assertSearchableTable($client, $table);
+		return $this->getExcludedIdsForValidatedTable($client, $table, $excludeQuery);
+	}
+
+	/**
+	 * @param HTTPClient $client
+	 * @param string $table
+	 * @param string $excludeQuery
+	 *
+	 * @return array<int, string|int>
+	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
+	 */
+	private function getExcludedIdsForValidatedTable(
 		HTTPClient $client,
 		string $table,
 		string $excludeQuery
@@ -168,6 +188,36 @@ class SearchEngine {
 		array $modelConfig,
 		float $threshold
 	): array {
+		$this->assertSearchableTable($client, $table);
+		return $this->performSearchWithExcludedIdsForValidatedTable(
+			$client,
+			$table,
+			$searchQuery,
+			$excludedIds,
+			$modelConfig,
+			$threshold
+		);
+	}
+
+	/**
+	 * @param HTTPClient $client
+	 * @param string $table
+	 * @param string $searchQuery
+	 * @param array<int, string|int> $excludedIds
+	 * @param array{model: string, settings:array<string, mixed>} $modelConfig
+	 * @param float $threshold
+	 *
+	 * @return array<int, array<string, mixed>>
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
+	 */
+	private function performSearchWithExcludedIdsForValidatedTable(
+		HTTPClient $client,
+		string $table,
+		string $searchQuery,
+		array $excludedIds,
+		array $modelConfig,
+		float $threshold
+	): array {
 		$retrievalLimit = $this->getRetrievalLimit($modelConfig);
 		$vectorField = $this->detectVectorField($client, $table);
 
@@ -211,6 +261,20 @@ class SearchEngine {
 		Buddy::debugvv('└─ Results found: ' . sizeof($result));
 
 		return $this->filterVectorFields($result, $table, $client);
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	private function assertSearchableTable(HTTPClient $client, string $table): void {
+		if (preg_match(self::TABLE_IDENTIFIER_PATTERN, $table) !== 1) {
+			throw ManticoreSearchClientError::create('Invalid table identifier');
+		}
+
+		if (!$client->hasTable($table)) {
+			throw ManticoreSearchClientError::create("Table '$table' not found");
+		}
 	}
 
 	/**

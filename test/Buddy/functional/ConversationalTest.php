@@ -94,31 +94,78 @@ class ConversationalTest extends TestCase {
 				api_key = 'sk-test-key',
 				retrieval_limit = 100
 			)",
-			'retrieval_limit must be between 1 and 50'
+			'retrieval_limit must be an integer between 1 and 50'
 		);
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelInvalidMaxDocumentLengthUsesDefault(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'bad_model'");
-
-		$result = static::runSqlQuery(
+	public function testCreateRagModelRejectsNonIntegerKResults(): void {
+		$this->assertQueryResultContainsError(
 			"CREATE RAG MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
-				max_document_length = 0
-			)"
+				retrieval_limit = 1.5
+			)",
+			'retrieval_limit must be an integer between 1 and 50'
 		);
-		$this->assertIsArray($result);
+	}
 
-		$this->assertQueryResult(
-			"DESCRIBE RAG MODEL 'bad_model'",
-			['settings.max_document_length', '2000']
+	/**
+	 * @throws Exception
+	 */
+	public function testCreateRagModelInvalidTimeout(): void {
+		$this->assertQueryResultContainsError(
+			"CREATE RAG MODEL 'bad_model' (
+				model = 'openai:gpt-4',
+				api_key = 'sk-test-key',
+				timeout = 65537
+			)",
+			'timeout must be an integer between 1 and 65536'
 		);
+	}
 
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'bad_model'");
+	/**
+	 * @throws Exception
+	 */
+	public function testCreateRagModelRejectsNonIntegerTimeout(): void {
+		$this->assertQueryResultContainsError(
+			"CREATE RAG MODEL 'bad_model' (
+				model = 'openai:gpt-4',
+				api_key = 'sk-test-key',
+				timeout = 1.5
+			)",
+			'timeout must be an integer between 1 and 65536'
+		);
+	}
+
+	/**
+	 * @throws Exception
+	 */
+	public function testCreateRagModelInvalidMaxDocumentLength(): void {
+		$this->assertQueryResultContainsError(
+			"CREATE RAG MODEL 'bad_model' (
+				model = 'openai:gpt-4',
+				api_key = 'sk-test-key',
+				max_document_length = -2
+			)",
+			'max_document_length must be an integer between -1 and 65536'
+		);
+	}
+
+	/**
+	 * @throws Exception
+	 */
+	public function testCreateRagModelRejectsNonIntegerMaxDocumentLength(): void {
+		$this->assertQueryResultContainsError(
+			"CREATE RAG MODEL 'bad_model' (
+				model = 'openai:gpt-4',
+				api_key = 'sk-test-key',
+				max_document_length = 1.5
+			)",
+			'max_document_length must be an integer between -1 and 65536'
+		);
 	}
 
 	/**

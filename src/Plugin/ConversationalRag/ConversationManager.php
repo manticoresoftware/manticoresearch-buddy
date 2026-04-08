@@ -22,6 +22,7 @@ class ConversationManager {
 
 	public const string CONVERSATIONS_TABLE = 'rag_conversations';
 	private const int CONVERSATION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+	private const int TIMESTAMP_PRECISION = 1000000;
 
 	/**
 	 * @param Client $client
@@ -100,8 +101,8 @@ class ConversationManager {
 			'└─ Excluded IDs count: ' . ($excludedIds === null ? 0 : sizeof($excludedIds))
 		);
 
-		$currentTime = time();
-		$ttlTime = $currentTime + self::CONVERSATION_TTL_SECONDS;
+		$currentTime = (int)(microtime(true) * self::TIMESTAMP_PRECISION);
+		$ttlTime = time() + self::CONVERSATION_TTL_SECONDS;
 
 		$intentValue = $intent ? $this->quote($intent) : "''";
 		$searchQueryValue = $searchQuery ? $this->quote($searchQuery) : "''";
@@ -160,7 +161,7 @@ class ConversationManager {
 		$sql = sprintf(
 		/** @lang manticore */            'SELECT role, message FROM %s '
 			. 'WHERE conversation_uuid = %s '
-			. 'ORDER BY created_at ASC '
+			. 'ORDER BY created_at ASC, id ASC '
 			. 'LIMIT %d',
 			self::CONVERSATIONS_TABLE,
 			$this->quote($conversationUuid),
@@ -221,7 +222,7 @@ class ConversationManager {
 			. 'WHERE conversation_uuid = %s '
 			. 'AND role = %s '
 			. 'AND intent != %s '
-			. 'ORDER BY created_at DESC '
+			. 'ORDER BY created_at DESC, id DESC '
 			. 'LIMIT 1',
 			self::CONVERSATIONS_TABLE,
 			$this->quote($conversationUuid),
@@ -314,7 +315,7 @@ class ConversationManager {
 			'SELECT role, message FROM %s '
 			. 'WHERE conversation_uuid = %s '
 			. 'AND intent != %s '
-			. 'ORDER BY created_at ASC '
+			. 'ORDER BY created_at ASC, id ASC '
 			. 'LIMIT %d',
 			self::CONVERSATIONS_TABLE,
 			$this->quote($conversationUuid),
@@ -370,7 +371,7 @@ class ConversationManager {
 			'SELECT intent FROM %s '
 			. 'WHERE conversation_uuid = %s '
 			. 'AND role = %s '
-			. 'ORDER BY created_at DESC '
+			. 'ORDER BY created_at DESC, id DESC '
 			. 'LIMIT %d',
 			self::CONVERSATIONS_TABLE,
 			$this->quote($conversationUuid),
