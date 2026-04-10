@@ -251,8 +251,7 @@ CREATE RAG MODEL advanced_assistant (
 Validation enforced by Buddy:
 
 - `retrieval_limit`: `1..50`
-- `max_document_length`: `-1` or `> 0`
-  invalid or missing values are normalized to the default `2000` during model creation
+- `max_document_length`: `0` disables truncation; otherwise `100..65536`
 
 ### Returned result
 
@@ -386,13 +385,13 @@ Conversation flow includes:
 Buddy-specific search settings:
 
 - `retrieval_limit`: number of documents retrieved for KNN
-- `max_document_length`: per-document context budget; `-1` disables truncation
+- `max_document_length`: per-document context budget; `0` disables truncation
 
 `max_document_length` directly affects result quality and cost:
 
 - smaller values reduce prompt size and spend, but can hide useful context
 - larger values improve context completeness, but increase token usage
-- `-1` disables truncation entirely and should be used carefully with large documents
+- `0` disables truncation entirely and should be used carefully with large documents
 
 ## Tested Examples
 
@@ -448,7 +447,7 @@ CREATE RAG MODEL assistant (
     base_url='http://host.docker.internal:8787/v1',
     timeout=60,
     retrieval_limit=5,
-    max_document_length=-1
+    max_document_length=0
 );
 ```
 

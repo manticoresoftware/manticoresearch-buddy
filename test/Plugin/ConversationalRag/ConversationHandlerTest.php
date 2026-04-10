@@ -406,7 +406,7 @@ class ConversationHandlerTest extends TestCase {
 	public function testCreateModelInvalidMaxDocumentLength(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
 			model = 'openai:gpt-4',
-			max_document_length = -2
+			max_document_length = 99
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -434,7 +434,7 @@ class ConversationHandlerTest extends TestCase {
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
 		$this->assertStringContainsString(
-			'max_document_length must be an integer between -1 and 65536',
+			'max_document_length must be 0 or an integer between 100 and 65536',
 			$error->getResponseError()
 		);
 	}

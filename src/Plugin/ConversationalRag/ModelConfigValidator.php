@@ -184,16 +184,18 @@ final class ModelConfigValidator {
 		if (is_string($maxDocumentLength)) {
 			if (preg_match('/^-?[0-9]+\z/', $maxDocumentLength) !== 1) {
 				throw QueryParseError::create(
-					'max_document_length must be an integer between -1 and 65536'
+					'max_document_length must be 0 or an integer between 100 and 65536'
 				);
 			}
 
 			$maxDocumentLength = (int)$maxDocumentLength;
 		}
 
-		if (!is_int($maxDocumentLength) || $maxDocumentLength < -1 || $maxDocumentLength > 65536) {
+		if (!is_int($maxDocumentLength)
+			|| ($maxDocumentLength !== 0 && ($maxDocumentLength < 100 || $maxDocumentLength > 65536))
+		) {
 			throw QueryParseError::create(
-				'max_document_length must be an integer between -1 and 65536'
+				'max_document_length must be 0 or an integer between 100 and 65536'
 			);
 		}
 	}

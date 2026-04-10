@@ -148,9 +148,9 @@ class ConversationalTest extends TestCase {
 			"CREATE RAG MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
-				max_document_length = -2
+				max_document_length = 99
 			)",
-			'max_document_length must be an integer between -1 and 65536'
+			'max_document_length must be 0 or an integer between 100 and 65536'
 		);
 	}
 
@@ -164,7 +164,7 @@ class ConversationalTest extends TestCase {
 				api_key = 'sk-test-key',
 				max_document_length = 1.5
 			)",
-			'max_document_length must be an integer between -1 and 65536'
+			'max_document_length must be 0 or an integer between 100 and 65536'
 		);
 	}
 
@@ -211,13 +211,13 @@ class ConversationalTest extends TestCase {
 			model = 'openai:gpt-4',
 			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5,
-			max_document_length = -1
+			max_document_length = 0
 		)"
 		);
 
 		$this->assertQueryResult(
 			"DESCRIBE RAG MODEL 'test_model'",
-			['test_model', 'openai:gpt-4', '-1']
+			['test_model', 'openai:gpt-4', '0']
 		);
 
 		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");

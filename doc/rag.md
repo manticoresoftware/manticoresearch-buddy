@@ -89,8 +89,8 @@ Recommended optional fields:
 
 `max_document_length` is normalized during model creation:
 
-- valid values are `-1` or any positive integer
-- missing or invalid values are stored as the default `2000`
+- valid values are `0` to disable truncation, or an integer between `100` and `65536`
+- missing values are stored as the default `2000`
 
 ## Model Format
 
@@ -217,7 +217,7 @@ CREATE RAG MODEL assistant (
     base_url='http://host.docker.internal:8787/v1',
     timeout=60,
     retrieval_limit=5,
-    max_document_length=-1
+    max_document_length=0
 );
 ```
 
@@ -225,4 +225,4 @@ CREATE RAG MODEL assistant (
 
 - use a smaller value to reduce cost and latency
 - use a larger value to preserve more context
-- use `-1` to disable truncation entirely when quality matters more than spend
+- use `0` to disable truncation entirely when quality matters more than spend

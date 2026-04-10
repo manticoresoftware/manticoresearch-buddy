@@ -201,7 +201,7 @@ class ModelManager {
 		}
 
 		$maxDocumentLength = (int)$value;
-		if ($maxDocumentLength === -1 || $maxDocumentLength > 0) {
+		if ($maxDocumentLength === 0 || ($maxDocumentLength >= 100 && $maxDocumentLength <= 65536)) {
 			return $maxDocumentLength;
 		}
 

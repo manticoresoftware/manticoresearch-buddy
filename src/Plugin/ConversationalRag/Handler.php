@@ -611,7 +611,7 @@ final class Handler extends BaseHandlerWithClient {
 
 				// Use comma + space as separator between fields
 				$content = implode(', ', $contentParts);
-				if ($maxDocumentLength === -1 || strlen($content) <= $maxDocumentLength) {
+				if ($maxDocumentLength === 0 || strlen($content) <= $maxDocumentLength) {
 					return $content;
 				}
 
@@ -635,7 +635,7 @@ final class Handler extends BaseHandlerWithClient {
 		Buddy::debugv('RAG: [DEBUG CONTEXT]');
 		Buddy::debugv('RAG: ├─ Documents count: ' . sizeof($searchResults));
 		Buddy::debugv('RAG: ├─ Total context length: ' . strlen($context) . ' chars');
-		$maxDocumentLengthLabel = $maxDocumentLength === -1 ? 'unlimited' : (string)$maxDocumentLength;
+		$maxDocumentLengthLabel = $maxDocumentLength === 0 ? 'unlimited' : (string)$maxDocumentLength;
 		Buddy::debugv("RAG: └─ Max doc length: $maxDocumentLengthLabel chars");
 	}
 

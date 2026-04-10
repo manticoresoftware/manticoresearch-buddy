@@ -498,8 +498,8 @@ class ModelManagerTest extends TestCase {
 		);
 		$this->assertEquals(2000, $defaulted['max_document_length']);
 
-		/** @var array{max_document_length:int} $invalid */
-		$invalid = $method->invoke(
+		/** @var array{max_document_length:int} $disabled */
+		$disabled = $method->invoke(
 			$modelManager,
 			[
 				'name' => 'test_model',
@@ -507,18 +507,29 @@ class ModelManagerTest extends TestCase {
 				'max_document_length' => 0,
 			]
 		);
-		$this->assertEquals(2000, $invalid['max_document_length']);
+		$this->assertEquals(0, $disabled['max_document_length']);
 
-		/** @var array{max_document_length:int} $disabled */
-		$disabled = $method->invoke(
+		/** @var array{max_document_length:int} $invalid */
+		$invalid = $method->invoke(
 			$modelManager,
 			[
 				'name' => 'test_model',
 				'model' => 'openai:gpt-4',
-				'max_document_length' => -1,
+				'max_document_length' => 99,
 			]
 		);
-		$this->assertEquals(-1, $disabled['max_document_length']);
+		$this->assertEquals(2000, $invalid['max_document_length']);
+
+		/** @var array{max_document_length:int} $tooLarge */
+		$tooLarge = $method->invoke(
+			$modelManager,
+			[
+				'name' => 'test_model',
+				'model' => 'openai:gpt-4',
+				'max_document_length' => 65537,
+			]
+		);
+		$this->assertEquals(2000, $tooLarge['max_document_length']);
 	}
 
 	/**

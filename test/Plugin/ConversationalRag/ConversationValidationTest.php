@@ -551,7 +551,7 @@ class ConversationValidationTest extends TestCase {
 	public function testMaxDocumentLengthBelowMinimum(): void {
 		$query = "CREATE RAG MODEL 'test_model' (
 			model = 'openai:gpt-4',
-			max_document_length = -2
+			max_document_length = 99
 		)";
 
 		$payload = RagPayload::fromRequest(
@@ -577,7 +577,7 @@ class ConversationValidationTest extends TestCase {
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
 		$this->assertStringContainsString(
-			'max_document_length must be an integer between -1 and 65536',
+			'max_document_length must be 0 or an integer between 100 and 65536',
 			$error->getResponseError()
 		);
 	}
@@ -611,7 +611,7 @@ class ConversationValidationTest extends TestCase {
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
 		$this->assertStringContainsString(
-			'max_document_length must be an integer between -1 and 65536',
+			'max_document_length must be 0 or an integer between 100 and 65536',
 			$error->getResponseError()
 		);
 	}
@@ -645,7 +645,7 @@ class ConversationValidationTest extends TestCase {
 		$error = $task->getError();
 		$this->assertInstanceOf(QueryParseError::class, $error);
 		$this->assertStringContainsString(
-			'max_document_length must be an integer between -1 and 65536',
+			'max_document_length must be 0 or an integer between 100 and 65536',
 			$error->getResponseError()
 		);
 	}
@@ -653,7 +653,7 @@ class ConversationValidationTest extends TestCase {
 	public function testValidMaxDocumentLengthEdgeCases(): void {
 		$query1 = "CREATE RAG MODEL 'test_model1' (
 			model = 'openai:gpt-4',
-			max_document_length = -1
+			max_document_length = 0
 		)";
 
 		$payload1 = RagPayload::fromRequest(
@@ -669,7 +669,7 @@ class ConversationValidationTest extends TestCase {
 			)
 		);
 
-		$this->assertEquals(-1, $payload1->params['max_document_length']);
+		$this->assertEquals(0, $payload1->params['max_document_length']);
 
 		$query2 = "CREATE RAG MODEL 'test_model2' (
 			model = 'openai:gpt-4',
