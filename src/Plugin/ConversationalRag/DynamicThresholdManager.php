@@ -48,12 +48,12 @@ class DynamicThresholdManager {
 		// Detect if user wants broader search using LLM (from original detectExpansionIntent)
 		$wantsExpansion = $this->detectExpansionIntent($userQuery, $conversationHistory, $llmProvider, $modelConfig);
 
-		Buddy::debugvv("\n[DEBUG DYNAMIC THRESHOLD]");
-		Buddy::debugvv('├─ Wants expansion: ' . ($wantsExpansion ? 'YES' : 'NO'));
+		Buddy::debugv("\nRAG: [DEBUG DYNAMIC THRESHOLD]");
+		Buddy::debugv('RAG: ├─ Wants expansion: ' . ($wantsExpansion ? 'YES' : 'NO'));
 
 		if (!$wantsExpansion) {
-			Buddy::debugvv("├─ Using base threshold: {$baseThreshold}");
-			Buddy::debugvv('└─ Expansion count reset to 0');
+			Buddy::debugv("RAG: ├─ Using base threshold: {$baseThreshold}");
+			Buddy::debugv('RAG: └─ Expansion count reset to 0');
 
 			return [
 				'threshold' => $baseThreshold,
@@ -89,13 +89,13 @@ class DynamicThresholdManager {
 		// Progressive expansion with calculated step (original logic)
 		$threshold = min($baseThreshold + ($expansionCount * $step), $maxThreshold);
 
-		Buddy::debugvv("├─ Expansion level: {$expansionCount} / " . self::MAX_EXPANSIONS);
-		Buddy::debugvv("├─ Base threshold: {$baseThreshold}");
-		Buddy::debugvv("├─ Max threshold: {$maxThreshold} (+" . (self::MAX_EXPANSION_PERCENT * 100) . '%)');
-		Buddy::debugvv("├─ Step size: {$step}");
-		Buddy::debugvv("├─ Calculated threshold: {$threshold}");
-		Buddy::debugvv(
-			'└─ Expansion percent: ' .
+		Buddy::debugv("RAG: ├─ Expansion level: {$expansionCount} / " . self::MAX_EXPANSIONS);
+		Buddy::debugv("RAG: ├─ Base threshold: {$baseThreshold}");
+		Buddy::debugv("RAG: ├─ Max threshold: {$maxThreshold} (+" . (self::MAX_EXPANSION_PERCENT * 100) . '%)');
+		Buddy::debugv("RAG: ├─ Step size: {$step}");
+		Buddy::debugv("RAG: ├─ Calculated threshold: {$threshold}");
+		Buddy::debugv(
+			'RAG: └─ Expansion percent: ' .
 			round((($threshold - $baseThreshold) / $baseThreshold) * 100, 1) . '%'
 		);
 
@@ -148,9 +148,9 @@ class DynamicThresholdManager {
 	): bool {
 		// CRITICAL: If no conversation history, cannot be expansion (from original)
 		if (empty(trim($conversationHistory))) {
-			Buddy::debugvv("\n[DEBUG EXPANSION CHECK]");
-			Buddy::debugvv('├─ No conversation history');
-			Buddy::debugvv('└─ Expansion: NO (no prior results to expand from)');
+			Buddy::debugv("\nRAG: [DEBUG EXPANSION CHECK]");
+			Buddy::debugv('RAG: ├─ No conversation history');
+			Buddy::debugv('RAG: └─ Expansion: NO (no prior results to expand from)');
 			return false;
 		}
 
@@ -185,7 +185,7 @@ Does this query request BROADENING beyond previous results?
 Answer: YES or NO";
 
 		$llmProvider->configure($modelConfig);
-		$response = $llmProvider->generateResponse($expansionPrompt, ['temperature' => 0.1, 'max_tokens' => 10]);
+		$response = $llmProvider->generateResponse($expansionPrompt, ['temperature' => 0, 'max_tokens' => 10]);
 
 		if (!$response['success']) {
 			return false;
@@ -193,10 +193,10 @@ Answer: YES or NO";
 
 		$result = trim(strtolower($response['content']));
 
-		Buddy::debugvv("\n[DEBUG EXPANSION CHECK]");
-		Buddy::debugvv('├─ Has conversation history: YES');
-		Buddy::debugvv("├─ LLM response: {$result}");
-		Buddy::debugvv('└─ Expansion: ' . ($result === 'yes' ? 'YES' : 'NO'));
+		Buddy::debugv("\nRAG: [DEBUG EXPANSION CHECK]");
+		Buddy::debugv('RAG: ├─ Has conversation history: YES');
+		Buddy::debugv("RAG: ├─ LLM response: {$result}");
+		Buddy::debugv('RAG: └─ Expansion: ' . ($result === 'yes' ? 'YES' : 'NO'));
 
 		return $result === 'yes';
 	}

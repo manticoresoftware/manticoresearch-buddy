@@ -67,7 +67,7 @@ Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST,
 NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 
 			$llmProvider->configure($modelConfig);
-			$response = $llmProvider->generateResponse($intentPrompt, ['temperature' => 0.1, 'max_tokens' => 50]);
+			$response = $llmProvider->generateResponse($intentPrompt, ['temperature' => 0, 'max_tokens' => 50]);
 
 			if (!$response['success']) {
 				throw new ManticoreSearchClientError(
@@ -79,8 +79,8 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 			$intent = $this->validateIntent(trim(strtoupper($content)));
 
 			// Debug: Log intent classification
-			Buddy::debugvv("\n[DEBUG INTENT CLASSIFICATION]");
-			Buddy::debugvv("└─ Detected intent: {$intent}");
+			Buddy::debugv("\nRAG: [DEBUG INTENT CLASSIFICATION]");
+			Buddy::debugv("RAG: └─ Detected intent: {$intent}");
 
 			return $intent;
 		} catch (ManticoreSearchClientError $e) {
@@ -224,7 +224,7 @@ Examples:
 	Answer ONLY in the format above.";
 
 			$llmProvider->configure($modelConfig);
-			$response = $llmProvider->generateResponse($queryPrompt, ['temperature' => 0.3, 'max_tokens' => 200]);
+			$response = $llmProvider->generateResponse($queryPrompt, ['temperature' => 0, 'max_tokens' => 200]);
 			$llmResponseContent = $response['content'];
 
 			if (!$response['success']) {
@@ -265,11 +265,11 @@ Examples:
 			$searchQuery = $userQuery;
 
 			// Debug: Log query generation
-			Buddy::debugvv("\n[DEBUG QUERY GENERATION]");
-			Buddy::debugvv("├─ User query: '{$userQuery}'");
-			Buddy::debugvv("├─ Intent: {$intent}");
-			Buddy::debugvv("├─ Generated SEARCH_QUERY: '{$searchQuery}'");
-			Buddy::debugvv("└─ Generated EXCLUDE_QUERY: '{$excludeQuery}'");
+			Buddy::debugv("\nRAG: [DEBUG QUERY GENERATION]");
+			Buddy::debugv("RAG: ├─ User query: '{$userQuery}'");
+			Buddy::debugv("RAG: ├─ Intent: {$intent}");
+			Buddy::debugv("RAG: ├─ Generated SEARCH_QUERY: '{$searchQuery}'");
+			Buddy::debugv("RAG: └─ Generated EXCLUDE_QUERY: '{$excludeQuery}'");
 
 			return [
 				'search_query' => $searchQuery,

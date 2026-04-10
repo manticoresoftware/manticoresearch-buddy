@@ -88,17 +88,17 @@ class ConversationManager {
 		?array $excludedIds = null
 	): void {
 		// Debug: Log message saving
-		Buddy::debugvv("\n[DEBUG CONVERSATION SAVE]");
-		Buddy::debugvv("├─ Conversation UUID: $conversationUuid");
-		Buddy::debugvv("├─ Model UUID: $modelUuid");
-		Buddy::debugvv("├─ Role: $role");
-		Buddy::debugvv('├─ Message: ' . substr($message, 0, 100) . (strlen($message) > 100 ? '...' : ''));
-		Buddy::debugvv("├─ Tokens used: $tokensUsed");
-		Buddy::debugvv('├─ Intent: ' . ($intent ?? 'none'));
-		Buddy::debugvv('├─ Search query: ' . ($searchQuery ? substr($searchQuery, 0, 50) . '...' : 'none'));
-		Buddy::debugvv('├─ Exclude query: ' . ($excludeQuery ? substr($excludeQuery, 0, 50) . '...' : 'none'));
-		Buddy::debugvv(
-			'└─ Excluded IDs count: ' . ($excludedIds === null ? 0 : sizeof($excludedIds))
+		Buddy::debugv("\nRAG: [DEBUG CONVERSATION SAVE]");
+		Buddy::debugv("RAG: ├─ Conversation UUID: $conversationUuid");
+		Buddy::debugv("RAG: ├─ Model UUID: $modelUuid");
+		Buddy::debugv("RAG: ├─ Role: $role");
+		Buddy::debugv('RAG: ├─ Message: ' . substr($message, 0, 100) . (strlen($message) > 100 ? '...' : ''));
+		Buddy::debugv("RAG: ├─ Tokens used: $tokensUsed");
+		Buddy::debugv('RAG: ├─ Intent: ' . ($intent ?? 'none'));
+		Buddy::debugv('RAG: ├─ Search query: ' . ($searchQuery ? substr($searchQuery, 0, 50) . '...' : 'none'));
+		Buddy::debugv('RAG: ├─ Exclude query: ' . ($excludeQuery ? substr($excludeQuery, 0, 50) . '...' : 'none'));
+		Buddy::debugv(
+			'RAG: └─ Excluded IDs count: ' . ($excludedIds === null ? 0 : sizeof($excludedIds))
 		);
 
 		$currentTime = (int)(microtime(true) * self::TIMESTAMP_PRECISION);
@@ -138,7 +138,7 @@ class ConversationManager {
 			);
 		}
 
-		Buddy::debugvv('└─ Message saved successfully');
+		Buddy::debugv('RAG: └─ Message saved successfully');
 	}
 
 	/**
@@ -151,9 +151,9 @@ class ConversationManager {
 	 */
 	public function getConversationHistory(string $conversationUuid, int $limit = 100): string {
 		// Debug: Log history retrieval
-		Buddy::debugvv("\n[DEBUG CONVERSATION HISTORY RETRIEVAL]");
-		Buddy::debugvv("├─ Conversation UUID: $conversationUuid");
-		Buddy::debugvv("├─ Limit: $limit");
+		Buddy::debugv("\nRAG: [DEBUG CONVERSATION HISTORY RETRIEVAL]");
+		Buddy::debugv("RAG: ├─ Conversation UUID: $conversationUuid");
+		Buddy::debugv("RAG: ├─ Limit: $limit");
 
 		$safeLimit = $this->assertPositiveLimit($limit, 'limit');
 
@@ -168,7 +168,7 @@ class ConversationManager {
 			$safeLimit
 		);
 
-		Buddy::debugvv("├─ SQL: $sql");
+		Buddy::debugv("RAG: ├─ SQL: $sql");
 
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
@@ -179,7 +179,7 @@ class ConversationManager {
 		$history = '';
 		if (is_array($data[0])) {
 			$rows = $data[0]['data'];
-			Buddy::debugvv('├─ Messages found: ' . $data->count());
+			Buddy::debugv('RAG: ├─ Messages found: ' . $data->count());
 			foreach ($rows as $row) {
 				$role = (string)$row['role'];
 				$message = (string)$row['message'];
@@ -188,8 +188,8 @@ class ConversationManager {
 		}
 
 		$historyLength = strlen($history);
-		Buddy::debugvv("├─ History length: $historyLength chars");
-		Buddy::debugvv('└─ History preview: ' . substr($history, 0, 150) . ($historyLength > 150 ? '...' : ''));
+		Buddy::debugv("RAG: ├─ History length: $historyLength chars");
+		Buddy::debugv('RAG: └─ History preview: ' . substr($history, 0, 150) . ($historyLength > 150 ? '...' : ''));
 
 		return $history;
 	}
@@ -213,8 +213,8 @@ class ConversationManager {
 	 */
 	public function getLatestSearchContext(string $conversationUuid): ?array {
 		// Debug: Log search context retrieval
-		Buddy::debugvv("\n[DEBUG SEARCH CONTEXT RETRIEVAL]");
-		Buddy::debugvv("├─ Conversation UUID: $conversationUuid");
+		Buddy::debugv("\nRAG: [DEBUG SEARCH CONTEXT RETRIEVAL]");
+		Buddy::debugv("RAG: ├─ Conversation UUID: $conversationUuid");
 
 		/** @lang Manticore */
 		$sql = sprintf(
@@ -230,7 +230,7 @@ class ConversationManager {
 			$this->quote(Intent::CONTENT_QUESTION)
 		);
 
-		Buddy::debugvv("├─ SQL: $sql");
+		Buddy::debugv("RAG: ├─ SQL: $sql");
 
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
@@ -244,7 +244,7 @@ class ConversationManager {
 
 		$rows = $data[0]['data'];
 		if (empty($rows)) {
-			Buddy::debugvv('└─ No search context found');
+			Buddy::debugv('RAG: └─ No search context found');
 			return null;
 		}
 
@@ -263,12 +263,12 @@ class ConversationManager {
 			? []
 			: self::decodeExcludedIds($rawExcludedIds);
 
-		Buddy::debugvv('├─ Search query: ' . substr($searchContext['search_query'], 0, 50) . '...');
+		Buddy::debugv('RAG: ├─ Search query: ' . substr($searchContext['search_query'], 0, 50) . '...');
 		$excludePreview = $searchContext['exclude_query'] !== ''
 			? substr($searchContext['exclude_query'], 0, 50) . '...'
 			: 'none';
-		Buddy::debugvv('├─ Exclude query: ' . $excludePreview);
-		Buddy::debugvv('└─ Excluded IDs count: ' . sizeof($excludedIdsArray));
+		Buddy::debugv('RAG: ├─ Exclude query: ' . $excludePreview);
+		Buddy::debugv('RAG: └─ Excluded IDs count: ' . sizeof($excludedIdsArray));
 
 		return $searchContext;
 	}
@@ -304,9 +304,9 @@ class ConversationManager {
 	 */
 	public function getConversationHistoryForQueryGeneration(string $conversationUuid, int $limit = 100): string {
 		// Debug: Log filtered history retrieval for query generation
-		Buddy::debugvv("\n[DEBUG FILTERED HISTORY RETRIEVAL]");
-		Buddy::debugvv("├─ Conversation UUID: $conversationUuid");
-		Buddy::debugvv("├─ Limit: $limit");
+		Buddy::debugv("\nRAG: [DEBUG FILTERED HISTORY RETRIEVAL]");
+		Buddy::debugv("RAG: ├─ Conversation UUID: $conversationUuid");
+		Buddy::debugv("RAG: ├─ Limit: $limit");
 
 		$safeLimit = $this->assertPositiveLimit($limit, 'limit');
 
@@ -323,7 +323,7 @@ class ConversationManager {
 			$safeLimit
 		);
 
-		Buddy::debugvv("├─ SQL: $sql");
+		Buddy::debugv("RAG: ├─ SQL: $sql");
 
 		$result = $this->client->sendRequest($sql);
 		if ($result->hasError()) {
@@ -337,7 +337,7 @@ class ConversationManager {
 		if (is_array($data[0])) {
 			$rows = $data[0]['data'];
 
-			Buddy::debugvv('├─ Filtered messages found: ' . sizeof($rows));
+			Buddy::debugv('RAG: ├─ Filtered messages found: ' . sizeof($rows));
 			foreach ($rows as $row) {
 				$role = (string)$row['role'];
 				$message = (string)$row['message'];
@@ -346,12 +346,12 @@ class ConversationManager {
 		}
 
 		$historyLength = strlen($history);
-		Buddy::debugvv("├─ Filtered history length: $historyLength chars");
+		Buddy::debugv("RAG: ├─ Filtered history length: $historyLength chars");
 		$preview = substr($history, 0, 150);
 		if ($historyLength > 150) {
 			$preview .= '...';
 		}
-		Buddy::debugvv('└─ Filtered history preview: ' . $preview);
+		Buddy::debugv('RAG: └─ Filtered history preview: ' . $preview);
 
 		return $history;
 	}

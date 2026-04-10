@@ -29,7 +29,7 @@ use Throwable;
  * including model management and conversation processing
  */
 final class Handler extends BaseHandlerWithClient {
-	private const float RESPONSE_TEMPERATURE = 0.2;
+	private const float RESPONSE_TEMPERATURE = 0;
 	private const int RESPONSE_MAX_TOKENS = 4096;
 	private const float RESPONSE_TOP_P = 1.0;
 	private const float RESPONSE_FREQUENCY_PENALTY = 0.0;
@@ -351,9 +351,9 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return void
 	 */
 	private static function logConversationStart(string $conversationUuid): void {
-		Buddy::debugvv("\n[DEBUG CONVERSATION FLOW]");
-		Buddy::debugvv('├─ Starting conversation processing');
-		Buddy::debugvv("├─ Conversation UUID: $conversationUuid");
+		Buddy::debugv("\nRAG: [DEBUG CONVERSATION FLOW]");
+		Buddy::debugv('RAG: ├─ Starting conversation processing');
+		Buddy::debugv("RAG: ├─ Conversation UUID: $conversationUuid");
 	}
 
 	/**
@@ -364,8 +364,8 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return void
 	 */
 	private static function logConversationHistory(string $conversationHistory): void {
-		Buddy::debugvv('├─ Retrieved history for intent classification');
-		Buddy::debugvv('├─ History length: ' . strlen($conversationHistory) . ' chars');
+		Buddy::debugv('RAG: ├─ Retrieved history for intent classification');
+		Buddy::debugv('RAG: ├─ History length: ' . strlen($conversationHistory) . ' chars');
 	}
 
 	/**
@@ -398,7 +398,7 @@ final class Handler extends BaseHandlerWithClient {
 		$intent = $intentClassifier->classifyIntent(
 			$query, $conversationHistory, $provider, $model
 		);
-		Buddy::debugvv("├─ Intent classified: $intent");
+		Buddy::debugv("RAG: ├─ Intent classified: $intent");
 		return $intent;
 	}
 
@@ -444,11 +444,11 @@ final class Handler extends BaseHandlerWithClient {
 		SearchContext $context,
 		SearchServices $services
 	): array {
-		Buddy::debugvv('├─ Processing CONTENT_QUESTION intent');
+		Buddy::debugv('RAG: ├─ Processing CONTENT_QUESTION intent');
 		$lastContext = $services->conversationManager->getLatestSearchContext($context->request->conversationUuid);
 
 		if ($lastContext) {
-			Buddy::debugvv('├─ Found previous search context to reuse');
+			Buddy::debugv('RAG: ├─ Found previous search context to reuse');
 			$queries = [
 				'search_query' => $lastContext['search_query'],
 				'exclude_query' => $lastContext['exclude_query'],
@@ -482,11 +482,11 @@ final class Handler extends BaseHandlerWithClient {
 				$services->client, $context->request->table, $queries['search_query'], $excludedIds,
 				$context->model, $thresholdInfo['threshold']
 			);
-			Buddy::debugvv('├─ CONTENT_QUESTION performed KNN search with previous query parameters');
+			Buddy::debugv('RAG: ├─ CONTENT_QUESTION performed KNN search with previous query parameters');
 			return [$context->intent, $searchResults, $queries, $excludedIds];
 		}
 
-		Buddy::debugvv('├─ No previous search context found, falling back to NEW_SEARCH');
+		Buddy::debugv('RAG: ├─ No previous search context found, falling back to NEW_SEARCH');
 		// Fallback to NEW_SEARCH logic
 		return self::handleQueryGeneratingIntent(
 			$context->withIntent(Intent::NEW_SEARCH), $services
@@ -508,13 +508,13 @@ final class Handler extends BaseHandlerWithClient {
 		SearchContext $context,
 		SearchServices $services
 	): array {
-		Buddy::debugvv("├─ Processing query-generating intent: $context->intent");
+		Buddy::debugv("RAG: ├─ Processing query-generating intent: $context->intent");
 		$cleanHistory = $services->conversationManager->getConversationHistoryForQueryGeneration(
 			$context->request->conversationUuid
 		);
 
-		Buddy::debugvv('├─ Using filtered history for query generation');
-		Buddy::debugvv('├─ Clean history length: ' . strlen($cleanHistory) . ' chars');
+		Buddy::debugv('RAG: ├─ Using filtered history for query generation');
+		Buddy::debugv('RAG: ├─ Clean history length: ' . strlen($cleanHistory) . ' chars');
 
 		$intentClassifierInstance = new IntentClassifier();
 		$queries = $intentClassifierInstance->generateQueries(
@@ -564,11 +564,11 @@ final class Handler extends BaseHandlerWithClient {
 		string $intent,
 		array $queries
 	): void {
-		Buddy::debugvv('[DEBUG PREPROCESSING]');
-		Buddy::debugvv("├─ User query: '$request->query'");
-		Buddy::debugvv("├─ Intent: $intent");
-		Buddy::debugvv("├─ Search query: '{$queries['search_query']}'");
-		Buddy::debugvv("└─ Exclude query: '{$queries['exclude_query']}'");
+		Buddy::debugv('RAG: [DEBUG PREPROCESSING]');
+		Buddy::debugv("RAG: ├─ User query: '$request->query'");
+		Buddy::debugv("RAG: ├─ Intent: $intent");
+		Buddy::debugv("RAG: ├─ Search query: '{$queries['search_query']}'");
+		Buddy::debugv("RAG: └─ Exclude query: '{$queries['exclude_query']}'");
 	}
 
 	/**
@@ -632,11 +632,11 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return void
 	 */
 	private static function logContextBuilding(array $searchResults, string $context, int $maxDocumentLength): void {
-		Buddy::debugvv('[DEBUG CONTEXT]');
-		Buddy::debugvv('├─ Documents count: ' . sizeof($searchResults));
-		Buddy::debugvv('├─ Total context length: ' . strlen($context) . ' chars');
+		Buddy::debugv('RAG: [DEBUG CONTEXT]');
+		Buddy::debugv('RAG: ├─ Documents count: ' . sizeof($searchResults));
+		Buddy::debugv('RAG: ├─ Total context length: ' . strlen($context) . ' chars');
 		$maxDocumentLengthLabel = $maxDocumentLength === -1 ? 'unlimited' : (string)$maxDocumentLength;
-		Buddy::debugvv("└─ Max doc length: $maxDocumentLengthLabel chars");
+		Buddy::debugv("RAG: └─ Max doc length: $maxDocumentLengthLabel chars");
 	}
 
 	/**
@@ -740,16 +740,16 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$assistantIntent = ($turn->intent === Intent::CONTENT_QUESTION) ? Intent::CONTENT_QUESTION : null;
-		Buddy::debugvv('├─ Saving assistant response');
-		Buddy::debugvv('├─ Assistant intent: ' . ($assistantIntent ?? 'none'));
-		Buddy::debugvv('├─ Response length: ' . strlen($turn->responseText) . ' chars');
-		Buddy::debugvv("├─ Tokens used: $turn->tokensUsed");
+		Buddy::debugv('RAG: ├─ Saving assistant response');
+		Buddy::debugv('RAG: ├─ Assistant intent: ' . ($assistantIntent ?? 'none'));
+		Buddy::debugv('RAG: ├─ Response length: ' . strlen($turn->responseText) . ' chars');
+		Buddy::debugv("RAG: ├─ Tokens used: $turn->tokensUsed");
 
 		$conversationManager->saveMessage(
 			$conversationUuid, $modelUuid, 'assistant', $turn->responseText, $turn->tokensUsed, $assistantIntent
 		);
 
-		Buddy::debugvv('└─ Conversation processing completed');
+		Buddy::debugv('RAG: └─ Conversation processing completed');
 	}
 
 

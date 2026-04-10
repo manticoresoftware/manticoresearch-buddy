@@ -113,12 +113,12 @@ class SearchEngine {
 				WHERE knn($vectorField, 15, '$excludeEscaped')
 				AND knn_dist < 0.75";
 
-		Buddy::debugvv("\n[DEBUG EXCLUSION QUERY]");
-		Buddy::debugvv("├─ Exclude query: '$excludeQuery'");
-		Buddy::debugvv("├─ Table: $table");
-		Buddy::debugvv("├─ Vector field: $vectorField");
-		Buddy::debugvv('├─ Threshold: 0.75');
-		Buddy::debugvv("├─ Final SQL: $sql");
+		Buddy::debugv("\nRAG: [DEBUG EXCLUSION QUERY]");
+		Buddy::debugv("RAG: ├─ Exclude query: '$excludeQuery'");
+		Buddy::debugv("RAG: ├─ Table: $table");
+		Buddy::debugv("RAG: ├─ Vector field: $vectorField");
+		Buddy::debugv('RAG: ├─ Threshold: 0.75');
+		Buddy::debugv("RAG: ├─ Final SQL: $sql");
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
@@ -130,8 +130,8 @@ class SearchEngine {
 		$excludeResults = $result[0]['data'] ?? [];
 
 		$excludedIds = array_column($excludeResults, 'id');
-		Buddy::debugvv('├─ Raw results count: ' . sizeof($excludeResults));
-		Buddy::debugvv('└─ Excluded IDs found: [' . implode(', ', $excludedIds) . ']');
+		Buddy::debugv('RAG: ├─ Raw results count: ' . sizeof($excludeResults));
+		Buddy::debugv('RAG: └─ Excluded IDs found: [' . implode(', ', $excludedIds) . ']');
 
 		return $excludedIds;
 	}
@@ -243,12 +243,12 @@ class SearchEngine {
 			$excludeClause
 		);
 
-		Buddy::debugvv("\n[DEBUG KNN SEARCH]");
-		Buddy::debugvv("├─ Search query: '$searchQuery'");
-		Buddy::debugvv('├─ Excluded IDs: [' . implode(', ', $excludedIds) . ']');
-		Buddy::debugvv("├─ retrieval_limit: $retrievalLimit");
-		Buddy::debugvv("├─ Threshold: $threshold");
-		Buddy::debugvv("├─ Final SQL: $sql");
+		Buddy::debugv("\nRAG: [DEBUG KNN SEARCH]");
+		Buddy::debugv("RAG: ├─ Search query: '$searchQuery'");
+		Buddy::debugv('RAG: ├─ Excluded IDs: [' . implode(', ', $excludedIds) . ']');
+		Buddy::debugv("RAG: ├─ retrieval_limit: $retrievalLimit");
+		Buddy::debugv("RAG: ├─ Threshold: $threshold");
+		Buddy::debugv("RAG: ├─ Final SQL: $sql");
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
@@ -258,7 +258,7 @@ class SearchEngine {
 		/** @var array<int, array{data: array<int, array<string, mixed>>}> $responseResult */
 		$responseResult = $response->getResult();
 		$result = $responseResult[0]['data'] ?? [];
-		Buddy::debugvv('└─ Results found: ' . sizeof($result));
+		Buddy::debugv('RAG: └─ Results found: ' . sizeof($result));
 
 		return $this->filterVectorFields($result, $table, $client);
 	}
