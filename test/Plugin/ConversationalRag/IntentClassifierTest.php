@@ -165,7 +165,8 @@ class IntentClassifierTest extends TestCase {
 			->willReturn(
 				[
 				'success' => true,
-				'content' => "SEARCH_QUERY: action movies\nEXCLUDE_QUERY: comedy movies",
+				'content' => '{"search_keywords":[{"term":"action movies","confidence":95}],'
+					. '"exclude_query":["comedy movies"]}',
 				'metadata' => [],
 				]
 			);
@@ -197,7 +198,8 @@ class IntentClassifierTest extends TestCase {
 			->willReturn(
 				[
 				'success' => true,
-				'content' => "SEARCH_QUERY: science fiction movies\nEXCLUDE_QUERY: none",
+				'content' => '{"search_keywords":[{"term":"science fiction movies","confidence":92}],'
+					. '"exclude_query":["none"]}',
 				'metadata' => [],
 				]
 			);
@@ -229,7 +231,8 @@ class IntentClassifierTest extends TestCase {
 			->willReturn(
 				[
 				'success' => true,
-				'content' => "SEARCH_QUERY: similar to Inception\nEXCLUDE_QUERY: Inception",
+				'content' => '{"search_keywords":[{"term":"similar to Inception","confidence":88}],'
+					. '"exclude_query":["Inception"]}',
 				'metadata' => [],
 				]
 			);

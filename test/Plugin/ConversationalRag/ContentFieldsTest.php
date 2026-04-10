@@ -168,7 +168,7 @@ class ContentFieldsTest extends TestCase {
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, 'title,content', -1);
+		$context = $method->invoke(null, $searchResults, 'title,content', 0);
 		$this->assertIsString($context);
 		$this->assertStringNotContainsString('...', $context);
 	}

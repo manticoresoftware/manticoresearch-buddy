@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
+use JsonException;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
@@ -165,67 +166,43 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 			$conversationHistory = $this->limitConversationHistory($conversationHistory);
 			$historyText = $conversationHistory;
 
-			$queryPrompt = "Generate search query based on user request.
-
-History:
-{$historyText}
-
-Query: {$userQuery}
-Intent: {$intent}
-
-Generate a rich search query separated by commas, sorted by relativity with:
-- Content type (movies, TV shows, books, etc.)
-- Genre/theme/topic keywords
-- Multiple relevant terms
-
-Answer format:
-SEARCH_QUERY: [your query]
-EXCLUDE_QUERY: [titles to exclude OR 'none']
-
-Rules for EXCLUDE_QUERY - Extract exclusions from BOTH current query AND history:
-1. EXPLICIT exclusions in current query (regardless of intent):
-   - 'I already watched X' → EXCLUDE: X
-   - 'similar to X but not Y' → EXCLUDE: Y
-   - 'I like that direction but not Z' → EXCLUDE: Z
-   - 'tell me about programming but not Python' → EXCLUDE: Python
-
-2. HISTORY-based exclusions (CRITICAL - Read carefully):
-   - REJECTION/ALTERNATIVES: Include titles previously rejected from history
-   - TOPIC_CHANGE: Use 'none' (fresh start, ignore history)
-   - IMPORTANT: Scan history BACKWARDS from most recent message
-   - STOP extracting exclusions if you encounter a topic change in history
-   - Only include exclusions from the CURRENT topic context
-   - Indicators of topic change: 'instead', 'actually', 'now show me', 'switch to', genre changes
-
-3. If NO exclusions found in query OR history: Use 'none'
-
-Examples:
-- Query: 'I already watched Breaking Bad but I like that direction'
-  EXCLUDE_QUERY: Breaking Bad
-
-- Query: 'What else like Game of Thrones? Not The Witcher though'
-  EXCLUDE_QUERY: The Witcher
-
-- Query: 'I love this!' (with no exclusions)
-  EXCLUDE_QUERY: none
-
-- History: 'crime dramas' → 'I don't like Breaking Bad' → 'Show me comedies instead' → 'What else?'
-  Query: 'What else?'
-  Intent: ALTERNATIVES
-  Analysis: Topic changed to comedies, Breaking Bad rejection was in previous topic
-  EXCLUDE_QUERY: none (Breaking Bad is from old topic context)
-
-- History: 'comedies' → 'I don't like The Office' → 'What else?'
-  Query: 'What else?'
-  Intent: ALTERNATIVES
-  Analysis: Same topic (comedies), The Office rejection is current
-  EXCLUDE_QUERY: The Office (same topic context)
-
-	Answer ONLY in the format above.";
+			$queryPrompt = '**ROLE:** You are an expert Search Query Generator. '
+				. 'Your sole function is to convert a user request into a highly structured '
+				. "JSON output suitable for advanced search engines.\n"
+				. '**GOAL:** Generate a rich, comma-separated list of keywords (`search_keywords`) '
+				. 'based on the `Query` and context from `History`. The query must be sorted by '
+				. "relevance: Content Type → Genre/Theme → Specific Keywords.\n"
+				. "**OUTPUT FORMAT (STRICT):** You MUST respond ONLY in JSON format:\n"
+				. "```json\n"
+				. "{\n"
+				. "\"search_keywords\": [{\"term\": \"keyword1\", \"confidence\": 95}],\n"
+				. "\"exclude_query\": [\"title_to_exclude\"],\n"
+				. "}\n"
+				. "```\n\n"
+				. '**RULES FOR `EXCLUDE_QUERY` (CRITICAL):** Extract exclusions from both the current '
+				. "query and history, following these strict rules:\n"
+				. "**A. Explicit Exclusions (Current Query):**\n"
+				. "*   If the user says \"I already watched X\" → EXCLUDE: X\n"
+				. "*   If the user says \"similar to X but not Y\" → EXCLUDE: Y\n"
+				. "*   If the user says \"not Z\" → EXCLUDE: Z\n"
+				. "*   (Apply this logic regardless of intent.)\n"
+				. "**B. History-Based Exclusions (Contextual):**\n"
+				. "1.  Scan `History` **BACKWARDS** from the most recent message.\n"
+				. '2.  Stop scanning immediately if you detect a Topic Change Indicator '
+				. "(e.g., 'instead', 'actually', 'now show me', genre shift).\n"
+				. "3.  Only include exclusions relevant to the *current* topic context.\n"
+				. "4.  If no exclusions are found in the query or history, use \"none\".\n\n"
+				. '**EXAMPLE SCENARIO (History Context):** If History shows a topic change '
+				. "occurred before a rejection, that rejection is ignored for `EXCLUDE_QUERY`.\n\n"
+				. "**INPUTS:**\n"
+				. 'History: ' . (mb_strlen($historyText) > 0 ? $historyText : '(none)') . "\n"
+				. 'Query: ' . $userQuery . "\n"
+				. 'Intent: ' . $intent . "\n\n"
+				. 'JSON:';
 
 			$llmProvider->configure($modelConfig);
 			$response = $llmProvider->generateResponse($queryPrompt, ['temperature' => 0, 'max_tokens' => 200]);
-			$llmResponseContent = $response['content'];
+			$llmResponseContent = (string)$response['content'];
 
 			if (!$response['success']) {
 				throw new ManticoreSearchClientError(
@@ -233,18 +210,17 @@ Examples:
 				);
 			}
 
-			$lines = explode("\n", trim((string)$response['content']));
-			foreach ($lines as $line) {
-				$line = trim($line);
-				if (preg_match('/^SEARCH_QUERY:\s*(.+)$/i', $line, $matches)) {
-					$searchQuery = trim($matches[1]);
-				}
-				if (!preg_match('/^EXCLUDE_QUERY:\s*(.+)$/i', $line, $matches)) {
-					continue;
-				}
+			Buddy::debugv("\nRAG: [DEBUG QUERY GENERATION LLM RESPONSE]");
+			Buddy::debugv('RAG: └─ Raw LLM response: ' . $llmResponseContent);
 
-				$excludeQuery = trim($matches[1]);
+			/** @var mixed $decodedResponse */
+			$decodedResponse = json_decode($llmResponseContent, true, 512, JSON_THROW_ON_ERROR);
+			if (!is_array($decodedResponse)) {
+				throw new ManticoreSearchClientError('Query generation returned invalid JSON structure');
 			}
+
+			$searchQuery = $this->normalizeSearchKeywords($decodedResponse['search_keywords'] ?? null);
+			$excludeQuery = $this->normalizeQueryTerms($decodedResponse['exclude_query'] ?? null, 'exclude_query');
 
 			// Fallback to user query if parsing failed
 			if (empty($searchQuery)) {
@@ -261,13 +237,17 @@ Examples:
 				'exclude_query' => $excludeQuery,
 				'llm_response' => $llmResponseContent,
 			];
-		} catch (ManticoreSearchClientError $e) {
+		} catch (JsonException | ManticoreSearchClientError $e) {
 			$searchQuery = $userQuery;
 
 			// Debug: Log query generation
 			Buddy::debugv("\nRAG: [DEBUG QUERY GENERATION]");
 			Buddy::debugv("RAG: ├─ User query: '{$userQuery}'");
 			Buddy::debugv("RAG: ├─ Intent: {$intent}");
+			Buddy::debugv(
+				'RAG: ├─ Raw LLM response: ' .
+				($llmResponseContent !== '' ? $llmResponseContent : $e->getMessage())
+			);
 			Buddy::debugv("RAG: ├─ Generated SEARCH_QUERY: '{$searchQuery}'");
 			Buddy::debugv("RAG: └─ Generated EXCLUDE_QUERY: '{$excludeQuery}'");
 
@@ -277,5 +257,84 @@ Examples:
 				'llm_response' => $llmResponseContent !== '' ? $llmResponseContent : $e->getMessage(),
 			];
 		}
+	}
+
+	/**
+	 * @param mixed $value
+	 * @param string $field
+	 * @return string
+	 */
+	private function normalizeQueryTerms(mixed $value, string $field): string {
+		if (is_string($value)) {
+			return $this->normalizeQueryString($value);
+		}
+
+		if (!is_array($value)) {
+			throw new ManticoreSearchClientError("Query generation field '{$field}' must be a JSON array or string");
+		}
+
+		$terms = [];
+		foreach ($value as $term) {
+			if (!is_string($term)) {
+				throw new ManticoreSearchClientError(
+					"Query generation field '{$field}' must contain only strings"
+				);
+			}
+
+			$normalizedTerm = trim($term);
+			if ($normalizedTerm === '') {
+				continue;
+			}
+
+			$terms[] = $normalizedTerm;
+		}
+
+		return $this->normalizeQueryString(implode(', ', $terms));
+	}
+
+	/**
+	 * @param mixed $value
+	 * @return string
+	 */
+	private function normalizeSearchKeywords(mixed $value): string {
+		if (!is_array($value)) {
+			throw new ManticoreSearchClientError(
+				"Query generation field 'search_keywords' must be a JSON array"
+			);
+		}
+
+		$terms = [];
+		foreach ($value as $keyword) {
+			if (!is_array($keyword)) {
+				throw new ManticoreSearchClientError(
+					"Query generation field 'search_keywords' must contain only objects"
+				);
+			}
+
+			$term = $keyword['term'] ?? null;
+			if (!is_string($term)) {
+				throw new ManticoreSearchClientError(
+					"Query generation field 'search_keywords' objects must contain a string 'term'"
+				);
+			}
+
+			$normalizedTerm = trim($term);
+			if ($normalizedTerm === '') {
+				continue;
+			}
+
+			$terms[] = $normalizedTerm;
+		}
+
+		return $this->normalizeQueryString(implode(', ', $terms));
+	}
+
+	private function normalizeQueryString(string $value): string {
+		$normalizedValue = trim($value);
+		if ($normalizedValue === '' || strtolower($normalizedValue) === 'none') {
+			return '';
+		}
+
+		return $normalizedValue;
 	}
 }

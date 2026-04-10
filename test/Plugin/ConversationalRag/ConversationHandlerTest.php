@@ -625,7 +625,8 @@ class ConversationHandlerTest extends TestCase {
 					[
 					['content' => 'NEW_SEARCH', 'success' => true, 'metadata' => []], // classifyIntent response
 					[
-						'content' => 'SEARCH_QUERY: action movies\nEXCLUDE_QUERY: none',
+						'content' => '{"search_keywords":[{"term":"action movies","confidence":94}],'
+							. '"exclude_query":["none"]}',
 					'success' => true,
 					'metadata' => [],
 					], // generateQueries response
@@ -804,7 +805,8 @@ class ConversationHandlerTest extends TestCase {
 				[
 					['content' => Intent::CONTENT_QUESTION, 'success' => true, 'metadata' => []],
 					[
-						'content' => 'SEARCH_QUERY: comedy movies' . "\n" . 'EXCLUDE_QUERY: none',
+						'content' => '{"search_keywords":[{"term":"comedy movies","confidence":90}],'
+							. '"exclude_query":["none"]}',
 						'success' => true,
 						'metadata' => [],
 					],
