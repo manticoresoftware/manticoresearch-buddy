@@ -932,16 +932,16 @@
         },
         {
             "name": "manticoresoftware/telemetry",
-            "version": "0.1.23",
+            "version": "0.1.25",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/telemetry-lib.git",
-                "reference": "8e2efd649a04d449b87fcc7de1261f13dac184bd"
+                "reference": "39522a13e5268aa0367021a5871d6a7c98653367"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/8e2efd649a04d449b87fcc7de1261f13dac184bd",
-                "reference": "8e2efd649a04d449b87fcc7de1261f13dac184bd",
+                "url": "https://api.github.com/repos/manticoresoftware/telemetry-lib/zipball/39522a13e5268aa0367021a5871d6a7c98653367",
+                "reference": "39522a13e5268aa0367021a5871d6a7c98653367",
                 "shasum": ""
             },
             "require": {
@@ -978,9 +978,9 @@
             ],
             "support": {
                 "issues": "https://github.com/manticoresoftware/telemetry-lib/issues",
-                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.23"
+                "source": "https://github.com/manticoresoftware/telemetry-lib/tree/0.1.25"
             },
-            "time": "2024-03-20T07:42:24+00:00"
+            "time": "2026-04-13T10:57:32+00:00"
         },
         {
             "name": "marc-mabe/php-enum",
