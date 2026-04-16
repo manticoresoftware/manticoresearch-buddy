@@ -598,7 +598,7 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testHandleConversationNewQuestionGeneratesNewContext(): void {
-		$query = "CALL CONVERSATIONAL_RAG('Show me action movies', 'movies', 'model-uuid', 'content', 'conv-uuid')";
+		$query = "CALL CONVERSATIONAL_RAG('Show me action movies', 'movies', 'model-uuid', 'conv-uuid')";
 
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
@@ -613,8 +613,6 @@ class ConversationHandlerTest extends TestCase {
 				]
 			)
 		);
-
-			$this->assertEquals('content', $payload->params['content_fields']);
 
 			$handler = new RagHandler(
 				$payload, $this->createMockLlmProvider(
@@ -662,30 +660,17 @@ class ConversationHandlerTest extends TestCase {
 			]]
 		);
 
-		$describeResponse = $this->createResponse(
+		$schemaResponse = $this->createResponse(
 			[[
 			'data' => [
-				['Field' => 'id', 'Type' => 'bigint'],
-				['Field' => 'content', 'Type' => 'text'],
-				['Field' => 'embedding', 'Type' => 'FLOAT_VECTOR(1536)'],
+				[
+					'Table' => 'movies',
+					'Create Table' => "CREATE TABLE movies (\ncontent text,\n"
+						. "embedding FLOAT_VECTOR from='content'\n)",
+				],
 			],
 			]]
 		);
-
-		// 8: getExcludedIds (KNN search for exclusions - but since exclude_query is 'none', this might not be called)
-			// Since exclude_query is 'none', getExcludedIds returns []
-			// So no call here
-
-			// 9: getVectorFields (DESCRIBE table for result filtering)
-			$describeResponse2 = $this->createResponse(
-				[[
-				'data' => [
-					['Field' => 'id', 'Type' => 'bigint'],
-					['Field' => 'content', 'Type' => 'text'],
-					['Field' => 'embedding', 'Type' => 'FLOAT_VECTOR(1536)'],
-				],
-				]]
-			);
 
 
 
@@ -708,9 +693,8 @@ class ConversationHandlerTest extends TestCase {
 				...$initResponses, // initializeTables
 				$modelResponse, // getModelByUuidOrName
 				$historyResponse, // getConversationMessages
-				$describeResponse, // detectVectorField for main search
+				$schemaResponse, // inspectTableSchema for main search
 				$searchResponse, // performSearchWithExcludedIds
-				$describeResponse2, // getVectorFields
 				$saveUserContextResponse, // saveMessage user with context
 				$saveAssistantResponse, // saveMessage assistant
 			];
@@ -764,7 +748,7 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testFollowUpWithoutContextFallsBackToNewIntent(): void {
-		$query = "CALL CONVERSATIONAL_RAG('What about comedies?', 'movies', 'model-uuid', 'content', 'conv-uuid')";
+		$query = "CALL CONVERSATIONAL_RAG('What about comedies?', 'movies', 'model-uuid', 'conv-uuid')";
 
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
@@ -814,22 +798,14 @@ class ConversationHandlerTest extends TestCase {
 			]]
 		);
 		$historyResponse = $this->createResponse([['data' => []]]);
-		$describeResponse = $this->createResponse(
-			[[ 'data' => [
-				['Field' => 'id', 'Type' => 'bigint'],
-				['Field' => 'content', 'Type' => 'text'],
-				['Field' => 'embedding', 'Type' => 'FLOAT_VECTOR(1536)'],
-			] ]]
+		$schemaResponse = $this->createResponse(
+			[[ 'data' => [[
+				'Table' => 'movies',
+				'Create Table' => "CREATE TABLE movies (\ncontent text,\nembedding FLOAT_VECTOR from='content'\n)",
+			]] ]]
 		);
 		$searchResponse = $this->createResponse(
 			[[ 'data' => [['id' => 7, 'content' => 'Funny movie', 'knn_dist' => 0.1]] ]]
-		);
-		$describeResponse2 = $this->createResponse(
-			[[ 'data' => [
-				['Field' => 'id', 'Type' => 'bigint'],
-				['Field' => 'content', 'Type' => 'text'],
-				['Field' => 'embedding', 'Type' => 'FLOAT_VECTOR(1536)'],
-			] ]]
 		);
 		$saveUserResponse = $this->createResponse();
 		$saveAssistantResponse = $this->createResponse();
@@ -839,9 +815,8 @@ class ConversationHandlerTest extends TestCase {
 			...$initResponses,
 			$modelResponse,
 			$historyResponse,
-			$describeResponse,
+			$schemaResponse,
 			$searchResponse,
-			$describeResponse2,
 			$saveUserResponse,
 			$saveAssistantResponse,
 		];
@@ -865,9 +840,37 @@ class ConversationHandlerTest extends TestCase {
 		$task = $handler->run();
 
 		$this->assertTrue($task->isSucceed());
-		$userInsert = $queries[7];
+		$userInsert = $queries[6];
 		$this->assertStringContainsString("'NEW'", $userInsert);
 		$this->assertStringContainsString("'comedy movies'", $userInsert);
+	}
+
+	public function testConversationRejectsInvalidTableIdentifierBeforeHasTable(): void {
+		$query = "CALL CONVERSATIONAL_RAG('Show me action movies', 'movies WHERE 1=1', 'model-uuid', 'conv-uuid')";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => $query,
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler($payload, $this->createMockLlmProvider([]));
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$mockClient->expects($this->never())
+			->method('hasTable');
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$this->assertStringContainsString('Invalid table identifier', $task->getError()->getResponseError());
 	}
 
 		/**

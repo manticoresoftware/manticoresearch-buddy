@@ -355,20 +355,11 @@ final class Payload extends BasePayload {
 			'model_uuid' => $this->unquoteString($parts[2] ?? ''),
 		];
 
-		if (!isset($parts[3])) {
-			throw QueryParseError::create('content_fields parameter is required (position 4)');
+		if (isset($parts[3])) {
+			$result['conversation_uuid'] = $this->unquoteString($parts[3]);
 		}
-
-		$contentFields = trim($this->unquoteString($parts[3]));
-		if (empty($contentFields)) {
-			throw QueryParseError::create('content_fields parameter cannot be empty');
-		}
-
-		$result['content_fields'] = $contentFields;
-
-		// conversation_uuid is now the 5th parameter and OPTIONAL
 		if (isset($parts[4])) {
-			$result['conversation_uuid'] = $this->unquoteString($parts[4]);
+			throw QueryParseError::create('CONVERSATIONAL_RAG expects query, table, model, optional conversation_uuid');
 		}
 
 		return $result;

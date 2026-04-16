@@ -17,7 +17,6 @@ final class ConversationRequest {
 		public string $query,
 		public string $table,
 		public string $modelUuid,
-		public string $contentFields,
 		public string $conversationUuid = ''
 	) {
 	}

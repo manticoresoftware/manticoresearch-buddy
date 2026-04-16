@@ -156,7 +156,7 @@ class IntegrationTest extends TestCase {
 	}
 
 	public function testConversationalRagFlowNewSearch(): void {
-		$query = "CALL CONVERSATIONAL_RAG('What is machine learning?', 'docs', 'test_model', 'content')";
+		$query = "CALL CONVERSATIONAL_RAG('What is machine learning?', 'docs', 'test_model')";
 
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
@@ -175,11 +175,10 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('What is machine learning?', $payload->params['query']);
 		$this->assertEquals('docs', $payload->params['table']);
 		$this->assertEquals('test_model', $payload->params['model_uuid']);
-		$this->assertEquals('content', $payload->params['content_fields']);
 	}
 
 	public function testConversationalRagFlowWithTable(): void {
-		$query = "CALL CONVERSATIONAL_RAG('Search this table', 'my_table', 'test_model', 'content')";
+		$query = "CALL CONVERSATIONAL_RAG('Search this table', 'my_table', 'test_model', 'conversation_1')";
 
 		$payload = RagPayload::fromRequest(
 			Request::fromArray(
@@ -198,30 +197,7 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('Search this table', $payload->params['query']);
 		$this->assertEquals('my_table', $payload->params['table']);
 		$this->assertEquals('test_model', $payload->params['model_uuid']);
-		$this->assertEquals('content', $payload->params['content_fields']);
-	}
-
-	public function testConversationalRagWithMultipleContentFields(): void {
-		$query = "CALL CONVERSATIONAL_RAG('Find products', 'products', 'test_model', 'title,description,price')";
-
-		$payload = RagPayload::fromRequest(
-			Request::fromArray(
-				[
-				'version' => Buddy::PROTOCOL_VERSION,
-				'error' => '',
-				'payload' => $query,
-				'format' => RequestFormat::SQL,
-				'endpointBundle' => ManticoreEndpoint::Sql,
-				'path' => '',
-				]
-			)
-		);
-
-		$this->assertEquals('conversation', $payload->action);
-		$this->assertEquals('Find products', $payload->params['query']);
-		$this->assertEquals('products', $payload->params['table']);
-		$this->assertEquals('test_model', $payload->params['model_uuid']);
-		$this->assertEquals('title,description,price', $payload->params['content_fields']);
+		$this->assertEquals('conversation_1', $payload->params['conversation_uuid']);
 	}
 
 	public function testEndToEndModelLifecycle(): void {
@@ -292,7 +268,7 @@ class IntegrationTest extends TestCase {
 				[
 				'version' => Buddy::PROTOCOL_VERSION,
 				'error' => '',
-				'payload' => "CALL CONVERSATIONAL_RAG('Test query', 'docs', 'lifecycle_test', 'content')",
+				'payload' => "CALL CONVERSATIONAL_RAG('Test query', 'docs', 'lifecycle_test')",
 				'format' => RequestFormat::SQL,
 				'endpointBundle' => ManticoreEndpoint::Sql,
 				'path' => '',
@@ -303,7 +279,6 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('conversation', $ragPayload->action);
 		$this->assertEquals('Test query', $ragPayload->params['query']);
 		$this->assertEquals('lifecycle_test', $ragPayload->params['model_uuid']);
-		$this->assertEquals('content', $ragPayload->params['content_fields']);
 
 		// 5. Drop model
 		$dropPayload = RagPayload::fromRequest(

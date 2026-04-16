@@ -38,7 +38,7 @@ Supported model storage and runtime behavior:
 The RAG query searches an existing table and expects at least:
 
 - one `FLOAT_VECTOR` field
-- one or more text fields that you will pass as `content_fields`
+- auto-embedding source fields configured on that vector field with `from='...'`
 
 Example:
 
@@ -101,19 +101,7 @@ CREATE RAG MODEL proxy_assistant (
 CALL CONVERSATIONAL_RAG(
     'What is vector search?',
     'docs',
-    'test_assistant',
-    'content'
-);
-```
-
-With multiple content fields:
-
-```sql
-CALL CONVERSATIONAL_RAG(
-    'Tell me about RAG',
-    'docs',
-    'test_assistant',
-    'title,content'
+    'test_assistant'
 );
 ```
 
@@ -124,7 +112,6 @@ CALL CONVERSATIONAL_RAG(
     'Can you explain more?',
     'docs',
     'test_assistant',
-    'content',
     'test-conv-12345678-1234-1234-1234-123456789abc'
 );
 ```
@@ -328,7 +315,6 @@ CALL CONVERSATIONAL_RAG(
     'user query',
     'table_name',
     'model_name_or_uuid',
-    'content_fields',
     'optional_conversation_uuid'
 );
 ```
@@ -340,12 +326,11 @@ Positional parameters:
 | 1 | `query` | Yes | User question |
 | 2 | `table` | Yes | Table to search |
 | 3 | `model_name_or_uuid` | Yes | RAG model name or UUID |
-| 4 | `content_fields` | Yes | Comma-separated list of fields used to build context |
-| 5 | `conversation_uuid` | No | Conversation UUID. If omitted, Buddy generates one |
+| 4 | `conversation_uuid` | No | Conversation UUID. If omitted, Buddy generates one |
 
 Notes:
 
-- `content_fields` is mandatory
+- context fields are detected from the `from='...'` setting of the detected `FLOAT_VECTOR` field
 - missing fields are skipped and logged as warnings
 - empty or whitespace-only field values are skipped
 - multiple fields are joined with `, `
@@ -379,7 +364,7 @@ Conversation flow includes:
 - LLM-based intent classification
 - KNN search over a detected `FLOAT_VECTOR` field
 - optional exclusion of previously rejected or already shown items
-- context building from the requested `content_fields`
+- context building from auto-detected embedding source fields
 - context truncation using `max_document_length`
 
 Buddy-specific search settings:
@@ -430,8 +415,7 @@ CREATE RAG MODEL advanced_assistant (
 CALL CONVERSATIONAL_RAG(
     'What is vector search?',
     'docs',
-    'test_assistant',
-    'content'
+    'test_assistant'
 );
 ```
 

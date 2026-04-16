@@ -277,7 +277,7 @@ class ConversationalPayloadTest extends TestCase {
 	 */
 	public function testEscapedQuotesInConversationParams(): void {
 		$query = "CALL CONVERSATIONAL_RAG('I\\'m like programming, " .
-			"lets talk about it', 'docs', 'test_model', 'content', 'conversation_1')";
+			"lets talk about it', 'docs', 'test_model', 'conversation_1')";
 
 		$payload = $this->parseSqlPayload($query);
 
@@ -285,15 +285,14 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals("I'm like programming, lets talk about it", $payload->params['query']);
 		$this->assertEquals('docs', $payload->params['table']);
 		$this->assertEquals('test_model', $payload->params['model_uuid']);
-		$this->assertEquals('content', $payload->params['content_fields']);
 		$this->assertEquals('conversation_1', $payload->params['conversation_uuid']);
 	}
 
 	/**
 	 * @throws QueryParseError
 	 */
-	public function testConversationParsingWithContentFields(): void {
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'title,content')";
+	public function testConversationParsingWithoutConversationUuid(): void {
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123')";
 
 		$payload = $this->parseSqlPayload($query);
 
@@ -301,40 +300,24 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals('test query', $payload->params['query']);
 		$this->assertEquals('docs', $payload->params['table']);
 		$this->assertEquals('model123', $payload->params['model_uuid']);
-		$this->assertEquals('title,content', $payload->params['content_fields']);
+		$this->assertArrayNotHasKey('conversation_uuid', $payload->params);
 	}
 
 	/**
 	 * @throws QueryParseError
 	 */
-	public function testConversationParsingWithSingleCustomField(): void {
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'summary')";
+	public function testConversationParsingWithConversationUuid(): void {
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'conversation_1')";
 
 		$payload = $this->parseSqlPayload($query);
 
-		$this->assertEquals('summary', $payload->params['content_fields']);
+		$this->assertEquals('conversation_1', $payload->params['conversation_uuid']);
 	}
 
-	public function testMissingContentFieldsThrowsException(): void {
+	public function testConversationParsingRejectsLegacyContentFieldsArgument(): void {
 		$this->expectException(QueryParseError::class);
 
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123')";
-
-		$this->parseSqlPayload($query);
-	}
-
-	public function testEmptyContentFieldsThrowsException(): void {
-		$this->expectException(QueryParseError::class);
-
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', '')";
-
-		$this->parseSqlPayload($query);
-	}
-
-	public function testWhitespaceContentFieldsThrowsException(): void {
-		$this->expectException(QueryParseError::class);
-
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', '   ')";
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'content', 'conversation_1')";
 
 		$this->parseSqlPayload($query);
 	}

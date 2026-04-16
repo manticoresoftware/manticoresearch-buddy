@@ -33,6 +33,7 @@ final class Handler extends BaseHandlerWithClient {
 	private const float RESPONSE_TOP_P = 1.0;
 	private const float RESPONSE_FREQUENCY_PENALTY = 0.0;
 	private const float RESPONSE_PRESENCE_PENALTY = 0.0;
+	private const string TABLE_IDENTIFIER_PATTERN = '/^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?$/';
 
 	private ?LlmProvider $llmProvider;
 
@@ -64,7 +65,7 @@ final class Handler extends BaseHandlerWithClient {
 			$provider = $injectedProvider ?? new LlmProvider();
 			$conversationManager = new ConversationManager($client);
 			$intentClassifier = new IntentClassifier();
-			$searchEngine = new SearchEngine();
+			$searchEngine = new SearchEngine($client);
 
 			// Ensure database tables exist
 			self::initializeTables($modelManager, $conversationManager, $client);
@@ -260,8 +261,9 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$conversationUuid = $request->conversationUuid;
+		self::validateTable($client, $request->table);
 		$model = $modelManager->getModelByUuidOrName($client, $request->modelUuid);
-		$services = new SearchServices($conversationManager, $provider, $searchEngine, $client);
+		$services = new SearchServices($conversationManager, $provider, $searchEngine);
 
 		$conversationHistory = $conversationManager->getConversationMessages($conversationUuid);
 		self::logConversationStart($conversationUuid, $conversationHistory);
@@ -285,7 +287,8 @@ final class Handler extends BaseHandlerWithClient {
 
 		self::logPreprocessingResults($request, $intent, $queries);
 		$maxDocumentLength = $settings['max_document_length'];
-		$context = self::buildContext($searchResults, $request->contentFields, $maxDocumentLength);
+		$schema = $searchEngine->inspectTableSchema($request->table);
+		$context = self::buildContext($searchResults, $schema->contentFields, $maxDocumentLength);
 		self::logContextBuilding($searchResults, $context, $maxDocumentLength);
 		$response = self::generateResponse(
 			$model,
@@ -325,6 +328,19 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
+	 * @throws ManticoreSearchClientError
+	 */
+	private static function validateTable(Client $client, string $table): void {
+		if (preg_match(self::TABLE_IDENTIFIER_PATTERN, $table) !== 1) {
+			throw ManticoreSearchClientError::create('Invalid table identifier');
+		}
+
+		if (!$client->hasTable($table)) {
+			throw ManticoreSearchClientError::create("Table '$table' not found");
+		}
+	}
+
+	/**
 	 * @param Payload $payload
 	 *
 	 * @return ConversationRequest
@@ -335,7 +351,6 @@ final class Handler extends BaseHandlerWithClient {
 			$payload->params['query'] ?? '',
 			$payload->params['table'] ?? '',
 			$payload->params['model_uuid'] ?? '',
-			$payload->params['content_fields'],
 			$payload->params['conversation_uuid'] ?? ''
 		);
 	}
@@ -437,8 +452,8 @@ final class Handler extends BaseHandlerWithClient {
 
 			$excludedIds = self::decodeStoredExcludedIds($lastContext['excluded_ids']);
 
-			$searchResults = $services->searchEngine->performSearchWithExcludedIds(
-				$services->client, $context->request->table, $queries['search_query'], $excludedIds,
+			$searchResults = $services->searchEngine->search(
+				$context->request->table, $queries['search_query'], $excludedIds,
 				$context->model, $thresholdInfo['threshold']
 			);
 			Buddy::debugv('RAG: ├─ FOLLOW_UP performed KNN search with previous query parameters');
@@ -487,8 +502,7 @@ final class Handler extends BaseHandlerWithClient {
 			0.8
 		);
 
-		$searchResults = $services->searchEngine->performSearchWithExcludedIds(
-			$services->client,
+		$searchResults = $services->searchEngine->search(
 			$context->request->table,
 			$queries['search_query'],
 			$excludedIds,
@@ -550,7 +564,7 @@ final class Handler extends BaseHandlerWithClient {
 		$excludedIds = [];
 		if (!empty($queries['exclude_query']) && $queries['exclude_query'] !== 'none') {
 			$excludedIds = $services->searchEngine->getExcludedIds(
-				$services->client, $context->request->table, $queries['exclude_query']
+				$context->request->table, $queries['exclude_query']
 			);
 		}
 		if ($context->intent !== Intent::NEW) {
@@ -560,8 +574,8 @@ final class Handler extends BaseHandlerWithClient {
 			);
 		}
 
-		$searchResults = $services->searchEngine->performSearchWithExcludedIds(
-			$services->client, $context->request->table, $queries['search_query'], $excludedIds,
+		$searchResults = $services->searchEngine->search(
+			$context->request->table, $queries['search_query'], $excludedIds,
 			$context->model, $thresholdInfo['threshold']
 		);
 
