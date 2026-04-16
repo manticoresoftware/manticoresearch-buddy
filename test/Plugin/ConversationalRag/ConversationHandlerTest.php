@@ -574,15 +574,11 @@ class ConversationHandlerTest extends TestCase {
 			$handler->setManticoreClient($mockClient);
 
 			try {
-				echo "About to call handler->run()...\n";
 				$task = $handler->run();
-				echo "Handler->run() completed\n";
 
 				$this->assertTrue($task->isSucceed());
 				$result = $task->getResult();
 			} catch (Exception $e) {
-				echo 'Exception: ' . $e->getMessage() . "\n";
-				echo 'Stack trace: ' . $e->getTraceAsString() . "\n";
 				throw $e;
 			}
 
@@ -623,14 +619,13 @@ class ConversationHandlerTest extends TestCase {
 			$handler = new RagHandler(
 				$payload, $this->createMockLlmProvider(
 					[
-					['content' => 'NEW_SEARCH', 'success' => true, 'metadata' => []], // classifyIntent response
+					['content' => 'NEW', 'success' => true, 'metadata' => []], // classifyIntent response
 					[
 						'content' => '{"search_keywords":[{"term":"action movies","confidence":94}],'
 							. '"exclude_query":["none"]}',
 					'success' => true,
 					'metadata' => [],
 					], // generateQueries response
-					['content' => 'YES', 'success' => true, 'metadata' => []], // detectExpansionIntent response
 					[
 					'content' => 'Here are some action movies!',
 					'metadata' => ['tokens_used' => 120],
@@ -657,18 +652,8 @@ class ConversationHandlerTest extends TestCase {
 			]]
 		);
 
-		// 4: getConversationHistory
+		// 4: getConversationMessages
 		$historyResponse = $this->createResponse(
-			[[
-			'total' => 0,
-			'error' => '',
-			'warning' => '',
-			'data' => [],
-			]]
-		);
-
-		// 5: getConversationHistoryForQueryGeneration
-		$queryHistoryResponse = $this->createResponse(
 			[[
 			'total' => 0,
 			'error' => '',
@@ -722,8 +707,7 @@ class ConversationHandlerTest extends TestCase {
 			$responses = [
 				...$initResponses, // initializeTables
 				$modelResponse, // getModelByUuidOrName
-				$historyResponse, // getConversationHistory
-				$queryHistoryResponse, // getConversationHistoryForQueryGeneration
+				$historyResponse, // getConversationMessages
 				$describeResponse, // detectVectorField for main search
 				$searchResponse, // performSearchWithExcludedIds
 				$describeResponse2, // getVectorFields
@@ -738,16 +722,12 @@ class ConversationHandlerTest extends TestCase {
 			$mockClient->method('sendRequest')
 			->willReturnCallback(
 				function ($sql) use (&$callCounter, $responses) {
-					echo 'DB Call #' . (++$callCounter) . ': ' . substr($sql, 0, 100) . "...\n";
+					unset($sql);
+					$callCounter++;
 					if ($callCounter > sizeof($responses)) {
-						echo "ERROR: More calls than expected responses!\n";
-						echo 'Available responses: ' . sizeof($responses) . "\n";
-						echo 'This is call #' . $callCounter . "\n";
 						throw new Exception("Unexpected database call #$callCounter");
 					}
-					$response = $responses[$callCounter - 1];
-					echo '  Returning response type: ' . $response::class . "\n";
-					return $response;
+					return $responses[$callCounter - 1];
 				}
 			);
 
@@ -783,7 +763,7 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertStringContainsString('action movies', $struct[0]['data'][0]['search_query']);
 	}
 
-	public function testContentQuestionWithoutContextFallsBackToNewSearchIntent(): void {
+	public function testFollowUpWithoutContextFallsBackToNewIntent(): void {
 		$query = "CALL CONVERSATIONAL_RAG('What about comedies?', 'movies', 'model-uuid', 'content', 'conv-uuid')";
 
 		$payload = RagPayload::fromRequest(
@@ -803,14 +783,13 @@ class ConversationHandlerTest extends TestCase {
 			$payload,
 			$this->createMockLlmProvider(
 				[
-					['content' => Intent::CONTENT_QUESTION, 'success' => true, 'metadata' => []],
+					['content' => Intent::FOLLOW_UP, 'success' => true, 'metadata' => []],
 					[
 						'content' => '{"search_keywords":[{"term":"comedy movies","confidence":90}],'
 							. '"exclude_query":["none"]}',
 						'success' => true,
 						'metadata' => [],
 					],
-					['content' => 'YES', 'success' => true, 'metadata' => []],
 					[
 						'content' => 'Here are some comedies!',
 						'metadata' => ['tokens_used' => 99],
@@ -835,8 +814,6 @@ class ConversationHandlerTest extends TestCase {
 			]]
 		);
 		$historyResponse = $this->createResponse([['data' => []]]);
-		$latestContextResponse = $this->createResponse([['data' => []]]);
-		$queryHistoryResponse = $this->createResponse([['data' => []]]);
 		$describeResponse = $this->createResponse(
 			[[ 'data' => [
 				['Field' => 'id', 'Type' => 'bigint'],
@@ -862,8 +839,6 @@ class ConversationHandlerTest extends TestCase {
 			...$initResponses,
 			$modelResponse,
 			$historyResponse,
-			$latestContextResponse,
-			$queryHistoryResponse,
 			$describeResponse,
 			$searchResponse,
 			$describeResponse2,
@@ -890,8 +865,8 @@ class ConversationHandlerTest extends TestCase {
 		$task = $handler->run();
 
 		$this->assertTrue($task->isSucceed());
-		$userInsert = $queries[9];
-		$this->assertStringContainsString("'NEW_SEARCH'", $userInsert);
+		$userInsert = $queries[7];
+		$this->assertStringContainsString("'NEW'", $userInsert);
 		$this->assertStringContainsString("'comedy movies'", $userInsert);
 	}
 
@@ -904,20 +879,19 @@ class ConversationHandlerTest extends TestCase {
 	private function createMockLlmProvider(array $responses): LlmProvider {
 		$mockProvider = $this->createMock(LlmProvider::class);
 		$callCount = 0;
-		$mockProvider->method('generateResponse')
-			->willReturnCallback(
-				function ($_prompt, $_options = []) use (&$responses, &$callCount) {
-					unset($_prompt, $_options);
-					if ($callCount >= sizeof($responses)) {
-						throw new \Exception(
-							'Too many LLM calls: expected ' . sizeof($responses) . ', got ' . ($callCount + 1)
-						);
-					}
-					$result = $responses[$callCount];
-					$callCount++;
-					return $result;
-				}
-			);
+		$callback = function ($_prompt, $_options = []) use (&$responses, &$callCount) {
+			unset($_prompt, $_options);
+			if ($callCount >= sizeof($responses)) {
+				throw new \Exception(
+					'Too many LLM calls: expected ' . sizeof($responses) . ', got ' . ($callCount + 1)
+				);
+			}
+			$result = $responses[$callCount];
+			$callCount++;
+			return $result;
+		};
+
+		$mockProvider->method('generateResponse')->willReturnCallback($callback);
 
 		return $mockProvider;
 	}

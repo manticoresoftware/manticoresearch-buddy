@@ -23,25 +23,6 @@ class BaseProviderTest extends TestCase {
 		// Nothing to clean up
 	}
 
-	public function testConfigureResetsClient(): void {
-		$config = ['model' => 'openai:gpt-4'];
-
-		// Configure once
-		$this->provider->configure($config);
-
-		// Initialize client via reflection
-		$reflection = new ReflectionClass($this->provider);
-		$clientProperty = $reflection->getProperty('client');
-		$clientProperty->setAccessible(true);
-		$clientProperty->setValue($this->provider, (object)['test' => 'client']);
-
-		// Configure again
-		$this->provider->configure($config);
-
-		// Client should be reset
-		$this->assertNull($clientProperty->getValue($this->provider));
-	}
-
 	public function testGetSettingsMergesOverrides(): void {
 		$config = [
 			'settings' => ['api_key' => 'sk-test', 'timeout' => 30, 'temperature' => 0.5, 'max_tokens' => 500],
@@ -166,20 +147,6 @@ class BaseProviderTest extends TestCase {
 		);
 	}
 
-	public function testGetClientForModelAcceptsEmptyClientOptions(): void {
-		if (!class_exists('Llm')) {
-			$this->markTestSkipped('llm extension is not available');
-		}
-
-		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('getClientForModel');
-		$method->setAccessible(true);
-
-		$result = $method->invoke($this->provider, 'openai:gpt-4o-mini', []);
-
-		$this->assertInstanceOf(Llm::class, $result);
-	}
-
 	public function testConvertToFloatValidNumeric(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
@@ -204,49 +171,11 @@ class BaseProviderTest extends TestCase {
 		$this->assertEquals(42, $method->invoke($this->provider, 42)); // Already int
 	}
 
-	public function testGetConfigWithDefault(): void {
-		$config = ['existing_key' => 'value'];
-		$this->provider->configure($config);
-
-		// Use reflection to access protected method
-		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('getConfig');
-		$method->setAccessible(true);
-
-		$this->assertEquals('value', $method->invoke($this->provider, 'existing_key'));
-		$this->assertEquals('default', $method->invoke($this->provider, 'missing_key', 'default'));
-		$this->assertNull($method->invoke($this->provider, 'missing_key'));
-	}
-
 	public function testEstimateTokens(): void {
 		$this->assertEquals(1, $this->provider->estimateTokens('test')); // 4 chars / 4 = 1
 		$this->assertEquals(1, $this->provider->estimateTokens('abcd')); // 4 chars / 4 = 1
 		$this->assertEquals(2, $this->provider->estimateTokens('abcde')); // 5 chars / 4 = 1.25, ceil to 2
 		$this->assertEquals(3, $this->provider->estimateTokens('abcdefghijk')); // 12 chars / 4 = 3
-	}
-
-	public function testGetStylePromptDefault(): void {
-		$this->provider->configure([]);
-
-		// Use reflection to access protected method
-		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('getStylePrompt');
-		$method->setAccessible(true);
-
-		$result = $method->invoke($this->provider);
-		$this->assertStringContainsString('helpful AI assistant', is_string($result) ? $result : '');
-	}
-
-	public function testGetStylePromptCustom(): void {
-		$this->provider->configure(['style_prompt' => 'Custom prompt']);
-
-		// Use reflection to access protected method
-		$reflection = new ReflectionClass($this->provider);
-		$method = $reflection->getMethod('getStylePrompt');
-		$method->setAccessible(true);
-
-		$result = $method->invoke($this->provider);
-		$this->assertEquals('Custom prompt', $result);
 	}
 
 	public function testFormatError(): void {
@@ -263,10 +192,25 @@ class BaseProviderTest extends TestCase {
 				'success' => false,
 				'error' => 'Test message',
 				'content' => '',
-				'details' => 'Test exception',
 				'provider' => 'llm',
+				'details' => 'Test exception',
 				], $result
 			);
+	}
+
+	public function testFormatFailureMessageIncludesDetails(): void {
+		$result = LlmProvider::formatFailureMessage(
+			'Query generation failed',
+			[
+				'error' => 'LLM request failed',
+				'details' => 'OpenRouter API error 429 Too Many Requests',
+			]
+		);
+
+		$this->assertEquals(
+			'Query generation failed: LLM request failed: OpenRouter API error 429 Too Many Requests',
+			$result
+		);
 	}
 
 	public function testFormatSuccess(): void {

@@ -225,7 +225,6 @@ class SearchEngine {
 			return [];
 		}
 
-		$searchEscaped = $this->escapeString($searchQuery);
 		$knnK = $retrievalLimit;
 		$excludeClause = '';
 		if (!empty($excludedIds)) {
@@ -236,7 +235,7 @@ class SearchEngine {
 		$sql = $this->buildVectorSearchSql(
 			$table,
 			$vectorField,
-			$searchEscaped,
+			$searchQuery,
 			$knnK,
 			$threshold,
 			$retrievalLimit,
@@ -295,19 +294,68 @@ class SearchEngine {
 	private function buildVectorSearchSql(
 		string $table,
 		string $vectorField,
-		string $searchEscaped,
+		string $searchQuery,
 		int $knnK,
 		float $threshold,
 		int $limit,
 		string $excludeClause
 	): string {
-		$excludeSql = $excludeClause !== '' ? "\n\t\t\t\t\t$excludeClause" : '';
+		$searchTerms = $this->splitSearchQueryTerms($searchQuery);
+		$whereClauses = [
+			$this->buildKnnWhereSql($vectorField, $knnK, $searchTerms),
+			"knn_dist < $threshold",
+		];
+		if ($excludeClause !== '') {
+			$whereClauses[] = $excludeClause;
+		}
 
-		return /** @lang manticore */ "SELECT *, knn_dist() as knn_dist
-				FROM {$table}
-				WHERE knn($vectorField, $knnK, '$searchEscaped')
-				AND knn_dist < $threshold{$excludeSql}
-				LIMIT $limit";
+		$sql = sprintf(
+		/** @lang manticore */
+			'SELECT *, knn_dist() as knn_dist FROM %s WHERE %s LIMIT %d',
+			$table,
+			implode(' AND ', $whereClauses),
+			$limit
+		);
+
+		if (sizeof($searchTerms) > 1) {
+			$sql .= " OPTION fusion_method='rrf'";
+		}
+
+		return $sql;
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private function splitSearchQueryTerms(string $searchQuery): array {
+		$terms = [];
+		foreach (explode(',', $searchQuery) as $term) {
+			$normalizedTerm = trim($term);
+			if ($normalizedTerm === '') {
+				continue;
+			}
+
+			$terms[] = $normalizedTerm;
+		}
+
+		if ($terms === []) {
+			throw ManticoreSearchClientError::create('Search query must contain at least one term');
+		}
+
+		return $terms;
+	}
+
+	/**
+	 * @param array<int, string> $searchTerms
+	 */
+	private function buildKnnWhereSql(string $vectorField, int $knnK, array $searchTerms): string {
+		$knnClauses = [];
+		foreach ($searchTerms as $searchTerm) {
+			$searchEscaped = $this->escapeString($searchTerm);
+			$knnClauses[] = "knn($vectorField, $knnK, '$searchEscaped')";
+		}
+
+		return implode(' AND ', $knnClauses);
 	}
 
 	/**

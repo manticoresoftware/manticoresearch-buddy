@@ -437,6 +437,64 @@ class SearchEngineTest extends TestCase {
 	}
 
 	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	public function testPerformSearchWithMultipleGeneratedTermsBuildsHybridKnnQuery(): void {
+		$searchEngine = $this->createSearchEngine();
+		$mockClient = $this->createMock(HTTPClient::class);
+		$schemaResponse = $this->createSchemaResponse(
+			[
+				['Field' => 'embedding_vector', 'Type' => 'float_vector'],
+			]
+		);
+		$searchResponse = $this->createDataResponse(
+			[
+				['id' => 1, 'title' => 'Market cap article', 'knn_dist' => 0.1],
+			]
+		);
+
+		$sqlQueries = [];
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('docs')
+			->willReturn(true);
+		$mockClient->expects($this->exactly(3))
+			->method('sendRequest')
+			->willReturnCallback(
+				function (string $sql) use ($schemaResponse, $searchResponse, &$sqlQueries): Response {
+					$sqlQueries[] = $sql;
+
+					return match (sizeof($sqlQueries)) {
+						1, 3 => $schemaResponse,
+						2 => $searchResponse,
+						default => throw new Exception('Unexpected sendRequest call count'),
+					};
+				}
+			);
+
+		$result = $searchEngine->performSearchWithExcludedIds(
+			$mockClient,
+			'docs',
+			'Market Capitalization vs Net Asset Value, difference between market cap and NAV, ' .
+			'how to calculate Market Cap and NAV',
+			[],
+			$this->createDefaultModelConfig(),
+			0.8
+		);
+
+		$searchSql = $sqlQueries[1];
+		$this->assertStringContainsString(
+			"WHERE knn(embedding_vector, 5, 'Market Capitalization vs Net Asset Value') "
+			. "AND knn(embedding_vector, 5, 'difference between market cap and NAV') "
+			. "AND knn(embedding_vector, 5, 'how to calculate Market Cap and NAV')",
+			$searchSql
+		);
+		$this->assertStringContainsString("OPTION fusion_method='rrf'", $searchSql);
+		$this->assertCount(1, $result);
+	}
+
+	/**
 	 * @throws ReflectionException
 	 */
 	public function testGetVectorFieldsSuccessful(): void {

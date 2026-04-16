@@ -10,6 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationManager;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationMessage;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -48,13 +49,12 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$this->conversationManager->initializeTable($this->client);
 
 		// Save a user message
-		$this->conversationManager->saveMessage(
+		$this->saveUser(
 			'test-conversation-1',
 			'test-model-1',
-			'user',
 			'What is machine learning?',
 			50,
-			'NEW_QUESTION',
+			'NEW',
 			'machine learning information',
 			'',
 			[]
@@ -64,21 +64,17 @@ class ConversationManagerIntegrationTest extends TestCase {
 		sleep(1);
 
 		// Save an assistant response
-		$this->conversationManager->saveMessage(
+		$this->saveAssistant(
 			'test-conversation-1',
 			'test-model-1',
-			'assistant',
 			'Machine learning is a subset of artificial intelligence that focuses '
 			. 'on algorithms that can learn from data.',
 			75,
-			'ANSWER',
-			'',
-			'',
-			[]
+			'ANSWER'
 		);
 
 		// Retrieve conversation history
-		$history = $this->conversationManager->getConversationHistory('test-conversation-1');
+		$history = $this->getConversationHistory('test-conversation-1');
 
 		$expectedHistory = "user: What is machine learning?\n"
 			. 'assistant: Machine learning is a subset of artificial intelligence that focuses '
@@ -87,15 +83,15 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$this->assertEquals($expectedHistory, $history);
 
 		// Test search context retrieval
-		$searchContext = $this->conversationManager->getLatestSearchContext('test-conversation-1');
+		$searchContext = $this->getLatestSearchContext('test-conversation-1');
 		$this->assertIsArray($searchContext);
 		$this->assertEquals('machine learning information', $searchContext['search_query']);
 		$this->assertEquals('', $searchContext['exclude_query']);
 		$this->assertEquals('[]', $searchContext['excluded_ids']); // Empty excluded IDs are stored as JSON
 
-		// Test filtered history for query generation
-		$filteredHistory = $this->conversationManager->getConversationHistoryForQueryGeneration('test-conversation-1');
-		$this->assertEquals($expectedHistory, $filteredHistory);
+		// Test query-generation history
+		$queryHistory = $this->getConversationHistoryForQueryGeneration('test-conversation-1');
+		$this->assertEquals($expectedHistory, $queryHistory);
 	}
 
 	/**
@@ -110,64 +106,54 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$this->conversationManager->initializeTable($this->client);
 
 		// First exchange with search context
-		$this->conversationManager->saveMessage(
+		$this->saveUser(
 			'test-conversation-2',
 			'test-model-2',
-			'user',
 			'Show me movies about space',
 			30,
-			'NEW_SEARCH',
+			'NEW',
 			'movies about space',
 			'Star Wars',
 			['1', '2', '3']
 		);
 
-		$this->conversationManager->saveMessage(
+		$this->saveAssistant(
 			'test-conversation-2',
 			'test-model-2',
-			'assistant',
 			'Here are some great space movies: 2001: A Space Odyssey, Interstellar, Gravity...',
 			60,
-			'ANSWER',
-			'',
-			'',
-			[]
+			'ANSWER'
 		);
 
 		// Second exchange with different search context
-		$this->conversationManager->saveMessage(
+		$this->saveUser(
 			'test-conversation-2',
 			'test-model-2',
-			'user',
 			'What about documentaries?',
 			25,
-			'NEW_SEARCH',
+			'NEW',
 			'documentaries about space',
 			'fiction movies',
 			['4', '5', '6']
 		);
 
-		$this->conversationManager->saveMessage(
+		$this->saveAssistant(
 			'test-conversation-2',
 			'test-model-2',
-			'assistant',
 			'Here are some space documentaries: Cosmos, The Farthest, Apollo 13...',
 			55,
-			'ANSWER',
-			'',
-			'',
-			[]
+			'ANSWER'
 		);
 
 		// Test that we get the latest search context
-		$searchContext = $this->conversationManager->getLatestSearchContext('test-conversation-2');
+		$searchContext = $this->getLatestSearchContext('test-conversation-2');
 		$this->assertNotNull($searchContext);
 		$this->assertEquals('documentaries about space', $searchContext['search_query']);
 		$this->assertEquals('fiction movies', $searchContext['exclude_query']);
 		$this->assertEquals('["4","5","6"]', $searchContext['excluded_ids']);
 
 		// Test complete history
-		$history = $this->conversationManager->getConversationHistory('test-conversation-2');
+		$history = $this->getConversationHistory('test-conversation-2');
 		$this->assertStringContainsString('Show me movies about space', $history);
 		$this->assertStringContainsString('What about documentaries?', $history);
 		$this->assertStringContainsString('Here are some great space movies', $history);
@@ -175,7 +161,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 	}
 
 	/**
-	 * Test conversation with CONTENT_QUESTION intent filtering
+	 * Test conversation with FOLLOW_UP intent history
 	 *
 	 * @throws ManticoreSearchClientError
 	 * @throws JsonException
@@ -186,72 +172,85 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$this->conversationManager->initializeTable($this->client);
 
 		// Regular search question
-		$this->conversationManager->saveMessage(
+		$this->saveUser(
 			'test-conversation-3',
 			'test-model-3',
-			'user',
 			'What are the best sci-fi movies?',
 			25,
-			'NEW_SEARCH',
+			'NEW',
 			'best sci-fi movies',
 			'',
 			[]
 		);
 
-		$this->conversationManager->saveMessage(
+		$this->saveAssistant(
 			'test-conversation-3',
 			'test-model-3',
-			'assistant',
 			'Here are some highly-rated sci-fi movies: Blade Runner 2049, Arrival, The Matrix...',
 			50,
-			'ANSWER',
-			'',
-			'',
-			[]
+			'ANSWER'
 		);
 
-		// Content question (should be filtered out in query generation)
-		$this->conversationManager->saveMessage(
+		// Follow-up question should remain in query generation history.
+		$this->saveUser(
 			'test-conversation-3',
 			'test-model-3',
-			'user',
 			'Tell me more about Blade Runner 2049',
 			20,
-			'CONTENT_QUESTION',
+			'FOLLOW_UP',
 			'',
 			'',
 			[]
 		);
 
-		$this->conversationManager->saveMessage(
+		$this->saveAssistant(
 			'test-conversation-3',
 			'test-model-3',
-			'assistant',
 			'Blade Runner 2049 is a 2017 science fiction film directed by Denis Villeneuve...',
 			45,
-			'ANSWER',
+			'ANSWER'
+		);
+
+		$this->saveUser(
+			'test-conversation-3',
+			'test-model-3',
+			'Who directed it?',
+			15,
+			'FOLLOW_UP',
 			'',
 			'',
 			[]
+		);
+
+		$this->saveAssistant(
+			'test-conversation-3',
+			'test-model-3',
+			'Denis Villeneuve directed Blade Runner 2049.',
+			30,
+			'FOLLOW_UP'
 		);
 
 		// Test that complete history includes everything
 		$this->assertStringContainsString(
 			'What are the best sci-fi movies?',
-			$this->conversationManager->getConversationHistory('test-conversation-3')
+			$this->getConversationHistory('test-conversation-3')
 		);
 		$this->assertStringContainsString(
 			'Tell me more about Blade Runner 2049',
-			$this->conversationManager->getConversationHistory('test-conversation-3')
+			$this->getConversationHistory('test-conversation-3')
+		);
+		$this->assertStringContainsString(
+			'Who directed it?',
+			$this->getConversationHistory('test-conversation-3')
 		);
 
-		// Test that filtered history excludes CONTENT_QUESTION
-		$filteredHistory = $this->conversationManager->getConversationHistoryForQueryGeneration('test-conversation-3');
-		$this->assertStringContainsString('What are the best sci-fi movies?', $filteredHistory);
-		$this->assertStringNotContainsString('Tell me more about Blade Runner 2049', $filteredHistory);
+		$queryHistory = $this->getConversationHistoryForQueryGeneration('test-conversation-3');
+		$this->assertStringContainsString('What are the best sci-fi movies?', $queryHistory);
+		$this->assertStringContainsString('Tell me more about Blade Runner 2049', $queryHistory);
+		$this->assertStringContainsString('Who directed it?', $queryHistory);
 
-		// Test that search context is not affected by CONTENT_QUESTION
-		$searchContext = $this->conversationManager->getLatestSearchContext('test-conversation-3');
+		// Test that search context is not affected by consecutive FOLLOW_UP turns.
+		$searchContext = $this->getLatestSearchContext('test-conversation-3');
 		$this->assertNotNull($searchContext);
 		$this->assertEquals('best sci-fi movies', $searchContext['search_query']);
 	}
@@ -267,17 +266,17 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$this->conversationManager->initializeTable($this->client);
 
 		// Test history for non-existent conversation
-		$history = $this->conversationManager->getConversationHistory('non-existent-conversation');
+		$history = $this->getConversationHistory('non-existent-conversation');
 		$this->assertEquals('', $history);
 
-		// Test filtered history for non-existent conversation
+		// Test query-generation history for non-existent conversation
 		$this->assertEquals(
 			'',
-			$this->conversationManager->getConversationHistoryForQueryGeneration('non-existent-conversation')
+			$this->getConversationHistoryForQueryGeneration('non-existent-conversation')
 		);
 
 		// Test search context for non-existent conversation
-		$searchContext = $this->conversationManager->getLatestSearchContext('non-existent-conversation');
+		$searchContext = $this->getLatestSearchContext('non-existent-conversation');
 		$this->assertNull($searchContext);
 	}
 
@@ -296,20 +295,19 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$specialMessage = "This message contains: quotes 'single' and \"double\", " .
 			"newlines\nand\ttabs, backslashes\\, and unicode: ñáéíóú 🚀";
 
-		$this->conversationManager->saveMessage(
+		$this->saveUser(
 			'test-conversation-4',
 			'test-model-4',
-			'user',
 			$specialMessage,
 			100,
-			'NEW_SEARCH',
+			'NEW',
 			'special characters test',
 			'',
 			[]
 		);
 
 		// Retrieve and verify the message is preserved correctly
-		$history = $this->conversationManager->getConversationHistory('test-conversation-4');
+		$history = $this->getConversationHistory('test-conversation-4');
 		$this->assertStringContainsString('quotes \'single\' and "double"', $history);
 		$this->assertStringContainsString('newlines', $history);
 		$this->assertStringContainsString('tabs', $history);
@@ -329,20 +327,19 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$this->conversationManager->initializeTable($this->client);
 
 		$excludedIds = ['10', '20', '30', '40', '50'];
-		$this->conversationManager->saveMessage(
+		$this->saveUser(
 			'test-conversation-5',
 			'test-model-5',
-			'user',
 			'Show me results excluding some items',
 			35,
-			'NEW_SEARCH',
+			'NEW',
 			'results excluding items',
 			'items to exclude',
 			$excludedIds
 		);
 
 		// Test search context retrieval with JSON
-		$searchContext = $this->conversationManager->getLatestSearchContext('test-conversation-5');
+		$searchContext = $this->getLatestSearchContext('test-conversation-5');
 		$this->assertIsArray($searchContext);
 		$this->assertEquals('results excluding items', $searchContext['search_query']);
 		$this->assertEquals('items to exclude', $searchContext['exclude_query']);
@@ -364,20 +361,91 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$this->conversationManager->initializeTable($this->client);
 
 		// Verify table exists by trying to insert into it
-		$this->conversationManager->saveMessage(
+		$this->saveUser(
 			'test-conversation-6',
 			'test-model-6',
-			'user',
 			'Test message for table creation',
 			10,
-			'NEW_SEARCH',
+			'NEW',
 			'table creation test',
 			'',
 			[]
 		);
 
 		// Verify we can retrieve the message
-		$history = $this->conversationManager->getConversationHistory('test-conversation-6');
+		$history = $this->getConversationHistory('test-conversation-6');
 		$this->assertStringContainsString('Test message for table creation', $history);
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	private function getConversationHistory(string $conversationUuid): string {
+		return $this->conversationManager->getConversationMessages($conversationUuid)->format();
+	}
+
+	/**
+	 * @return array{search_query: string, exclude_query: string, excluded_ids: string}|null
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	private function getLatestSearchContext(string $conversationUuid): ?array {
+		return $this->conversationManager->getConversationMessages($conversationUuid)->latestSearchContext();
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	private function getConversationHistoryForQueryGeneration(string $conversationUuid): string {
+		return $this->conversationManager->getConversationMessages($conversationUuid)->format();
+	}
+
+	/**
+	 * @param array<int, string> $excludedIds
+	 * @throws JsonException
+	 * @throws ManticoreSearchClientError
+	 */
+	private function saveUser(
+		string $conversationUuid,
+		string $modelUuid,
+		string $message,
+		int $tokensUsed,
+		string $intent,
+		string $searchQuery,
+		string $excludeQuery,
+		array $excludedIds
+	): void {
+		$this->conversationManager->saveMessage(
+			$conversationUuid,
+			$modelUuid,
+			ConversationMessage::userWithExcludedIds(
+				$message,
+				$intent,
+				$searchQuery,
+				$excludeQuery,
+				$excludedIds
+			),
+			$tokensUsed
+		);
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 */
+	private function saveAssistant(
+		string $conversationUuid,
+		string $modelUuid,
+		string $message,
+		int $tokensUsed,
+		string $intent
+	): void {
+		$this->conversationManager->saveMessage(
+			$conversationUuid,
+			$modelUuid,
+			ConversationMessage::assistant($message, $intent),
+			$tokensUsed
+		);
 	}
 }

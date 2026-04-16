@@ -9,8 +9,12 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationHistory;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationMessage;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Intent;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\IntentClassifier;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -29,6 +33,26 @@ class IntentClassifierTest extends TestCase {
 		putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 	}
 
+	/**
+	 * @param array<string, array{user?: string, assistant?: string}> $turns
+	 */
+	private function history(array $turns): ConversationHistory {
+		$messages = [];
+		foreach ($turns as $turn) {
+			if (isset($turn['user'])) {
+				$messages[] = ConversationMessage::user($turn['user'], Intent::NEW);
+			}
+
+			if (!isset($turn['assistant'])) {
+				continue;
+			}
+
+			$messages[] = ConversationMessage::assistant($turn['assistant'], Intent::NEW);
+		}
+
+		return new ConversationHistory($messages);
+	}
+
 	public function testClassifyIntentRejection(): void {
 		$intentClassifier = new IntentClassifier();
 
@@ -44,19 +68,28 @@ class IntentClassifierTest extends TestCase {
 				->willReturn(
 					[
 					'success' => true,
-					'content' => 'REJECTION',
+					'content' => 'REJECT',
 					'metadata' => [],
 					]
 				);
 
-		$intent = $intentClassifier->classifyIntent(
-			'I already watched that movie',
-			"user: I want to watch a comedy\nassistant: I recommend The Office\nuser: I already watched that",
-			$mockProvider,
-			$modelConfig
+		$history = $this->history(
+			[
+			'1970-01-01T00:00:00.000000Z' => [
+				'user' => 'I want to watch a comedy',
+				'assistant' => 'I recommend The Office',
+			],
+			'1970-01-01T00:00:01.000000Z' => [
+				'user' => 'I already watched that',
+			],
+			]
 		);
 
-		$this->assertEquals('REJECTION', $intent);
+		$intent = $intentClassifier->classifyIntent(
+			'I already watched that movie', $history, $mockProvider, $modelConfig
+		);
+
+		$this->assertEquals('REJECT', $intent);
 	}
 
 	public function testClassifyIntentAlternatives(): void {
@@ -74,19 +107,28 @@ class IntentClassifierTest extends TestCase {
 			->willReturn(
 				[
 				'success' => true,
-				'content' => 'ALTERNATIVES',
+				'content' => 'EXPAND',
 				'metadata' => [],
 				]
 			);
 
-		$intent = $intentClassifier->classifyIntent(
-			'What else do you have?',
-			"user: Show me comedies\nassistant: I recommend The Office\nuser: What else do you have?",
-			$mockProvider,
-			$modelConfig
+		$history = $this->history(
+			[
+			'1970-01-01T00:00:00.000000Z' => [
+				'user' => 'Show me comedies',
+				'assistant' => 'I recommend The Office',
+			],
+			'1970-01-01T00:00:01.000000Z' => [
+				'user' => 'What else do you have?',
+			],
+			]
 		);
 
-		$this->assertEquals('ALTERNATIVES', $intent);
+		$intent = $intentClassifier->classifyIntent(
+			'What else do you have?', $history, $mockProvider, $modelConfig
+		);
+
+		$this->assertEquals('EXPAND', $intent);
 	}
 
 	public function testClassifyIntentNewSearch(): void {
@@ -104,19 +146,19 @@ class IntentClassifierTest extends TestCase {
 			->willReturn(
 				[
 				'success' => true,
-				'content' => 'NEW_SEARCH',
+				'content' => 'NEW',
 				'metadata' => [],
 				]
 			);
 
 		$intent = $intentClassifier->classifyIntent(
 			'Show me action movies',
-			'', // No conversation history
+			$this->history([]),
 			$mockProvider,
 			$modelConfig
 		);
 
-		$this->assertEquals('NEW_SEARCH', $intent);
+		$this->assertEquals('NEW', $intent);
 	}
 
 	public function testClassifyIntentLLMFailure(): void {
@@ -141,13 +183,71 @@ class IntentClassifierTest extends TestCase {
 
 		$intent = $intentClassifier->classifyIntent(
 			'What movies do you recommend?',
-			'',
+			$this->history([]),
 			$mockProvider,
 			$modelConfig
 		);
 
-		// Should fallback to NEW_SEARCH on failure
-		$this->assertEquals('NEW_SEARCH', $intent);
+		// Should fallback to NEW on failure
+		$this->assertEquals('NEW', $intent);
+	}
+
+	public function testClassifyIntentUnexpectedResponseFallsBackToNew(): void {
+		$intentClassifier = new IntentClassifier();
+
+		$modelConfig = ['model' => 'openai:gpt-4'];
+
+		/** @var MockObject&LlmProvider $mockProvider */
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
+		$mockProvider->method('generateResponse')
+			->willReturn(
+				[
+					'success' => true,
+					'content' => 'MAYBE',
+					'metadata' => [],
+				]
+			);
+
+		$intent = $intentClassifier->classifyIntent(
+			'What movies do you recommend?',
+			$this->history([]),
+			$mockProvider,
+			$modelConfig
+		);
+
+		$this->assertEquals('NEW', $intent);
+	}
+
+	public function testClassifyIntentUnclearFallsBackToNew(): void {
+		$intentClassifier = new IntentClassifier();
+
+		$modelConfig = ['model' => 'openai:gpt-4'];
+
+		/** @var MockObject&LlmProvider $mockProvider */
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
+		$mockProvider->method('generateResponse')
+			->willReturn(
+				[
+					'success' => true,
+					'content' => 'UNCLEAR',
+					'metadata' => [],
+				]
+			);
+
+		$intent = $intentClassifier->classifyIntent(
+			'???',
+			$this->history([]),
+			$mockProvider,
+			$modelConfig
+		);
+
+		$this->assertEquals('NEW', $intent);
 	}
 
 	public function testGenerateQueriesWithExclusions(): void {
@@ -173,8 +273,8 @@ class IntentClassifierTest extends TestCase {
 
 		$result = $intentClassifier->generateQueries(
 			'I want action movies but not comedies',
-			'NEW_SEARCH',
-			'',
+			'NEW',
+			[],
 			$mockProvider,
 			$modelConfig
 		);
@@ -206,8 +306,8 @@ class IntentClassifierTest extends TestCase {
 
 		$result = $intentClassifier->generateQueries(
 			'Show me science fiction movies',
-			'NEW_SEARCH',
-			'',
+			'NEW',
+			[],
 			$mockProvider,
 			$modelConfig
 		);
@@ -239,8 +339,16 @@ class IntentClassifierTest extends TestCase {
 
 		$result = $intentClassifier->generateQueries(
 			'I liked Inception, what else?',
-			'INTEREST',
-			"user: Show me Inception\nassistant: Here's Inception\nuser: I liked Inception, what else?",
+			'REFINE',
+			[
+				'1970-01-01T00:00:00.000000Z' => [
+					'user' => 'Show me Inception',
+					'assistant' => "Here's Inception",
+				],
+				'1970-01-01T00:00:01.000000Z' => [
+					'user' => 'I liked Inception, what else?',
+				],
+			],
 			$mockProvider,
 			$modelConfig
 		);
@@ -249,51 +357,260 @@ class IntentClassifierTest extends TestCase {
 		$this->assertEquals('Inception', $result['exclude_query']);
 	}
 
-	public function testLimitConversationHistoryShortHistory(): void {
+	public function testGenerateQueriesParsesFencedJson(): void {
 		$intentClassifier = new IntentClassifier();
 
-		$shortHistory = "user: hello\nassistant: hi\nuser: how are you?\nassistant: good";
+		$modelConfig = ['model' => 'openai:gpt-4'];
 
-		// Use reflection to access private method
-		$reflection = new ReflectionClass($intentClassifier);
-		$method = $reflection->getMethod('limitConversationHistory');
-		$method->setAccessible(true);
+		/** @var MockObject&LlmProvider $mockProvider */
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
+		$mockProvider->method('generateResponse')
+			->willReturn(
+				[
+					'success' => true,
+					'content' => "```json\n"
+						. '{"search_keywords":[{"term":"RAG explanation","confidence":95}],'
+						. '"exclude_query":["none"]}' . "\n```",
+					'metadata' => [],
+				]
+			);
 
-		$result = $method->invoke($intentClassifier, $shortHistory);
+		$result = $intentClassifier->generateQueries(
+			'Explain RAG',
+			'NEW',
+			[],
+			$mockProvider,
+			$modelConfig
+		);
 
-		$this->assertEquals($shortHistory, $result);
+		$this->assertEquals('RAG explanation', $result['search_query']);
+		$this->assertEquals('', $result['exclude_query']);
 	}
 
-	public function testLimitConversationHistoryLongHistory(): void {
+	public function testGenerateQueriesFallsBackToUserQueryWhenLlmReturnsEmptyKeywords(): void {
 		$intentClassifier = new IntentClassifier();
 
-		// Create history with more than 10 exchanges (20 lines)
-		$longHistory = '';
+		$modelConfig = ['model' => 'openai:gpt-4'];
+
+		/** @var MockObject&LlmProvider $mockProvider */
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
+		$mockProvider->method('generateResponse')
+			->willReturn(
+				[
+					'success' => true,
+					'content' => '{"search_keywords":[],"exclude_query":["none"]}',
+					'metadata' => [],
+				]
+			);
+
+		$result = $intentClassifier->generateQueries(
+			'ok bye',
+			'NEW',
+			[],
+			$mockProvider,
+			$modelConfig
+		);
+
+		$this->assertEquals('ok bye', $result['search_query']);
+		$this->assertEquals('', $result['exclude_query']);
+	}
+
+	public function testGenerateQueriesThrowsOnInvalidJson(): void {
+		$intentClassifier = new IntentClassifier();
+
+		$modelConfig = ['model' => 'openai:gpt-4'];
+
+		/** @var MockObject&LlmProvider $mockProvider */
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
+		$mockProvider->method('generateResponse')
+			->willReturn(
+				[
+					'success' => true,
+					'content' => '```json',
+					'metadata' => [],
+				]
+			);
+
+		$this->expectException(ManticoreSearchClientError::class);
+
+		$intentClassifier->generateQueries(
+			'Explain RAG',
+			'NEW',
+			[],
+			$mockProvider,
+			$modelConfig
+		);
+	}
+
+	public function testGenerateQueriesFailureIncludesProviderDetails(): void {
+		$intentClassifier = new IntentClassifier();
+
+		$modelConfig = ['model' => 'openrouter:google/gemma-4-31b-it:free'];
+
+		/** @var MockObject&LlmProvider $mockProvider */
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
+		$mockProvider->method('generateResponse')
+			->willReturn(
+				[
+					'success' => false,
+					'error' => 'LLM request failed',
+					'content' => '',
+					'provider' => 'llm',
+					'details' => 'OpenRouter API error 429 Too Many Requests',
+				]
+			);
+
+		try {
+			$intentClassifier->generateQueries(
+				'tv shows?',
+				'NEW',
+				[],
+				$mockProvider,
+				$modelConfig
+			);
+			$this->fail('Expected query generation failure');
+		} catch (ManticoreSearchClientError $e) {
+			$this->assertStringContainsString(
+				'Query generation failed: LLM request failed: OpenRouter API error 429 Too Many Requests',
+				$e->getResponseError()
+			);
+		}
+	}
+
+	public function testBuildHistoryPayloadShortHistory(): void {
+		$messages = [
+			['role' => 'user', 'message' => 'hello'],
+			['role' => 'assistant', 'message' => 'hi'],
+			['role' => 'user', 'message' => 'how are you?'],
+			['role' => 'assistant', 'message' => 'good'],
+		];
+
+		$this->assertEquals(
+			[
+				'1970-01-01T00:00:00.000000Z' => [
+					'user' => 'hello',
+					'assistant' => 'hi',
+				],
+				'1970-01-01T00:00:01.000000Z' => [
+					'user' => 'how are you?',
+					'assistant' => 'good',
+				],
+			],
+			$this->createConversationHistory($messages)->payload()
+		);
+	}
+
+	public function testBuildHistoryPayloadLimitsHistory(): void {
+		$messages = [];
 		for ($i = 0; $i < 12; $i++) {
-			$longHistory .= "user: message {$i}\nassistant: response {$i}\n";
+			$messages[] = ['role' => 'user', 'message' => "message {$i}"];
+			$messages[] = ['role' => 'assistant', 'message' => "response {$i}"];
 		}
 
-		// Use reflection to access private method
-		$reflection = new ReflectionClass($intentClassifier);
-		$method = $reflection->getMethod('limitConversationHistory');
-		$method->setAccessible(true);
+		$result = $this->createConversationHistory($messages)->payload();
 
-		$result = $method->invoke($intentClassifier, $longHistory);
+		$this->assertCount(10, $result);
+		$this->assertEquals(
+			[
+				'user' => 'message 2',
+				'assistant' => 'response 2',
+			],
+			$result['1970-01-01T00:00:00.000000Z']
+		);
+		$this->assertEquals(
+			[
+				'user' => 'message 11',
+				'assistant' => 'response 11',
+			],
+			$result['1970-01-01T00:00:09.000000Z']
+		);
+	}
 
-		$resultString = is_string($result) ? $result : '';
-		$lines = explode("\n", trim($resultString));
+	public function testBuildHistoryPayloadPreservesMultilineMessages(): void {
+		$result = $this->createConversationHistory(
+			[
+				['role' => 'user', 'message' => 'tv shows?'],
+				[
+					'role' => 'assistant',
+					'message' => "1. Game of Thrones\n\n2. Breaking Bad\n\n3. Stranger Things",
+				],
+				['role' => 'user', 'message' => 'what is the cast in GoT?'],
+				[
+					'role' => 'assistant',
+					'message' => "Main cast:\n\n- Emilia Clarke\n- Kit Harington",
+				],
+				['role' => 'user', 'message' => 'aaa, I saw this show'],
+			]
+		)->payload();
 
-		$this->assertGreaterThanOrEqual(18, sizeof($lines)); // Should be limited, at least 9 exchanges (18 lines)
-		$this->assertLessThanOrEqual(20, sizeof($lines)); // Should not exceed 10 exchanges (20 lines)
-		$this->assertStringContainsString('message', $resultString); // Should contain messages
+		$this->assertEquals(
+			[
+				'user' => 'tv shows?',
+				'assistant' => "1. Game of Thrones\n\n2. Breaking Bad\n\n3. Stranger Things",
+			],
+			$result['1970-01-01T00:00:00.000000Z']
+		);
+		$this->assertEquals(
+			[
+				'user' => 'what is the cast in GoT?',
+				'assistant' => "Main cast:\n\n- Emilia Clarke\n- Kit Harington",
+			],
+			$result['1970-01-01T00:00:01.000000Z']
+		);
+		$this->assertEquals(
+			[
+				'user' => 'aaa, I saw this show',
+			],
+			$result['1970-01-01T00:00:02.000000Z']
+		);
+	}
+
+	public function testBuildHistoryPayloadGroupsTurnsByTimestamp(): void {
+		$result = $this->createConversationHistory(
+			[
+				['role' => 'user', 'message' => 'tv shows?'],
+				['role' => 'assistant', 'message' => "1. **Game of Thrones**\n- fantasy drama"],
+				['role' => 'user', 'message' => 'what is the cast in GoT?'],
+				['role' => 'assistant', 'message' => "Main cast:\n- Emilia Clarke\n- Kit Harington"],
+				['role' => 'user', 'message' => 'aaa, I saw this show'],
+			]
+		)->payload();
+
+		$this->assertEquals(
+			[
+				'1970-01-01T00:00:00.000000Z' => [
+					'user' => 'tv shows?',
+					'assistant' => "1. **Game of Thrones**\n- fantasy drama",
+				],
+				'1970-01-01T00:00:01.000000Z' => [
+					'user' => 'what is the cast in GoT?',
+					'assistant' => "Main cast:\n- Emilia Clarke\n- Kit Harington",
+				],
+				'1970-01-01T00:00:02.000000Z' => [
+					'user' => 'aaa, I saw this show',
+				],
+			],
+			$result
+		);
 	}
 
 	public function testValidateIntentValidIntents(): void {
 		$intentClassifier = new IntentClassifier();
 
 		$validIntents = [
-			'REJECTION', 'ALTERNATIVES', 'TOPIC_CHANGE', 'INTEREST', 'NEW_SEARCH',
-			'CONTENT_QUESTION', 'NEW_QUESTION', 'CLARIFICATION', 'UNCLEAR',
+			'FOLLOW_UP', 'REFINE', 'EXPAND', 'REJECT', 'NEW', 'UNCLEAR',
 		];
 
 		// Use reflection to access private method
@@ -306,12 +623,33 @@ class IntentClassifierTest extends TestCase {
 			$this->assertEquals($intent, $result);
 		}
 
-		// Test with extra text
-		$result = $method->invoke($intentClassifier, 'I think this is REJECTION because...');
-		$this->assertEquals('REJECTION', $result);
+		$result = $method->invoke($intentClassifier, ' REJECT ');
+		$this->assertEquals('REJECT', $result);
 
 		// Test invalid intent
+		$result = $method->invoke($intentClassifier, 'I think this is REJECT because...');
+		$this->assertNull($result);
+
 		$result = $method->invoke($intentClassifier, 'INVALID_INTENT');
-		$this->assertEquals('NEW_SEARCH', $result); // Should default to NEW_SEARCH
+		$this->assertNull($result);
+	}
+
+	/**
+	 * @param array<int, array{role:string, message:string}> $messages
+	 */
+	private function createConversationHistory(array $messages): ConversationHistory {
+		$conversationMessages = [];
+		foreach ($messages as $message) {
+			$conversationMessages[] = new ConversationMessage(
+				$message['role'],
+				$message['message'],
+				'',
+				'',
+				'',
+				''
+			);
+		}
+
+		return new ConversationHistory($conversationMessages);
 	}
 }

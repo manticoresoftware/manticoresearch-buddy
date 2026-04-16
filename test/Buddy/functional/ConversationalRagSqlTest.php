@@ -117,7 +117,7 @@ class ConversationalRagSqlTest extends TestCase {
 			'INSERT INTO rag_conversations (conversation_uuid, model_uuid, created_at, role, message, '
 				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 				. "('test-conv-1', 'test-model-1', " . time() . ", 'user', 'Test message', 50, "
-				. "'NEW_SEARCH', '', '[]', " . (time() + 86400) . ')'
+				. "'NEW', '', '[]', " . (time() + 86400) . ')'
 		);
 		$this->assertEmpty($result); // INSERT via SQL returns empty result
 
@@ -207,7 +207,7 @@ class ConversationalRagSqlTest extends TestCase {
 			'INSERT INTO rag_conversations (conversation_uuid, model_uuid, created_at, role, message, '
 				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 				. "('$conversationId', '{$modelName}', $currentTime, 'user', 'First question', "
-				. "30, 'NEW_SEARCH', '', '[]', " . ($currentTime + 86400) . ')'
+				. "30, 'NEW', '', '[]', " . ($currentTime + 86400) . ')'
 		);
 		$this->assertEmpty($result); // INSERT via SQL returns empty result
 
@@ -223,7 +223,7 @@ class ConversationalRagSqlTest extends TestCase {
 			'INSERT INTO rag_conversations (conversation_uuid, model_uuid, created_at, role, message, '
 				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 				. "('$conversationId', '{$modelName}', " . ($currentTime + 120) . ", 'user', "
-				. "'Second question', 25, 'CONTENT_QUESTION', '', '[]', " . ($currentTime + 86400) . ')'
+				. "'Second question', 25, 'FOLLOW_UP', '', '[]', " . ($currentTime + 86400) . ')'
 		);
 		$this->assertEmpty($result); // INSERT via SQL returns empty result
 
@@ -237,21 +237,21 @@ class ConversationalRagSqlTest extends TestCase {
 		$this->assertStringContainsString('First answer', implode(' ', $historyResult));
 		$this->assertStringContainsString('Second question', implode(' ', $historyResult));
 
-		// Test filtered history (excluding CONTENT_QUESTION)
-		$filteredResult = $this->runSqlQuery(
+		// Test query-generation history keeps FOLLOW_UP messages
+		$queryHistoryResult = $this->runSqlQuery(
 			'SELECT role, message FROM rag_conversations WHERE conversation_uuid = '
-			. "'$conversationId' AND intent != 'CONTENT_QUESTION' ORDER BY created_at ASC"
+			. "'$conversationId' ORDER BY created_at ASC"
 		);
-		$this->assertNotEmpty($filteredResult);
-		$this->assertStringContainsString('First question', implode(' ', $filteredResult));
-		$this->assertStringContainsString('First answer', implode(' ', $filteredResult));
-		$this->assertStringNotContainsString('Second question', implode(' ', $filteredResult));
+		$this->assertNotEmpty($queryHistoryResult);
+		$this->assertStringContainsString('First question', implode(' ', $queryHistoryResult));
+		$this->assertStringContainsString('First answer', implode(' ', $queryHistoryResult));
+		$this->assertStringContainsString('Second question', implode(' ', $queryHistoryResult));
 
 		// Test search context retrieval (only select attributes, not stored fields)
 		$contextResult = $this->runSqlQuery(
 			'SELECT exclude_query, excluded_ids FROM rag_conversations WHERE '
 				. "conversation_uuid = '$conversationId' AND role = 'user' "
-				. "AND intent != 'CONTENT_QUESTION' ORDER BY created_at DESC LIMIT 1"
+				. "AND intent != 'FOLLOW_UP' ORDER BY created_at DESC LIMIT 1"
 		);
 		$this->assertNotEmpty($contextResult);
 	}
@@ -320,7 +320,7 @@ class ConversationalRagSqlTest extends TestCase {
 				'INSERT INTO rag_conversations (conversation_uuid, model_uuid, created_at, role, message, '
 					. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 					. "('$convId', '{$modelName}', $currentTime, '$user', '$message', 30, "
-					. "'NEW_SEARCH', '', '[]', " . ($currentTime + 86400) . ')'
+					. "'NEW', '', '[]', " . ($currentTime + 86400) . ')'
 			);
 			$this->assertEmpty($result); // INSERT via SQL returns empty result
 		}

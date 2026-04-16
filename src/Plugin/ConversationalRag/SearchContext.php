@@ -16,7 +16,7 @@ final class SearchContext {
 	/**
 	 * @param string $intent
 	 * @param ConversationRequest $request
-	 * @param string $conversationHistory
+	 * @param ConversationHistory $history
 	 * @param array{
 	 *   id:string,
 	 *   uuid:string,
@@ -31,7 +31,7 @@ final class SearchContext {
 	public function __construct(
 		public string $intent,
 		public ConversationRequest $request,
-		public string $conversationHistory,
+		public ConversationHistory $history,
 		public array $model
 	) {
 	}

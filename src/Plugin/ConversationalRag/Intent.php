@@ -12,13 +12,11 @@
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
 final class Intent {
-	public const REJECTION = 'REJECTION';
-	public const ALTERNATIVES = 'ALTERNATIVES';
-	public const TOPIC_CHANGE = 'TOPIC_CHANGE';
-	public const INTEREST = 'INTEREST';
-	public const NEW_SEARCH = 'NEW_SEARCH';
-	public const CONTENT_QUESTION = 'CONTENT_QUESTION';
-	public const NEW_QUESTION = 'NEW_QUESTION';
-	public const CLARIFICATION = 'CLARIFICATION';
-	public const UNCLEAR = 'UNCLEAR';
+
+	public const string FOLLOW_UP = 'FOLLOW_UP';
+	public const string REFINE = 'REFINE';
+	public const string EXPAND = 'EXPAND';
+	public const string REJECT = 'REJECT';
+	public const string NEW = 'NEW';
+	public const string UNCLEAR = 'UNCLEAR';
 }

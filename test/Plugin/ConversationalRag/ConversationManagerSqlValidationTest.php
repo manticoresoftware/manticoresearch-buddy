@@ -10,6 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationManager;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationMessage;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Struct;
@@ -42,8 +43,7 @@ class ConversationManagerSqlValidationTest extends TestCase {
 		$conversationManager->saveMessage(
 			'conv-123',
 			'model-456',
-			'user',
-			'Hello, how are you?',
+			ConversationMessage::user('Hello, how are you?', 'NEW'),
 			150
 		);
 	}
@@ -177,13 +177,14 @@ class ConversationManagerSqlValidationTest extends TestCase {
 		$conversationManager->saveMessage(
 			'conv-with-all-params',
 			'model-with-all-params',
-			'user',
-			'Message with all parameters',
-			100,
-			'NEW_SEARCH',
-			'search query here',
-			'exclude query here',
-			['1', '2', '3']
+			ConversationMessage::userWithExcludedIds(
+				'Message with all parameters',
+				'NEW',
+				'search query here',
+				'exclude query here',
+				['1', '2', '3']
+			),
+			100
 		);
 	}
 
@@ -246,16 +247,15 @@ class ConversationManagerSqlValidationTest extends TestCase {
 		$conversationManager->saveMessage(
 			'conv-123',
 			'model-456',
-			'user',
-			"O'Reilly's book has a line\nbreak and quote\"test",
+			ConversationMessage::user("O'Reilly's book has a line\nbreak and quote\"test", 'NEW'),
 			150
 		);
 	}
 
 	/**
-	 * Test that getConversationHistory generates valid SELECT SQL
+	 * Test that getConversationMessages generates valid SELECT SQL
 	 */
-	public function testGetConversationHistoryGeneratesValidSelectSql(): void {
+	public function testGetConversationMessagesGeneratesValidSelectSql(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$conversationManager = new ConversationManager($mockClient);
 
@@ -267,8 +267,8 @@ class ConversationManagerSqlValidationTest extends TestCase {
 				[
 				[
 				'data' => [
-					['role' => 'user', 'message' => 'Hello'],
-					['role' => 'assistant', 'message' => 'Hi there!'],
+					$this->createConversationRow('user', 'Hello'),
+					$this->createConversationRow('assistant', 'Hi there!'),
 				],
 				],
 				]
@@ -281,7 +281,11 @@ class ConversationManagerSqlValidationTest extends TestCase {
 			$this->callback(
 				function ($sql) {
 					// Validate SELECT SQL structure
-					$this->assertStringStartsWith('SELECT role, message FROM rag_conversations', $sql);
+					$this->assertStringStartsWith(
+						'SELECT role, message, intent, search_query, exclude_query, excluded_ids '
+						. 'FROM rag_conversations',
+						$sql
+					);
 					$this->assertStringContainsString("WHERE conversation_uuid = 'conv-123'", $sql);
 					$this->assertStringContainsString('ORDER BY created_at ASC, id ASC', $sql);
 					$this->assertStringContainsString('LIMIT 100', $sql);
@@ -292,14 +296,17 @@ class ConversationManagerSqlValidationTest extends TestCase {
 		)
 		->willReturn($mockResponse);
 
-		$result = $conversationManager->getConversationHistory('conv-123');
-		$this->assertEquals("user: Hello\nassistant: Hi there!\n", $result);
+			$result = $conversationManager->getConversationMessages('conv-123');
+			$this->assertEquals(
+				"user: Hello\nassistant: Hi there!\n",
+				$result->format()
+			);
 	}
 
 	/**
-	 * Test that getLatestSearchContext generates valid SELECT SQL with proper filtering
+	 * Test that latest search context is derived from conversation messages
 	 */
-	public function testGetLatestSearchContextGeneratesValidSelectSql(): void {
+	public function testLatestSearchContextUsesConversationMessagesSelectSql(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$conversationManager = new ConversationManager($mockClient);
 
@@ -311,11 +318,14 @@ class ConversationManagerSqlValidationTest extends TestCase {
 				[
 				[
 				'data' => [
-					[
-						'search_query' => 'movies about space',
-						'exclude_query' => 'Star Wars',
-						'excluded_ids' => '[1,2,3]',
-					],
+					$this->createConversationRow(
+						'user',
+						'Show me movies',
+						'NEW',
+						'movies about space',
+						'Star Wars',
+						'[1,2,3]'
+					),
 				],
 				],
 				]
@@ -329,14 +339,13 @@ class ConversationManagerSqlValidationTest extends TestCase {
 				function ($sql) {
 					// Validate SELECT SQL structure for search context
 					$this->assertStringStartsWith(
-						'SELECT search_query, exclude_query, excluded_ids FROM rag_conversations',
+						'SELECT role, message, intent, search_query, exclude_query, excluded_ids '
+						. 'FROM rag_conversations',
 						$sql
 					);
 					$this->assertStringContainsString("WHERE conversation_uuid = 'conv-123'", $sql);
-					$this->assertStringContainsString("AND role = 'user'", $sql);
-					$this->assertStringContainsString("AND intent != 'CONTENT_QUESTION'", $sql);
-					$this->assertStringContainsString('ORDER BY created_at DESC, id DESC', $sql);
-					$this->assertStringContainsString('LIMIT 1', $sql);
+					$this->assertStringContainsString('ORDER BY created_at ASC, id ASC', $sql);
+					$this->assertStringContainsString('LIMIT 100', $sql);
 
 					return true;
 				}
@@ -344,19 +353,19 @@ class ConversationManagerSqlValidationTest extends TestCase {
 		)
 		->willReturn($mockResponse);
 
-		$result = $conversationManager->getLatestSearchContext('conv-123');
+		$result = $conversationManager->getConversationMessages('conv-123')->latestSearchContext();
 		$this->assertIsArray($result);
 		$this->assertEquals('movies about space', $result['search_query']);
 	}
 
 	/**
-	 * Test that getConversationHistoryForQueryGeneration generates valid filtered SELECT SQL
+	 * Test that query generation history is built from conversation messages
 	 */
-	public function testGetConversationHistoryForQueryGenerationGeneratesValidSelectSql(): void {
+	public function testQueryGenerationHistoryUsesConversationMessagesSelectSql(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$conversationManager = new ConversationManager($mockClient);
 
-		// Mock response with filtered conversation data
+		// Mock response with conversation data
 		$mockResponse = $this->createMock(Response::class);
 		$mockResponse->method('hasError')->willReturn(false);
 		$mockResponse->method('getResult')->willReturn(
@@ -364,8 +373,8 @@ class ConversationManagerSqlValidationTest extends TestCase {
 				[
 				[
 				'data' => [
-					['role' => 'user', 'message' => 'Show me movies'],
-					['role' => 'assistant', 'message' => 'Here are movies...'],
+					$this->createConversationRow('user', 'Show me movies'),
+					$this->createConversationRow('assistant', 'Here are movies...'),
 				],
 				],
 				]
@@ -377,10 +386,14 @@ class ConversationManagerSqlValidationTest extends TestCase {
 		->with(
 			$this->callback(
 				function ($sql) {
-					// Validate filtered SELECT SQL structure
-					$this->assertStringStartsWith('SELECT role, message FROM rag_conversations', $sql);
+					// Validate SELECT SQL structure
+					$this->assertStringStartsWith(
+						'SELECT role, message, intent, search_query, exclude_query, excluded_ids '
+						. 'FROM rag_conversations',
+						$sql
+					);
 					$this->assertStringContainsString("WHERE conversation_uuid = 'conv-123'", $sql);
-					$this->assertStringContainsString("AND intent != 'CONTENT_QUESTION'", $sql);
+					$this->assertStringNotContainsString("AND intent != 'FOLLOW_UP'", $sql);
 					$this->assertStringContainsString('ORDER BY created_at ASC, id ASC', $sql);
 					$this->assertStringContainsString('LIMIT 50', $sql);
 
@@ -390,8 +403,8 @@ class ConversationManagerSqlValidationTest extends TestCase {
 		)
 		->willReturn($mockResponse);
 
-		$result = $conversationManager->getConversationHistoryForQueryGeneration('conv-123', 50);
-		$this->assertEquals("user: Show me movies\nassistant: Here are movies...\n", $result);
+			$result = $conversationManager->getConversationMessages('conv-123', 50)->format();
+			$this->assertEquals("user: Show me movies\nassistant: Here are movies...\n", $result);
 	}
 
 	/**
@@ -431,5 +444,27 @@ class ConversationManagerSqlValidationTest extends TestCase {
 		->willReturn($mockResponse);
 
 		$conversationManager->initializeTable($mockClient);
+	}
+
+	/**
+	 * @return array{role:string, message:string, intent:string, search_query:string,
+	 *   exclude_query:string, excluded_ids:string}
+	 */
+	private function createConversationRow(
+		string $role,
+		string $message,
+		string $intent = '',
+		string $searchQuery = '',
+		string $excludeQuery = '',
+		string $excludedIds = ''
+	): array {
+		return [
+			'role' => $role,
+			'message' => $message,
+			'intent' => $intent,
+			'search_query' => $searchQuery,
+			'exclude_query' => $excludeQuery,
+			'excluded_ids' => $excludedIds,
+		];
 	}
 }

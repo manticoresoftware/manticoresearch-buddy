@@ -14,8 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
 /**
- * LLM-driven dynamic threshold manager (based on original calculateDynamicThreshold)
- * Uses LLM to detect expansion intent instead of hardcoded patterns
+ * Dynamic threshold manager for expansion intent.
  */
 class DynamicThresholdManager {
 	private const MAX_EXPANSIONS = 5;
@@ -23,30 +22,20 @@ class DynamicThresholdManager {
 	private const EXPANSION_STEPS = 4;
 
 	/**
-	 * Calculate dynamic threshold based on LLM expansion intent detection
-	 * Based on original calculateDynamicThreshold and detectExpansionIntent
+	 * Calculate dynamic threshold based on classified intent and previous expansion count.
 	 *
-	 * @param string $conversationUuid
-	 * @param string $userQuery
-	 * @param string $conversationHistory
-	 * @param ConversationManager $conversationManager
-	 * @param LlmProvider $llmProvider
-	 * @param array<string, mixed> $modelConfig
+	 * @param string $intent
+	 * @param int $consecutiveExpansionCount
 	 * @param float $baseThreshold
 	 * @return array{threshold: float, expansion_level: int, is_expanded: bool, max_threshold: float,
 	 *               expansion_percent: float, expansion_limit_reached: bool}
 	 */
 	public function calculateDynamicThreshold(
-		string $conversationUuid,
-		string $userQuery,
-		string $conversationHistory,
-		ConversationManager $conversationManager,
-		LlmProvider $llmProvider,
-		array $modelConfig,
+		string $intent,
+		int $consecutiveExpansionCount,
 		float $baseThreshold = 0.8
 	): array {
-		// Detect if user wants broader search using LLM (from original detectExpansionIntent)
-		$wantsExpansion = $this->detectExpansionIntent($userQuery, $conversationHistory, $llmProvider, $modelConfig);
+		$wantsExpansion = $intent === Intent::EXPAND;
 
 		Buddy::debugv("\nRAG: [DEBUG DYNAMIC THRESHOLD]");
 		Buddy::debugv('RAG: ├─ Wants expansion: ' . ($wantsExpansion ? 'YES' : 'NO'));
@@ -65,7 +54,7 @@ class DynamicThresholdManager {
 			];
 		}
 
-		$expansionCount = $this->getConsecutiveExpansionCount($conversationManager, $conversationUuid);
+		$expansionCount = $consecutiveExpansionCount;
 		$maxThreshold = $baseThreshold * (1 + self::MAX_EXPANSION_PERCENT);
 
 		// Check if we've hit maximum expansions
@@ -107,97 +96,5 @@ class DynamicThresholdManager {
 			'expansion_percent' => round((($threshold - $baseThreshold) / $baseThreshold) * 100, 1),
 			'expansion_limit_reached' => $expansionCount >= self::MAX_EXPANSIONS,
 		];
-	}
-
-	/**
-	 * @param ConversationManager $conversationManager
-	 * @param string $conversationUuid
-	 * @return int
-	 */
-	private function getConsecutiveExpansionCount(
-		ConversationManager $conversationManager,
-		string $conversationUuid
-	): int {
-		$intents = $conversationManager->getRecentUserIntents($conversationUuid, self::MAX_EXPANSIONS + 5);
-
-		$count = 0;
-		foreach ($intents as $intent) {
-			if ($intent !== Intent::ALTERNATIVES) {
-				break;
-			}
-			$count++;
-		}
-
-		return $count;
-	}
-
-	/**
-	 * Detect if user wants to broaden their search (expansion intent)
-	 *
-	 * @param string $userQuery
-	 * @param string $conversationHistory
-	 * @param LlmProvider $llmProvider
-	 * @param array<string, mixed> $modelConfig
-	 * @return bool
-	 */
-	private function detectExpansionIntent(
-		string $userQuery,
-		string $conversationHistory,
-		LlmProvider $llmProvider,
-		array $modelConfig
-	): bool {
-		// CRITICAL: If no conversation history, cannot be expansion (from original)
-		if (empty(trim($conversationHistory))) {
-			Buddy::debugv("\nRAG: [DEBUG EXPANSION CHECK]");
-			Buddy::debugv('RAG: ├─ No conversation history');
-			Buddy::debugv('RAG: └─ Expansion: NO (no prior results to expand from)');
-			return false;
-		}
-
-		$historyText = $conversationHistory;
-
-		// Use original expansion prompt
-		$expansionPrompt = "
-Analyze if the user wants to BROADEN their search beyond previously shown results.
-
-EXPANSION CONCEPT:
-- User has seen specific results before and wants MORE options beyond what was shown
-- User wants to discover additional content in the same general area
-- User wants to widen the search scope, not change topics or narrow focus
-
-REQUIREMENTS for expansion:
-1. Previous results must exist in conversation history
-2. User wants additional options (not replacement of what was shown)
-3. User wants broader scope (not more specific criteria)
-
-This is NOT expansion:
-- First requests with no prior results
-- Asking for different genre/topic (that's topic change)
-- Asking for more specific criteria (that's refinement)
-- Questions about shown content (that's clarification)
-
-Conversation history:
-{$historyText}
-
-Current query: {$userQuery}
-
-Does this query request BROADENING beyond previous results?
-Answer: YES or NO";
-
-		$llmProvider->configure($modelConfig);
-		$response = $llmProvider->generateResponse($expansionPrompt, ['temperature' => 0, 'max_tokens' => 10]);
-
-		if (!$response['success']) {
-			return false;
-		}
-
-		$result = trim(strtolower($response['content']));
-
-		Buddy::debugv("\nRAG: [DEBUG EXPANSION CHECK]");
-		Buddy::debugv('RAG: ├─ Has conversation history: YES');
-		Buddy::debugv("RAG: ├─ LLM response: {$result}");
-		Buddy::debugv('RAG: └─ Expansion: ' . ($result === 'yes' ? 'YES' : 'NO'));
-
-		return $result === 'yes';
 	}
 }

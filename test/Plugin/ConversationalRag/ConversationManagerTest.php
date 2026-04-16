@@ -10,6 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationManager;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationMessage;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
@@ -112,8 +113,7 @@ class ConversationManagerTest extends TestCase {
 		$conversationManager->saveMessage(
 			'conv-123',
 			'model-456',
-			'user',
-			'Hello, how are you?',
+			ConversationMessage::user('Hello, how are you?', 'NEW'),
 			150
 		);
 	}
@@ -143,13 +143,7 @@ class ConversationManagerTest extends TestCase {
 		$conversationManager->saveMessage(
 			'conv-123',
 			'model-456',
-			'user',
-			'Hello',
-			0,
-			'NEW_SEARCH',
-			'query',
-			'',
-			[]
+			ConversationMessage::userWithExcludedIds('Hello', 'NEW', 'query', '', [])
 		);
 	}
 
@@ -171,10 +165,10 @@ class ConversationManagerTest extends TestCase {
 				[
 					[
 						'data' => [
-							['role' => 'user', 'message' => 'Hello'],
-							['role' => 'assistant', 'message' => 'Hi there!'],
-							['role' => 'user', 'message' => 'How are you?'],
-							['role' => 'assistant', 'message' => 'I am doing well, thank you!'],
+							$this->createConversationRow('user', 'Hello'),
+							$this->createConversationRow('assistant', 'Hi there!'),
+							$this->createConversationRow('user', 'How are you?'),
+							$this->createConversationRow('assistant', 'I am doing well, thank you!'),
 						],
 					],
 				]
@@ -183,10 +177,15 @@ class ConversationManagerTest extends TestCase {
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
-			->with($this->stringContains(/** @lang manticore */ 'SELECT role, message FROM rag_conversations'))
+			->with(
+				$this->stringContains(
+					/** @lang manticore */
+					'SELECT role, message, intent, search_query, exclude_query, excluded_ids FROM rag_conversations'
+				)
+			)
 			->willReturn($mockResponse);
 
-		$result = $conversationManager->getConversationHistory('conv-123');
+		$result = $conversationManager->getConversationMessages('conv-123')->format();
 
 		$expected = "user: Hello\nassistant: Hi there!\nuser: How are you?\nassistant: I am doing well, thank you!\n";
 		$this->assertEquals($expected, $result);
@@ -206,7 +205,7 @@ class ConversationManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$result = $conversationManager->getConversationHistory('conv-123');
+		$result = $conversationManager->getConversationMessages('conv-123')->format();
 
 		$this->assertEquals('', $result);
 	}
@@ -228,6 +227,28 @@ class ConversationManagerTest extends TestCase {
 	}
 
 	/**
+	 * @return array{role:string, message:string, intent:string, search_query:string,
+	 *   exclude_query:string, excluded_ids:string}
+	 */
+	private function createConversationRow(
+		string $role,
+		string $message,
+		string $intent = '',
+		string $searchQuery = '',
+		string $excludeQuery = '',
+		string $excludedIds = ''
+	): array {
+		return [
+			'role' => $role,
+			'message' => $message,
+			'intent' => $intent,
+			'search_query' => $searchQuery,
+			'exclude_query' => $excludeQuery,
+			'excluded_ids' => $excludedIds,
+		];
+	}
+
+	/**
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
@@ -245,9 +266,9 @@ class ConversationManagerTest extends TestCase {
 				[
 					[
 						'data' => [
-							['role' => 'user', 'message' => 'First message'],
-							['role' => 'assistant', 'message' => 'First response'],
-							['role' => 'user', 'message' => 'Second message'],
+							$this->createConversationRow('user', 'First message'),
+							$this->createConversationRow('assistant', 'First response'),
+							$this->createConversationRow('user', 'Second message'),
 						],
 					],
 				]
@@ -256,10 +277,15 @@ class ConversationManagerTest extends TestCase {
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
-			->with($this->stringContains(/** @lang manticore */ 'SELECT role, message FROM rag_conversations'))
+			->with(
+				$this->stringContains(
+					/** @lang manticore */
+					'SELECT role, message, intent, search_query, exclude_query, excluded_ids FROM rag_conversations'
+				)
+			)
 			->willReturn($mockResponse);
 
-		$result = $conversationManager->getConversationHistory('conv-123', 5);
+		$result = $conversationManager->getConversationMessages('conv-123', 5)->format();
 
 		$expected = "user: First message\nassistant: First response\nuser: Second message\n";
 		$this->assertEquals($expected, $result);
@@ -288,13 +314,16 @@ class ConversationManagerTest extends TestCase {
 			->with(
 				$this->callback(
 					function ($sql) {
-						return str_contains($sql, "intent != 'CONTENT_QUESTION'");
+						return str_contains(
+							$sql,
+							'SELECT role, message, intent, search_query, exclude_query, excluded_ids'
+						);
 					}
 				)
 			)
 			->willReturn($mockResponse);
 
-		$result = $conversationManager->getLatestSearchContext('conv-123');
+		$result = $conversationManager->getConversationMessages('conv-123')->latestSearchContext();
 
 		$this->assertIsArray($result);
 		$this->assertEquals('movies about space', $result['search_query']);
@@ -312,7 +341,16 @@ class ConversationManagerTest extends TestCase {
 			Struct::fromData(
 				[
 					[
-						'data' => [$row],
+						'data' => [
+							$this->createConversationRow(
+								'user',
+								'Show me movies',
+								'NEW',
+								$row['search_query'],
+								$row['exclude_query'],
+								$row['excluded_ids']
+							),
+						],
 					],
 				]
 			)
@@ -337,7 +375,7 @@ class ConversationManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$result = $conversationManager->getLatestSearchContext('conv-123');
+		$result = $conversationManager->getConversationMessages('conv-123')->latestSearchContext();
 
 		$this->assertNull($result);
 	}
@@ -362,7 +400,7 @@ class ConversationManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$result = $conversationManager->getLatestSearchContext('conv-123');
+		$result = $conversationManager->getConversationMessages('conv-123')->latestSearchContext();
 
 		$this->assertIsArray($result);
 		$this->assertEquals('', $result['excluded_ids']);
@@ -372,13 +410,13 @@ class ConversationManagerTest extends TestCase {
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetConversationHistoryForQueryGenerationFiltersContentQuestions(): void {
+	public function testGetConversationHistoryForQueryGenerationKeepsFollowUps(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
 		$conversationManager = new ConversationManager($mockClient);
 
-		// Mock response with conversation data AFTER SQL filtering (CONTENT_QUESTION records excluded)
+		// Mock response with complete conversation data, including FOLLOW_UP records.
 		$mockResponse = $this->createMock(Response::class);
 		$mockResponse->method('hasError')->willReturn(false);
 		$mockResponse->method('getResult')->willReturn(
@@ -386,9 +424,30 @@ class ConversationManagerTest extends TestCase {
 				[
 					[
 						'data' => [
-							['role' => 'user', 'message' => 'Show me movies about space', 'intent' => 'NEW_SEARCH'],
-							['role' => 'assistant', 'message' => 'Here are some space movies...', 'intent' => null],
-							['role' => 'user', 'message' => 'Show me more like this', 'intent' => 'INTEREST'],
+							$this->createConversationRow(
+								'user',
+								'Show me movies about space',
+								'NEW'
+							),
+							$this->createConversationRow(
+								'assistant',
+								'Here are some space movies...'
+							),
+							$this->createConversationRow(
+								'user',
+								'Who directed it?',
+								'FOLLOW_UP'
+							),
+							$this->createConversationRow(
+								'assistant',
+								'It was directed by someone.',
+								'FOLLOW_UP'
+							),
+							$this->createConversationRow(
+								'user',
+								'Show me more like this',
+								'REFINE'
+							),
 						],
 					],
 				]
@@ -400,19 +459,99 @@ class ConversationManagerTest extends TestCase {
 			->with(
 				$this->callback(
 					function ($sql) {
-						return str_contains($sql, 'intent != \'CONTENT_QUESTION\'');
+						return !str_contains($sql, 'intent !=');
 					}
 				)
 			)
 			->willReturn($mockResponse);
 
-		$result = $conversationManager->getConversationHistoryForQueryGeneration('conv-123');
+		$result = $conversationManager->getConversationMessages('conv-123')->format();
 
-		// Should exclude the CONTENT_QUESTION exchange
 		$expected = "user: Show me movies about space\n" .
 			"assistant: Here are some space movies...\n" .
+			"user: Who directed it?\n" .
+			"assistant: It was directed by someone.\n" .
 			"user: Show me more like this\n";
 		$this->assertEquals($expected, $result);
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	public function testGetActiveExcludedIdsCollectsUntilLatestNew(): void {
+		$mockClient = $this->createMock(HTTPClient::class);
+		$conversationManager = $this->createConversationManager($mockClient);
+
+		$mockResponse = $this->createMock(Response::class);
+		$mockResponse->method('hasError')->willReturn(false);
+		$mockResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+					[
+						'data' => [
+							$this->createConversationRow('user', 'Old reject', 'REJECT', '', '', '["99"]'),
+							$this->createConversationRow('user', 'New', 'NEW', '', '', '["1"]'),
+							$this->createConversationRow('user', 'Reject', 'REJECT', '', '', '["5","6"]'),
+							$this->createConversationRow('user', 'Refine again', 'REFINE', '', '', '["7"]'),
+						],
+					],
+				]
+			)
+		);
+
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->with(
+				$this->callback(
+					static function (string $sql): bool {
+						return str_contains(
+							$sql,
+							'SELECT role, message, intent, search_query, exclude_query, excluded_ids'
+						);
+					}
+				)
+			)
+			->willReturn($mockResponse);
+
+		$this->assertEquals(
+			['7', '5', '6', '1'],
+			$conversationManager->getConversationMessages('conv-123')->activeExcludedIds()
+		);
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	public function testGetActiveExcludedIdsDeduplicatesIds(): void {
+		$mockClient = $this->createMock(HTTPClient::class);
+		$conversationManager = $this->createConversationManager($mockClient);
+
+		$mockResponse = $this->createMock(Response::class);
+		$mockResponse->method('hasError')->willReturn(false);
+		$mockResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+					[
+						'data' => [
+							$this->createConversationRow('user', 'New', 'NEW', '', '', '[]'),
+							$this->createConversationRow('user', 'Reject', 'REJECT', '', '', '["5"]'),
+							$this->createConversationRow('user', 'Refine', 'REFINE', '', '', '["5","6"]'),
+						],
+					],
+				]
+			)
+		);
+
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->willReturn($mockResponse);
+
+		$this->assertEquals(
+			['5', '6'],
+			$conversationManager->getConversationMessages('conv-123')->activeExcludedIds()
+		);
 	}
 
 	/**
@@ -445,13 +584,14 @@ class ConversationManagerTest extends TestCase {
 		$conversationManager->saveMessage(
 			'conv-123',
 			'model-456',
-			'user',
-			'Show me movies about space',
-			150,
-			'NEW_SEARCH',
-			'movies about space',
-			'Star Wars',
-			['1', '2', '3']
+			ConversationMessage::userWithExcludedIds(
+				'Show me movies about space',
+				'NEW',
+				'movies about space',
+				'Star Wars',
+				['1', '2', '3']
+			),
+			150
 		);
 	}
 }

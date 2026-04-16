@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 use JsonException;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use UnexpectedValueException;
 
 /**
  * LLM-driven intent classifier and query generator
@@ -25,59 +26,75 @@ class IntentClassifier {
 	 * Classify user intent using LLM analysis of conversation context
 	 *
 	 * @param string $userQuery
-	 * @param string $conversationHistory
+	 * @param ConversationHistory $conversationHistory
 	 * @param LlmProvider $llmProvider
 	 * @param array<string, mixed> $modelConfig
 	 * @return string
 	 */
 	public function classifyIntent(
 		string $userQuery,
-		string $conversationHistory,
+		ConversationHistory $conversationHistory,
 		LlmProvider $llmProvider,
 		array $modelConfig
 	): string {
 		try {
-			// Limit history size for LLM context (conversationHistory is already a formatted string)
-			$conversationHistory = $this->limitConversationHistory($conversationHistory);
-			$historyText = $conversationHistory;
-
-			$intentPrompt = "Analyze user intent from conversation.
-
-History:
-{$historyText}
-
-Query: {$userQuery}
-
-Classify as ONE of:
-- REJECTION: User declining shown content (like 'no', 'not interested', 'don't like')
-- ALTERNATIVES: User wants more options (like 'what else', 'other options', 'anything else')
-- TOPIC_CHANGE: User switching to new topic (like 'I want comedies instead',
-  'show me action movies')
-- INTEREST: User likes content and wants similar (like 'sounds good, what else like this',
-  'tell me more')
-- NEW_SEARCH: Fresh search with no prior context
-- CONTENT_QUESTION: User asking about previously shown content (like 'what's the cast',
-  'who directed it', 'when was it made', 'what's it about')
-- NEW_QUESTION: User asking about new topic requiring search (like 'what about action movies',
-  'show me comedies', 'tell me about programming')
-- CLARIFICATION: User providing additional details or correcting previous query
-  (like 'no it's from a movie', 'I meant something else')
-- UNCLEAR: Cannot determine intent (like gibberish, confusing, ambiguous)
-
-Answer ONLY with one word: REJECTION, ALTERNATIVES, TOPIC_CHANGE, INTEREST,
-NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
+			$intentPrompt = 'You are a strict, deterministic intent classifier for conversational search. '
+				. 'Analyze the `query` based on the provided `history`. '
+				. 'Classify the user\'s intent into **EXACTLY ONE** of these categories: '
+				. Intent::FOLLOW_UP . ',' . Intent::REFINE . ',' . Intent::EXPAND . ','
+				. Intent::REJECT . ',' . Intent::NEW . ', or ' . Intent::UNCLEAR . ".\n\n"
+				. "**Intent Definitions:**\n"
+				. '* ' . Intent::FOLLOW_UP . ': Query relates directly to previously shown content '
+				. "(e.g., \"Who directed it?\").\n"
+				. '* ' . Intent::REFINE . ': User adds constraints or narrows the scope of the current search '
+				. "(e.g., \"Only comedies,\" \"Not horror\").\n"
+				. '* ' . Intent::EXPAND . ': User requests more results for the existing query without changing '
+				. "criteria (e.g., \"Show more,\" \"What else?\").\n"
+				. '* ' . Intent::REJECT . ': User dislikes or rejects the current results '
+				. "(e.g., \"No,\" \"I don't like this\").\n"
+				. '* ' . Intent::NEW . ': Query introduces a completely new topic or search request '
+				. "unrelated to history.\n"
+				. '* ' . Intent::UNCLEAR . ": Intent is ambiguous, incomplete, or nonsensical.\n\n"
+				. '**Rules:** Be strictly deterministic. Base your decision ONLY on the provided JSON data. '
+				. 'Do not infer missing context. Prioritize rules as follows: '
+				. Intent::FOLLOW_UP . ' ' . Intent::REFINE . ' ' . Intent::EXPAND . ' ' . Intent::NEW
+				. ' ' . Intent::REJECT . '. Use ' . Intent::UNCLEAR . " only when confidence is low.\n\n"
+				. '**Output Format:** Return ONLY the single classification word '
+				. '(e.g., `' . Intent::FOLLOW_UP . "`).\n\n"
+				. "**Input:**\n"
+				. "```json\n"
+				. json_encode(['history' => $conversationHistory->payload(), 'query' => $userQuery])
+				. "\n```";
 
 			$llmProvider->configure($modelConfig);
-			$response = $llmProvider->generateResponse($intentPrompt, ['temperature' => 0, 'max_tokens' => 50]);
+			$response = $llmProvider->generateResponse(
+				$intentPrompt,
+				[
+					'temperature' => Handler::RESPONSE_TEMPERATURE,
+					'max_tokens' => 50,
+				]
+			);
 
 			if (!$response['success']) {
 				throw new ManticoreSearchClientError(
-					'Intent classification failed: ' . $response['error']
+					LlmProvider::formatFailureMessage('Intent classification failed', $response)
 				);
 			}
 
 			$content = (string)$response['content'];
+			Buddy::debugv("\nRAG: [DEBUG INTENT CLASSIFICATION LLM RESPONSE]");
+			Buddy::debugv('RAG: └─ Raw LLM response: ' . $this->formatLogLine($content));
+
 			$intent = $this->validateIntent(trim(strtoupper($content)));
+			if ($intent === null) {
+				Buddy::error(new UnexpectedValueException("Unexpected intent classification response: {$content}"));
+				return Intent::NEW;
+			}
+
+			if ($intent === Intent::UNCLEAR) {
+				Buddy::debugv('RAG: └─ UNCLEAR intent classified, falling back to NEW');
+				return Intent::NEW;
+			}
 
 			// Debug: Log intent classification
 			Buddy::debugv("\nRAG: [DEBUG INTENT CLASSIFICATION]");
@@ -86,58 +103,28 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 			return $intent;
 		} catch (ManticoreSearchClientError $e) {
 			Buddy::debug("Error intent classification: {$e->getMessage()}");
-			return Intent::NEW_SEARCH;
+			return Intent::NEW;
 		}
-	}
-
-	/**
-	 * Limit conversation history size for LLM context (matches original php_rag implementation)
-	 *
-	 * @param string $history
-	 * @param int $maxExchanges
-	 * @return string
-	 */
-	private function limitConversationHistory(string $history, int $maxExchanges = 10): string {
-		// Split by role markers (matches php_rag Line 57)
-		$lines = explode("\n", $history);
-
-		// Keep only last N exchanges (2 lines per exchange) (matches php_rag Line 60-63)
-		$maxLines = $maxExchanges * 2;
-		if (sizeof($lines) > $maxLines) {
-			$lines = array_slice($lines, -$maxLines);
-		}
-
-		return implode("\n", $lines);
 	}
 
 	/**
 	 * Validate and clean intent from LLM response
 	 *
 	 * @param string $intent
-	 * @return string
+	 * @return string|null
 	 */
-	private function validateIntent(string $intent): string {
+	private function validateIntent(string $intent): ?string {
+		$intent = trim($intent);
 		$validIntents = [
-			Intent::REJECTION,
-			Intent::ALTERNATIVES,
-			Intent::TOPIC_CHANGE,
-			Intent::INTEREST,
-			Intent::NEW_SEARCH,
-			Intent::CONTENT_QUESTION,
-			Intent::NEW_QUESTION,
-			Intent::CLARIFICATION,
+			Intent::FOLLOW_UP,
+			Intent::REFINE,
+			Intent::EXPAND,
+			Intent::REJECT,
+			Intent::NEW,
 			Intent::UNCLEAR,
 		];
 
-		// Extract just the intent word if LLM added explanation
-		foreach ($validIntents as $valid) {
-			if (stripos($intent, $valid) !== false) {
-				return $valid;
-			}
-		}
-
-		// Default fallback
-		return Intent::NEW_SEARCH;
+		return in_array($intent, $validIntents, true) ? $intent : null;
 	}
 
 	/**
@@ -145,118 +132,128 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 	 *
 	 * @param string $userQuery
 	 * @param string $intent
-	 * @param string $conversationHistory
+	 * @param array<string, array{user?: string, assistant?: string}> $historyPayload
 	 * @param LlmProvider $llmProvider
 	 * @param array<string, mixed> $modelConfig
+	 *
 	 * @return array{search_query:string, exclude_query: string, llm_response: string}
+	 * @throws ManticoreSearchClientError
 	 */
 	public function generateQueries(
 		string $userQuery,
 		string $intent,
-		string $conversationHistory,
+		array $historyPayload,
 		LlmProvider $llmProvider,
 		array $modelConfig
 	): array {
-		$searchQuery = '';
-		$excludeQuery = '';
-		$llmResponseContent = '';
+		$queryPrompt = '**ROLE:** You are an expert Search Query Generator. '
+			. 'Your sole function is to convert a user request into a highly structured '
+			. "JSON output suitable for advanced search engines.\n"
+			. '**GOAL:** Generate a rich, comma-separated list of keywords (`search_keywords`) '
+			. 'based on the `Query` and context from `History`. The query must be sorted by '
+			. "relevance: Content Type → Genre/Theme → Specific Keywords.\n"
+			. '**TERM QUALITY (CRITICAL):** Search terms must be synonym-like expansions of the '
+			. 'actual user request and conversation context, not generic tags or detached topic '
+			. "labels.\n"
+			. "*   Prefer complete phrases that preserve the subject of the request.\n"
+			. '*   Do not emit broad standalone tags such as "explanation" or "RAG" unless '
+			. "that exact tag is the subject itself.\n"
+			. "*   Good: \"RAG explanation\", \"retrieval augmented generation overview\".\n"
+			. "*   Bad: \"explanation\", \"RAG\".\n"
+			. "**OUTPUT FORMAT (STRICT):** You MUST respond ONLY in JSON format:\n"
+			. "```json\n"
+			. "{\n"
+			. '"search_keywords": [{"term": "keyword1", "confidence": 95}],
+         "exclude_query": ["title_to_exclude"],
+         "debug": "Here you should explain your answer"
+         }'
+			. "\n```\n\n"
+			. '**INTENT RULES:**
 
-		try {
-			// Limit history size for LLM context (conversationHistory is already a formatted string)
-			$conversationHistory = $this->limitConversationHistory($conversationHistory);
-			$historyText = $conversationHistory;
+- **NEW**
+  - Treat Query as standalone
+  - Ignore unrelated History
 
-			$queryPrompt = '**ROLE:** You are an expert Search Query Generator. '
-				. 'Your sole function is to convert a user request into a highly structured '
-				. "JSON output suitable for advanced search engines.\n"
-				. '**GOAL:** Generate a rich, comma-separated list of keywords (`search_keywords`) '
-				. 'based on the `Query` and context from `History`. The query must be sorted by '
-				. "relevance: Content Type → Genre/Theme → Specific Keywords.\n"
-				. "**OUTPUT FORMAT (STRICT):** You MUST respond ONLY in JSON format:\n"
+- **FOLLOW_UP**
+  - Keep topic from History
+  - Combine with Query (resolve "this", "it", "more")
+
+- **REFINE**
+  - Keep topic
+  - Apply Query as constraint (narrow or adjust)
+
+- **EXPAND**
+  - Keep topic
+  - Broaden with related aspects and variations
+
+- **REJECT**
+  - Ignore Query as search input if it is only a rejection signal
+  - Keep topic from History
+  - Generate alternative angles or formulations
+
+- **UNCLEAR**
+  - Infer topic from History only if clearly identifiable
+  - Otherwise return empty keywords
+'
+			. '**RULES FOR `EXCLUDE_QUERY` (CRITICAL):** Extract exclusions from both the current '
+			. "query and history, following these strict rules:\n"
+			. "**A. Explicit Exclusions (Current Query):**\n"
+			. "*   If the user says \"I already watched X\" → EXCLUDE: X\n"
+			. "*   If the user says \"similar to X but not Y\" → EXCLUDE: Y\n"
+			. "*   If the user says \"not Z\" → EXCLUDE: Z\n"
+			. "*   (Apply this logic regardless of intent.)\n"
+			. "**B. History-Based Exclusions (Contextual):**\n"
+			. "1.  Scan `History` **BACKWARDS** from the most recent message.\n"
+			. '2.  Stop scanning immediately if you detect a Topic Change
+			   3.  Only include exclusions relevant to the *current* topic context.
+			   4.  If no exclusions are found in the query or history, use "none".'."\n\n"
+			. '**EXAMPLE SCENARIO (History Context):** If History shows a topic change '
+			. "occurred before a rejection, that rejection is ignored for `EXCLUDE_QUERY`.\n\n"
+				. "**INPUT:**\n"
 				. "```json\n"
-				. "{\n"
-				. "\"search_keywords\": [{\"term\": \"keyword1\", \"confidence\": 95}],\n"
-				. "\"exclude_query\": [\"title_to_exclude\"],\n"
-				. "}\n"
-				. "```\n\n"
-				. '**RULES FOR `EXCLUDE_QUERY` (CRITICAL):** Extract exclusions from both the current '
-				. "query and history, following these strict rules:\n"
-				. "**A. Explicit Exclusions (Current Query):**\n"
-				. "*   If the user says \"I already watched X\" → EXCLUDE: X\n"
-				. "*   If the user says \"similar to X but not Y\" → EXCLUDE: Y\n"
-				. "*   If the user says \"not Z\" → EXCLUDE: Z\n"
-				. "*   (Apply this logic regardless of intent.)\n"
-				. "**B. History-Based Exclusions (Contextual):**\n"
-				. "1.  Scan `History` **BACKWARDS** from the most recent message.\n"
-				. '2.  Stop scanning immediately if you detect a Topic Change Indicator '
-				. "(e.g., 'instead', 'actually', 'now show me', genre shift).\n"
-				. "3.  Only include exclusions relevant to the *current* topic context.\n"
-				. "4.  If no exclusions are found in the query or history, use \"none\".\n\n"
-				. '**EXAMPLE SCENARIO (History Context):** If History shows a topic change '
-				. "occurred before a rejection, that rejection is ignored for `EXCLUDE_QUERY`.\n\n"
-				. "**INPUTS:**\n"
-				. 'History: ' . (mb_strlen($historyText) > 0 ? $historyText : '(none)') . "\n"
-				. 'Query: ' . $userQuery . "\n"
-				. 'Intent: ' . $intent . "\n\n"
+				. json_encode(['history' => $historyPayload, 'query' => $userQuery, 'intent' => $intent])
+				. "\n```\n\n"
 				. 'JSON:';
 
-			$llmProvider->configure($modelConfig);
-			$response = $llmProvider->generateResponse($queryPrompt, ['temperature' => 0, 'max_tokens' => 200]);
-			$llmResponseContent = (string)$response['content'];
+		$llmProvider->configure($modelConfig);
+		$response = $llmProvider->generateResponse($queryPrompt);
+		$llmResponseContent = (string)$response['content'];
 
-			if (!$response['success']) {
-				throw new ManticoreSearchClientError(
-					'Query generation failed: ' . $response['error']
-				);
-			}
-
-			Buddy::debugv("\nRAG: [DEBUG QUERY GENERATION LLM RESPONSE]");
-			Buddy::debugv('RAG: └─ Raw LLM response: ' . $llmResponseContent);
-
-			/** @var mixed $decodedResponse */
-			$decodedResponse = json_decode($llmResponseContent, true, 512, JSON_THROW_ON_ERROR);
-			if (!is_array($decodedResponse)) {
-				throw new ManticoreSearchClientError('Query generation returned invalid JSON structure');
-			}
-
-			$searchQuery = $this->normalizeSearchKeywords($decodedResponse['search_keywords'] ?? null);
-			$excludeQuery = $this->normalizeQueryTerms($decodedResponse['exclude_query'] ?? null, 'exclude_query');
-
-			// Fallback to user query if parsing failed
-			if (empty($searchQuery)) {
-				$searchQuery = $userQuery;
-			}
-
-			// Clean up exclude query
-			if (empty($excludeQuery) || strtolower($excludeQuery) === 'none') {
-				$excludeQuery = '';
-			}
-
-			return [
-				'search_query' => $searchQuery,
-				'exclude_query' => $excludeQuery,
-				'llm_response' => $llmResponseContent,
-			];
-		} catch (JsonException | ManticoreSearchClientError $e) {
-			$searchQuery = $userQuery;
-
-			// Debug: Log query generation
-			Buddy::debugv("\nRAG: [DEBUG QUERY GENERATION]");
-			Buddy::debugv("RAG: ├─ User query: '{$userQuery}'");
-			Buddy::debugv("RAG: ├─ Intent: {$intent}");
-			Buddy::debugv(
-				'RAG: ├─ Raw LLM response: ' .
-				($llmResponseContent !== '' ? $llmResponseContent : $e->getMessage())
+		if (!$response['success']) {
+			throw ManticoreSearchClientError::create(
+				LlmProvider::formatFailureMessage('Query generation failed', $response)
 			);
-			Buddy::debugv("RAG: ├─ Generated SEARCH_QUERY: '{$searchQuery}'");
-			Buddy::debugv("RAG: └─ Generated EXCLUDE_QUERY: '{$excludeQuery}'");
-
-			return [
-				'search_query' => $searchQuery,
-				'exclude_query' => $excludeQuery,
-				'llm_response' => $llmResponseContent !== '' ? $llmResponseContent : $e->getMessage(),
-			];
 		}
+
+		Buddy::debugv("\nRAG: [DEBUG QUERY GENERATION LLM RESPONSE]");
+		Buddy::debugv('RAG: └─ Raw LLM response: ' . $this->formatLogLine($llmResponseContent));
+
+		$normalizedJson = $this->normalizeJsonResponse($llmResponseContent);
+		Buddy::debugv('RAG: └─ Normalized JSON payload: ' . $this->formatLogLine($normalizedJson));
+
+		try {
+			$decodedResponse = json_decode($normalizedJson, true, 512, JSON_THROW_ON_ERROR);
+		} catch (JsonException $e) {
+			throw ManticoreSearchClientError::create(
+				'Query generation returned invalid JSON: ' . $e->getMessage()
+			);
+		}
+
+		if (!is_array($decodedResponse)) {
+			throw ManticoreSearchClientError::create('Query generation returned invalid JSON structure');
+		}
+
+		$searchQuery = $this->normalizeSearchKeywords($decodedResponse['search_keywords'] ?? null);
+		if ($searchQuery === '') {
+			$searchQuery = $this->normalizeQueryString($userQuery);
+		}
+		$excludeQuery = $this->normalizeQueryTerms($decodedResponse['exclude_query'] ?? null, 'exclude_query');
+
+		return [
+			'search_query' => $searchQuery,
+			'exclude_query' => $excludeQuery,
+			'llm_response' => $llmResponseContent,
+		];
 	}
 
 	/**
@@ -294,7 +291,9 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 
 	/**
 	 * @param mixed $value
+	 *
 	 * @return string
+	 * @throws ManticoreSearchClientError
 	 */
 	private function normalizeSearchKeywords(mixed $value): string {
 		if (!is_array($value)) {
@@ -327,6 +326,29 @@ NEW_SEARCH, CONTENT_QUESTION, NEW_QUESTION, CLARIFICATION, or UNCLEAR";
 		}
 
 		return $this->normalizeQueryString(implode(', ', $terms));
+	}
+
+	private function normalizeJsonResponse(string $response): string {
+		$normalizedResponse = trim($response);
+		if (!str_starts_with($normalizedResponse, '```')) {
+			return $normalizedResponse;
+		}
+
+		$normalizedResponse = preg_replace('/^```[a-zA-Z0-9_-]*\s*/', '', $normalizedResponse);
+		if (!is_string($normalizedResponse)) {
+			throw ManticoreSearchClientError::create('Query generation returned invalid fenced JSON');
+		}
+
+		$normalizedResponse = preg_replace('/\s*```$/', '', $normalizedResponse);
+		if (!is_string($normalizedResponse)) {
+			throw ManticoreSearchClientError::create('Query generation returned invalid fenced JSON');
+		}
+
+		return trim($normalizedResponse);
+	}
+
+	private function formatLogLine(string $value): string {
+		return trim(str_replace(["\r", "\n"], [' ', ' '], $value));
 	}
 
 	private function normalizeQueryString(string $value): string {

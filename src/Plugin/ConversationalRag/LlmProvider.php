@@ -20,7 +20,6 @@ use UnexpectedValueException;
  * The extension exposes global classes: `Llm`, `Message`, `MessageCollection`, `Response`, `Usage`.
  */
 class LlmProvider {
-	private const string DEFAULT_MODEL = 'gpt-4o-mini';
 	/**
 	 * Transport options accepted by the llm extension constructor.
 	 *
@@ -37,17 +36,12 @@ class LlmProvider {
 	 */
 	private array $config = [];
 
-	private ?object $client = null;
-	private ?string $clientModelId = null;
-
 	/**
 	 * @param array<string, mixed> $config
 	 * @return void
 	 */
 	public function configure(array $config): void {
 		$this->config = $config;
-		$this->client = null;
-		$this->clientModelId = null;
 	}
 
 	/**
@@ -80,11 +74,11 @@ class LlmProvider {
 	 */
 	public function generateResponse(string $prompt, array $options = []): array {
 		try {
-			$modelId = $this->getModelId();
-
+			/** @var string $modelId */
+			$modelId = $this->config['model'];
 			$settings = $this->getSettings($options);
 			$clientOptions = $this->extractClientOptions($settings);
-			$llm = $this->getClientForModel($modelId, $clientOptions);
+			$llm = new \Llm($modelId, $clientOptions);
 			$this->applySettingsToClient($llm, $settings);
 			$messages = $this->buildMessages($prompt);
 
@@ -118,15 +112,7 @@ class LlmProvider {
 	 * @return array<int, \Message>
 	 */
 	private function buildMessages(string $prompt): array {
-		$stylePrompt = $this->getStylePrompt();
-
-		$messages = [];
-		if ($stylePrompt !== '') {
-			$messages[] = \Message::system($stylePrompt);
-		}
-		$messages[] = \Message::user($prompt);
-
-		return $messages;
+		return [\Message::user($prompt)];
 	}
 
 	/**
@@ -162,6 +148,21 @@ class LlmProvider {
 	public function estimateTokens(string $text): int {
 		// Simple estimation: ~4 characters per token
 		return (int)ceil(strlen($text) / 4);
+	}
+
+	/**
+	 * @param array{error:string, details?: mixed} $response
+	 */
+	public static function formatFailureMessage(string $prefix, array $response): string {
+		$message = $prefix . ': ' . $response['error'];
+		if (isset($response['details']) && is_string($response['details'])) {
+			$details = trim($response['details']);
+			if ($details !== '') {
+				$message .= ': ' . $details;
+			}
+		}
+
+		return $message;
 	}
 
 	/**
@@ -248,44 +249,17 @@ class LlmProvider {
 		return $value;
 	}
 
-	private function getConfig(string $key, mixed $default = null): mixed {
-		return $this->config[$key] ?? $default;
-	}
-
-	private function getStylePrompt(): string {
-		/** @var string $prompt */
-		$prompt = $this->getConfig('style_prompt', '');
-
-		if ($prompt === '') {
-			$prompt = 'You are a helpful AI assistant. Answer questions based on the provided context.';
-		}
-
-		return $prompt;
-	}
-
 	/**
-	 * @return array{success:false, error:string, content:string, details?: string|null, provider:string}
+	 * @return array{success:false, error:string, content:string, provider:string, details?: string|null}
 	 */
 	private function formatError(string $message, ?Throwable $exception = null): array {
 		return [
 			'success' => false,
 			'error' => $message,
 			'content' => '',
+			'provider' => 'llm',
 			'details' => $exception?->getMessage(),
-			'provider' => $this->getName(),
 		];
-	}
-
-	private function getName(): string {
-		$model = $this->getConfig('model');
-		if (is_string($model) && str_contains($model, ':')) {
-			[$provider, $modelName] = array_pad(explode(':', trim($model), 2), 2, '');
-			if ($provider !== '' && $modelName !== '') {
-				return $provider;
-			}
-		}
-
-		return 'llm';
 	}
 
 	/**
@@ -313,31 +287,4 @@ class LlmProvider {
 		];
 	}
 
-	private function getModelId(): string {
-		$model = $this->getConfig('model', self::DEFAULT_MODEL);
-		$modelId = is_string($model) ? trim($model) : self::DEFAULT_MODEL;
-		[$provider, $modelName] = array_pad(explode(':', $modelId, 2), 2, '');
-		if ($provider !== '' && $modelName !== '') {
-			return $modelId;
-		}
-
-		throw new UnexpectedValueException("model must use 'provider:model' format");
-	}
-
-	/**
-	 * @param string $modelId
-	 * @param array<string, mixed> $options
-	 *
-	 * @return \Llm
-	 */
-	private function getClientForModel(string $modelId, array $options = []): \Llm {
-		if ($this->client === null || !$this->client instanceof \Llm || $this->clientModelId !== $modelId) {
-			$this->client = new \Llm($modelId, $options);
-			$this->clientModelId = $modelId;
-		}
-
-		/** @var \Llm $llm */
-		$llm = $this->client;
-		return $llm;
-	}
 }
