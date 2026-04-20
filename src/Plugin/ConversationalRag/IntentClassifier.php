@@ -128,7 +128,7 @@ class IntentClassifier {
 	}
 
 	/**
-	 * Generate search and exclude queries based on intent
+	 * Generate search query from conversation context.
 	 *
 	 * @param string $userQuery
 	 * @param string $intent
@@ -146,78 +146,19 @@ class IntentClassifier {
 		LlmProvider $llmProvider,
 		array $modelConfig
 	): array {
-		$queryPrompt = '**ROLE:** You are an expert Search Query Generator. '
-			. 'Your sole function is to convert a user request into a highly structured '
-			. "JSON output suitable for advanced search engines.\n"
-			. '**GOAL:** Generate a rich, comma-separated list of keywords (`search_keywords`) '
-			. 'based on the `Query` and context from `History`. The query must be sorted by '
-			. "relevance: Content Type → Genre/Theme → Specific Keywords.\n"
-			. '**TERM QUALITY (CRITICAL):** Search terms must be synonym-like expansions of the '
-			. 'actual user request and conversation context, not generic tags or detached topic '
-			. "labels.\n"
-			. "*   Prefer complete phrases that preserve the subject of the request.\n"
-			. '*   Do not emit broad standalone tags such as "explanation" or "RAG" unless '
-			. "that exact tag is the subject itself.\n"
-			. "*   Good: \"RAG explanation\", \"retrieval augmented generation overview\".\n"
-			. "*   Bad: \"explanation\", \"RAG\".\n"
-			. "**OUTPUT FORMAT (STRICT):** You MUST respond ONLY in JSON format:\n"
-			. "```json\n"
-			. "{\n"
-			. '"search_keywords": [{"term": "keyword1", "confidence": 95}],
-         "exclude_query": ["title_to_exclude"],
-         "debug": "Here you should explain your answer"
-         }'
-			. "\n```\n\n"
-			. '**INTENT RULES:**
+		unset($intent);
 
-- **NEW**
-  - Treat Query as standalone
-  - Ignore unrelated History
-
-- **FOLLOW_UP**
-  - Keep topic from History
-  - Combine with Query (resolve "this", "it", "more")
-
-- **REFINE**
-  - Keep topic
-  - Apply Query as constraint (narrow or adjust)
-
-- **EXPAND**
-  - Keep topic
-  - Broaden with related aspects and variations
-
-- **REJECT**
-  - Ignore Query as search input if it is only a rejection signal
-  - Keep topic from History
-  - Generate alternative angles or formulations
-
-- **UNCLEAR**
-  - Infer topic from History only if clearly identifiable
-  - Otherwise return empty keywords
-'
-			. '**RULES FOR `EXCLUDE_QUERY` (CRITICAL):** Extract exclusions from both the current '
-			. "query and history, following these strict rules:\n"
-			. "**A. Explicit Exclusions (Current Query):**\n"
-			. "*   If the user says \"I already watched X\" → EXCLUDE: X\n"
-			. "*   If the user says \"similar to X but not Y\" → EXCLUDE: Y\n"
-			. "*   If the user says \"not Z\" → EXCLUDE: Z\n"
-			. "*   (Apply this logic regardless of intent.)\n"
-			. "**B. History-Based Exclusions (Contextual):**\n"
-			. "1.  Scan `History` **BACKWARDS** from the most recent message.\n"
-			. '2.  Stop scanning immediately if you detect a Topic Change
-			   3.  Only include exclusions relevant to the *current* topic context.
-			   4.  If no exclusions are found in the query or history, use "none".'."\n\n"
-			. '**EXAMPLE SCENARIO (History Context):** If History shows a topic change '
-			. "occurred before a rejection, that rejection is ignored for `EXCLUDE_QUERY`.\n\n"
-				. "**INPUT:**\n"
-				. "```json\n"
-				. json_encode(['history' => $historyPayload, 'query' => $userQuery, 'intent' => $intent])
-				. "\n```\n\n"
-				. 'JSON:';
+		$queryPrompt = 'Rewrite the follow-up question on top of a human-assistant conversation history '
+			. "as a standalone question that encompasses all pertinent context.\n\n"
+			. "    <Conversation history>\n"
+			. $this->formatConversationHistory($historyPayload)
+			. "\n"
+			. "    <Question>\n"
+			. "  {$userQuery}\n\n"
+			. '    <Standalone question>';
 
 		$llmProvider->configure($modelConfig);
 		$response = $llmProvider->generateResponse($queryPrompt);
-		$llmResponseContent = (string)$response['content'];
 
 		if (!$response['success']) {
 			throw ManticoreSearchClientError::create(
@@ -225,130 +166,55 @@ class IntentClassifier {
 			);
 		}
 
+		$llmResponseContent = (string)$response['content'];
 		Buddy::debugv("\nRAG: [DEBUG QUERY GENERATION LLM RESPONSE]");
 		Buddy::debugv('RAG: └─ Raw LLM response: ' . $this->formatLogLine($llmResponseContent));
 
-		$normalizedJson = $this->normalizeJsonResponse($llmResponseContent);
-		Buddy::debugv('RAG: └─ Normalized JSON payload: ' . $this->formatLogLine($normalizedJson));
-
-		try {
-			$decodedResponse = json_decode($normalizedJson, true, 512, JSON_THROW_ON_ERROR);
-		} catch (JsonException $e) {
-			throw ManticoreSearchClientError::create(
-				'Query generation returned invalid JSON: ' . $e->getMessage()
-			);
-		}
-
-		if (!is_array($decodedResponse)) {
-			throw ManticoreSearchClientError::create('Query generation returned invalid JSON structure');
-		}
-
-		$searchQuery = $this->normalizeSearchKeywords($decodedResponse['search_keywords'] ?? null);
+		$searchQuery = $this->normalizeQueryString($llmResponseContent);
 		if ($searchQuery === '') {
-			$searchQuery = $this->normalizeQueryString($userQuery);
+			throw ManticoreSearchClientError::create('Query generation returned empty search query');
 		}
-		$excludeQuery = $this->normalizeQueryTerms($decodedResponse['exclude_query'] ?? null, 'exclude_query');
 
 		return [
 			'search_query' => $searchQuery,
-			'exclude_query' => $excludeQuery,
+			'exclude_query' => '',
 			'llm_response' => $llmResponseContent,
 		];
 	}
 
-	/**
-	 * @param mixed $value
-	 * @param string $field
-	 * @return string
-	 */
-	private function normalizeQueryTerms(mixed $value, string $field): string {
-		if (is_string($value)) {
-			return $this->normalizeQueryString($value);
-		}
-
-		if (!is_array($value)) {
-			throw new ManticoreSearchClientError("Query generation field '{$field}' must be a JSON array or string");
-		}
-
-		$terms = [];
-		foreach ($value as $term) {
-			if (!is_string($term)) {
-				throw new ManticoreSearchClientError(
-					"Query generation field '{$field}' must contain only strings"
-				);
-			}
-
-			$normalizedTerm = trim($term);
-			if ($normalizedTerm === '') {
-				continue;
-			}
-
-			$terms[] = $normalizedTerm;
-		}
-
-		return $this->normalizeQueryString(implode(', ', $terms));
-	}
-
-	/**
-	 * @param mixed $value
-	 *
-	 * @return string
-	 * @throws ManticoreSearchClientError
-	 */
-	private function normalizeSearchKeywords(mixed $value): string {
-		if (!is_array($value)) {
-			throw new ManticoreSearchClientError(
-				"Query generation field 'search_keywords' must be a JSON array"
-			);
-		}
-
-		$terms = [];
-		foreach ($value as $keyword) {
-			if (!is_array($keyword)) {
-				throw new ManticoreSearchClientError(
-					"Query generation field 'search_keywords' must contain only objects"
-				);
-			}
-
-			$term = $keyword['term'] ?? null;
-			if (!is_string($term)) {
-				throw new ManticoreSearchClientError(
-					"Query generation field 'search_keywords' objects must contain a string 'term'"
-				);
-			}
-
-			$normalizedTerm = trim($term);
-			if ($normalizedTerm === '') {
-				continue;
-			}
-
-			$terms[] = $normalizedTerm;
-		}
-
-		return $this->normalizeQueryString(implode(', ', $terms));
-	}
-
-	private function normalizeJsonResponse(string $response): string {
-		$normalizedResponse = trim($response);
-		if (!str_starts_with($normalizedResponse, '```')) {
-			return $normalizedResponse;
-		}
-
-		$normalizedResponse = preg_replace('/^```[a-zA-Z0-9_-]*\s*/', '', $normalizedResponse);
-		if (!is_string($normalizedResponse)) {
-			throw ManticoreSearchClientError::create('Query generation returned invalid fenced JSON');
-		}
-
-		$normalizedResponse = preg_replace('/\s*```$/', '', $normalizedResponse);
-		if (!is_string($normalizedResponse)) {
-			throw ManticoreSearchClientError::create('Query generation returned invalid fenced JSON');
-		}
-
-		return trim($normalizedResponse);
-	}
-
 	private function formatLogLine(string $value): string {
 		return trim(str_replace(["\r", "\n"], [' ', ' '], $value));
+	}
+
+	/**
+	 * @param array<string, array{user?: string, assistant?: string}> $historyPayload
+	 */
+	private function formatConversationHistory(array $historyPayload): string {
+		$historyLines = [];
+		foreach ($historyPayload as $turn) {
+			if (isset($turn['user'])) {
+				$historyLines[] = '    ' . $this->encodePromptJsonLine(['user' => $turn['user']]);
+			}
+
+			if (!isset($turn['assistant'])) {
+				continue;
+			}
+
+			$historyLines[] = '    ' . $this->encodePromptJsonLine(['assistant' => $turn['assistant']]);
+		}
+
+		return implode("\n", $historyLines);
+	}
+
+	/**
+	 * @param array{user?: string, assistant?: string} $line
+	 */
+	private function encodePromptJsonLine(array $line): string {
+		try {
+			return json_encode($line, JSON_THROW_ON_ERROR);
+		} catch (JsonException $e) {
+			throw ManticoreSearchClientError::create('Query generation prompt encoding failed: ' . $e->getMessage());
+		}
 	}
 
 	private function normalizeQueryString(string $value): string {

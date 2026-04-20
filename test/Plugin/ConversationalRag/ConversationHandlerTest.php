@@ -10,7 +10,6 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Handler as RagHandler;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Intent;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Payload as RagPayload;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
@@ -617,10 +616,8 @@ class ConversationHandlerTest extends TestCase {
 			$handler = new RagHandler(
 				$payload, $this->createMockLlmProvider(
 					[
-					['content' => 'NEW', 'success' => true, 'metadata' => []], // classifyIntent response
 					[
-						'content' => '{"search_keywords":[{"term":"action movies","confidence":94}],'
-							. '"exclude_query":["none"]}',
+						'content' => 'Show me action movies',
 					'success' => true,
 					'metadata' => [],
 					], // generateQueries response
@@ -767,10 +764,8 @@ class ConversationHandlerTest extends TestCase {
 			$payload,
 			$this->createMockLlmProvider(
 				[
-					['content' => Intent::FOLLOW_UP, 'success' => true, 'metadata' => []],
 					[
-						'content' => '{"search_keywords":[{"term":"comedy movies","confidence":90}],'
-							. '"exclude_query":["none"]}',
+						'content' => 'What comedy movies are relevant to the current conversation?',
 						'success' => true,
 						'metadata' => [],
 					],
@@ -842,7 +837,10 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertTrue($task->isSucceed());
 		$userInsert = $queries[6];
 		$this->assertStringContainsString("'NEW'", $userInsert);
-		$this->assertStringContainsString("'comedy movies'", $userInsert);
+		$this->assertStringContainsString(
+			"'What comedy movies are relevant to the current conversation?'",
+			$userInsert
+		);
 	}
 
 	public function testConversationRejectsInvalidTableIdentifierBeforeHasTable(): void {

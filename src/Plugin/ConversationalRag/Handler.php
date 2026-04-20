@@ -268,9 +268,13 @@ final class Handler extends BaseHandlerWithClient {
 		$conversationHistory = $conversationManager->getConversationMessages($conversationUuid);
 		self::logConversationStart($conversationUuid, $conversationHistory);
 
-		$intent = $intentClassifier->classifyIntent(
-			$request->query, $conversationHistory, $provider, $model
-		);
+		unset($intentClassifier);
+
+		// Intent classification is disabled for the standalone-query ranking experiment.
+		// $intent = $intentClassifier->classifyIntent(
+		// 	$request->query, $conversationHistory, $provider, $model
+		// );
+		$intent = Intent::NEW;
 		Buddy::debugv("RAG: ├─ Intent classified: $intent");
 
 		/** @var array{max_document_length:int} $settings */
@@ -403,127 +407,20 @@ final class Handler extends BaseHandlerWithClient {
 		SearchContext $context,
 		SearchServices $services
 	): array {
-		if ($context->intent === Intent::FOLLOW_UP) {
-			return self::handleFollowUpIntent(
-				$context, $services
-			);
-		}
-
-		if ($context->intent === Intent::EXPAND) {
-			return self::handleExpandIntent($context, $services);
-		}
+		// Follow-up reuse and expansion are disabled for the standalone-query ranking experiment.
+		// if ($context->intent === Intent::FOLLOW_UP) {
+		// 	return self::handleFollowUpIntent(
+		// 		$context, $services
+		// 	);
+		// }
+		//
+		// if ($context->intent === Intent::EXPAND) {
+		// 	return self::handleExpandIntent($context, $services);
+		// }
 
 		return self::handleSearchIntent(
 			$context, $services
 		);
-	}
-
-	/**
-	 * Handle FOLLOW_UP intent
-	 *
-	 * @param SearchContext $context
-	 * @param SearchServices $services
-	 *
-	 * @return array{string, array<int, array<string, mixed>>, array{search_query: string,
-	 *   exclude_query: string}, array<int, string|int>}
-	 * @throws ManticoreSearchClientError
-	 * @throws ManticoreSearchResponseError
-	 */
-	private static function handleFollowUpIntent(
-		SearchContext $context,
-		SearchServices $services
-	): array {
-		Buddy::debugv('RAG: ├─ Processing FOLLOW_UP intent');
-		$lastContext = $context->history->latestSearchContext();
-
-		if ($lastContext) {
-			Buddy::debugv('RAG: ├─ Found previous search context to reuse');
-			$queries = [
-				'search_query' => $lastContext['search_query'],
-				'exclude_query' => $lastContext['exclude_query'],
-			];
-
-			$thresholdManager = new DynamicThresholdManager();
-			$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-				$context->intent,
-				$context->history->consecutiveExpansionCount(),
-				0.8
-			);
-
-			$excludedIds = self::decodeStoredExcludedIds($lastContext['excluded_ids']);
-
-			$searchResults = $services->searchEngine->search(
-				$context->request->table, $queries['search_query'], $excludedIds,
-				$context->model, $thresholdInfo['threshold']
-			);
-			Buddy::debugv('RAG: ├─ FOLLOW_UP performed KNN search with previous query parameters');
-			return [$context->intent, $searchResults, $queries, $excludedIds];
-		}
-
-		Buddy::debugv('RAG: ├─ No previous search context found, falling back to NEW');
-		return self::handleSearchIntent(
-			$context->withIntent(Intent::NEW), $services
-		);
-	}
-
-	/**
-	 * Handle EXPAND intent
-	 *
-	 * @param SearchContext $context
-	 * @param SearchServices $services
-	 *
-	 * @return array{string, array<int, array<string, mixed>>, array{search_query: string,
-	 *   exclude_query: string}, array<int, string|int>}
-	 * @throws ManticoreSearchClientError
-	 * @throws ManticoreSearchResponseError
-	 */
-	private static function handleExpandIntent(
-		SearchContext $context,
-		SearchServices $services
-	): array {
-		Buddy::debugv('RAG: ├─ Processing EXPAND intent');
-		$lastContext = $context->history->latestSearchContext();
-
-		if (!$lastContext) {
-			Buddy::debugv('RAG: ├─ No previous search context found, falling back to NEW');
-			return self::handleSearchIntent($context->withIntent(Intent::NEW), $services);
-		}
-
-		$queries = [
-			'search_query' => $lastContext['search_query'],
-			'exclude_query' => $lastContext['exclude_query'],
-		];
-		$excludedIds = self::decodeStoredExcludedIds($lastContext['excluded_ids']);
-
-		$thresholdManager = new DynamicThresholdManager();
-		$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-			$context->intent,
-			$context->history->consecutiveExpansionCount(),
-			0.8
-		);
-
-		$searchResults = $services->searchEngine->search(
-			$context->request->table,
-			$queries['search_query'],
-			$excludedIds,
-			$context->model,
-			$thresholdInfo['threshold']
-		);
-
-		return [$context->intent, $searchResults, $queries, $excludedIds];
-	}
-
-	/**
-	 * @return array<int, string|int>
-	 */
-	private static function decodeStoredExcludedIds(string $excludedIds): array {
-		if ($excludedIds === '') {
-			return [];
-		}
-
-		/** @var array<int, string|int> $decodedExcludedIds */
-		$decodedExcludedIds = simdjson_decode($excludedIds, true);
-		return $decodedExcludedIds;
 	}
 
 	/**
@@ -555,40 +452,31 @@ final class Handler extends BaseHandlerWithClient {
 			$context->model
 		);
 
-		$thresholdManager = new DynamicThresholdManager();
-		$thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-			$context->intent,
-			$context->history->consecutiveExpansionCount()
-		);
-
+		// Dynamic threshold expansion and no-result exclusions are disabled for this experiment.
+		// $thresholdManager = new DynamicThresholdManager();
+		// $thresholdInfo = $thresholdManager->calculateDynamicThreshold(
+		// 	$context->intent,
+		// 	$context->history->consecutiveExpansionCount()
+		// );
 		$excludedIds = [];
-		if (!empty($queries['exclude_query']) && $queries['exclude_query'] !== 'none') {
-			$excludedIds = $services->searchEngine->getExcludedIds(
-				$context->request->table, $queries['exclude_query']
-			);
-		}
-		if ($context->intent !== Intent::NEW) {
-			$excludedIds = self::mergeExcludedIds(
-				$excludedIds,
-				$context->history->activeExcludedIds()
-			);
-		}
+		// if (!empty($queries['exclude_query']) && $queries['exclude_query'] !== 'none') {
+		// 	$excludedIds = $services->searchEngine->getExcludedIds(
+		// 		$context->request->table, $queries['exclude_query']
+		// 	);
+		// }
+		// if ($context->intent !== Intent::NEW) {
+		// 	$excludedIds = self::mergeExcludedIds(
+		// 		$excludedIds,
+		// 		$context->history->activeExcludedIds()
+		// 	);
+		// }
 
 		$searchResults = $services->searchEngine->search(
 			$context->request->table, $queries['search_query'], $excludedIds,
-			$context->model, $thresholdInfo['threshold']
+			$context->model, 0.8
 		);
 
 		return [$context->intent, $searchResults, $queries, $excludedIds];
-	}
-
-	/**
-	 * @param array<int, string|int> $currentExcludedIds
-	 * @param array<int, string|int> $activeExcludedIds
-	 * @return array<int, string|int>
-	 */
-	private static function mergeExcludedIds(array $currentExcludedIds, array $activeExcludedIds): array {
-		return array_values(array_unique([...$currentExcludedIds, ...$activeExcludedIds], SORT_REGULAR));
 	}
 
 	/**

@@ -250,7 +250,7 @@ class IntentClassifierTest extends TestCase {
 		$this->assertEquals('NEW', $intent);
 	}
 
-	public function testGenerateQueriesWithExclusions(): void {
+	public function testGenerateQueriesUsesStandaloneQuestionResponse(): void {
 		$intentClassifier = new IntentClassifier();
 
 			$modelConfig = ['model' => 'openai:gpt-4'];
@@ -265,8 +265,7 @@ class IntentClassifierTest extends TestCase {
 			->willReturn(
 				[
 				'success' => true,
-				'content' => '{"search_keywords":[{"term":"action movies","confidence":95}],'
-					. '"exclude_query":["comedy movies"]}',
+				'content' => 'What are action movies that are not comedies?',
 				'metadata' => [],
 				]
 			);
@@ -279,11 +278,11 @@ class IntentClassifierTest extends TestCase {
 			$modelConfig
 		);
 
-		$this->assertEquals('action movies', $result['search_query']);
-		$this->assertEquals('comedy movies', $result['exclude_query']);
+		$this->assertEquals('What are action movies that are not comedies?', $result['search_query']);
+		$this->assertEquals('', $result['exclude_query']);
 	}
 
-	public function testGenerateQueriesNoExclusions(): void {
+	public function testGenerateQueriesPassesQueryAndHistoryToPrompt(): void {
 		$intentClassifier = new IntentClassifier();
 
 			$modelConfig = ['model' => 'openai:gpt-4'];
@@ -291,32 +290,51 @@ class IntentClassifierTest extends TestCase {
 			// Mock LLM provider
 			/** @var MockObject&LlmProvider $mockProvider */
 			$mockProvider = $this->createMock(LlmProvider::class);
+		$generatedPrompt = '';
 		$mockProvider->expects($this->once())
 			->method('configure')
 			->with($modelConfig);
-		$mockProvider->method('generateResponse')
-			->willReturn(
-				[
-				'success' => true,
-				'content' => '{"search_keywords":[{"term":"science fiction movies","confidence":92}],'
-					. '"exclude_query":["none"]}',
-				'metadata' => [],
-				]
+		$mockProvider->expects($this->once())
+			->method('generateResponse')
+			->willReturnCallback(
+				static function (string $prompt) use (&$generatedPrompt): array {
+					$generatedPrompt = $prompt;
+					return [
+						'success' => true,
+						'content' => 'What are more science fiction movies?',
+						'metadata' => [],
+					];
+				}
 			);
 
 		$result = $intentClassifier->generateQueries(
-			'Show me science fiction movies',
+			'What else?',
 			'NEW',
-			[],
+			[
+				'1970-01-01T00:00:00.000000Z' => [
+					'user' => 'Show me science fiction movies',
+					'assistant' => 'Here are science fiction movies.',
+				],
+			],
 			$mockProvider,
 			$modelConfig
 		);
 
-		$this->assertEquals('science fiction movies', $result['search_query']);
-		$this->assertEquals('', $result['exclude_query']); // Should be empty when 'none'
+		$this->assertEquals('What are more science fiction movies?', $result['search_query']);
+		$this->assertEquals('', $result['exclude_query']);
+		$this->assertStringContainsString(
+			'Rewrite the follow-up question on top of a human-assistant conversation history '
+				. 'as a standalone question that encompasses all pertinent context.',
+			$generatedPrompt
+		);
+		$this->assertStringContainsString("    <Conversation history>\n", $generatedPrompt);
+		$this->assertStringContainsString('    {"user":"Show me science fiction movies"}', $generatedPrompt);
+		$this->assertStringContainsString('    {"assistant":"Here are science fiction movies."}', $generatedPrompt);
+		$this->assertStringContainsString("    <Question>\n  What else?\n\n", $generatedPrompt);
+		$this->assertStringContainsString('    <Standalone question>', $generatedPrompt);
 	}
 
-	public function testGenerateQueriesIntentBased(): void {
+	public function testGenerateQueriesIgnoresIntentForExperiment(): void {
 		$intentClassifier = new IntentClassifier();
 
 			$modelConfig = ['model' => 'openai:gpt-4'];
@@ -331,8 +349,7 @@ class IntentClassifierTest extends TestCase {
 			->willReturn(
 				[
 				'success' => true,
-				'content' => '{"search_keywords":[{"term":"similar to Inception","confidence":88}],'
-					. '"exclude_query":["Inception"]}',
+				'content' => 'What movies are similar to Inception?',
 				'metadata' => [],
 				]
 			);
@@ -353,11 +370,11 @@ class IntentClassifierTest extends TestCase {
 			$modelConfig
 		);
 
-		$this->assertEquals('similar to Inception', $result['search_query']);
-		$this->assertEquals('Inception', $result['exclude_query']);
+		$this->assertEquals('What movies are similar to Inception?', $result['search_query']);
+		$this->assertEquals('', $result['exclude_query']);
 	}
 
-	public function testGenerateQueriesParsesFencedJson(): void {
+	public function testGenerateQueriesTrimsStandaloneQuestion(): void {
 		$intentClassifier = new IntentClassifier();
 
 		$modelConfig = ['model' => 'openai:gpt-4'];
@@ -371,9 +388,7 @@ class IntentClassifierTest extends TestCase {
 			->willReturn(
 				[
 					'success' => true,
-					'content' => "```json\n"
-						. '{"search_keywords":[{"term":"RAG explanation","confidence":95}],'
-						. '"exclude_query":["none"]}' . "\n```",
+					'content' => "  What is retrieval augmented generation?  \n",
 					'metadata' => [],
 				]
 			);
@@ -386,11 +401,11 @@ class IntentClassifierTest extends TestCase {
 			$modelConfig
 		);
 
-		$this->assertEquals('RAG explanation', $result['search_query']);
+		$this->assertEquals('What is retrieval augmented generation?', $result['search_query']);
 		$this->assertEquals('', $result['exclude_query']);
 	}
 
-	public function testGenerateQueriesFallsBackToUserQueryWhenLlmReturnsEmptyKeywords(): void {
+	public function testGenerateQueriesThrowsWhenLlmReturnsEmptyQuery(): void {
 		$intentClassifier = new IntentClassifier();
 
 		$modelConfig = ['model' => 'openai:gpt-4'];
@@ -404,38 +419,7 @@ class IntentClassifierTest extends TestCase {
 			->willReturn(
 				[
 					'success' => true,
-					'content' => '{"search_keywords":[],"exclude_query":["none"]}',
-					'metadata' => [],
-				]
-			);
-
-		$result = $intentClassifier->generateQueries(
-			'ok bye',
-			'NEW',
-			[],
-			$mockProvider,
-			$modelConfig
-		);
-
-		$this->assertEquals('ok bye', $result['search_query']);
-		$this->assertEquals('', $result['exclude_query']);
-	}
-
-	public function testGenerateQueriesThrowsOnInvalidJson(): void {
-		$intentClassifier = new IntentClassifier();
-
-		$modelConfig = ['model' => 'openai:gpt-4'];
-
-		/** @var MockObject&LlmProvider $mockProvider */
-		$mockProvider = $this->createMock(LlmProvider::class);
-		$mockProvider->expects($this->once())
-			->method('configure')
-			->with($modelConfig);
-		$mockProvider->method('generateResponse')
-			->willReturn(
-				[
-					'success' => true,
-					'content' => '```json',
+					'content' => "  \n",
 					'metadata' => [],
 				]
 			);
@@ -443,12 +427,42 @@ class IntentClassifierTest extends TestCase {
 		$this->expectException(ManticoreSearchClientError::class);
 
 		$intentClassifier->generateQueries(
+			'ok bye',
+			'NEW',
+			[],
+			$mockProvider,
+			$modelConfig
+		);
+	}
+
+	public function testGenerateQueriesKeepsNonJsonResponseAsSearchQuery(): void {
+		$intentClassifier = new IntentClassifier();
+
+		$modelConfig = ['model' => 'openai:gpt-4'];
+
+		/** @var MockObject&LlmProvider $mockProvider */
+		$mockProvider = $this->createMock(LlmProvider::class);
+		$mockProvider->expects($this->once())
+			->method('configure')
+			->with($modelConfig);
+		$mockProvider->method('generateResponse')
+			->willReturn(
+				[
+					'success' => true,
+					'content' => 'Explain RAG as a standalone topic.',
+					'metadata' => [],
+				]
+			);
+
+		$result = $intentClassifier->generateQueries(
 			'Explain RAG',
 			'NEW',
 			[],
 			$mockProvider,
 			$modelConfig
 		);
+
+		$this->assertEquals('Explain RAG as a standalone topic.', $result['search_query']);
 	}
 
 	public function testGenerateQueriesFailureIncludesProviderDetails(): void {

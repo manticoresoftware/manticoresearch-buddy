@@ -298,63 +298,31 @@ class SearchEngine {
 		int $limit,
 		string $excludeClause
 	): string {
-		$searchTerms = $this->splitSearchQueryTerms($searchQuery);
+		$normalizedSearchQuery = trim($searchQuery);
+		if ($normalizedSearchQuery === '') {
+			throw ManticoreSearchClientError::create('Search query must contain at least one term');
+		}
+
 		$whereClauses = [
-			$this->buildKnnWhereSql($vectorField, $knnK, $searchTerms),
+			$this->buildKnnWhereSql($vectorField, $knnK, $normalizedSearchQuery),
 			"knn_dist < $threshold",
 		];
 		if ($excludeClause !== '') {
 			$whereClauses[] = $excludeClause;
 		}
 
-		$sql = sprintf(
+		return sprintf(
 		/** @lang manticore */
 			'SELECT *, knn_dist() as knn_dist FROM %s WHERE %s LIMIT %d',
 			$table,
 			implode(' AND ', $whereClauses),
 			$limit
 		);
-
-		if (sizeof($searchTerms) > 1) {
-			$sql .= " OPTION fusion_method='rrf'";
-		}
-
-		return $sql;
 	}
 
-	/**
-	 * @return array<int, string>
-	 * @throws ManticoreSearchClientError
-	 */
-	private function splitSearchQueryTerms(string $searchQuery): array {
-		$terms = [];
-		foreach (explode(',', $searchQuery) as $term) {
-			$normalizedTerm = trim($term);
-			if ($normalizedTerm === '') {
-				continue;
-			}
-
-			$terms[] = $normalizedTerm;
-		}
-
-		if ($terms === []) {
-			throw ManticoreSearchClientError::create('Search query must contain at least one term');
-		}
-
-		return $terms;
-	}
-
-	/**
-	 * @param array<int, string> $searchTerms
-	 */
-	private function buildKnnWhereSql(string $vectorField, int $knnK, array $searchTerms): string {
-		$knnClauses = [];
-		foreach ($searchTerms as $searchTerm) {
-			$searchEscaped = $this->escapeString($searchTerm);
-			$knnClauses[] = "knn($vectorField, $knnK, '$searchEscaped')";
-		}
-
-		return implode(' AND ', $knnClauses);
+	private function buildKnnWhereSql(string $vectorField, int $knnK, string $searchQuery): string {
+		$searchEscaped = $this->escapeString($searchQuery);
+		return "knn($vectorField, $knnK, '$searchEscaped')";
 	}
 
 	/**

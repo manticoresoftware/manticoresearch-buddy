@@ -366,7 +366,7 @@ class SearchEngineTest extends TestCase {
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testPerformSearchWithMultipleGeneratedTermsBuildsHybridKnnQuery(): void {
+	public function testPerformSearchUsesSingleKnnQueryForStandaloneQuestion(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$searchEngine = $this->createSearchEngine($mockClient);
 		$schemaResponse = $this->createSchemaResponse(
@@ -395,8 +395,8 @@ class SearchEngineTest extends TestCase {
 
 		$result = $searchEngine->search(
 			'docs',
-			'Market Capitalization vs Net Asset Value, difference between market cap and NAV, ' .
-			'how to calculate Market Cap and NAV',
+			'Market Capitalization vs Net Asset Value, difference between market cap and NAV, '
+				. 'how to calculate Market Cap and NAV',
 			[],
 			$this->createDefaultModelConfig(),
 			0.8
@@ -404,12 +404,11 @@ class SearchEngineTest extends TestCase {
 
 		$searchSql = $sqlQueries[1];
 		$this->assertStringContainsString(
-			"WHERE knn(embedding_vector, 5, 'Market Capitalization vs Net Asset Value') "
-			. "AND knn(embedding_vector, 5, 'difference between market cap and NAV') "
-			. "AND knn(embedding_vector, 5, 'how to calculate Market Cap and NAV')",
+			"WHERE knn(embedding_vector, 5, 'Market Capitalization vs Net Asset Value, "
+				. "difference between market cap and NAV, how to calculate Market Cap and NAV')",
 			$searchSql
 		);
-		$this->assertStringContainsString("OPTION fusion_method='rrf'", $searchSql);
+		$this->assertStringNotContainsString("OPTION fusion_method='rrf'", $searchSql);
 		$this->assertCount(1, $result);
 	}
 
