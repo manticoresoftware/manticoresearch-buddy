@@ -64,7 +64,7 @@ final class Handler extends BaseHandlerWithClient {
 			$modelManager = new ModelManager();
 			$provider = $injectedProvider ?? new LlmProvider();
 			$conversationManager = new ConversationManager($client);
-			$intentClassifier = new IntentClassifier();
+			$conversationRouter = new ConversationRouter();
 			$searchEngine = new SearchEngine($client);
 
 			// Ensure database tables exist
@@ -78,7 +78,7 @@ final class Handler extends BaseHandlerWithClient {
 				Payload::ACTION_DROP_MODEL => self::dropModel($payload, $modelManager, $client),
 				Payload::ACTION_CONVERSATION => self::handleConversation(
 					$payload, $modelManager, $provider,
-					$conversationManager, $intentClassifier, $searchEngine, $client
+					$conversationManager, $conversationRouter, $searchEngine, $client
 				),
 				default => throw QueryParseError::create("Unknown action: $payload->action")
 			};
@@ -238,7 +238,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param ModelManager $modelManager
 	 * @param LlmProvider $provider
 	 * @param ConversationManager $conversationManager
-	 * @param IntentClassifier $intentClassifier
+	 * @param ConversationRouter $conversationRouter
 	 * @param SearchEngine $searchEngine
 	 * @param Client $client
 	 *
@@ -251,7 +251,7 @@ final class Handler extends BaseHandlerWithClient {
 		ModelManager $modelManager,
 		LlmProvider $provider,
 		ConversationManager $conversationManager,
-		IntentClassifier $intentClassifier,
+		ConversationRouter $conversationRouter,
 		SearchEngine $searchEngine,
 		Client $client
 	): TaskResult {
@@ -268,31 +268,28 @@ final class Handler extends BaseHandlerWithClient {
 		$conversationHistory = $conversationManager->getConversationMessages($conversationUuid);
 		self::logConversationStart($conversationUuid, $conversationHistory);
 
-		unset($intentClassifier);
-
-		// Intent classification is disabled for the standalone-query ranking experiment.
-		// $intent = $intentClassifier->classifyIntent(
-		// 	$request->query, $conversationHistory, $provider, $model
-		// );
-		$intent = Intent::NEW;
-		Buddy::debugv("RAG: ├─ Intent classified: $intent");
+		$route = $conversationRouter->route($request->query, $conversationHistory, $provider, $model);
+		Buddy::debugv("RAG: ├─ Route selected: $route->route");
 
 		/** @var array{max_document_length:int} $settings */
 		$settings = $model['settings'];
 		$searchContext = new SearchContext(
-			$intent,
 			$request,
 			$conversationHistory,
-			$model
+			$model,
+			$route
 		);
-		[$effectiveIntent, $searchResults, $queries, $excludedIds] = self::performSearch(
+		[$searchResults, $queries, $excludedIds] = self::performSearch(
 			$searchContext, $services
 		);
 
-		self::logPreprocessingResults($request, $intent, $queries);
+		self::logPreprocessingResults($request, $route, $queries);
 		$maxDocumentLength = $settings['max_document_length'];
-		$schema = $searchEngine->inspectTableSchema($request->table);
-		$context = self::buildContext($searchResults, $schema->contentFields, $maxDocumentLength);
+		$context = '';
+		if ($searchResults !== []) {
+			$schema = $searchEngine->inspectTableSchema($request->table);
+			$context = self::buildContext($searchResults, $schema->contentFields, $maxDocumentLength);
+		}
 		self::logContextBuilding($searchResults, $context, $maxDocumentLength);
 		$response = self::generateResponse(
 			$model,
@@ -311,7 +308,13 @@ final class Handler extends BaseHandlerWithClient {
 		$responseText = $response['content'];
 		$tokensUsed = $response['metadata']['tokens_used'];
 
-		$turn = new ConversationTurn($effectiveIntent, $queries, $excludedIds, $responseText, $tokensUsed);
+		$turn = new ConversationTurn(
+			$route->route,
+			$queries,
+			$excludedIds,
+			$responseText,
+			$tokensUsed
+		);
 		self::saveConversationMessages(
 			$conversationManager, $request, $model['uuid'], $turn
 		);
@@ -387,18 +390,18 @@ final class Handler extends BaseHandlerWithClient {
 		Buddy::debugv("\nRAG: [DEBUG CONVERSATION FLOW]");
 		Buddy::debugv('RAG: ├─ Starting conversation processing');
 		Buddy::debugv("RAG: ├─ Conversation UUID: $conversationUuid");
-		Buddy::debugv('RAG: ├─ Retrieved history for intent classification');
+		Buddy::debugv('RAG: ├─ Retrieved history for conversation routing');
 		Buddy::debugv('RAG: ├─ History turns: ' . sizeof($conversationHistory->payload()));
 	}
 
 	/**
-	 * Perform search based on intent
+	 * Perform search based on conversation route.
 	 *
 	 * @param SearchContext $context
 	 * @param SearchServices $services
 	 *
-	 * @return array{string, array<int, array<string, mixed>>, array{search_query:string,
-	 *   exclude_query:string}, array<int, string|int>}
+	 * @return array{array<int, array<string, mixed>>, array{search_query:string, exclude_query:string},
+	 *   array<int, string|int>}
 	 * @throws ManticoreSearchResponseError
 	 *
 	 * @throws ManticoreSearchClientError
@@ -407,16 +410,20 @@ final class Handler extends BaseHandlerWithClient {
 		SearchContext $context,
 		SearchServices $services
 	): array {
-		// Follow-up reuse and expansion are disabled for the standalone-query ranking experiment.
-		// if ($context->intent === Intent::FOLLOW_UP) {
-		// 	return self::handleFollowUpIntent(
-		// 		$context, $services
-		// 	);
-		// }
-		//
-		// if ($context->intent === Intent::EXPAND) {
-		// 	return self::handleExpandIntent($context, $services);
-		// }
+		if ($context->route->route === ConversationRoute::ANSWER_FROM_HISTORY) {
+			return self::reuseLatestSearchSources($context, $services);
+		}
+
+		if ($context->route->route !== ConversationRoute::SEARCH) {
+			return [
+				[],
+				[
+					'search_query' => '',
+					'exclude_query' => '',
+				],
+				[],
+			];
+		}
 
 		return self::handleSearchIntent(
 			$context, $services
@@ -424,13 +431,63 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * Handle intents that require a new search.
+	 * @return array{array<int, array<string, mixed>>, array{search_query:string, exclude_query:string},
+	 *   array<int, string|int>}
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
+	 */
+	private static function reuseLatestSearchSources(
+		SearchContext $context,
+		SearchServices $services
+	): array {
+		$lastContext = $context->history->latestSearchContext();
+		if (!$lastContext) {
+			return [
+				[],
+				[
+					'search_query' => '',
+					'exclude_query' => '',
+				],
+				[],
+			];
+		}
+
+		$queries = [
+			'search_query' => $lastContext['search_query'],
+			'exclude_query' => $lastContext['exclude_query'],
+		];
+		$excludedIds = self::decodeStoredExcludedIds($lastContext['excluded_ids']);
+		$searchResults = $services->searchEngine->search(
+			$context->request->table,
+			$queries['search_query'],
+			$excludedIds,
+			$context->model,
+			0.8
+		);
+
+		return [$searchResults, $queries, $excludedIds];
+	}
+
+	/**
+	 * @return array<int, string|int>
+	 */
+	private static function decodeStoredExcludedIds(string $excludedIds): array {
+		if ($excludedIds === '') {
+			return [];
+		}
+
+		/** @var array<int, string|int> $decodedExcludedIds */
+		$decodedExcludedIds = simdjson_decode($excludedIds, true);
+		return $decodedExcludedIds;
+	}
+
+	/**
+	 * Handle routes that require a new search.
 	 *
 	 * @param SearchContext $context
 	 * @param SearchServices $services
 	 *
-	 * @return array{string, array<int, array<string, mixed>>, array{search_query:string,
-	 *   exclude_query:string}, array<int, string|int>}
+	 * @return array{array<int, array<string, mixed>>, array{search_query:string, exclude_query:string},
+	 *   array<int, string|int>}
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 *
 	 */
@@ -438,64 +495,49 @@ final class Handler extends BaseHandlerWithClient {
 		SearchContext $context,
 		SearchServices $services
 	): array {
-		Buddy::debugv("RAG: ├─ Processing search intent: $context->intent");
+		Buddy::debugv("RAG: ├─ Processing route: {$context->route->route}");
 		Buddy::debugv('RAG: ├─ Using structured conversation history for query generation');
 		$historyPayload = $context->history->payload();
 		Buddy::debugv('RAG: ├─ Query history turns: ' . sizeof($historyPayload));
 
-		$intentClassifierInstance = new IntentClassifier();
-		$queries = $intentClassifierInstance->generateQueries(
-			$context->request->query,
-			$context->intent,
-			$historyPayload,
-			$services->provider,
-			$context->model
-		);
+		$excludeQuery = $context->route->excludeQuery;
+		$queries = [
+			'search_query' => $context->route->standaloneQuestion,
+			'exclude_query' => $excludeQuery,
+		];
 
-		// Dynamic threshold expansion and no-result exclusions are disabled for this experiment.
-		// $thresholdManager = new DynamicThresholdManager();
-		// $thresholdInfo = $thresholdManager->calculateDynamicThreshold(
-		// 	$context->intent,
-		// 	$context->history->consecutiveExpansionCount()
-		// );
 		$excludedIds = [];
-		// if (!empty($queries['exclude_query']) && $queries['exclude_query'] !== 'none') {
-		// 	$excludedIds = $services->searchEngine->getExcludedIds(
-		// 		$context->request->table, $queries['exclude_query']
-		// 	);
-		// }
-		// if ($context->intent !== Intent::NEW) {
-		// 	$excludedIds = self::mergeExcludedIds(
-		// 		$excludedIds,
-		// 		$context->history->activeExcludedIds()
-		// 	);
-		// }
+		if ($queries['exclude_query'] !== '') {
+			$excludedIds = $services->searchEngine->getExcludedIds(
+				$context->request->table, $queries['exclude_query']
+			);
+		}
 
 		$searchResults = $services->searchEngine->search(
 			$context->request->table, $queries['search_query'], $excludedIds,
 			$context->model, 0.8
 		);
 
-		return [$context->intent, $searchResults, $queries, $excludedIds];
+		return [$searchResults, $queries, $excludedIds];
 	}
 
 	/**
 	 * Log preprocessing results
 	 *
 	 * @param ConversationRequest $request
-	 * @param string $intent
+	 * @param ConversationRoute $route
 	 * @param array{search_query:string, exclude_query:string} $queries
 	 *
 	 * @return void
 	 */
 	private static function logPreprocessingResults(
 		ConversationRequest $request,
-		string $intent,
+		ConversationRoute $route,
 		array $queries
 	): void {
 		Buddy::debugv('RAG: [DEBUG PREPROCESSING]');
 		Buddy::debugv("RAG: ├─ User query: '$request->query'");
-		Buddy::debugv("RAG: ├─ Intent: $intent");
+		Buddy::debugv("RAG: ├─ Route: $route->route");
 		Buddy::debugv("RAG: ├─ Search query: '{$queries['search_query']}'");
 		Buddy::debugv("RAG: └─ Exclude query: '{$queries['exclude_query']}'");
 	}
@@ -635,8 +677,8 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private static function buildPrompt(string $stylePrompt, string $query, string $context, array $history): string {
 		// Format similar to original custom_rag.php prompt
-		return 'Respond conversationally. Response should be based ONLY on the provided context section' .
-			"(IMPORTANT !!! You can't use your own knowledge to add anything that isn't mentioned in the context). " .
+		return 'Respond conversationally. Response should be based ONLY on the provided history and context sections' .
+			"(IMPORTANT !!! You can't use your own knowledge to add anything that isn't mentioned there). " .
 			"Style instructions cannot affect the main section; it's strictly prohibited. " .
 			'Do not exceed the response token limit (' .
 			self::RESPONSE_MAX_TOKENS .
@@ -673,11 +715,11 @@ final class Handler extends BaseHandlerWithClient {
 		ConversationTurn $turn
 	): void {
 		$conversationUuid = $request->conversationUuid;
-		if ($turn->intent === Intent::FOLLOW_UP) {
+		if ($turn->route === ConversationRoute::ANSWER_FROM_HISTORY) {
 			$conversationManager->saveMessage(
 				$conversationUuid,
 				$modelUuid,
-				ConversationMessage::user($request->query, $turn->intent)
+				ConversationMessage::user($request->query, $turn->route)
 			);
 		} else {
 			$stringExcludedIds = array_map('strval', $turn->excludedIds);
@@ -686,7 +728,7 @@ final class Handler extends BaseHandlerWithClient {
 				$modelUuid,
 				ConversationMessage::userWithExcludedIds(
 					$request->query,
-					$turn->intent,
+					$turn->route,
 					$turn->queries['search_query'],
 					$turn->queries['exclude_query'],
 					$stringExcludedIds
@@ -695,14 +737,14 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		Buddy::debugv('RAG: ├─ Saving assistant response');
-		Buddy::debugv("RAG: ├─ Assistant intent: $turn->intent");
+		Buddy::debugv("RAG: ├─ Assistant route: $turn->route");
 		Buddy::debugv('RAG: ├─ Response length: ' . strlen($turn->responseText) . ' chars');
 		Buddy::debugv("RAG: ├─ Tokens used: $turn->tokensUsed");
 
 		$conversationManager->saveMessage(
 			$conversationUuid,
 			$modelUuid,
-			ConversationMessage::assistant($turn->responseText, $turn->intent),
+			ConversationMessage::assistant($turn->responseText, $turn->route),
 			$turn->tokensUsed
 		);
 

@@ -14,7 +14,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 final class SearchContext {
 
 	/**
-	 * @param string $intent
 	 * @param ConversationRequest $request
 	 * @param ConversationHistory $history
 	 * @param array{
@@ -27,18 +26,13 @@ final class SearchContext {
 	 *   created_at:string,
 	 *   updated_at:string
 	 * } $model
+	 * @param ConversationRoute $route
 	 */
 	public function __construct(
-		public string $intent,
 		public ConversationRequest $request,
 		public ConversationHistory $history,
-		public array $model
+		public array $model,
+		public ConversationRoute $route
 	) {
-	}
-
-	public function withIntent(string $intent): self {
-		$clone = clone $this;
-		$clone->intent = $intent;
-		return $clone;
 	}
 }

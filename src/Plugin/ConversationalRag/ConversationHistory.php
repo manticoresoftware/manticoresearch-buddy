@@ -78,7 +78,10 @@ final readonly class ConversationHistory {
 	public function latestSearchContext(): ?array {
 		for ($i = sizeof($this->messages) - 1; $i >= 0; $i--) {
 			$message = $this->messages[$i];
-			if ($message->role !== 'user' || $message->intent === Intent::FOLLOW_UP) {
+			if ($message->role !== 'user'
+				|| $message->intent === ConversationRoute::ANSWER_FROM_HISTORY
+				|| $message->searchQuery === ''
+			) {
 				continue;
 			}
 
@@ -94,48 +97,6 @@ final readonly class ConversationHistory {
 		}
 
 		return null;
-	}
-
-	/**
-	 * @return array<int, string|int>
-	 * @throws ManticoreSearchClientError
-	 */
-	public function activeExcludedIds(): array {
-		$excludedIds = [];
-		for ($i = sizeof($this->messages) - 1; $i >= 0; $i--) {
-			$message = $this->messages[$i];
-			if ($message->role !== 'user') {
-				continue;
-			}
-
-			if ($message->excludedIds !== '') {
-				array_push($excludedIds, ...$this->decodeExcludedIds($message->excludedIds));
-			}
-
-			if ($message->intent === Intent::NEW) {
-				break;
-			}
-		}
-
-		return array_values(array_unique($excludedIds, SORT_REGULAR));
-	}
-
-	public function consecutiveExpansionCount(): int {
-		$count = 0;
-		for ($i = sizeof($this->messages) - 1; $i >= 0; $i--) {
-			$message = $this->messages[$i];
-			if ($message->role !== 'user') {
-				continue;
-			}
-
-			if ($message->intent !== Intent::EXPAND) {
-				break;
-			}
-
-			$count++;
-		}
-
-		return $count;
 	}
 
 	private function formatHistoryTimestamp(int $turnIndex): string {

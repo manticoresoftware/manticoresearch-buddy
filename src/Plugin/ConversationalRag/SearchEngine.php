@@ -238,7 +238,7 @@ class SearchEngine {
 		$excludeClause = '';
 		if (!empty($excludedIds)) {
 			$safeExcludeIds = array_map('intval', $excludedIds);
-			$excludeClause = 'AND id NOT IN (' . implode(',', $safeExcludeIds) . ')';
+			$excludeClause = 'id NOT IN (' . implode(',', $safeExcludeIds) . ')';
 			$knnK += sizeof($excludedIds) + 5;
 		}
 		$sql = $this->buildVectorSearchSql(

@@ -48,7 +48,7 @@ class LlmProvider {
 	 * Generate a response from the LLM
 	 *
 	 * @param string $prompt
-	 * @param array<string, string|int|float> $options
+	 * @param array<string, mixed> $options
 	 *
 	 * @return (
 	 *   array{
@@ -109,6 +109,76 @@ class LlmProvider {
 	}
 
 	/**
+	 * Generate a tool call from the LLM.
+	 *
+	 * @param string $prompt
+	 * @param array{name:string, description:string, parameters:array<string, mixed>} $toolDefinition
+	 * @param array<string, mixed> $options
+	 *
+	 * @return (
+	 *   array{
+	 *     success:true,
+	 *     content:string,
+	 *     tool_calls:array<int, mixed>,
+	 *     metadata:array{
+	 *       tokens_used:int,
+	 *       input_tokens:int,
+	 *       output_tokens:int,
+	 *       response_time_ms:int,
+	 *       finish_reason:string
+	 *     }
+	 *   }
+	 * )|(
+	 *   array{
+	 *     success:false,
+	 *     error:string,
+	 *     content:string,
+	 *     provider:string,
+	 *     details?:string|null
+	 *   }
+	 * )
+	 */
+	public function generateToolCall(string $prompt, array $toolDefinition, array $options = []): array {
+		try {
+			/** @var string $modelId */
+			$modelId = $this->config['model'];
+			$settings = $this->getSettings($options);
+			$clientOptions = $this->extractClientOptions($settings);
+			$llm = new \Llm($modelId, $clientOptions);
+			$toolBuilder = $llm->withTools([\Tool::fromArray($toolDefinition)]);
+			$toolBuilder->setAutoExecute(false);
+			$this->applySettingsToToolBuilder($toolBuilder, $settings);
+			$messages = $this->buildMessages($prompt);
+
+			$startTime = microtime(true);
+			/** @var \ToolResponse $response */
+			$response = $toolBuilder->complete($messages);
+			$responseTime = (int)((microtime(true) - $startTime) * 1000);
+
+			/** @var \Usage $usage */
+			$usage = $response->getUsage();
+
+			return [
+				'success' => true,
+				'content' => $response->getContent(),
+				'tool_calls' => $response->getToolCalls(),
+				'metadata' => [
+					'tokens_used' => $usage->getTotalTokens(),
+					'input_tokens' => $usage->getPromptTokens(),
+					'output_tokens' => $usage->getOutputTokens(),
+					'response_time_ms' => $responseTime,
+					'finish_reason' => 'tool_calls',
+				],
+			];
+		} catch (Throwable $e) {
+			if ($e instanceof UnexpectedValueException) {
+				throw $e;
+			}
+			return $this->formatError('LLM tool call failed', $e);
+		}
+	}
+
+	/**
 	 * @return array<int, \Message>
 	 */
 	private function buildMessages(string $prompt): array {
@@ -137,6 +207,21 @@ class LlmProvider {
 		}
 
 		$llm->setPresencePenalty((float)$settings['presence_penalty']);
+	}
+
+	/**
+	 * @param \ToolBuilder $toolBuilder
+	 * @param array<string, mixed> $settings
+	 */
+	private function applySettingsToToolBuilder(\ToolBuilder $toolBuilder, array $settings): void {
+		if (isset($settings['temperature']) && is_numeric($settings['temperature'])) {
+			$toolBuilder->setTemperature((float)$settings['temperature']);
+		}
+		if (!isset($settings['max_tokens']) || !is_numeric($settings['max_tokens'])) {
+			return;
+		}
+
+		$toolBuilder->setMaxTokens((int)$settings['max_tokens']);
 	}
 
 	/**

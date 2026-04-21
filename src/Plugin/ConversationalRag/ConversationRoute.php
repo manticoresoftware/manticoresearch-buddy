@@ -11,12 +11,17 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
-final class Intent {
+final class ConversationRoute {
 
-	public const string FOLLOW_UP = 'FOLLOW_UP';
-	public const string REFINE = 'REFINE';
-	public const string EXPAND = 'EXPAND';
+	public const string ANSWER_FROM_HISTORY = 'ANSWER_FROM_HISTORY';
+	public const string SEARCH = 'SEARCH';
 	public const string REJECT = 'REJECT';
-	public const string NEW = 'NEW';
-	public const string UNCLEAR = 'UNCLEAR';
+
+	public function __construct(
+		public string $route,
+		public string $standaloneQuestion,
+		public string $excludeQuery,
+		public string $reason
+	) {
+	}
 }

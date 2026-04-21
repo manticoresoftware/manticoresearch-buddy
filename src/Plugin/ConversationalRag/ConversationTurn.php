@@ -14,14 +14,14 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 final class ConversationTurn {
 
 	/**
-	 * @param string $intent
+	 * @param string $route
 	 * @param array{search_query:string, exclude_query:string} $queries
 	 * @param array<int, string|int> $excludedIds
 	 * @param string $responseText
 	 * @param int $tokensUsed
 	 */
 	public function __construct(
-		public string $intent,
+		public string $route,
 		public array $queries,
 		public array $excludedIds,
 		public string $responseText,

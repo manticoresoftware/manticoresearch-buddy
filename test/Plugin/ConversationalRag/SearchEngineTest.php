@@ -727,6 +727,7 @@ class SearchEngineTest extends TestCase {
 		// Verify search SQL excludes the found ID
 		$searchSql = $sqlQueries[2];
 		$this->assertStringContainsString('id NOT IN (1156395647918669832)', $searchSql);
+		$this->assertStringNotContainsString('AND AND id NOT IN', $searchSql);
 
 		// Verify results don't contain the excluded ID
 		$this->assertCount(2, $result);

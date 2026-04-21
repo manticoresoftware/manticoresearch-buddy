@@ -9,9 +9,17 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationHistory;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationManager;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationMessage;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationRequest;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationRoute;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Handler as RagHandler;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Payload as RagPayload;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchContext;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchEngine;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchServices;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
@@ -617,15 +625,13 @@ class ConversationHandlerTest extends TestCase {
 				$payload, $this->createMockLlmProvider(
 					[
 					[
-						'content' => 'Show me action movies',
-					'success' => true,
-					'metadata' => [],
-					], // generateQueries response
-					[
 					'content' => 'Here are some action movies!',
 					'metadata' => ['tokens_used' => 120],
 					'success' => true,
 					], // generateResponse
+					],
+					[
+						$this->createToolRouteResponse(ConversationRoute::SEARCH, 'Show me action movies', ''),
 					]
 				)
 			);
@@ -765,15 +771,17 @@ class ConversationHandlerTest extends TestCase {
 			$this->createMockLlmProvider(
 				[
 					[
-						'content' => 'What comedy movies are relevant to the current conversation?',
-						'success' => true,
-						'metadata' => [],
-					],
-					[
 						'content' => 'Here are some comedies!',
 						'metadata' => ['tokens_used' => 99],
 						'success' => true,
 					],
+				],
+				[
+					$this->createToolRouteResponse(
+						ConversationRoute::SEARCH,
+						'What comedy movies are relevant to the current conversation?',
+						''
+					),
 				]
 			)
 		);
@@ -836,10 +844,80 @@ class ConversationHandlerTest extends TestCase {
 
 		$this->assertTrue($task->isSucceed());
 		$userInsert = $queries[6];
-		$this->assertStringContainsString("'NEW'", $userInsert);
+		$this->assertStringContainsString("'" . ConversationRoute::SEARCH . "'", $userInsert);
 		$this->assertStringContainsString(
 			"'What comedy movies are relevant to the current conversation?'",
 			$userInsert
+		);
+	}
+
+	public function testAnswerFromHistoryReusesLatestSearchSources(): void {
+		$history = new ConversationHistory(
+			[
+				ConversationMessage::userWithExcludedIds(
+					'Recommend TV shows',
+					ConversationRoute::SEARCH,
+					'What are some good TV shows to watch?',
+					'Breaking Bad',
+					['5696241144904548358']
+				),
+				ConversationMessage::assistant('Breaking Bad is a crime drama.', ConversationRoute::SEARCH),
+				ConversationMessage::user('Which one was the crime drama?', ConversationRoute::ANSWER_FROM_HISTORY),
+			]
+		);
+		$route = new ConversationRoute(ConversationRoute::ANSWER_FROM_HISTORY, '', '', 'History contains answer.');
+		$model = [
+			'id' => '1',
+			'uuid' => 'model-uuid',
+			'name' => 'test_model',
+			'model' => 'openai:gpt-4',
+			'style_prompt' => '',
+			'settings' => ['retrieval_limit' => 5],
+			'created_at' => '',
+			'updated_at' => '',
+		];
+		$context = new SearchContext(
+			new ConversationRequest('Which one was the crime drama?', 'docs', 'model-uuid', 'conv-uuid'),
+			$history,
+			$model,
+			$route
+		);
+
+		$searchEngine = $this->createMock(SearchEngine::class);
+		$searchEngine->expects($this->once())
+			->method('search')
+			->with(
+				'docs',
+				'What are some good TV shows to watch?',
+				['5696241144904548358'],
+				$model,
+				0.8
+			)
+			->willReturn([['id' => 1, 'content' => 'Breaking Bad is a crime drama.']]);
+
+		$reflection = new ReflectionClass(RagHandler::class);
+		$method = $reflection->getMethod('performSearch');
+		$method->setAccessible(true);
+		$result = $method->invoke(
+			null,
+			$context,
+			new SearchServices(
+				$this->createMock(ConversationManager::class),
+				$this->createMock(LlmProvider::class),
+				$searchEngine
+			)
+		);
+
+		$this->assertEquals(
+			[
+				[['id' => 1, 'content' => 'Breaking Bad is a crime drama.']],
+				[
+					'search_query' => 'What are some good TV shows to watch?',
+					'exclude_query' => 'Breaking Bad',
+				],
+				['5696241144904548358'],
+			],
+			$result
 		);
 	}
 
@@ -874,10 +952,11 @@ class ConversationHandlerTest extends TestCase {
 		/**
 		 * Create a mock LLM provider with predefined responses
 		 *
-		 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
-		 * @return LlmProvider
-		 */
-	private function createMockLlmProvider(array $responses): LlmProvider {
+			 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
+			 * @param array<int, array<string, mixed>> $toolResponses Array of LLM tool response arrays
+			 * @return LlmProvider
+			 */
+	private function createMockLlmProvider(array $responses, array $toolResponses = []): LlmProvider {
 		$mockProvider = $this->createMock(LlmProvider::class);
 		$callCount = 0;
 		$callback = function ($_prompt, $_options = []) use (&$responses, &$callCount) {
@@ -891,10 +970,56 @@ class ConversationHandlerTest extends TestCase {
 			$callCount++;
 			return $result;
 		};
+		$toolCallCount = 0;
+		$toolCallback = function ($_prompt, $_tool, $_options = []) use (&$toolResponses, &$toolCallCount) {
+			unset($_prompt, $_tool, $_options);
+			if ($toolCallCount >= sizeof($toolResponses)) {
+				throw new \Exception(
+					'Too many LLM tool calls: expected ' . sizeof($toolResponses) . ', got ' . ($toolCallCount + 1)
+				);
+			}
+			$result = $toolResponses[$toolCallCount];
+			$toolCallCount++;
+			return $result;
+		};
 
 		$mockProvider->method('generateResponse')->willReturnCallback($callback);
+		$mockProvider->method('generateToolCall')->willReturnCallback($toolCallback);
 
 		return $mockProvider;
+	}
+
+	/**
+	 * @return array{success:true, content:string, tool_calls:array<int, mixed>, metadata:array<string, int|string>}
+	 */
+	private function createToolRouteResponse(string $route, string $standaloneQuestion, string $excludeQuery): array {
+		return [
+			'success' => true,
+			'content' => '',
+			'tool_calls' => [
+				[
+					'function' => [
+						'name' => 'route_conversation',
+						'arguments' => json_encode(
+							[
+								'route' => $route,
+								'standalone_question' => $standaloneQuestion,
+								'exclude_query' => $excludeQuery,
+								'reason' => 'test',
+							],
+							JSON_THROW_ON_ERROR
+						),
+					],
+				],
+			],
+			'metadata' => [
+				'tokens_used' => 10,
+				'input_tokens' => 8,
+				'output_tokens' => 2,
+				'response_time_ms' => 1,
+				'finish_reason' => 'tool_calls',
+			],
+		];
 	}
 
 	/**
