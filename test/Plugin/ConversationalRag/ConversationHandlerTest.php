@@ -993,25 +993,24 @@ class ConversationHandlerTest extends TestCase {
 	 * @return array{success:true, content:string, tool_calls:array<int, mixed>, metadata:array<string, int|string>}
 	 */
 	private function createToolRouteResponse(string $route, string $standaloneQuestion, string $excludeQuery): array {
+		$toolCall = $this->createMock(ToolCall::class);
+		$toolCall->method('getArguments')
+			->willReturn(
+				json_encode(
+					[
+						'route' => $route,
+						'standalone_question' => $standaloneQuestion,
+						'exclude_query' => $excludeQuery,
+						'reason' => 'test',
+					],
+					JSON_THROW_ON_ERROR
+				)
+			);
+
 		return [
 			'success' => true,
 			'content' => '',
-			'tool_calls' => [
-				[
-					'function' => [
-						'name' => 'route_conversation',
-						'arguments' => json_encode(
-							[
-								'route' => $route,
-								'standalone_question' => $standaloneQuestion,
-								'exclude_query' => $excludeQuery,
-								'reason' => 'test',
-							],
-							JSON_THROW_ON_ERROR
-						),
-					],
-				],
-			],
+			'tool_calls' => [$toolCall],
 			'metadata' => [
 				'tokens_used' => 10,
 				'input_tokens' => 8,
