@@ -122,6 +122,7 @@ final class Handler extends BaseHandlerWithClient {
 					}, explode(',', $queryVector)
 				),
 			],
+			'size' => ($payload->size ?? 20) + 1,
 		];
 
 		if ($payload->select !== []) {
@@ -139,18 +140,23 @@ final class Handler extends BaseHandlerWithClient {
 			ManticoreSearchResponseError::throw((string)$resp->getError());
 		}
 
-		/** @var array{hits:array{hits:array<array{_id?:int}>}} $result */
+		/** @var array{hits:array{total?:int, hits:array<array{_id?:int}>}} $result */
 		$result = $resp->getResult()->toArray();
 		$docId = (int)$payload->docId;
+		$removed = 0;
 		$hits = [];
 		foreach ($result['hits']['hits'] as $v) {
 			if (isset($v['_id']) && $v['_id'] === $docId) {
+				$removed++;
 				continue;
 			}
 
 			$hits[] = $v;
 		}
 		$result['hits']['hits'] = $hits;
+		if ($removed > 0 && isset($result['hits']['total'])) {
+			$result['hits']['total'] -= $removed;
+		}
 		return Response::fromBody((string)json_encode($result));
 	}
 
@@ -173,14 +179,19 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		$result = $resp->getResult()->toArray();
-		if (is_array($result[0])) {
+		if (is_array($result[0] ?? null) && isset($result[0]['data']) && is_array($result[0]['data'])) {
 			$docId = (int)$payload->docId;
+			$removed = 0;
 			foreach ($result[0]['data'] as $k => $v) {
-				if (!isset($v['id']) || $v['id'] !== $docId) {
+				if (!isset($v['id']) || (int)$v['id'] !== $docId) {
 					continue;
 				}
 
+				$removed++;
 				unset($result[0]['data'][$k]);
+			}
+			if ($removed > 0 && isset($result[0]['total'])) {
+				$result[0]['total'] -= $removed;
 			}
 			$resp = Response::fromBody((string)json_encode($result));
 		}
@@ -216,6 +227,10 @@ final class Handler extends BaseHandlerWithClient {
 			'base_expr' => "($queryVector)",
 			'sub_tree' => false,
 			];
+		}
+
+		if (isset($parsedQuery['LIMIT']['rowcount']) && (int)($parsedQuery['LIMIT']['offset'] ?? 0) === 0) {
+			$parsedQuery['LIMIT']['rowcount'] = (string)((int)$parsedQuery['LIMIT']['rowcount'] + 1);
 		}
 		$payload::$sqlQueryParser::setParsedPayload($parsedQuery);
 	}
