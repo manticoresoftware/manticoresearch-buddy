@@ -1684,8 +1684,9 @@ final class Table {
 		$agents = $this->buildAgentDefinitions($map, $shards, $replicationFactor);
 
 		// Finally generate create table
-		return "CREATE TABLE `{$this->name}`
-			type='distributed' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
+		$structure = $this->structure ? "({$this->structure})" : '';
+		return "CREATE TABLE `{$this->name}` {$structure}
+			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
 			";
 	}
 
@@ -1737,8 +1738,9 @@ final class Table {
 		$agents = $this->buildAgentDefinitions($map, $shards, $replicationFactor);
 
 		// Finally generate create table
-		return "CREATE TABLE `{$this->name}`
-			type='distributed' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
+		$structure = $this->structure ? "({$this->structure})" : '';
+		return "CREATE TABLE `{$this->name}` {$structure}
+			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
 			";
 	}
 
