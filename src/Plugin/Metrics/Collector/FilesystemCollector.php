@@ -83,7 +83,7 @@ final class FilesystemCollector implements CollectorInterface {
 		string $tableName,
 		string $type
 	): ?array {
-		if ($type === 'distributed') {
+		if ($type === 'distributed' || $type === 'shard') {
 			return null;
 		}
 

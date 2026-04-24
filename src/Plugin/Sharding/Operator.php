@@ -145,7 +145,6 @@ final class Operator {
 
 		// Update nodes state and remove inactive once to secure logic
 		$this->state->set('cluster_hash', $clusterHash);
-
 		return $this;
 	}
 
@@ -156,7 +155,30 @@ final class Operator {
 	protected function becomeMaster(): static {
 		Buddy::info('becoming master');
 		$this->state->set('master', $this->node->id);
+		$this->cleanupUncommittedRebalances();
 		return $this;
+	}
+
+	/**
+	 * Purge queue items from rebalances where the master died before committing.
+	 * Detects rebalance_group:* without a matching rebalance_committed:*.
+	 * @return void
+	 */
+	protected function cleanupUncommittedRebalances(): void {
+		$groups = $this->state->listRegex('rebalance_group:.+');
+		foreach ($groups as $row) {
+			[, $name] = explode(':', $row['key']);
+			/** @var string $group */
+			$group = $row['value'];
+			$committed = $this->state->get("rebalance_committed:{$name}");
+			if ($committed === $group) {
+				continue;
+			}
+			Buddy::info("Cleaning up uncommitted rebalance for table {$name}, group {$group}");
+			$this->getQueue()->purgeOperationGroup($group);
+			$this->state->delete("rebalance_group:{$name}");
+			$this->state->set("rebalance:{$name}", 'idle');
+		}
 	}
 
 	/**
@@ -291,17 +313,63 @@ final class Operator {
 		Buddy::debugvv("Sharding: table status of {$table}: queue size: {$queueSize}, processed: {$processed}");
 
 		$isProcessed = $processed === $queueSize;
-		// Update the state
+	// Update the state when all queue items are processed
 		if ($isProcessed) {
 			$result['status'] = 'done';
+
+			// Set the result field that CreateHandler waits for
+			// - In DEBUG mode: return actual SHOW CREATE TABLE response for debugging
+			// - In production: return empty success response
 			$result['result'] = ConfigManager::getInt('DEBUG') && $result['type'] === 'create'
 			? $this->client->sendRequest("SHOW CREATE TABLE {$table} OPTION force=1")->getBody()
 			: TaskResult::none()->toString();
+
+			Buddy::debugvv("Sharding: table {$table} completed, setting result: " . substr($result['result'], 0, 100));
 			$this->state->set($stateKey, $result);
 		}
 
 		return $isProcessed;
 	}
+
+	/**
+	 * Check if queued rebalance operations have completed and log when done
+	 * @return static
+	 */
+	public function checkRebalanceStatus(): static {
+		$list = $this->state->listRegex('rebalance_queue_ids:.+');
+		foreach ($list as $row) {
+			[, $name] = explode(':', $row['key']);
+			/** @var array<string,int> $nodeTailIds */
+			$nodeTailIds = $row['value'];
+			if (!is_array($nodeTailIds)) {
+				continue;
+			}
+
+			foreach ($nodeTailIds as $node => $queueId) {
+				$queueRow = $this->getQueue()->getById($queueId);
+				if (!$queueRow || $queueRow['status'] === 'created' || $queueRow['status'] === 'processing') {
+					continue 2;
+				}
+				if ($queueRow['status'] !== 'processed') {
+					$this->state->delete("rebalance_queue_ids:{$name}");
+					$this->state->delete("rebalance_committed:{$name}");
+					$this->state->delete("rebalance_group:{$name}");
+					$this->state->set("rebalance:{$name}", 'idle');
+					$qStatus = $queueRow['status'];
+					Buddy::info("Rebalancing failed for table {$name}: node {$node} id {$queueId} status {$qStatus}");
+					continue 2;
+				}
+			}
+
+			$this->state->delete("rebalance_queue_ids:{$name}");
+			$this->state->delete("rebalance_committed:{$name}");
+			$this->state->delete("rebalance_group:{$name}");
+			$this->state->set("rebalance:{$name}", 'completed');
+			Buddy::info("Rebalancing completed for table {$name}");
+		}
+		return $this;
+	}
+
 	/**
 	 * Wrapper around process queue with current node
 	 * @return static

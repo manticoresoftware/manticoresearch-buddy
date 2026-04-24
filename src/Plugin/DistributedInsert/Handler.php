@@ -253,7 +253,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 		}
 
 		/** @var array<mixed> */
-		return TaskResult::none()->getStruct();
+		return TaskResult::withTotal(sizeof($positions))->getStruct();
 	}
 
 	/**
@@ -409,6 +409,14 @@ final class Handler extends BaseHandlerWithFlagCache {
 	 * @return Map<string,string>
 	 */
 	protected function getTableClusterMap(array $tables): Map {
+		$cacheKey = 'cluster_map:' . implode(',', $tables);
+		$cache = $this->manticoreClient->getMetaCache();
+		/** @var Map<string,string>|null $cached */
+		$cached = $cache->get($cacheKey);
+		if ($cached !== null) {
+			return $cached;
+		}
+
 		$tablesStr = "'" . implode("','", $tables) . "'";
 		$query = "
 		SELECT node, table, shards
@@ -453,6 +461,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 			$map[$shard] = Table::getClusterName($nodes);
 		}
 
+		$cache->set($cacheKey, $map);
 		return $map;
 	}
 }

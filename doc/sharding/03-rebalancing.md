@@ -1,509 +1,232 @@
 # Rebalancing Logic and Algorithms
 
-The rebalancing system is the core of the Manticore Buddy Sharding implementation, handling both node failures and new node additions with sophisticated algorithms tailored to different replication factors.
+The rebalancing system handles both node failures and new node additions with algorithms tailored to different replication factors.
 
 ## Rebalancing Overview
 
-### Main Rebalancing Entry Point
+### Main Entry Point
 
-The enhanced rebalancing logic differentiates between different scenarios and routes them to appropriate handlers:
+The `rebalance()` method differentiates scenarios and routes to appropriate handlers. All queue items are tagged with an `$operationGroup` and gated by a commit flag — nodes only process items after the master finishes queuing ALL of them.
 
 ```php
 public function rebalance(Queue $queue): void {
-    try {
-        // Create state instance for tracking rebalancing operations
-        $state = new State($this->client);
+    $operationGroup = "rebalance_{$this->name}_" . time();
+    $state = $this->state;
 
-        // Prevent concurrent rebalancing operations
-        $rebalanceKey = "rebalance:{$this->name}";
-        $currentRebalance = $state->get($rebalanceKey);
-
-        if ($currentRebalance === 'running') {
-            Buddy::debugvv("Sharding rebalance: operation already running for table {$this->name}, skipping");
-            return;
-        }
-
-        // Mark rebalancing as running
-        $state->set($rebalanceKey, 'running');
-
-        $schema = $this->getShardSchema();
-        $allNodes = $this->cluster->getNodes();
-        $inactiveNodes = $this->cluster->getInactiveNodes();
-        $activeNodes = $allNodes->diff($inactiveNodes);
-
-        // Detect new nodes (not in current schema)
-        $schemaNodes = new Set($schema->map(fn($row) => $row['node']));
-        $newNodes = $activeNodes->diff($schemaNodes);
-
-        // Handle different rebalancing scenarios
-        if ($inactiveNodes->count() > 0) {
-            // Existing logic: handle failed nodes
-            $newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
-            $this->handleFailedNodesRebalance($queue, $schema, $newSchema, $inactiveNodes);
-        } elseif ($newNodes->count() > 0) {
-            // New logic: handle new nodes
-            $replicationFactor = $this->getReplicationFactor($schema);
-            $newSchema = Util::rebalanceWithNewNodes($schema, $newNodes, $replicationFactor);
-            $this->handleNewNodesRebalance($queue, $schema, $newSchema, $newNodes);
-        } else {
-            // No changes needed
-            $state->set($rebalanceKey, 'idle');
-            return;
-        }
-
-        // Mark rebalancing as completed
-        $state->set($rebalanceKey, 'completed');
-    } catch (\Throwable $t) {
-        // Mark rebalancing as failed and reset state
-        $state = new State($this->client);
-        $rebalanceKey = "rebalance:{$this->name}";
-        $state->set($rebalanceKey, 'failed');
-        throw $t;
+    // Prevent concurrent rebalancing
+    $rebalanceKey = "rebalance:{$this->name}";
+    if ($state->get($rebalanceKey) === 'running' || $state->get($rebalanceKey) === 'queued') {
+        return;
     }
+
+    $state->set($rebalanceKey, 'running');
+    $state->set("rebalance_group:{$this->name}", $operationGroup);
+
+    // ... detect inactive/new nodes, route to handler ...
+
+    // After ALL queue items are added — set commit flag
+    $state->set("rebalance_committed:{$this->name}", $operationGroup);
+    $state->set($rebalanceKey, 'queued');
+    $state->set("rebalance_queue_ids:{$this->name}", $lastQueueId);
 }
 ```
 
-## Scenario Detection Logic
+If master dies before setting `rebalance_committed`, the new master detects the uncommitted group via `cleanupUncommittedRebalances()` and purges orphaned items.
+
+## Scenario Detection
 
 The system differentiates between three scenarios:
 
-1. **Failed Nodes**: Nodes that were in the schema but are now inactive
-2. **New Nodes**: Nodes that are active but not in the current schema
-3. **Stable State**: No changes needed
+1. **Failed Nodes**: Nodes in schema but now inactive — redistributes orphaned shards
+2. **New Nodes**: Active nodes not in schema — adds replicas or redistributes
+3. **Partial State**: Inactive + new nodes simultaneously — skips rebalancing, waits for recovery
+4. **Stable State**: No changes needed
 
-```php
-// Current schema nodes
-$schemaNodes = new Set($schema->map(fn($row) => $row['node']));
+Additional guards:
+- RF=1 with inactive nodes: skips (data unrecoverable)
+- Active nodes < RF: skips (can't maintain replication factor)
 
-// All active nodes in cluster
-$activeNodes = $allNodes->diff($inactiveNodes);
+## Failed Node Rebalancing
 
-// New nodes = active nodes not in schema
-$newNodes = $activeNodes->diff($schemaNodes);
-
-// Failed nodes = schema nodes that are inactive
-$failedNodes = $inactiveNodes->intersect($schemaNodes);
-```
-
-## Failed Node Rebalancing (Existing Logic)
-
-### Process Overview
-
-When nodes fail, the system redistributes orphaned shards to remaining active nodes:
+Redistributes orphaned shards to remaining active nodes. All calls pass `$operationGroup`.
 
 ```php
 protected function handleFailedNodesRebalance(
-    Queue $queue,
-    Vector $schema,
-    Vector $newSchema,
-    Set $inactiveNodes
-): void {
-    // Initialize cluster map and shard nodes mapping
+    Queue $queue, Vector $schema, Vector $newSchema,
+    Set $inactiveNodes, string $operationGroup = ''
+): array {
     $initData = $this->initializeClusterMap($schema, $inactiveNodes);
-    $shardNodesMap = $initData['shardNodesMap'];
-    $clusterMap = $initData['clusterMap'];
 
     $affectedSchema = $schema->filter(
         fn ($row) => $inactiveNodes->contains($row['node'])
     );
 
-    // Process affected shards for rebalancing
-    $this->processAffectedShards($queue, $affectedSchema, $newSchema, $shardNodesMap, $clusterMap);
-
-    // Update schema in database FIRST, then create distributed tables
-    $this->updateScheme($newSchema);
-    $this->createDistributedTablesFromSchema($queue, $newSchema);
-}
-```
-
-### Cluster Map Initialization
-
-```php
-private function initializeClusterMap(Vector $schema, Set $inactiveNodes): array {
-    /** @var Map<string,Cluster> */
-    $clusterMap = new Map;
-
-    // Detect shard to nodes map with alive schema
-    $shardNodesMap = $this->getShardNodesMap(
-        $schema->filter(
-            fn ($row) => !$inactiveNodes->contains($row['node'])
-        )
+    $this->processAffectedShards(
+        $queue, $affectedSchema, $newSchema,
+        $initData['shardNodesMap'], $initData['clusterMap'], $operationGroup
     );
 
-    // Preload current cluster map with configuration
-    foreach ($shardNodesMap as $connections) {
-        $clusterName = static::getClusterName($connections);
-        $connections->sort();
-        $node = $connections->first();
-        $cluster = new Cluster($this->client, $clusterName, $node);
-        $clusterMap[$clusterName] = $cluster;
-    }
-
-    return ['shardNodesMap' => $shardNodesMap, 'clusterMap' => $clusterMap];
+    $this->updateScheme($newSchema);
+    return $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
 }
 ```
 
-## New Node Rebalancing (Enhanced Logic)
+## New Node Rebalancing
 
 ### Strategy Selection
 
-The system routes new node handling based on replication factor:
+Routes based on replication factor:
 
 ```php
-protected function handleNewNodesRebalance(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): void {
+protected function handleNewNodesRebalance(
+    Queue $queue, Vector $schema, Vector $newSchema,
+    Set $newNodes, string $operationGroup = ''
+): array {
     $replicationFactor = $this->getReplicationFactor($schema);
 
     if ($replicationFactor === 1) {
-        $this->handleRF1NewNodes($queue, $schema, $newSchema, $newNodes);
-    } else {
-        $this->handleRFNNewNodes($queue, $schema, $newSchema, $newNodes);
+        return $this->handleRF1NewNodes($queue, $schema, $newSchema, $newNodes, $operationGroup);
     }
+    return $this->handleRFNNewNodes($queue, $schema, $newSchema, $newNodes, $operationGroup);
 }
 ```
 
-### RF=1 New Node Handling (Complex Case)
+### RF=1: Shard Movement via Intermediate Clusters
 
-For RF=1, shards must be **moved** from existing nodes to new nodes using intermediate clusters:
+For RF=1, shards must be **moved** (not copied) using temporary clusters:
 
 ```php
-protected function handleRF1NewNodes(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): void {
-    // Calculate which shards need to move
+protected function handleRF1NewNodes(..., string $operationGroup = ''): array {
     $shardsToMove = $this->calculateShardsToMove($schema, $newSchema, $newNodes);
 
-    // Track the last queue ID from shard movements
     $lastMoveQueueId = 0;
     foreach ($shardsToMove as $shardId => $moveInfo) {
         $lastMoveQueueId = $this->moveShardWithIntermediateCluster(
-            $queue,
-            $shardId,
-            $moveInfo['from'],
-            $moveInfo['to']
+            $queue, $shardId, $moveInfo['from'], $moveInfo['to']
         );
     }
 
-    // Update schema ONLY AFTER all shard movements complete
     if ($lastMoveQueueId > 0) {
         $queue->setWaitForId($lastMoveQueueId);
     }
 
     $this->updateScheme($newSchema);
-    $this->createDistributedTablesFromSchema($queue, $newSchema);
-
-    // Reset wait for id
+    $nodeTailIds = $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
     $queue->resetWaitForId();
+    return $nodeTailIds;
 }
 ```
 
-### Shard Movement Calculation
+### RF>=2: Balanced Replica Addition
+
+For RF>=2, new nodes receive replicas. All `queue->add()` calls include `$operationGroup`:
 
 ```php
-protected function calculateShardsToMove(Vector $oldSchema, Vector $newSchema, Set $newNodes): array {
-    $moves = [];
-
-    foreach ($newSchema as $row) {
-        if (!$newNodes->contains($row['node'])) {
-            continue;
-        }
-
-        // This is a new node, find shards assigned to it
-        foreach ($row['shards'] as $shard) {
-            // Find where this shard was in the old schema
-            $oldOwner = $this->findShardOwner($oldSchema, $shard);
-
-            if (!$oldOwner) {
-                continue;
-            }
-
-            $moves[$shard] = ['from' => $oldOwner, 'to' => $row['node']];
-        }
-    }
-
-    return $moves;
-}
-```
-
-### RF>=2 New Node Handling (Simpler Case)
-
-For RF>=2, new nodes can receive replicas without moving existing data:
-
-```php
-protected function handleRFNNewNodes(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): void {
-    /** @var Map<string,Cluster> */
+protected function handleRFNNewNodes(..., string $operationGroup = ''): array {
     $clusterMap = new Map;
+    $lastQueueId = 0;
 
-    // For RF>=2, add new nodes as replicas to existing shards
     foreach ($newNodes as $newNode) {
-        // Find shards that should be replicated to this new node
         $shardsForNewNode = $this->getShardsForNewNode($newSchema, $newNode);
 
         foreach ($shardsForNewNode as $shard) {
-            // Create shard table on new node
-            $queue->add($newNode, $this->getCreateTableShardSQL($shard));
+            $shardName = $this->getShardName($shard);
+            $rollback = "DROP TABLE IF EXISTS {$shardName}";
+            $lastQueueId = $queue->add(
+                $newNode, $this->getCreateTableShardSQL($shard), $rollback, $operationGroup
+            );
 
             // Set up replication from existing nodes
-            $existingNodes = $this->getExistingNodesForShard($schema, $shard);
-            if ($existingNodes->count() <= 0) {
-                continue;
-            }
-
-            $connectedNodes = $existingNodes->merge(new Set([$newNode]));
-            $existingNodes->sort();
-            $primaryNode = $existingNodes->first();
-
             $clusterMap = $this->handleReplication(
-                $primaryNode,
-                $queue,
-                $connectedNodes,
-                $clusterMap,
-                $shard
+                $primaryNode, $queue, $connectedNodes, $clusterMap, $shard, $operationGroup
             );
         }
     }
 
-    // Update schema in database FIRST, then create distributed tables
+    foreach ($clusterMap as $cluster) {
+        $cluster->processPendingTables($queue, $operationGroup);
+    }
+
+    // Defer schema update until all queue operations complete
+    if ($lastQueueId > 0) {
+        $queue->setWaitForId($lastQueueId);
+    }
     $this->updateScheme($newSchema);
-    $this->createDistributedTablesFromSchema($queue, $newSchema);
+    $nodeTailIds = $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
+    $queue->resetWaitForId();
+    return $nodeTailIds;
 }
 ```
 
-## Util Algorithm Enhancements
+## Util Algorithms
 
-### New Node Rebalancing Algorithm
+### `rebalanceWithNewNodes()` — RF-Respecting Schema Calculation
+
+For RF>=2, recalculates a fully balanced schema across all nodes using the same assignment algorithm as initial creation. This ensures the original RF is maintained.
 
 ```php
-public static function rebalanceWithNewNodes(Vector $schema, Set $newNodes, int $replicationFactor): Vector {
+public static function rebalanceWithNewNodes(
+    Vector $schema, Set $newNodes, int $replicationFactor
+): Vector {
     if (!$newNodes->count()) {
         return $schema;
     }
 
-    // Add new nodes to schema with empty shards
     $newSchema = self::addNodesToSchema($schema, $newNodes);
 
     if ($replicationFactor === 1) {
-        // For RF=1, we need to move shards to achieve better distribution
         return self::redistributeShardsForRF1($newSchema, $newNodes);
     }
 
-    // For RF>=2, we can add replicas to new nodes
-    return self::addReplicasToNewNodes($newSchema, $newNodes);
-}
-```
-
-### RF=1 Redistribution Algorithm
-
-```php
-private static function redistributeShardsForRF1(Vector $schema, Set $newNodes): Vector {
-    // Copy existing nodes as-is initially
-    $newSchema = self::copyExistingNodesForRF1($schema, $newNodes);
-
-    // Calculate how many shards each new node should get for balanced distribution
-    $targetShardsPerNode = self::calculateTargetShardsPerNode($newSchema, $newNodes);
-
-    // Add new nodes and determine which shards to move to them
-    foreach ($newNodes as $newNode) {
-        $shardsToMove = max(1, $targetShardsPerNode);
-        $shardsForNewNode = self::moveShardsToNewNode($newSchema, $shardsToMove);
-
-        // Add the new node with its target shards
-        $newSchema[] = [
-            'node' => $newNode,
-            'shards' => $shardsForNewNode,
-            'connections' => new Set([$newNode]),
-        ];
+    // For RF>=2, recalculate balanced schema respecting the RF
+    $allNodes = new Set($newSchema->map(fn($row) => $row['node']));
+    $allNodes->sort();
+    $totalShards = self::getTotalUniqueShards($schema);
+    if ($totalShards > 0) {
+        $balancedSchema = self::initializeSchema($allNodes);
+        $nodeMap = self::initializeNodeMap($allNodes->count());
+        return self::assignNodesToSchema(
+            $balancedSchema, $nodeMap, $allNodes, $totalShards, $replicationFactor
+        );
     }
 
     return $newSchema;
 }
 ```
 
-### Shard Movement Logic
+### `rebalanceShardingScheme()` — Failed Node Redistribution
 
-```php
-private static function moveShardsToNewNode(Vector $newSchema, int $shardsToMove): Set {
-    $shardsForNewNode = new Set();
-
-    for ($i = 0; $i < $shardsToMove; $i++) {
-        $loadedNodeInfo = self::findMostLoadedNode($newSchema);
-        $sourceNodeIndex = $loadedNodeInfo['index'];
-        $maxShards = $loadedNodeInfo['maxShards'];
-
-        // If we found a source node with shards, mark one for movement
-        if ($sourceNodeIndex < 0 || $maxShards <= 0) {
-            break;
-        }
-
-        // Take one shard from the most loaded node
-        $sourceRow = $newSchema[$sourceNodeIndex];
-        if ($sourceRow === null) {
-            break;
-        }
-        $shardToMove = $sourceRow['shards']->first();
-
-        // For RF=1, remove the shard from source node immediately
-        $sourceRow['shards']->remove($shardToMove);
-        $newSchema[$sourceNodeIndex] = $sourceRow;
-        $shardsForNewNode->add($shardToMove);
-    }
-
-    return $shardsForNewNode;
-}
-```
-
-### RF>=2 Replica Addition Algorithm
-
-```php
-private static function addReplicasToNewNodes(Vector $schema, Set $newNodes): Vector {
-    // Collect all existing shards
-    $allShards = self::collectExistingShards($schema, $newNodes);
-
-    // For RF>=2, add all shards to new nodes for load balancing
-    $schema = self::assignShardsToNewNodes($schema, $newNodes, $allShards);
-
-    // Update connections for all nodes to include all nodes that have each shard
-    return self::updateShardConnections($schema, $allShards);
-}
-```
+Redistributes shards from inactive nodes to active ones. For RF>1 with new nodes, uses the same balanced assignment. For RF=1, returns schema as-is (data unrecoverable).
 
 ## Distributed Table Creation
 
-### Schema-Aware Creation
-
-The system creates distributed tables based on the calculated schema:
+All operations tagged with `$operationGroup`:
 
 ```php
-protected function createDistributedTablesFromSchema(Queue $queue, Vector $newSchema): void {
-    /** @var Set<int> */
-    $dropQueueIds = new Set;
-
-    // First, drop all distributed tables with proper force option
+protected function createDistributedTablesFromSchema(
+    Queue $queue, Vector $newSchema, string $operationGroup = ''
+): array {
+    // Drop all distributed tables
     foreach ($newSchema as $row) {
         $sql = "DROP TABLE IF EXISTS {$this->name} OPTION force=1";
-        $queueId = $queue->add($row['node'], $sql);
-        $dropQueueIds->add($queueId);
+        $queue->add($row['node'], $sql, '', $operationGroup);
     }
 
-    // Then create new distributed tables, waiting for all drops to complete
-    $lastDropId = $dropQueueIds->count() > 0 ? max($dropQueueIds->toArray()) : 0;
-
+    // Create new distributed tables (waiting for drops)
     foreach ($newSchema as $row) {
-        // Do nothing when no shards present for this node
-        if (!$row['shards']->count()) {
-            continue;
-        }
-
-        // Wait for all DROP operations to complete before creating new tables
-        if ($lastDropId > 0) {
-            $queue->setWaitForId($lastDropId);
-        }
-
-        // Pass the calculated schema to avoid database timing issues
         $sql = $this->getCreateShardedTableSQLWithSchema($row['shards'], $newSchema);
-        $queue->add($row['node'], $sql);
-    }
-
-    // Reset wait for id
-    $queue->resetWaitForId();
-}
-```
-
-### RF-Aware Agent Configuration
-
-```php
-private function buildAgentDefinitions(Map $map, Set $shards, int $replicationFactor): Set {
-    $agents = new Set;
-    $currentNodeId = Node::findId($this->client);
-
-    foreach ($map as $shard => $nodeConnections) {
-        if ($replicationFactor === 1) {
-            // RF=1: Create agents for shards that DON'T exist locally (remote shards)
-            if ($shards->contains($shard)) {
-                continue;
-            }
-        } else {
-            // RF>=2: Create agents for shards that DO exist locally (replicated shards)
-            if (!$shards->contains($shard)) {
-                continue;
-            }
-        }
-
-        // Filter out the current node from agents (don't point to yourself)
-        $remoteConnections = $nodeConnections->filter(
-            fn($connection) => !str_starts_with($connection, $currentNodeId . ':')
-        );
-
-        if ($remoteConnections->count() <= 0) {
-            continue;
-        }
-
-        $agents->add("agent='{$remoteConnections->join('|')}'");
-    }
-
-    return $agents;
-}
-```
-
-## Load Balancing Algorithms
-
-### Target Shard Calculation
-
-```php
-private static function calculateTargetShardsPerNode(Vector $newSchema, Set $newNodes): int {
-    $totalShards = 0;
-    foreach ($newSchema as $row) {
-        $totalShards += $row['shards']->count();
-    }
-    $totalNodes = $newSchema->count() + $newNodes->count();
-    return $totalNodes > 0 ? (int)floor($totalShards / $totalNodes) : 0;
-}
-```
-
-### Most Loaded Node Detection
-
-```php
-private static function findMostLoadedNode(Vector $newSchema): array {
-    $maxShards = 0;
-    $sourceNodeIndex = -1;
-
-    foreach ($newSchema as $index => $existingRow) {
-        if ($existingRow['shards']->count() <= $maxShards) {
-            continue;
-        }
-
-        $maxShards = $existingRow['shards']->count();
-        $sourceNodeIndex = $index;
-    }
-
-    return ['index' => $sourceNodeIndex, 'maxShards' => $maxShards];
-}
-```
-
-## Edge Case Handling
-
-### More Nodes Than Shards
-
-```php
-// Some nodes will have shards, others won't (since we only have limited shards)
-$nodesWithShards = 0;
-$nodesWithoutShards = 0;
-
-foreach ($newSchema as $row) {
-    if ($row['shards']->count() > 0) {
-        $nodesWithShards++;
-        // No node should have more than 1 shard when nodes > shards
-        $this->assertLessThanOrEqual(1, $row['shards']->count());
-    } else {
-        $nodesWithoutShards++;
+        $queue->add($row['node'], $sql, "DROP TABLE IF EXISTS {$this->name}", $operationGroup);
     }
 }
 ```
 
-### Empty Schema Handling
+## Commit Flag Mechanism
 
-```php
-if ($schema->count() === 0) {
-    // All nodes are new - handle initial sharding
-    return $this->handleInitialSharding($newNodes, $replicationFactor);
-}
-```
+The commit flag prevents partial rebalance execution when master dies mid-queuing:
 
-This comprehensive rebalancing system ensures proper shard distribution while maintaining data safety and system availability across all supported replication factors and edge cases.
+1. Master sets `rebalance_group:{table}` = group ID
+2. Master queues ALL items with that group ID
+3. Master sets `rebalance_committed:{table}` = group ID (commit flag)
+4. Nodes process items only when `isGroupCommitted()` returns true
+5. On completion, `checkRebalanceStatus()` cleans up committed/group state
+6. On master death, new master calls `cleanupUncommittedRebalances()` → purges orphaned items

@@ -4,7 +4,71 @@ This comprehensive troubleshooting guide covers common issues, diagnostic proced
 
 ## Common Issues
 
-### 1. Rebalancing Stuck in 'running' State
+### 1. ALTER CLUSTER ADD TABLE Timeout Issues
+
+**Symptoms:**
+- `ALTER CLUSTER ADD TABLE` commands fail with timeout errors
+- Large tables appear to fail but are actually synchronizing
+- Queue shows repeated failures for cluster table additions
+- Tables eventually appear in cluster despite error messages
+
+**Root Cause:**
+`ALTER CLUSTER ADD TABLE` commands are blocking operations that can take significant time for large tables. The command may timeout at the client level while table synchronization continues in the background.
+
+**Diagnosis:**
+```bash
+# Check if query is still running
+mysql -h127.0.0.1 -P9306 -e "SHOW QUERIES"
+
+# Check cluster status to see if tables are being synchronized
+mysql -h127.0.0.1 -P9306 -e "SHOW CLUSTERS"
+
+# Check queue status for repeated failures
+mysql -h127.0.0.1 -P9306 -e "SELECT * FROM system.sharding_queue WHERE query LIKE '%ALTER CLUSTER%ADD%' ORDER BY created_at DESC LIMIT 10"
+```
+
+**Expected Behavior with New Verification System:**
+The system now automatically handles these scenarios:
+
+1. **Query Still Running**: If `SHOW QUERIES` shows the command is still executing, the system will retry later
+2. **Query Completed**: If query is no longer running, system checks `SHOW CLUSTERS` to verify table synchronization
+3. **Successful Verification**: If tables are found in cluster, command is marked as successful despite timeout error
+4. **Failed Verification**: If tables are not in cluster, command is marked as failed for genuine issues
+
+**Monitoring Logs:**
+```bash
+# Look for verification messages in logs
+tail -f /var/log/buddy.log | grep -E "(ALTER CLUSTER|still running|verifying cluster|Tables verified)"
+
+# Expected log messages:
+# [DEBUG] ALTER CLUSTER ADD TABLE still running, will retry later
+# [DEBUG] ALTER CLUSTER ADD TABLE no longer running, verifying cluster status
+# [DEBUG] Tables verified in cluster, marking as processed
+```
+
+**Manual Verification:**
+```sql
+-- Check if specific tables are in cluster
+SHOW CLUSTERS;
+
+-- Verify table accessibility through cluster
+SELECT * FROM cluster_name:table_name LIMIT 1;
+
+-- Check queue status for the operation
+SELECT id, query, status, tries, created_at, updated_at
+FROM system.sharding_queue
+WHERE query LIKE '%ALTER CLUSTER%ADD%table_name%'
+ORDER BY created_at DESC;
+```
+
+**Resolution:**
+No manual intervention required with the new system. The verification mechanism will:
+- Automatically detect ongoing synchronization
+- Verify successful completion via cluster status
+- Mark operations as successful when tables are properly synchronized
+- Only report genuine failures when tables are not synchronized
+
+### 2. Rebalancing Stuck in 'running' State
 
 **Symptoms:**
 - Status shows 'running' but no progress for extended time (>30 minutes)
@@ -295,7 +359,53 @@ function removeDuplicateShards(array $extraShards): void {
 $table->createDistributedTablesFromSchema($queue, $schema);
 ```
 
-### 5. Queue Commands Failing
+### 5. Queue Items Stuck Due to Uncommitted Operation Group
+
+**Symptoms:**
+- Queue has pending items but they are never executed
+- Items all belong to the same `operation_group`
+- Rebalancing state shows `running` but nothing progresses
+- Typically occurs after a master node failure during rebalance queuing
+
+**Root Cause:**
+The master node died after inserting queue items but before setting the `rebalance_committed:{table}` state key. The commit flag gate in `shouldSkipQuery()` prevents execution of any items whose operation group has not been committed.
+
+**Diagnosis:**
+```sql
+-- Check for pending items with an operation_group
+SELECT id, node, query, operation_group, status
+FROM system.sharding_queue
+WHERE status = 'pending' AND operation_group != ''
+ORDER BY created_at ASC LIMIT 20;
+
+-- Check if the committed flag exists for the table
+-- (replace {table} with the actual table name)
+SELECT * FROM system.sharding_state WHERE key = 'rebalance_committed:{table}';
+
+-- Check if the group key exists
+SELECT * FROM system.sharding_state WHERE key = 'rebalance_group:{table}';
+```
+
+If `rebalance_group:{table}` exists but `rebalance_committed:{table}` does not, the group is orphaned.
+
+**Resolution:**
+
+1. **Wait for automatic cleanup**: When a new master is elected, `becomeMaster()` calls `cleanupUncommittedRebalances()`, which detects uncommitted groups and purges their queue items. The next rebalance cycle will re-queue everything correctly.
+
+2. **Manual resolution** (if automatic cleanup hasn't triggered):
+```sql
+-- Option A: Manually set the committed flag to unblock execution
+-- (only if you are confident all items were fully queued)
+REPLACE INTO system.sharding_state (key, value) VALUES ('rebalance_committed:{table}', '1');
+
+-- Option B: Purge the orphaned items and reset state
+DELETE FROM system.sharding_queue WHERE operation_group = '{group_id}';
+DELETE FROM system.sharding_state WHERE key = 'rebalance_group:{table}';
+REPLACE INTO system.sharding_state (key, value) VALUES ('rebalance:{table}', '"failed"');
+-- The next rebalance cycle will start fresh
+```
+
+### 6. Queue Commands Failing
 
 **Symptoms:**
 - Queue depth keeps growing
@@ -367,7 +477,7 @@ SHOW STATUS LIKE 'cluster_%';
 -- Ensure nodes can create/modify clusters
 ```
 
-### 6. Performance Issues During Rebalancing
+### 7. Performance Issues During Rebalancing
 
 **Symptoms:**
 - Rebalancing takes extremely long time
