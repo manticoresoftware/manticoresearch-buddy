@@ -62,7 +62,7 @@ final class QueueRollbackIntegrationTest extends TestCase {
 			$this->assertEquals('shard_create_test', $command['operation_group']);
 
 			// Verify rollback patterns
-			if (str_contains($command['query'], 'CREATE TABLE') && !str_contains($command['query'], 'distributed')) {
+			if (str_contains($command['query'], 'CREATE TABLE') && !str_contains($command['query'], 'shard')) {
 				$this->assertStringContainsString('DROP TABLE IF EXISTS', $command['rollback_query']);
 			} elseif (str_contains($command['query'], 'CREATE CLUSTER')) {
 				$this->assertStringContainsString('DELETE CLUSTER', $command['rollback_query']);

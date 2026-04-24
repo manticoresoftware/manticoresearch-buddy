@@ -41,7 +41,7 @@ final class RebalanceCommitFlagTest extends TestCase {
 		$this->queue->add('node1', $drop, '', $group);
 		$this->queue->add('node2', $create, $drop, $group);
 		$this->queue->add('node1', $dropDist, '', $group);
-		$distCreate = "CREATE TABLE t type='distributed' local='system.t_s0'";
+		$distCreate = "CREATE TABLE t type='shard' local='system.t_s0'";
 		$this->queue->add('node1', $distCreate, 'DROP TABLE IF EXISTS t', $group);
 
 		$commands = $this->queue->getCapturedCommands();
@@ -91,7 +91,7 @@ final class RebalanceCommitFlagTest extends TestCase {
 		$drop = 'DROP TABLE IF EXISTS system.t_s0';
 		$this->queue->add('node2', $create, $drop, $group);
 		$this->queue->add('node1', 'ALTER CLUSTER abc ADD system.t_s0', 'ALTER CLUSTER abc DROP system.t_s0', $group);
-		$distCreate = "CREATE TABLE t type='distributed' local='system.t_s0'";
+		$distCreate = "CREATE TABLE t type='shard' local='system.t_s0'";
 		$this->queue->add('node1', $distCreate, 'DROP TABLE IF EXISTS t', $group);
 
 		$commands = $this->queue->getCapturedCommands();
@@ -171,7 +171,7 @@ final class RebalanceCommitFlagTest extends TestCase {
 		$newQueue->add('node1', 'ALTER CLUSTER abc DROP system.t_s0', '', $newGroup);
 		$newQueue->add('node1', $drop, '', $newGroup);
 		$newQueue->add('node2', $create, $drop, $newGroup);
-		$dist = "CREATE TABLE t type='distributed'";
+		$dist = "CREATE TABLE t type='shard'";
 		$newQueue->add('node1', $dist, 'DROP TABLE IF EXISTS t', $newGroup);
 		$newQueue->add('node2', $dist, 'DROP TABLE IF EXISTS t', $newGroup);
 

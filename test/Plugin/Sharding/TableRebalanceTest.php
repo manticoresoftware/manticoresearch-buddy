@@ -394,7 +394,7 @@ class TableRebalanceTest extends TestCase {
 						$queue->add($firstActiveNode, 'DROP TABLE test_table', '');
 						$queue->add(
 							$firstActiveNode,
-							"CREATE TABLE test_table type='distributed' " .
+							"CREATE TABLE test_table type='shard' " .
 							"local='test_table_s0,test_table_s1' " .
 							"agent='node2:test_table_s2,test_table_s3'",
 							''
@@ -413,7 +413,7 @@ class TableRebalanceTest extends TestCase {
 					$queue->add('node1', 'DROP TABLE test_table', '');
 					$queue->add(
 						'node1',
-						"CREATE TABLE test_table type='distributed' local='test_table_s0' " .
+						"CREATE TABLE test_table type='shard' local='test_table_s0' " .
 						"agent='node2:test_table_s0'",
 						''
 					);

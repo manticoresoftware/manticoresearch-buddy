@@ -95,7 +95,7 @@ final class DropHandler extends BaseHandlerWithClient {
 			);
 		}
 
-		if (false === stripos($result[0]['data'][0]['Create Table'], "type='distributed'")) {
+		if (false === stripos($result[0]['data'][0]['Create Table'], "type='shard'")) {
 			return $this->getErrorTask(
 				"table '{$this->payload->table}' is not sharded: "
 					. 'DROP SHARDED TABLE failed: '

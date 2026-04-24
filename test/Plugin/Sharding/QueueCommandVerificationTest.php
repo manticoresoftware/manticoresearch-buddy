@@ -216,7 +216,7 @@ class QueueCommandVerificationTest extends TestCase {
 				$queue->add('127.0.0.1:1312', 'DROP TABLE test_table', '');
 				$queue->add(
 					'127.0.0.1:1312',
-					"CREATE TABLE test_table type='distributed' local='test_table_s1' " .
+					"CREATE TABLE test_table type='shard' local='test_table_s1' " .
 					"agent='127.0.0.1:3312:test_table_s0'",
 					''
 				);
@@ -237,7 +237,7 @@ class QueueCommandVerificationTest extends TestCase {
 				$queue->add('node1', 'DROP TABLE test_table', '');
 				$queue->add(
 					'node1',
-					"CREATE TABLE test_table type='distributed' local='test_table_s0,test_table_s1' " .
+					"CREATE TABLE test_table type='shard' local='test_table_s0,test_table_s1' " .
 					"agent='node2:test_table_s0,test_table_s1' agent='node3:test_table_s0,test_table_s1'",
 					''
 				);
@@ -253,7 +253,7 @@ class QueueCommandVerificationTest extends TestCase {
 				$queue->add('node1', 'DROP TABLE test_table', '');
 				$queue->add(
 					'node1',
-					"CREATE TABLE test_table type='distributed' local='test_table_s0' agent='node2:test_table_s1'",
+					"CREATE TABLE test_table type='shard' local='test_table_s0' agent='node2:test_table_s1'",
 					''
 				);
 

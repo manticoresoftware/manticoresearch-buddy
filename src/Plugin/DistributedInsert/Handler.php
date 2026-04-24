@@ -253,7 +253,7 @@ final class Handler extends BaseHandlerWithFlagCache {
 		}
 
 		/** @var array<mixed> */
-		return TaskResult::withTotal(count($positions))->getStruct();
+		return TaskResult::withTotal(sizeof($positions))->getStruct();
 	}
 
 	/**
