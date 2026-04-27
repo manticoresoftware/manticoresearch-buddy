@@ -288,7 +288,8 @@ final class Handler extends BaseHandlerWithClient {
 		$context = '';
 		if ($searchResults !== []) {
 			$schema = $searchEngine->inspectTableSchema($request->table);
-			$context = self::buildContext($searchResults, $schema->contentFields, $maxDocumentLength);
+			$contentFields = $request->fields !== '' ? $request->fields : $schema->contentFields;
+			$context = self::buildContext($searchResults, $contentFields, $maxDocumentLength);
 		}
 		self::logContextBuilding($searchResults, $context, $maxDocumentLength);
 		$response = self::generateResponse(
@@ -358,7 +359,8 @@ final class Handler extends BaseHandlerWithClient {
 			$payload->params['query'] ?? '',
 			$payload->params['table'] ?? '',
 			$payload->params['model_uuid'] ?? '',
-			$payload->params['conversation_uuid'] ?? ''
+			$payload->params['conversation_uuid'] ?? '',
+			$payload->params['fields'] ?? ''
 		);
 	}
 

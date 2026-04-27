@@ -348,21 +348,32 @@ final class Payload extends BasePayload {
 	 */
 	private function parseConversationParams(string $params): array {
 		$parts = $this->parseCommaSeparatedParams($params);
+		$partCount = sizeof($parts);
+		$error = 'CONVERSATIONAL_RAG expects query, table, model, optional conversation_uuid, optional fields';
 
-		$result = [
+		if ($partCount < 3) {
+			throw QueryParseError::create($error);
+		}
+
+		$parsed = [
 			'query' => $this->unquoteString($parts[0] ?? ''),
 			'table' => $this->unquoteString($parts[1] ?? ''),
 			'model_uuid' => $this->unquoteString($parts[2] ?? ''),
 		];
 
-		if (isset($parts[3])) {
-			$result['conversation_uuid'] = $this->unquoteString($parts[3]);
+		switch ($partCount) {
+			case 3:
+				return $parsed;
+			case 4:
+				$parsed['conversation_uuid'] = $this->unquoteString($parts[3]);
+				return $parsed;
+			case 5:
+				$parsed['conversation_uuid'] = $this->unquoteString($parts[3]);
+				$parsed['fields'] = $this->unquoteString($parts[4]);
+				return $parsed;
+			default:
+				throw QueryParseError::create($error);
 		}
-		if (isset($parts[4])) {
-			throw QueryParseError::create('CONVERSATIONAL_RAG expects query, table, model, optional conversation_uuid');
-		}
-
-		return $result;
 	}
 
 

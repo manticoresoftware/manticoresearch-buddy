@@ -140,8 +140,8 @@ CALL CONVERSATIONAL_RAG(
     'query',
     'table_name',
     'model_name_or_uuid',
-    'content_fields',
-    'optional_conversation_uuid'
+    'optional_conversation_uuid',
+    'optional_fields'
 );
 ```
 
@@ -152,8 +152,20 @@ Parameters:
 | 1 | `query` | Yes | User query |
 | 2 | `table` | Yes | Search table |
 | 3 | `model_name_or_uuid` | Yes | Model name or UUID |
-| 4 | `content_fields` | Yes | Comma-separated fields used to build context |
-| 5 | `conversation_uuid` | No | If omitted, Buddy generates one |
+| 4 | `conversation_uuid` | No | 4th positional argument. Pass `''` when you want to set `fields` without a conversation id |
+| 5 | `fields` | No | 5th positional argument. Comma-separated fields used to build context |
+
+`CALL CONVERSATIONAL_RAG` supports positional arguments only:
+
+```sql
+CALL CONVERSATIONAL_RAG(
+    'What is vector search?',
+    'docs',
+    'test_assistant',
+    '',
+    'title,content'
+);
+```
 
 Example:
 
@@ -161,18 +173,18 @@ Example:
 CALL CONVERSATIONAL_RAG(
     'What is vector search?',
     'docs',
-    'test_assistant',
-    'content'
+    'test_assistant'
 );
 ```
 
-Multiple content fields:
+Multiple fields with explicit conversation id:
 
 ```sql
 CALL CONVERSATIONAL_RAG(
     'Tell me about RAG',
     'docs',
     'test_assistant',
+    'conversation-1',
     'title,content'
 );
 ```
@@ -182,7 +194,7 @@ CALL CONVERSATIONAL_RAG(
 The search table must have:
 
 - at least one `FLOAT_VECTOR` field
-- one or more text fields referenced by `content_fields`
+- one or more text fields referenced by explicit `fields` or by the vector field `from='...'` setting
 
 Example:
 
