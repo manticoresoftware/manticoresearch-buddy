@@ -19,7 +19,7 @@ use Manticoresearch\Buddy\Core\Task\Task;
  */
 class ManagerSettingsKibanaHandler extends BaseHandler {
 
-	use QueryMapLoaderTrait;
+	use Traits\QueryMapLoaderTrait;
 
 	/**
 	 *  Initialize the executor
