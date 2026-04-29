@@ -46,7 +46,7 @@ final class QueueRollbackIntegrationTest extends TestCase {
 		);
 		$this->queue->add(
 			'node1',
-			'CREATE TABLE test type=\'distributed\' local=\'test_s0,test_s1\'',
+			'CREATE TABLE test type=\'shard\' local=\'test_s0,test_s1\'',
 			'DROP TABLE IF EXISTS test',
 			'shard_create_test'
 		);
@@ -106,7 +106,7 @@ final class QueueRollbackIntegrationTest extends TestCase {
 		$this->queue->add('node1', 'CREATE TABLE test_s1 (id bigint)', 'DROP TABLE IF EXISTS test_s1', $operationGroup);
 		$this->queue->add(
 			'node1',
-			'CREATE TABLE test type=\'distributed\'',
+			'CREATE TABLE test type=\'shard\'',
 			'DROP TABLE IF EXISTS test',
 			$operationGroup
 		);
@@ -162,7 +162,7 @@ final class QueueRollbackIntegrationTest extends TestCase {
 			['node1', 'DROP TABLE test', ''],
 			[
 				'node1',
-				'CREATE TABLE test type=\'distributed\' local=\'test_s1\' agent=\'node2:test_s0\'',
+				'CREATE TABLE test type=\'shard\' local=\'test_s1\' agent=\'node2:test_s0\'',
 				'DROP TABLE IF EXISTS test',
 			],
 		];
