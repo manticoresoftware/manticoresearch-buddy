@@ -161,7 +161,7 @@ class SimpleQueueCommandTest extends TestCase {
 			// Should NOT have intermediate clusters
 			'DROP TABLE',
 			'CREATE TABLE',
-			'type=\'distributed\'',
+			'type=\'shard\'',
 		];
 
 		// Verify RF=1 patterns

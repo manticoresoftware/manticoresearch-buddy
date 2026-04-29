@@ -78,10 +78,10 @@ class QueueCommandVerificationTest extends TestCase {
 			// Should clean up after movement
 			'DELETE CLUSTER temp_move_',
 
-			// Should create new distributed table
+			// Should create new shard aggregate table
 			'DROP TABLE',
 			'CREATE TABLE',
-			'type=\'distributed\'',
+			'type=\'shard\'',
 			]
 		);
 
@@ -129,10 +129,10 @@ class QueueCommandVerificationTest extends TestCase {
 			// Should NOT use intermediate clusters for RF>=2
 			'!CREATE CLUSTER temp_move_', // Assert this does NOT exist
 
-			// Should create new distributed table
+			// Should create new shard aggregate table
 			'DROP TABLE',
 			'CREATE TABLE',
-			'type=\'distributed\'',
+			'type=\'shard\'',
 			]
 		);
 
@@ -326,8 +326,8 @@ class QueueCommandVerificationTest extends TestCase {
 		// Should have table creation commands
 		$this->assertStringContainsString('CREATE TABLE', $allCommands, 'Should create tables');
 
-		// Should have distributed table creation
-		$this->assertStringContainsString('type=\'distributed\'', $allCommands, 'Should create distributed tables');
+		// Should have shard aggregate table creation
+		$this->assertStringContainsString('type=\'shard\'', $allCommands, 'Should create shard aggregate tables');
 
 		// Should have proper table names
 		$this->assertStringContainsString('test_table', $allCommands, 'Should reference test table');

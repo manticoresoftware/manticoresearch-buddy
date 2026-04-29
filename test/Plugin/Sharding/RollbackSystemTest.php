@@ -257,7 +257,7 @@ final class RollbackSystemTest extends TestCase {
 			['node1', 'DELETE CLUSTER temp_move_0_123', ''], // Cleanup - empty rollback
 			[
 				'node1',
-				'CREATE TABLE test type=\'distributed\' local=\'test_s1\' agent=\'node2:test_s0\'',
+				'CREATE TABLE test type=\'shard\' local=\'test_s1\' agent=\'node2:test_s0\'',
 				'DROP TABLE IF EXISTS test',
 			],
 		];
