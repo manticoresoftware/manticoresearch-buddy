@@ -9,55 +9,9 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\BuddyTest\Lib\TelemetrySpyHttpsWrapper;
 use Manticoresoftware\Telemetry\Metric as TelemetryMetric;
 use PHPUnit\Framework\TestCase;
-
-/**
- * Spy stream wrapper for https:// that captures the stream context options
- * passed to file_get_contents() by Manticoresoftware\Telemetry\Metric::process().
- * Returns an empty body so the library treats the call as a successful POST.
- */
-final class TelemetrySpyHttpsWrapper { // phpcs:ignore
-	/** @var array<mixed> */
-	public static array $contextOptions = [];
-	public static string $lastUrl = '';
-
-	/** @var resource|null */
-	public $context;
-	private bool $consumed = false;
-
-	/**
-	 * @param string $path
-	 * @param string $mode
-	 * @param int $options
-	 * @param string|null $opened_path
-	 */
-	public function stream_open(string $path, string $mode, int $options, ?string &$opened_path): bool {
-		self::$lastUrl = $path;
-		self::$contextOptions = is_resource($this->context) ? stream_context_get_options($this->context) : [];
-		return true;
-	}
-
-	public function stream_read(int $count): string {
-		if ($this->consumed) {
-			return '';
-		}
-		$this->consumed = true;
-		return '';
-	}
-
-	public function stream_eof(): bool {
-		return $this->consumed;
-	}
-
-	/** @return array<int|string,int> */
-	public function stream_stat(): array {
-		return [];
-	}
-
-	public function stream_close(): void {
-	}
-}
 
 /**
  * Regression guard for telemetry-lib issue #2 (PHP 8.4 silent telemetry failure).
