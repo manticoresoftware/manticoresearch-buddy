@@ -54,17 +54,22 @@ final class TelemetryHeadersTest extends TestCase {
 
 		$opts = TelemetrySpyHttpsWrapper::$contextOptions;
 		self::assertArrayHasKey('http', $opts);
-		self::assertArrayHasKey('header', $opts['http']);
+		/** @var array<string,mixed> $http */
+		$http = $opts['http'];
+		self::assertIsArray($http);
+		self::assertArrayHasKey('header', $http);
 
 		// Core regression guard: PHP 8.4 chokes on a string here.
 		self::assertIsArray(
-			$opts['http']['header'],
+			$http['header'],
 			'HTTP headers must be an array (telemetry-lib issue #2). '
 			. 'A string value reintroduces the PHP 8.4 silent-send-failure bug.'
 		);
+		/** @var array<int,string> $headers */
+		$headers = $http['header'];
 
 		// Defensive: even an array element with an embedded newline retriggers the warning.
-		foreach ($opts['http']['header'] as $h) {
+		foreach ($headers as $h) {
 			self::assertIsString($h);
 			self::assertStringNotContainsString(
 				"\n",
@@ -73,11 +78,11 @@ final class TelemetryHeadersTest extends TestCase {
 			);
 		}
 
-		self::assertContains('Content-Encoding: gzip', $opts['http']['header']);
+		self::assertContains('Content-Encoding: gzip', $headers);
 
 		$contentTypeHeaders = array_values(
 			array_filter(
-				$opts['http']['header'],
+				$headers,
 				static fn(string $h): bool => stripos($h, 'Content-Type:') === 0
 			)
 		);
@@ -89,9 +94,11 @@ final class TelemetryHeadersTest extends TestCase {
 			. 'this is the value PHP 8.4 specifically warns about'
 		);
 
-		self::assertSame('POST', $opts['http']['method']);
-		self::assertArrayHasKey('content', $opts['http']);
-		$decoded = @gzdecode($opts['http']['content']);
+		self::assertArrayHasKey('method', $http);
+		self::assertSame('POST', $http['method']);
+		self::assertArrayHasKey('content', $http);
+		self::assertIsString($http['content']);
+		$decoded = @gzdecode($http['content']);
 		self::assertIsString($decoded, 'POST body must be gzip-encoded');
 		self::assertStringContainsString('test_metric', $decoded);
 	}
