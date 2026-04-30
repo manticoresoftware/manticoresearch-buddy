@@ -9,8 +9,8 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationManager;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationMessage;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationManager;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationMessage;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Struct;

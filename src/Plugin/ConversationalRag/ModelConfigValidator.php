@@ -28,6 +28,7 @@ final class ModelConfigValidator {
 		'timeout',
 		'retrieval_limit',
 		'max_document_length',
+		'can_research',
 	];
 
 	/**
@@ -47,6 +48,7 @@ final class ModelConfigValidator {
 		$this->validateTimeout($config);
 		$this->validateRetrievalLimit($config);
 		$this->validateMaxDocumentLength($config);
+		$this->validateResearchFlag($config);
 
 		$createConfig = ['name' => $config['identifier']];
 		foreach (self::MODEL_FIELDS as $field) {
@@ -197,6 +199,32 @@ final class ModelConfigValidator {
 			throw QueryParseError::create(
 				'max_document_length must be 0 or an integer between 100 and 65536'
 			);
+		}
+	}
+
+	/**
+	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+	 *   max_document_length?: string|int, can_research?: string|int} $config
+	 *
+	 * @throws QueryParseError
+	 */
+	private function validateResearchFlag(array $config): void {
+		$this->validateBooleanFlag($config, 'can_research');
+	}
+
+	/**
+	 * @param array<string, mixed> $config
+	 * @throws QueryParseError
+	 */
+	private function validateBooleanFlag(array $config, string $field): void {
+		if (!array_key_exists($field, $config)) {
+			return;
+		}
+
+		$value = $config[$field];
+		if ($value !== 0 && $value !== 1) {
+			throw QueryParseError::create("$field must be 0 or 1");
 		}
 	}
 }

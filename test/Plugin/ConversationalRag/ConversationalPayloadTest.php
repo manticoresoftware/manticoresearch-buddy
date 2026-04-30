@@ -346,7 +346,8 @@ class ConversationalPayloadTest extends TestCase {
 	}
 
 	public function testConversationParsingTreatsNamedStyleFiveArgsAsPositionalValues(): void {
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', conversation_uuid='', fields='title,content')";
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', "
+			. "conversation_uuid='', fields='title,content')";
 
 		$payload = $this->parseSqlPayload($query);
 		$this->assertEquals("conversation_uuid=''", $payload->params['conversation_uuid']);

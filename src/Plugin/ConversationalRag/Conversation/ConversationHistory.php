@@ -8,7 +8,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
+namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation;
 
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 

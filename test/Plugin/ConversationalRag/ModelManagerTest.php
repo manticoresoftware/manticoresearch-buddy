@@ -509,8 +509,8 @@ class ModelManagerTest extends TestCase {
 		);
 		$this->assertEquals(0, $disabled['max_document_length']);
 
-		/** @var array{max_document_length:int} $invalid */
-		$invalid = $method->invoke(
+		$this->expectException(ManticoreSearchClientError::class);
+		$method->invoke(
 			$modelManager,
 			[
 				'name' => 'test_model',
@@ -518,10 +518,19 @@ class ModelManagerTest extends TestCase {
 				'max_document_length' => 99,
 			]
 		);
-		$this->assertEquals(2000, $invalid['max_document_length']);
+	}
 
-		/** @var array{max_document_length:int} $tooLarge */
-		$tooLarge = $method->invoke(
+	/**
+	 * @throws ReflectionException
+	 */
+	public function testExtractSettingsRejectsTooLargeMaxDocumentLength(): void {
+		$modelManager = new ModelManager();
+
+		$reflection = new ReflectionClass($modelManager);
+		$method = $reflection->getMethod('extractSettings');
+
+		$this->expectException(ManticoreSearchClientError::class);
+		$method->invoke(
 			$modelManager,
 			[
 				'name' => 'test_model',
@@ -529,7 +538,6 @@ class ModelManagerTest extends TestCase {
 				'max_document_length' => 65537,
 			]
 		);
-		$this->assertEquals(2000, $tooLarge['max_document_length']);
 	}
 
 	/**

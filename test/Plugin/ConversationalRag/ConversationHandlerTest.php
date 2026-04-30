@@ -9,17 +9,16 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationHistory;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationManager;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationMessage;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationRequest;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationRoute;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationHistory;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationMessage;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationRequest;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationRoute;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationSearchFlow;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationSearchRouter;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Handler as RagHandler;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Payload as RagPayload;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchContext;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchEngine;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchServices;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
@@ -865,7 +864,6 @@ class ConversationHandlerTest extends TestCase {
 				ConversationMessage::user('Which one was the crime drama?', ConversationRoute::ANSWER_FROM_HISTORY),
 			]
 		);
-		$route = new ConversationRoute(ConversationRoute::ANSWER_FROM_HISTORY, '', '', 'History contains answer.');
 		$model = [
 			'id' => '1',
 			'uuid' => 'model-uuid',
@@ -876,12 +874,7 @@ class ConversationHandlerTest extends TestCase {
 			'created_at' => '',
 			'updated_at' => '',
 		];
-		$context = new SearchContext(
-			new ConversationRequest('Which one was the crime drama?', 'docs', 'model-uuid', 'conv-uuid'),
-			$history,
-			$model,
-			$route
-		);
+		$request = new ConversationRequest('Which one was the crime drama?', 'docs', 'model-uuid', 'conv-uuid');
 
 		$searchEngine = $this->createMock(SearchEngine::class);
 		$searchEngine->expects($this->once())
@@ -891,21 +884,20 @@ class ConversationHandlerTest extends TestCase {
 				'What are some good TV shows to watch?',
 				['5696241144904548358'],
 				$model,
-				0.8
+				0.8,
+				''
 			)
 			->willReturn([['id' => 1, 'content' => 'Breaking Bad is a crime drama.']]);
+		$provider = $this->createMock(LlmProvider::class);
+		$provider->method('generateToolCall')
+			->willReturn($this->createToolRouteResponse(ConversationRoute::ANSWER_FROM_HISTORY, '', ''));
 
-		$reflection = new ReflectionClass(RagHandler::class);
-		$method = $reflection->getMethod('performSearch');
-		$method->setAccessible(true);
-		$result = $method->invoke(
-			null,
-			$context,
-			new SearchServices(
-				$this->createMock(ConversationManager::class),
-				$this->createMock(LlmProvider::class),
-				$searchEngine
-			)
+		$result = (new ConversationSearchFlow(new ConversationSearchRouter()))->retrieve(
+			$request,
+			$history,
+			$model,
+			$provider,
+			$searchEngine
 		);
 
 		$this->assertEquals(
@@ -916,6 +908,7 @@ class ConversationHandlerTest extends TestCase {
 					'exclude_query' => 'Breaking Bad',
 				],
 				['5696241144904548358'],
+				ConversationRoute::ANSWER_FROM_HISTORY,
 			],
 			$result
 		);
@@ -949,13 +942,228 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertStringContainsString('Invalid table identifier', $task->getError()->getResponseError());
 	}
 
-		/**
-		 * Create a mock LLM provider with predefined responses
-		 *
-			 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
-			 * @param array<int, array<string, mixed>> $toolResponses Array of LLM tool response arrays
-			 * @return LlmProvider
-			 */
+	public function testSearchWithResearchDerivesQueryAndAnswers(): void {
+		$query = "CALL CONVERSATIONAL_RAG('I need cpu for msi b150 gaming', 'docs', 'model-uuid', 'conv-uuid')";
+
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => $query,
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler(
+			$payload,
+			$this->createMockLlmProvider(
+				[
+					[
+						'success' => true,
+						'content' => 'Use Intel 6th/7th gen CPUs for B150 (LGA1151).',
+						'metadata' => ['tokens_used' => 42],
+					],
+				],
+				[
+					$this->createStrategyRouteResponse(
+						ConversationRoute::DERIVE_THEN_SEARCH,
+						'',
+						'Derive CPU compatibility facts for MSI B150 Gaming motherboard'
+					),
+					$this->createResearchToolResponse(
+						'LGA1151 Intel 6th Gen Intel 7th Gen Skylake Kaby Lake',
+						''
+					),
+				]
+			)
+		);
+
+		$mockClient = $this->createMock(HTTPClient::class);
+		$initResponses = $this->createInitializationResponses();
+		$modelResponse = $this->createResponse(
+			[[
+				'data' => [[
+					'uuid' => 'model-uuid',
+					'name' => 'test_model',
+					'style_prompt' => 'You are a helpful assistant.',
+					'settings' => '{"retrieval_limit":5,"max_document_length":2000,"can_research":1}',
+					'created_at' => '2023-01-01 00:00:00',
+				]],
+			]]
+		);
+		$historyResponse = $this->createResponse([['total' => 0, 'error' => '', 'warning' => '', 'data' => []]]);
+		$schemaResponse = $this->createResponse(
+			[[
+				'data' => [[
+					'Table' => 'docs',
+					'Create Table' => "CREATE TABLE docs (\ncontent text,\nembedding FLOAT_VECTOR from='content'\n)",
+				]],
+			]]
+		);
+		$search2Response = $this->createResponse(
+			[[
+				'data' => [[
+					'id' => 200,
+					'title' => 'Intel i7-6700K',
+					'content' => 'LGA1151 6th Gen compatible with Intel 100-series chipsets including B150',
+					'knn_dist' => 0.20,
+				]],
+			]]
+		);
+		$saveUserResponse = $this->createResponse();
+		$saveAssistantResponse = $this->createResponse();
+
+		$responses = [
+			...$initResponses,
+			$modelResponse,
+			$historyResponse,
+			$schemaResponse,
+			$search2Response,
+			$saveUserResponse,
+			$saveAssistantResponse,
+		];
+
+		$callCounter = 0;
+		$mockClient->method('hasTable')->with('docs')->willReturn(true);
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $sql) use (&$callCounter, $responses): Response {
+					unset($sql);
+					$callCounter++;
+					if ($callCounter > sizeof($responses)) {
+						throw new Exception("Unexpected database call #$callCounter");
+					}
+					return $responses[$callCounter - 1];
+				}
+			);
+
+		$handler->setManticoreClient($mockClient);
+		$task = $handler->run();
+		$this->assertTrue($task->isSucceed());
+		$struct = (array)$task->getResult()->getStruct();
+		/** @var array<int, array{data: array<int, array{search_query: string, sources: string}>}> $struct */
+		$this->assertStringContainsString('LGA1151', $struct[0]['data'][0]['search_query']);
+		$this->assertStringContainsString('Intel 6th Gen', $struct[0]['data'][0]['search_query']);
+		$this->assertStringContainsString('Skylake', $struct[0]['data'][0]['search_query']);
+		$this->assertStringContainsString('Kaby Lake', $struct[0]['data'][0]['search_query']);
+		$this->assertStringNotContainsString('constraint-only-token', $struct[0]['data'][0]['search_query']);
+		$this->assertStringContainsString('Intel i7-6700K', $struct[0]['data'][0]['sources']);
+	}
+
+	public function testSearchWithResearchDirectSearchRunsSingleSearchAndAnswers(): void {
+		$query = "CALL CONVERSATIONAL_RAG('I need cpu for msi b150 gaming', 'docs', 'model-uuid', 'conv-uuid')";
+		$payload = RagPayload::fromRequest(
+			Request::fromArray(
+				[
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => $query,
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => '',
+				]
+			)
+		);
+
+		$handler = new RagHandler(
+			$payload,
+			$this->createMockLlmProvider(
+				[
+					[
+						'success' => true,
+						'content' => 'Use Intel 6th/7th gen CPUs for B150 (LGA1151).',
+						'metadata' => ['tokens_used' => 42],
+					],
+				],
+				[
+					$this->createStrategyRouteResponse(
+						ConversationRoute::DIRECT_SEARCH,
+						'generic cpu',
+						''
+					),
+				]
+			)
+		);
+
+		$mockClient = $this->createMock(HTTPClient::class);
+		$initResponses = $this->createInitializationResponses();
+		$modelResponse = $this->createResponse(
+			[[
+				'data' => [[
+					'uuid' => 'model-uuid',
+					'name' => 'test_model',
+					'style_prompt' => 'You are a helpful assistant.',
+					'settings' => '{"retrieval_limit":5,"max_document_length":2000,"can_research":1}',
+					'created_at' => '2023-01-01 00:00:00',
+				]],
+			]]
+		);
+		$historyResponse = $this->createResponse([['total' => 0, 'error' => '', 'warning' => '', 'data' => []]]);
+		$schemaResponse = $this->createResponse(
+			[[
+				'data' => [[
+					'Table' => 'docs',
+					'Create Table' => "CREATE TABLE docs (\ncontent text,\nembedding FLOAT_VECTOR from='content'\n)",
+				]],
+			]]
+		);
+		$genericSearchResponse = $this->createResponse(
+			[[
+				'data' => [[
+					'id' => 100,
+					'title' => 'Generic CPU',
+					'content' => 'General CPU recommendation',
+					'knn_dist' => 0.60,
+				]],
+			]]
+		);
+		$saveUserResponse = $this->createResponse();
+		$saveAssistantResponse = $this->createResponse();
+
+		$responses = [
+			...$initResponses,
+			$modelResponse,
+			$historyResponse,
+			$schemaResponse,
+			$genericSearchResponse,
+			$saveUserResponse,
+			$saveAssistantResponse,
+		];
+
+		$callCounter = 0;
+		$mockClient->method('hasTable')->with('docs')->willReturn(true);
+		$mockClient->method('sendRequest')
+			->willReturnCallback(
+				function (string $sql) use (&$callCounter, $responses): Response {
+					unset($sql);
+					$callCounter++;
+					if ($callCounter > sizeof($responses)) {
+						throw new Exception("Unexpected database call #$callCounter");
+					}
+					return $responses[$callCounter - 1];
+				}
+			);
+
+		$handler->setManticoreClient($mockClient);
+		$task = $handler->run();
+		$this->assertTrue($task->isSucceed());
+		$struct = (array)$task->getResult()->getStruct();
+		/** @var array<int, array{data: array<int, array{search_query: string, response: string, sources: string}>}> $struct */
+		$this->assertSame('generic cpu', $struct[0]['data'][0]['search_query']);
+		$this->assertStringContainsString('Generic CPU', $struct[0]['data'][0]['sources']);
+	}
+
+	/**
+	 * Create a mock LLM provider with predefined responses
+	 *
+	 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
+	 * @param array<int, array<string, mixed>> $toolResponses Array of LLM tool response arrays
+	 * @return LlmProvider
+	 */
 	private function createMockLlmProvider(array $responses, array $toolResponses = []): LlmProvider {
 		$mockProvider = $this->createMock(LlmProvider::class);
 		$callCount = 0;
@@ -1001,6 +1209,91 @@ class ConversationHandlerTest extends TestCase {
 						'route' => $route,
 						'standalone_question' => $standaloneQuestion,
 						'exclude_query' => $excludeQuery,
+						'reason' => 'test',
+					],
+					JSON_THROW_ON_ERROR
+				)
+			);
+
+		return [
+			'success' => true,
+			'content' => '',
+			'tool_calls' => [$toolCall],
+			'metadata' => [
+				'tokens_used' => 10,
+				'input_tokens' => 8,
+				'output_tokens' => 2,
+				'response_time_ms' => 1,
+				'finish_reason' => 'tool_calls',
+			],
+		];
+	}
+
+	/**
+	 * @return array{success:true, content:string, tool_calls:array<int, mixed>, metadata:array<string, int|string>}
+	 */
+	private function createStrategyRouteResponse(string $strategy, string $searchQuery, string $deriveTask): array {
+		$toolCall = $this->createMock(ToolCall::class);
+		$toolCall->method('getArguments')
+			->willReturn(
+				json_encode(
+					[
+						'strategy' => $strategy,
+						'reason' => 'test',
+						'search_query' => $searchQuery,
+						'derive_task' => $deriveTask,
+					],
+					JSON_THROW_ON_ERROR
+				)
+			);
+
+		return [
+			'success' => true,
+			'content' => '',
+			'tool_calls' => [$toolCall],
+			'metadata' => [
+				'tokens_used' => 10,
+				'input_tokens' => 8,
+				'output_tokens' => 2,
+				'response_time_ms' => 1,
+				'finish_reason' => 'tool_calls',
+			],
+		];
+	}
+
+	/**
+	 * @param array<int, string> $constraints
+	 * @param array<int, string> $keywords
+	 * @return array{success:true, content:string, tool_calls:array<int, mixed>, metadata:array<string, int|string>}
+	 */
+	private function createResearchToolResponse(
+		string $expandedQuery,
+		string $excludeQuery,
+		array $constraints = ['constraint-only-token'],
+		array $keywords = [
+			'LGA1151',
+			'Intel 6th Gen',
+			'Intel 7th Gen',
+			'B150',
+			'Skylake',
+			'Kaby Lake',
+			'i3',
+			'i5',
+			'i7',
+			'Pentium',
+			'Celeron',
+		]
+	): array {
+		$toolCall = $this->createMock(ToolCall::class);
+		$toolCall->method('getArguments')
+			->willReturn(
+				json_encode(
+					[
+						'constraints' => $constraints,
+						'keywords' => $keywords,
+						'expanded_query' => $expandedQuery,
+						'exclude_query' => $excludeQuery,
+						'confidence' => 0.9,
 						'reason' => 'test',
 					],
 					JSON_THROW_ON_ERROR
