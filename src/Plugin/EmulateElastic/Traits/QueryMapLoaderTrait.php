@@ -9,7 +9,7 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
+namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic\Traits;
 
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -28,7 +28,7 @@ trait QueryMapLoaderTrait {
 		if (isset(static::$queryMap[$mapName])) {
 			return;
 		}
-		$queryMapFilePattern = __DIR__ . '/QueryMap/%MAP_NAME%.php';
+		$queryMapFilePattern = __DIR__ . '/../QueryMap/%MAP_NAME%.php';
 		/** @var array<mixed> $queryMap */
 		$queryMap = include (string)str_replace('%MAP_NAME%', $mapName, $queryMapFilePattern);
 		static::$queryMap[$mapName] = $queryMap;
