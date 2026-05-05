@@ -38,6 +38,7 @@ final class Payload extends BasePayload
 	public array $condition = [];
 
 	public Endpoint $endpointBundle;
+	public ?int $size = null;
 
 	/**
 	 * Get description for this plugin
@@ -88,6 +89,9 @@ final class Payload extends BasePayload
 		$payload->field = $parsedPayload['knn']['field'];
 		$payload->k = (string)$parsedPayload['knn']['k'];
 		$payload->docId = (string)$parsedPayload['knn']['doc_id'];
+		$payload->size = isset($parsedPayload['size'])
+				? (int)$parsedPayload['size']
+				: (isset($parsedPayload['limit']) ? (int)$parsedPayload['limit'] : null);
 	}
 
 	/**
