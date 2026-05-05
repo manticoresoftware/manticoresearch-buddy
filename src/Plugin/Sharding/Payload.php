@@ -61,7 +61,12 @@ final class Payload extends BasePayload {
 		return match ($request->command) {
 			'create', 'alter' => static::fromCreate($request),
 			'drop' => static::fromDrop($request),
-			'desc', 'describe', 'show' => static::fromDesc($request),
+			'show' => match (true) {
+				stripos($request->payload, 'show sharding master') === 0 => static::fromMaster($request),
+				stripos($request->payload, 'show sharding status') === 0 => static::fromStatus($request),
+				default => static::fromDesc($request),
+			},
+			'desc', 'describe' => static::fromDesc($request),
 			default => throw new QueryParseError('Failed to parse query'),
 		};
 	}
@@ -183,32 +188,86 @@ final class Payload extends BasePayload {
 		return $self;
 	}
 
+
+	/**
+	 * @param Request $request
+	 * @return static
+	 */
+	protected static function fromStatus(Request $request): static {
+		// Parse optional cluster:table or just table from SHOW SHARDING STATUS [cluster:]table
+		$pattern = '/^SHOW\s+SHARDING\s+STATUS(?:\s+(?:(?P<cluster>[^:\s]+):)?(?P<table>[^\s]+))?/ius';
+		preg_match($pattern, $request->payload, $matches);
+
+		$self = new static();
+		$self->path = $request->path;
+		$self->type = 'status';
+		$self->cluster = $matches['cluster'] ?? '';
+		$self->table = strtolower($matches['table'] ?? '');
+		$self->structure = '';
+		$self->options = [];
+		$self->quiet = false;
+		$self->extra = '';
+		return $self;
+	}
+
+	/**
+	 * @param Request $request
+	 * @return static
+	 */
+	protected static function fromMaster(Request $request): static {
+		$self = new static();
+		$self->path = $request->path;
+		$self->type = 'master';
+		$self->cluster = '';
+		$self->table = '';
+		$self->structure = '';
+		$self->options = [];
+		$self->quiet = false;
+		$self->extra = '';
+		return $self;
+	}
+
 	/**
 	 * @param Request $request
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
-		// Desc and Show distributed table first
 		if (($request->command === 'desc' || $request->command === 'describe')
 			&& strpos($request->error, 'contains system') !== false
 		) {
 			return true;
 		}
-		if ($request->command === 'show' && strpos($request->error, 'error in your query') !== false) {
+
+		if ($request->command === 'show') {
+			return stripos($request->payload, 'show sharding status') === 0
+				|| stripos($request->payload, 'show sharding master') === 0
+				|| strpos($request->error, 'error in your query') !== false;
+		}
+
+		return static::isShardingCreateOrDrop($request);
+	}
+
+	/**
+	 * Check if request is a sharding CREATE TABLE or DROP command
+	 * @param Request $request
+	 * @return bool
+	 */
+	protected static function isShardingCreateOrDrop(Request $request): bool {
+		$hasShardingError = stripos($request->error, 'contains system table')
+			|| stripos($request->error, 'require Buddy')
+			|| (stripos($request->error, 'syntax error') && stripos($request->error, 'near \':'));
+
+		if (!$hasShardingError) {
+			return false;
+		}
+
+		if (stripos($request->payload, 'drop') === 0) {
 			return true;
 		}
 
-		// Create and Drop
-		return (stripos($request->error, 'contains system table')
-			|| stripos($request->error, 'require Buddy') ||
-			(stripos($request->error, 'syntax error') && stripos($request->error, 'near \':'))
-		)
-			&& (
-				(stripos($request->payload, 'create table') === 0
-					&& stripos($request->payload, 'shards') !== false
-					&& preg_match('/(?P<key>rf|shards)\s*=\s*\'(?P<value>[^\']*)\'/ius', $request->payload)
-				) || stripos($request->payload, 'drop') === 0
-			);
+		return stripos($request->payload, 'create table') === 0
+			&& stripos($request->payload, 'shards') !== false
+			&& (bool)preg_match('/(?P<key>rf|shards)\s*=\s*\'(?P<value>[^\']*)\'/ius', $request->payload);
 	}
 
 	/**
@@ -276,6 +335,8 @@ final class Payload extends BasePayload {
 		return match ($this->type) {
 			'create' => CreateHandler::class,
 			'drop' => DropHandler::class,
+			'status' => ShowStatusHandler::class,
+			'master' => ShowMasterHandler::class,
 			'desc', 'describe', 'show' => DescHandler::class,
 			default => throw new \Exception('Unsupported sharding type'),
 		};

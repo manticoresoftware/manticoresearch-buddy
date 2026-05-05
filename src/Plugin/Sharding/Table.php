@@ -14,6 +14,7 @@ use RuntimeException;
 /** @package Manticoresearch\Buddy\Base\Plugin\Sharding */
 final class Table {
 	public readonly string $table;
+	protected State $state;
 
 	/**
 	 * Initialize with a given client
@@ -29,6 +30,8 @@ final class Table {
 		protected readonly string $extra
 	) {
 		$this->table = 'system.sharding_table';
+		$this->state = new State($this->client);
+		$this->state->setCluster($this->cluster);
 	}
 
 	/**
@@ -51,32 +54,31 @@ final class Table {
 			)
 			->getResult();
 
-		// Initialize an empty array to hold connections
-		$connections = [];
-		foreach ($res[0]['data'] as $row) {
+		// Build shard → nodes map first so we can reconstruct per-shard connections
+		$shardNodesMap = [];
+		foreach ($res[0]['data'] ?? [] as $row) {
 			/** @var array{node:string,shards:string} $row*/
 			$shards = static::parseShards($row['shards']);
 			foreach ($shards as $shard) {
-				$connections[$shard][] = $row['node'];
+				$shardNodesMap[$shard][] = $row['node'];
 			}
 		}
 
-		foreach ($res[0]['data'] as $row) {
+		foreach ($res[0]['data'] ?? [] as $row) {
 			$shards = static::parseShards($row['shards']);
+			// connections = nodes sharing the first shard of this node.
+			// All shards on a node belong to clusters of the same RF size — picking
+			// any single shard gives the correct peer set without inflating it via union.
+			$firstShard = $shards->first();
 			/** @var Set<string> */
-			$connectedNodes = new Set;
-			foreach ($shards as $shard) {
-				$connectedNodes->add(...$connections[$shard]);
-			}
+			$connectedNodes = new Set($shardNodesMap[$firstShard] ?? []);
 			/** @var array{node:string,shards:string} $row */
 			$nodes->push(
-				new Map(
-					[
-						'node' => $row['node'],
-						'shards' => $shards,
-						'connections' => $connectedNodes,
-					]
-				)
+				[
+					'node' => $row['node'],
+					'shards' => $shards,
+					'connections' => $connectedNodes,
+				]
 			);
 		}
 		return $nodes;
@@ -237,51 +239,74 @@ final class Table {
 			]
 		);
 
-		/** @var Map<string,Set<int>> */
-		$nodeShardsMap = new Map;
+		// Create unique operation group for this table creation
+		$operationGroup = "shard_create_{$this->name}_" . uniqid();
+		$result['operation_group'] = $operationGroup;
 
-		/** @var Set<string> */
-		$nodes = new Set;
+		try {
+			/** @var Map<string,Set<int>> */
+			$nodeShardsMap = new Map;
 
-		$schema = $this->configureNodeShards($shardCount, $replicationFactor);
-		$reduceFn = function (Map $clusterMap, array $row) use ($queue, &$nodes, &$nodeShardsMap) {
-			/** @var Map<string,Cluster> $clusterMap */
-			$nodes->add($row['node']);
-			$nodeShardsMap[$row['node']] = $row['shards'];
+			/** @var Set<string> */
+			$nodes = new Set;
 
-			foreach ($row['shards'] as $shard) {
-				$connectedNodes = $this->getConnectedNodes(new Set([$shard]));
+			$schema = $this->configureNodeShards($shardCount, $replicationFactor);
+			$reduceFn = function (Map $clusterMap, array $row) use ($queue, &$nodes, &$nodeShardsMap, $operationGroup) {
+				/** @var Map<string,Cluster> $clusterMap */
+				$nodes->add($row['node']);
+				$nodeShardsMap[$row['node']] = $row['shards'];
 
-				$clusterMap = $this->handleReplication(
-					$row['node'],
-					$queue,
-					$connectedNodes,
-					$clusterMap,
-					$shard
-				);
+				foreach ($row['shards'] as $shard) {
+					$connectedNodes = $this->getConnectedNodes(new Set([$shard]));
+
+					$clusterMap = $this->handleReplication(
+						$row['node'],
+						$queue,
+						$connectedNodes,
+						$clusterMap,
+						$shard,
+						$operationGroup
+					);
+				}
+
+				return $clusterMap;
+			};
+			$clusterMap = $schema->reduce($reduceFn, new Map);
+
+			// Now process all postponed pending tables to attach to each cluster
+			foreach ($clusterMap as $cluster) {
+				$cluster->processPendingTables($queue, $operationGroup);
 			}
 
-			return $clusterMap;
-		};
-		$clusterMap = $schema->reduce($reduceFn, new Map);
+			/** @var Set<int> */
+			$queueIds = new Set;
+			foreach ($nodeShardsMap as $node => $shards) {
+				// Even when no shards, we still create distributed table
+				$sql = $this->getCreateShardedTableSQL($shards);
+				$rollbackSql = "DROP TABLE IF EXISTS {$this->name}";
 
-		// Now process all postponed pending tables to attach to each cluster
-		foreach ($clusterMap as $cluster) {
-			$cluster->processPendingTables($queue);
+				// Use updated add method with rollback support
+				$queueId = $queue->add($node, $sql, $rollbackSql, $operationGroup);
+				$queueIds->add($queueId);
+			}
+
+			$result['nodes'] = $nodes;
+			$result['queue_ids'] = $queueIds;
+			$result['status'] = 'success';
+
+			return $result;
+		} catch (\Throwable $t) {
+			// Rollback entire table creation on any failure
+			Buddy::debugvv("Table creation failed for {$this->name}, initiating rollback for group {$operationGroup}");
+			$rollbackSuccess = $queue->rollbackOperationGroup($operationGroup);
+
+			$result['status'] = 'failed';
+			$result['error'] = $t->getMessage();
+			$result['rollback_executed'] = true;
+			$result['rollback_success'] = $rollbackSuccess;
+
+			throw $t;
 		}
-
-		/** @var Set<int> */
-		$queueIds = new Set;
-		foreach ($nodeShardsMap as $node => $shards) {
-			// Even when no shards, we still create distributed table
-			$sql = $this->getCreateShardedTableSQL($shards);
-			$queueId = $queue->add($node, $sql);
-			$queueIds->add($queueId);
-		}
-
-		$result['nodes'] = $nodes;
-		$result['queue_ids'] = $queueIds;
-		return $result;
 	}
 
 	/**
@@ -343,6 +368,7 @@ final class Table {
 	 * @param  Set<string>    $connectedNodes
 	 * @param  Map<string,Cluster>   $clusterMap
 	 * @param  int    $shard
+	 * @param  string|null $operationGroup Optional operation group for rollback
 	 * @return Map<string,Cluster> The cluster map that we use
 	 *  for session to maintain which nodes are connected
 	 *  and which cluster are processed already and who is the owner
@@ -352,12 +378,15 @@ final class Table {
 		Queue $queue,
 		Set $connectedNodes,
 		Map $clusterMap,
-		int $shard
+		int $shard,
+		?string $operationGroup = null
 	): Map {
 		// If no replication, add create table shard SQL to queue
 		if ($connectedNodes->count() === 1) {
 			$sql = $this->getCreateTableShardSQL($shard);
-			$queue->add($node, $sql);
+			$shardName = $this->getShardName($shard);
+			$rollbackSql = "DROP TABLE IF EXISTS {$shardName}";
+			$queue->add($node, $sql, $rollbackSql, $operationGroup);
 			return $clusterMap;
 		}
 
@@ -371,9 +400,9 @@ final class Table {
 				fn ($connectedNode) => $connectedNode !== $node
 			);
 			$clusterMap[$clusterName] = $cluster;
-			$waitForId = $cluster->create($queue);
+			$waitForId = $cluster->create($queue, $operationGroup);
 			$queue->setWaitForId($waitForId);
-			$cluster->addNodeIds($queue, ...$nodesToJoin);
+			$cluster->addNodeIds($queue, $nodesToJoin->toArray(), $operationGroup);
 			$queue->resetWaitForId();
 		}
 
@@ -382,36 +411,45 @@ final class Table {
 		if (!$cluster->hasPendingTable($table, TableOperation::Attach)) {
 			$cluster->addPendingTable($table, TableOperation::Attach);
 			$sql = $this->getCreateTableShardSQL($shard);
-			$queue->add($node, $sql);
+			$rollbackSql = "DROP TABLE IF EXISTS {$table}";
+			$queue->add($node, $sql, $rollbackSql, $operationGroup);
 		}
 		return $clusterMap;
 	}
 
+
+
+
+
 	/**
 	 * Rebalances the shards,
-	 * identifying affected shards from inactive nodes
-	 * and moving only them.
-	 *
+	 * it checks if there are any inactive nodes and rebalances the shards
 	 * @param Queue $queue
 	 * @return void
+	 * @phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
 	 */
 	// @phpcs:ignore SlevomatCodingStandard.Complexity.Cognitive.ComplexityTooHigh
 	public function rebalance(Queue $queue): void {
+		$operationGroup = "rebalance_{$this->name}_" . time();
+		$state = null;
 		try {
 			// Create state instance for tracking rebalancing operations
-			$state = new State($this->client);
+			$state = $this->state;
 
 			// Prevent concurrent rebalancing operations
 			$rebalanceKey = "rebalance:{$this->name}";
 			$currentRebalance = $state->get($rebalanceKey);
 
-			if ($currentRebalance === 'running') {
-				Buddy::debugvv("Sharding rebalance: operation already running for table {$this->name}, skipping");
+			if ($currentRebalance === 'running' || $currentRebalance === 'queued') {
+				Buddy::debugvv(
+					"Sharding rebalance: operation already {$currentRebalance} for table {$this->name}, skipping"
+				);
 				return;
 			}
 
-			// Mark rebalancing as running
+			// Mark rebalancing as running with operation group info
 			$state->set($rebalanceKey, 'running');
+			$state->set("rebalance_group:{$this->name}", $operationGroup);
 
 			$schema = $this->getShardSchema();
 			$allNodes = $this->cluster->getNodes();
@@ -422,36 +460,359 @@ final class Table {
 			$schemaNodes = new Set($schema->map(fn($row) => $row['node']));
 			$newNodes = $activeNodes->diff($schemaNodes);
 
-			// Handle different rebalancing scenarios
+			// Check for stop signal before proceeding
+			if ($this->checkStopSignal()) {
+				$queue->rollbackOperationGroup($operationGroup);
+				$state->set($rebalanceKey, 'stopped');
+				$this->clearStopSignal();
+				return;
+			}
+
+		// Handle different rebalancing scenarios
 			if ($inactiveNodes->count() > 0) {
-				// Existing logic: handle failed nodes
+				// We're in partial state - some nodes are down.
+				// Do NOT rebalance to new nodes during partial state - wait for recovery first.
+				if ($newNodes->count() > 0) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: new nodes arrived during partial state"
+						. " ({$inactiveNodes->join(', ')} inactive) - waiting for full recovery"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
+
+				// RF=1 means no replicas exist - dead node's shards are unrecoverable, skip rebalancing
+				if ($this->getReplicationFactor($schema) === 1) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: RF=1 and nodes are inactive"
+						. " ({$inactiveNodes->join(', ')}) - data on failed nodes is unrecoverable"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
+
+				$rf = $this->getReplicationFactor($schema);
+
+				// Not enough nodes to maintain RF - skip
+				if ($activeNodes->count() < $rf) {
+					Buddy::info(
+						"Skipping rebalance for table {$this->name}: only {$activeNodes->count()} active nodes"
+						. " cannot maintain RF={$rf} ({$inactiveNodes->join(', ')} inactive)"
+					);
+					$state->set($rebalanceKey, 'idle');
+					return;
+				}
+
+				// Rebalance using active nodes only (no new nodes during partial state)
 				$newSchema = Util::rebalanceShardingScheme($schema, $activeNodes);
-				$this->handleFailedNodesRebalance($queue, $schema, $newSchema, $inactiveNodes);
+				$lastQueueId = $this->handleFailedNodesRebalance(
+					$queue, $schema, $newSchema, $inactiveNodes, $operationGroup
+				);
 			} elseif ($newNodes->count() > 0) {
-				// New logic: handle new nodes
 				$replicationFactor = $this->getReplicationFactor($schema);
-
 				$newSchema = Util::rebalanceWithNewNodes($schema, $newNodes, $replicationFactor);
-
-				// Log the schema changes
-				// Schema changes will be handled by rebalance operations
-
-				$this->handleNewNodesRebalance($queue, $schema, $newSchema, $newNodes);
+				$lastQueueId = $this->handleNewNodesRebalance($queue, $schema, $newSchema, $newNodes, $operationGroup);
 			} else {
 				// No changes needed
 				$state->set($rebalanceKey, 'idle');
 				return;
 			}
 
-			// Mark rebalancing as completed
-			$state->set($rebalanceKey, 'completed');
+			// Mark as committed — nodes will now start processing queue items for this group
+			$state->set("rebalance_committed:{$this->name}", $operationGroup);
+			$state->set($rebalanceKey, 'queued');
+			$state->set("rebalance_queue_ids:{$this->name}", $lastQueueId);
+			Buddy::info("Rebalancing queued for table {$this->name}");
 		} catch (\Throwable $t) {
-			// Mark rebalancing as failed and reset state
-			$state = new State($this->client);
-			$rebalanceKey = "rebalance:{$this->name}";
-			$state->set($rebalanceKey, 'failed');
-			var_dump($t->getMessage());
+			// Enhanced error handling with rollback
+			$this->handleRebalancingFailure($t, $operationGroup, $queue, $state);
 		}
+	}
+
+	/**
+	 * Stop rebalancing operation
+	 *
+	 * @param bool $graceful If true, complete current operation
+	 *                       before stopping
+	 *
+	 * @return array{
+	 *   status: string,
+	 *   message: string,
+	 *   current_status?: string,
+	 *   graceful?: bool,
+	 *   rollback_executed?: bool
+	 * } Status information
+	 */
+	public function stopRebalancing(bool $graceful = true): array {
+		$state = $this->state;
+		$rebalanceKey = "rebalance:{$this->name}";
+		$currentStatus = $state->get($rebalanceKey);
+
+		if ($currentStatus !== 'running') {
+			return [
+				'status' => 'not_running',
+				'message' => 'Rebalancing is not currently running',
+				'current_status' => is_string($currentStatus) ? $currentStatus : 'unknown',
+			];
+		}
+
+		if ($graceful) {
+			// Set stop signal - will be checked during next operation
+			$this->setStopSignal();
+			return [
+				'status' => 'stop_requested',
+				'message' => 'Graceful stop requested - will complete current operation',
+				'graceful' => true,
+			];
+		}
+
+		// Immediate stop with rollback
+		$operationGroup = $state->get("rebalance_group:{$this->name}");
+		if (is_string($operationGroup)) {
+			$queue = new Queue($this->cluster, $this->client);
+			$queue->rollbackOperationGroup($operationGroup);
+		}
+
+		$state->set($rebalanceKey, 'stopped');
+		$this->clearStopSignal();
+
+		return [
+			'status' => 'stopped',
+			'message' => 'Rebalancing stopped immediately with rollback',
+			'graceful' => false,
+			'rollback_executed' => true,
+		];
+	}
+
+	/**
+	 * Pause rebalancing (can be resumed later)
+	 * @return bool Success status
+	 */
+	public function pauseRebalancing(): bool {
+		$state = $this->state;
+		$rebalanceKey = "rebalance:{$this->name}";
+		$currentStatus = $state->get($rebalanceKey);
+
+		if ($currentStatus !== 'running') {
+			return false;
+		}
+
+		$state->set($rebalanceKey, 'paused');
+		return true;
+	}
+
+	/**
+	 * Resume paused rebalancing
+	 * @return bool Success status
+	 */
+	public function resumeRebalancing(): bool {
+		$state = $this->state;
+		$rebalanceKey = "rebalance:{$this->name}";
+		$currentStatus = $state->get($rebalanceKey);
+
+		if ($currentStatus !== 'paused') {
+			return false;
+		}
+
+		$state->set($rebalanceKey, 'running');
+		return true;
+	}
+
+	/**
+	 * Get detailed rebalancing progress
+	 *
+	 * @return array{
+	 *   status: string,
+	 *   table: string,
+	 *   operation_group: mixed,
+	 *   can_stop: bool,
+	 *   can_pause: bool,
+	 *   can_resume: bool,
+	 *   queue_total?: int,
+	 *   queue_completed?: int,
+	 *   queue_failed?: int,
+	 *   queue_pending?: int,
+	 *   progress_percentage?: float
+	 * } Progress information
+	 */
+	public function getRebalancingProgress(): array {
+		$state = $this->state;
+		$rebalanceKey = "rebalance:{$this->name}";
+		$status = $state->get($rebalanceKey) ?? 'idle';
+		$operationGroup = $state->get("rebalance_group:{$this->name}");
+
+		$progress = [
+			'status' => is_string($status) ? $status : 'idle',
+			'table' => $this->name,
+			'operation_group' => $operationGroup,
+			'can_stop' => in_array($status, ['running', 'paused']),
+			'can_pause' => $status === 'running',
+			'can_resume' => $status === 'paused',
+		];
+
+		if (is_string($operationGroup)) {
+			// Get queue progress for this operation group
+			$queueProgress = $this->getQueueProgress($operationGroup);
+			$progress = array_merge($progress, $queueProgress);
+		}
+
+		return $progress;
+	}
+
+	/**
+	 * Reset rebalancing state
+	 * @return bool Success status
+	 */
+	public function resetRebalancingState(): bool {
+		$state = $this->state;
+		$rebalanceKey = "rebalance:{$this->name}";
+		$state->set($rebalanceKey, 'idle');
+		$state->delete("rebalance_group:{$this->name}");
+		$this->clearStopSignal();
+		return true;
+	}
+
+	/**
+	 * Check if stop signal is set
+	 * @return bool
+	 */
+	protected function checkStopSignal(): bool {
+		$state = $this->state;
+		return $state->get("stop_signal:{$this->name}") !== null;
+	}
+
+	/**
+	 * Set stop signal for graceful stopping
+	 * @return void
+	 */
+	protected function setStopSignal(): void {
+		$state = $this->state;
+		$state->set("stop_signal:{$this->name}", time());
+	}
+
+	/**
+	 * Clear stop signal
+	 * @return void
+	 */
+	protected function clearStopSignal(): void {
+		$state = $this->state;
+		$state->delete("stop_signal:{$this->name}");
+	}
+
+	/**
+	 * Handle rebalancing failure with comprehensive rollback
+	 * @param \Throwable $error
+	 * @param string $operationGroup
+	 * @param Queue $queue
+	 * @param ?State $state
+	 * @return void
+	 */
+	protected function handleRebalancingFailure(
+		\Throwable $error,
+		string $operationGroup,
+		Queue $queue,
+		?State $state = null
+	): void {
+		if (!$state) {
+			$state = $this->state;
+		}
+		$rebalanceKey = "rebalance:{$this->name}";
+
+		try {
+			// Execute rollback for the entire operation group if provided
+			$rollbackSuccess = false;
+			if ($operationGroup) {
+				$rollbackSuccess = $queue->rollbackOperationGroup($operationGroup);
+			}
+
+			// Mark as failed with rollback info
+			$state->set($rebalanceKey, 'failed');
+			$state->delete("rebalance_group:{$this->name}");
+
+			// Store error information for debugging
+			$errorInfo = [
+				'error_message' => $error->getMessage(),
+				'error_type' => $error::class,
+				'failed_at' => time(),
+				'operation_group' => $operationGroup,
+				'rollback_executed' => $operationGroup ? true : false,
+				'rollback_success' => $rollbackSuccess,
+			];
+
+			$state->set("rebalance_error:{$this->name}", json_encode($errorInfo));
+
+			// Clear stop signal if set
+			$this->clearStopSignal();
+
+			Buddy::debugvv(
+				"Rebalancing failed for table {$this->name}: " . $error->getMessage() .
+				' (Rollback ' . ($rollbackSuccess ? 'successful' : 'failed') . ')'
+			);
+		} catch (\Throwable $rollbackError) {
+			// Rollback itself failed - critical situation
+			$state->set($rebalanceKey, 'critical_failure');
+
+			Buddy::debugvv(
+				"CRITICAL: Rebalancing AND rollback failed for table {$this->name}. " .
+						  'Original error: ' . $error->getMessage() .
+				' Rollback error: ' . $rollbackError->getMessage()
+			);
+		}
+
+		// Re-throw original error for upstream handling
+		throw $error;
+	}
+
+	/**
+	 * Get queue progress for operation group
+	 * @param string $operationGroup
+	 *
+	 * @return array{
+	 *   queue_total: int,
+	 *   queue_completed: int,
+	 *   queue_failed: int,
+	 *   queue_pending: int,
+	 *   progress_percentage: float
+	 * }
+	 */
+	protected function getQueueProgress(string $operationGroup): array {
+		$table = $this->cluster->getSystemTableName('system.sharding_queue');
+
+		$query = "
+			SELECT
+				COUNT(*) as total,
+				SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) as completed,
+				SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as failed,
+				SUM(CASE WHEN status IN ('created', 'processing') THEN 1 ELSE 0 END) as pending
+			FROM {$table}
+			WHERE operation_group = '{$operationGroup}'
+		";
+
+		/** @var array{0?:array{data?:array{0?:array{total:int,completed:int,failed:int,pending:int}}}} */
+		$result = $this->client->sendRequest($query)->getResult();
+		$data = $result[0]['data'][0] ?? [];
+
+		// Handle case where query returns no results (empty data)
+		if (empty($data)) {
+			return [
+				'queue_total' => 0,
+				'queue_completed' => 0,
+				'queue_failed' => 0,
+				'queue_pending' => 0,
+				'progress_percentage' => 0.0,
+			];
+		}
+
+		/** @var array{total:int,completed:int,failed:int,pending:int} $data */
+		return [
+			'queue_total' => $data['total'],
+			'queue_completed' => $data['completed'],
+			'queue_failed' => $data['failed'],
+			'queue_pending' => $data['pending'],
+			'progress_percentage' => $data['total'] > 0
+				? round(($data['completed'] / $data['total']) * 100, 2)
+				: 0.0,
+		];
 	}
 
 	/**
@@ -497,17 +858,20 @@ final class Table {
 		Vector $affectedSchema,
 		Vector $newSchema,
 		Map $shardNodesMap,
-		Map $clusterMap
+		Map $clusterMap,
+		string $operationGroup = ''
 	): Map {
 		/** @var Set<string> */
 		$processedTables = new Set;
 
 		foreach ($affectedSchema as $row) {
 			// First thing first, remove from inactive node using the queue
-			$this->cleanUpNode($queue, $row['node'], $row['shards'], $processedTables);
+			$this->cleanUpNode($queue, $row['node'], $row['shards'], $processedTables, $operationGroup);
 
 			// Do real rebalance now
-			$clusterMap = $this->rebalanceShards($queue, $row, $newSchema, $shardNodesMap, $clusterMap);
+			$clusterMap = $this->rebalanceShards(
+				$queue, $row, $newSchema, $shardNodesMap, $clusterMap, $operationGroup
+			);
 		}
 
 		return $clusterMap;
@@ -527,26 +891,27 @@ final class Table {
 		array $row,
 		Vector $newSchema,
 		Map $shardNodesMap,
-		Map $clusterMap
+		Map $clusterMap,
+		string $operationGroup = ''
 	): Map {
 		foreach ($row['shards'] as $shard) {
 			/** @var Set<string> */
 			$nodesForShard = new Set;
 
 			foreach ($newSchema as $newRow) {
-				// The case when this shards should not be here
 				if (!$newRow['shards']->contains($shard)) {
 					continue;
 				}
 				$nodesForShard->add($newRow['node']);
 			}
 
-			// This is exception, actually
 			if (!$nodesForShard->count()) {
 				continue;
 			}
 
-			$clusterMap = $this->handleShardReplication($queue, $shard, $nodesForShard, $shardNodesMap, $clusterMap);
+			$clusterMap = $this->handleShardReplication(
+				$queue, $shard, $nodesForShard, $shardNodesMap, $clusterMap, $operationGroup
+			);
 		}
 
 		return $clusterMap;
@@ -559,6 +924,7 @@ final class Table {
 	 * @param Set<string> $nodesForShard
 	 * @param Map<int,Set<string>> $shardNodesMap
 	 * @param Map<string,Cluster> $clusterMap
+	 * @param string $operationGroup
 	 * @return Map<string,Cluster>
 	 */
 	private function handleShardReplication(
@@ -566,16 +932,12 @@ final class Table {
 		int $shard,
 		Set $nodesForShard,
 		Map $shardNodesMap,
-		Map $clusterMap
+		Map $clusterMap,
+		string $operationGroup = ''
 	): Map {
-		// It's very important here to start replication
-		// From the live node first due to
-		// cluster should be created there first
-		// We use previously generated shard to nodes map
 		/** @var Set<string> */
 		$shardNodes = $shardNodesMap[$shard];
 
-		// If this happens, we have no alive shard, this is critical, but do nothing for now
 		if (!$shardNodes->count()) {
 			return $clusterMap;
 		}
@@ -584,14 +946,13 @@ final class Table {
 		/** @var Set<string> */
 		$connectedNodes = $nodesForShard->merge($shardNodes);
 
-		// Reconfigure on alive shard
-		// Cuz it's the main shard where we have data already
 		return $this->handleReplication(
 			$aliveNode,
 			$queue,
 			$connectedNodes,
 			$clusterMap,
-			$shard
+			$shard,
+			$operationGroup
 		);
 	}
 
@@ -601,14 +962,16 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
 	 * @param Set<string> $inactiveNodes
-	 * @return void
+	 * @param string $operationGroup
+	 * @return array<string,int> Map of node => last queue ID
 	 */
 	protected function handleFailedNodesRebalance(
 		Queue $queue,
 		Vector $schema,
 		Vector $newSchema,
-		Set $inactiveNodes
-	): void {
+		Set $inactiveNodes,
+		string $operationGroup = ''
+	): array {
 		// Initialize cluster map and shard nodes mapping
 		$initData = $this->initializeClusterMap($schema, $inactiveNodes);
 		$shardNodesMap = $initData['shardNodesMap'];
@@ -619,11 +982,11 @@ final class Table {
 		);
 
 		// Process affected shards for rebalancing
-		$this->processAffectedShards($queue, $affectedSchema, $newSchema, $shardNodesMap, $clusterMap);
+		$this->processAffectedShards($queue, $affectedSchema, $newSchema, $shardNodesMap, $clusterMap, $operationGroup);
 
 		// Update schema in database FIRST, then create distributed tables
 		$this->updateScheme($newSchema);
-		$this->createDistributedTablesFromSchema($queue, $newSchema);
+		return $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
 	}
 
 	/**
@@ -632,16 +995,22 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
 	 * @param Set<string> $newNodes
-	 * @return void
+	 * @param string $operationGroup
+	 * @return array<string,int> Map of node => last queue ID
 	 */
-	protected function handleNewNodesRebalance(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): void {
+	protected function handleNewNodesRebalance(
+		Queue $queue,
+		Vector $schema,
+		Vector $newSchema,
+		Set $newNodes,
+		string $operationGroup = ''
+	): array {
 		$replicationFactor = $this->getReplicationFactor($schema);
 
 		if ($replicationFactor === 1) {
-			$this->handleRF1NewNodes($queue, $schema, $newSchema, $newNodes);
-		} else {
-			$this->handleRFNNewNodes($queue, $schema, $newSchema, $newNodes);
+			return $this->handleRF1NewNodes($queue, $schema, $newSchema, $newNodes, $operationGroup);
 		}
+		return $this->handleRFNNewNodes($queue, $schema, $newSchema, $newNodes, $operationGroup);
 	}
 
 	/**
@@ -650,9 +1019,15 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
 	 * @param Set<string> $newNodes
-	 * @return void
+	 * @return array<string,int> Map of node => last queue ID
 	 */
-	protected function handleRF1NewNodes(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): void {
+	protected function handleRF1NewNodes(
+		Queue $queue,
+		Vector $schema,
+		Vector $newSchema,
+		Set $newNodes,
+		string $operationGroup = ''
+	): array {
 		// For RF=1, we need to move shards from existing nodes to new nodes
 		// This requires careful orchestration with temporary clusters
 
@@ -678,10 +1053,11 @@ final class Table {
 
 		$this->updateScheme($newSchema);
 
-		$this->createDistributedTablesFromSchema($queue, $newSchema);
+		$nodeTailIds = $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
 
 		// Reset wait for id
 		$queue->resetWaitForId();
+		return $nodeTailIds;
 	}
 
 	/**
@@ -690,11 +1066,18 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
 	 * @param Set<string> $newNodes
-	 * @return void
+	 * @return array<string,int> Map of node => last queue ID
 	 */
-	protected function handleRFNNewNodes(Queue $queue, Vector $schema, Vector $newSchema, Set $newNodes): void {
+	protected function handleRFNNewNodes(
+		Queue $queue,
+		Vector $schema,
+		Vector $newSchema,
+		Set $newNodes,
+		string $operationGroup = ''
+	): array {
 		/** @var Map<string,Cluster> */
 		$clusterMap = new Map;
+		$lastQueueId = 0;
 
 		// For RF>=2, we add new nodes as replicas to existing shards
 		foreach ($newNodes as $newNode) {
@@ -703,7 +1086,11 @@ final class Table {
 
 			foreach ($shardsForNewNode as $shard) {
 				// Create shard table on new node
-				$queue->add($newNode, $this->getCreateTableShardSQL($shard));
+				$shardName = $this->getShardName($shard);
+				$rollback = "DROP TABLE IF EXISTS {$shardName}";
+				$lastQueueId = $queue->add(
+					$newNode, $this->getCreateTableShardSQL($shard), $rollback, $operationGroup
+				);
 
 				// Set up replication from existing nodes
 				$existingNodes = $this->getExistingNodesForShard($schema, $shard);
@@ -720,36 +1107,56 @@ final class Table {
 					$queue,
 					$connectedNodes,
 					$clusterMap,
-					$shard
+					$shard,
+					$operationGroup
 				);
 			}
 		}
 
-		// Update schema in database FIRST, then create distributed tables
+		// Flush pending ALTER CLUSTER ADD for all new clusters
+		foreach ($clusterMap as $cluster) {
+			$cluster->processPendingTables($queue, $operationGroup);
+		}
+
+		// Defer schema update until all queue operations complete so that the next
+		// checkBalance tick does not see the new node in the schema while it is still
+		// inactive (which would trigger a spurious handleFailedNodesRebalance and a
+		// wrong ALTER CLUSTER DROP on the not-yet-existing cluster).
+		if ($lastQueueId > 0) {
+			$queue->setWaitForId($lastQueueId);
+		}
 		$this->updateScheme($newSchema);
-		$this->createDistributedTablesFromSchema($queue, $newSchema);
+		$nodeTailIds = $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
+		$queue->resetWaitForId();
+		return $nodeTailIds;
 	}
 
 	/**
 	 * Create distributed tables from schema
 	 * @param Queue $queue
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $newSchema
-	 * @return void
+	 * @return array<string,int> Map of node => last queue ID added for that node
 	 */
-	protected function createDistributedTablesFromSchema(Queue $queue, Vector $newSchema): void {
+	protected function createDistributedTablesFromSchema(
+		Queue $queue,
+		Vector $newSchema,
+		string $operationGroup = ''
+	): array {
 		/** @var Set<int> */
 		$dropQueueIds = new Set;
 
 		// First, drop all distributed tables with proper force option
 		foreach ($newSchema as $row) {
 			$sql = "DROP TABLE IF EXISTS {$this->name} OPTION force=1";
-			$queueId = $queue->add($row['node'], $sql);
+			$queueId = $queue->add($row['node'], $sql, '', $operationGroup);
 			$dropQueueIds->add($queueId);
 		}
 
 		// Then create new distributed tables, waiting for all drops to complete
 		$lastDropId = $dropQueueIds->count() > 0 ? max($dropQueueIds->toArray()) : 0;
 
+		/** @var array<string,int> $nodeTailIds */
+		$nodeTailIds = [];
 		foreach ($newSchema as $row) {
 			// Do nothing when no shards present for this node
 			if (!$row['shards']->count()) {
@@ -761,33 +1168,36 @@ final class Table {
 				$queue->setWaitForId($lastDropId);
 			}
 
-			// Pass the calculated schema to avoid database timing issues
 			$sql = $this->getCreateShardedTableSQLWithSchema($row['shards'], $newSchema);
-			$queue->add($row['node'], $sql);
+			$lastQueueId = $queue->add($row['node'], $sql, "DROP TABLE IF EXISTS {$this->name}", $operationGroup);
+			$nodeTailIds[$row['node']] = $lastQueueId;
 		}
 
 		// Reset wait for id
 		$queue->resetWaitForId();
+		return $nodeTailIds;
 	}
 
 	/**
-	 * Get replication factor from current schema
+	 * Get replication factor from current schema by counting how many nodes hold each shard
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @return int
 	 */
-	protected function getReplicationFactor(Vector $schema): int {
-		if ($schema->count() === 0) {
+	public function getReplicationFactor(Vector $schema): int {
+		if ($schema->isEmpty()) {
 			return 1;
 		}
 
-		// Find the maximum number of connections for any shard
-		$maxConnections = 1;
+		$shardCounts = new Map();
 		foreach ($schema as $row) {
-			$maxConnections = max($maxConnections, $row['connections']->count());
+			foreach ($row['shards'] as $shard) {
+				$shardCounts->put($shard, $shardCounts->get($shard, 0) + 1);
+			}
 		}
 
-		return $maxConnections;
+		return $shardCounts->isEmpty() ? 1 : max($shardCounts->values()->toArray());
 	}
+
 
 	/**
 	 * Calculate which shards should move for RF=1 rebalancing
@@ -855,18 +1265,27 @@ final class Table {
 		$tempClusterName = "temp_move_{$shardId}_" . uniqid();
 
 		// Step 1: Create shard table on target node
-		$createQueueId = $queue->add($targetNode, $this->getCreateTableShardSQL($shardId));
+		$createQueueId = $queue->add(
+			$targetNode,
+			$this->getCreateTableShardSQL($shardId),
+			"DROP TABLE IF EXISTS {$shardName}"
+		);
 
 		// Step 2: Create temporary cluster on SOURCE node (where the data IS)
 		// CRITICAL: Use cluster name as path to ensure uniqueness for intermediate clusters
 		$clusterQueueId = $queue->add(
 			$sourceNode,
-			"CREATE CLUSTER {$tempClusterName} '{$tempClusterName}' as path"
+			"CREATE CLUSTER {$tempClusterName} '{$tempClusterName}' as path",
+			"DELETE CLUSTER {$tempClusterName}"
 		);
 
 		// Step 3: Add shard to cluster on SOURCE node FIRST (before JOIN)
 		$queue->setWaitForId($clusterQueueId);
-		$queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} ADD {$shardName}");
+		$queue->add(
+			$sourceNode,
+			"ALTER CLUSTER {$tempClusterName} ADD {$shardName}",
+			"ALTER CLUSTER {$tempClusterName} DROP {$shardName}"
+		);
 
 		// Step 4: NEW node joins the cluster that SOURCE created
 		// Wait for table creation on target node to complete first
@@ -874,21 +1293,26 @@ final class Table {
 		$queue->setWaitForId($createQueueId);
 		$joinQueueId = $queue->add(
 			$targetNode,
-			"JOIN CLUSTER {$tempClusterName} AT '{$sourceNode}' '{$tempClusterName}' as path "
+			"JOIN CLUSTER {$tempClusterName} AT '{$sourceNode}' '{$tempClusterName}' as path ",
+			"DELETE CLUSTER {$tempClusterName}"
 		);
 
 		// Step 5: CRITICAL - Wait for JOIN to complete (data is now synced)
 		// JOIN CLUSTER is synchronous, so once it's processed, data is fully copied
 		$queue->setWaitForId($joinQueueId);
-		$dropQueueId = $queue->add($sourceNode, "ALTER CLUSTER {$tempClusterName} DROP {$shardName}");
+		$dropQueueId = $queue->add(
+			$sourceNode,
+			"ALTER CLUSTER {$tempClusterName} DROP {$shardName}",
+			"ALTER CLUSTER {$tempClusterName} ADD {$shardName}"
+		);
 
 		// Step 6: Only after DROP from cluster, remove the table from source
 		$queue->setWaitForId($dropQueueId);
-		$deleteQueueId = $queue->add($sourceNode, "DROP TABLE {$shardName}");
+		$deleteQueueId = $queue->add($sourceNode, "DROP TABLE {$shardName}", '');
 
 		// Step 7: Clean up temporary cluster ONLY on SOURCE node after all operations complete
 		$queue->setWaitForId($deleteQueueId);
-		return $queue->add($sourceNode, "DELETE CLUSTER {$tempClusterName}");
+		return $queue->add($sourceNode, "DELETE CLUSTER {$tempClusterName}", '');
 	}
 
 	/**
@@ -929,29 +1353,20 @@ final class Table {
 	 * @return bool
 	 */
 	public function canStartRebalancing(): bool {
-		$state = new State($this->client);
+		$state = $this->state;
 		$rebalanceKey = "rebalance:{$this->name}";
 		$currentRebalance = $state->get($rebalanceKey);
 
 		return $currentRebalance !== 'running';
 	}
 
-	/**
-	 * Reset rebalancing state (useful for recovery)
-	 * @return void
-	 */
-	public function resetRebalancingState(): void {
-		$state = new State($this->client);
-		$rebalanceKey = "rebalance:{$this->name}";
-		$state->set($rebalanceKey, 'idle');
-	}
 
 	/**
 	 * Get current rebalancing status
 	 * @return string
 	 */
 	public function getRebalancingStatus(): string {
-		$state = new State($this->client);
+		$state = $this->state;
 		$rebalanceKey = "rebalance:{$this->name}";
 		$status = $state->get($rebalanceKey);
 		return is_string($status) ? $status : 'idle';
@@ -968,10 +1383,16 @@ final class Table {
 	 *  in cluster environment and anyway will be rercreated for another sharded table or whatever
 	 * @return Set<int>
 	 */
-	public function cleanUpNode(Queue $queue, string $nodeId, Set $shards, Set $processedTables): Set {
+	public function cleanUpNode(
+		Queue $queue,
+		string $nodeId,
+		Set $shards,
+		Set $processedTables,
+		string $operationGroup = ''
+	): Set {
 		/** @var Set<int> */
 		$queueIds = new Set;
-		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$this->name} OPTION force=1");
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$this->name} OPTION force=1", '', $operationGroup);
 
 		foreach ($shards as $shard) {
 			$connections = $this->getConnectedNodes(new Set([$shard]));
@@ -980,16 +1401,11 @@ final class Table {
 
 			if (sizeof($connections) > 1) {
 				$this->handleClusteredCleanUp(
-					$queue,
-					$nodeId,
-					$connections,
-					$clusterName,
-					$table,
-					$queueIds,
-					$processedTables
+					$queue, $nodeId, $connections, $clusterName,
+					$table, $queueIds, $processedTables, $operationGroup
 				);
 			} else {
-				$this->handleSingleNodeCleanUp($queue, $nodeId, $table, $queueIds);
+				$this->handleSingleNodeCleanUp($queue, $nodeId, $table, $queueIds, $operationGroup);
 			}
 		}
 
@@ -1008,7 +1424,6 @@ final class Table {
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 * @throws Exception
-	 * @return void
 	 */
 	private function handleClusteredCleanUp(
 		Queue $queue,
@@ -1017,25 +1432,44 @@ final class Table {
 		string $clusterName,
 		string $table,
 		Set $queueIds,
-		Set $processedTables
+		Set $processedTables,
+		string $operationGroup = ''
 	): void {
+		$aliveRemoveId = 0;
 		if (!$processedTables->contains($table)) {
-			foreach ($connections as $connectedNode) {
-				if ($connectedNode === $nodeId) {
-					continue;
-				}
-				$cluster = new Cluster(
-					$this->client,
-					$clusterName,
-					$connectedNode
-				);
+			// Mark processed BEFORE the operation so no other iteration can duplicate it
+			$processedTables->add($table);
+
+			// Pick ONE alive node (sorted for determinism) — ALTER CLUSTER DROP replicates to all
+			// alive members; running it on multiple nodes causes "table not in cluster" on the second attempt
+			$aliveNodes = $connections->filter(fn($n) => $n !== $nodeId);
+			$aliveNodes->sort();
+			$aliveNode = $aliveNodes->first();
+
+			if ($aliveNode) {
+				$cluster = new Cluster($this->client, $clusterName, $aliveNode);
+				// Bootstrap the surviving node as primary so it can accept cluster operations
+				// while the dead node is still listed as a member
 				$queueIds[] = $cluster->makePrimary($queue);
-				$queueIds[] = $cluster->removeTables($queue, $table);
-				$processedTables->add($table);
+				$aliveRemoveId = $cluster->removeTables($queue, [$table]);
+				$queueIds[] = $aliveRemoveId;
 			}
 		}
 
-		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}");
+		// ALTER CLUSTER DROP on the alive node replicates only to alive members — the dead node
+		// was offline and missed it, so it still owns the table as a cluster member when it comes back.
+		// Queue ALTER CLUSTER DROP on the dead node itself (waiting for the alive node's DROP first
+		// so cluster state is consistent), then DROP TABLE waiting on that.
+		$deadNodeCluster = new Cluster($this->client, $clusterName, $nodeId);
+		if ($aliveRemoveId > 0) {
+			$queue->setWaitForId($aliveRemoveId);
+		}
+		$deadNodeRemoveId = $deadNodeCluster->removeTables($queue, [$table]);
+		$queueIds[] = $deadNodeRemoveId;
+
+		$queue->setWaitForId($deadNodeRemoveId);
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}", '', $operationGroup);
+		$queue->resetWaitForId();
 	}
 
 	/**
@@ -1043,12 +1477,19 @@ final class Table {
 	 * @param string $nodeId
 	 * @param string $table
 	 * @param Set<int> &$queueIds
+	 * @param string $operationGroup
 	 * @return void
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 */
-	private function handleSingleNodeCleanUp(Queue $queue, string $nodeId, string $table, Set &$queueIds): void {
-		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}");
+	private function handleSingleNodeCleanUp(
+		Queue $queue,
+		string $nodeId,
+		string $table,
+		Set &$queueIds,
+		string $operationGroup = ''
+	): void {
+		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}", '', $operationGroup);
 	}
 	/**
 	 * Convert schema to map where each shard has nodes
@@ -1243,8 +1684,9 @@ final class Table {
 		$agents = $this->buildAgentDefinitions($map, $shards, $replicationFactor);
 
 		// Finally generate create table
-		return "CREATE TABLE `{$this->name}`
-			type='distributed' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
+		$structure = $this->structure ? "({$this->structure})" : '';
+		return "CREATE TABLE `{$this->name}` {$structure}
+			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
 			";
 	}
 
@@ -1296,8 +1738,9 @@ final class Table {
 		$agents = $this->buildAgentDefinitions($map, $shards, $replicationFactor);
 
 		// Finally generate create table
-		return "CREATE TABLE `{$this->name}`
-			type='distributed' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
+		$structure = $this->structure ? "({$this->structure})" : '';
+		return "CREATE TABLE `{$this->name}` {$structure}
+			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
 			";
 	}
 
@@ -1357,7 +1800,7 @@ final class Table {
 	 * @param  string $shards
 	 * @return Set<int>
 	 */
-	protected static function parseShards(string $shards): Set {
+	public static function parseShards(string $shards): Set {
 		return trim($shards) !== ''
 			? new Set(array_map('intval', explode(',', $shards)))
 			: new Set
@@ -1383,7 +1826,7 @@ final class Table {
 		Map $clusterMap
 	): void {
 		// Calculate original replication factor to ensure safe operations
-		$originalRf = $this->calculateReplicationFactor($oldSchema);
+		$originalRf = $this->getReplicationFactor($oldSchema);
 
 		// Create map of old schema for comparison
 		/** @var Map<string,Set<int>> */
@@ -1404,7 +1847,8 @@ final class Table {
 			// Create missing shard tables on this node
 			foreach ($shardsToCreate as $shard) {
 				$sql = $this->getCreateTableShardSQL($shard);
-				$queue->add($row['node'], $sql);
+				$shardName = $this->getShardName($shard);
+				$queue->add($row['node'], $sql, "DROP TABLE IF EXISTS {$shardName}");
 
 				// Find nodes that already have this shard in old schema for replication
 				$existingNodesWithShard = $oldSchema->filter(
@@ -1432,31 +1876,4 @@ final class Table {
 		}
 	}
 
-	/**
-	 * Calculate the original replication factor from the schema
-	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
-	 * @return int
-	 */
-	private function calculateReplicationFactor(Vector $schema): int {
-		if ($schema->isEmpty()) {
-			return 1;
-		}
-
-		// Count how many nodes have each shard
-		$shardCounts = new Map();
-
-		foreach ($schema as $row) {
-			foreach ($row['shards'] as $shard) {
-				$currentCount = $shardCounts->get($shard, 0);
-				$shardCounts->put($shard, $currentCount + 1);
-			}
-		}
-
-		if ($shardCounts->isEmpty()) {
-			return 1;
-		}
-
-		// The replication factor is the maximum count of any shard
-		return max($shardCounts->values()->toArray());
-	}
 }

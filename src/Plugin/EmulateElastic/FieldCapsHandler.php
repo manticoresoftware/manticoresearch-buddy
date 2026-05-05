@@ -181,7 +181,10 @@ class FieldCapsHandler extends BaseHandlerWithClient {
 		$requestTables = [];
 		foreach ($queryResult[0]['data'] as $tableData) {
 			// Exclude Manticore tables with meta data
-			if ($tableData['Type'] === 'distributed' || in_array(substr($tableData['Table'], 0, 1), ['_', '.'])) {
+			$skipTypes = ['distributed', 'shard'];
+			if (in_array($tableData['Type'], $skipTypes, true)
+				|| in_array(substr($tableData['Table'], 0, 1), ['_', '.'])
+			) {
 				continue;
 			}
 			$requestTables[] = $tableData['Table'];

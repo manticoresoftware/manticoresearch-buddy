@@ -250,4 +250,29 @@ class UtilTest extends TestCase {
 			);
 		}
 	}
+
+	/**
+	 * RF=1 node failure: the dead node actually held shards.
+	 * rebalanceShardingScheme must NOT assign those shards to surviving nodes
+	 * (there are no replicas to copy from — data is unrecoverable).
+	 * The caller (Table::rebalance) is responsible for skipping the operation,
+	 * but the schema returned here must reflect reality: dead shards are gone.
+	 */
+	public function testRebalanceRf1NodeWithShardsGoesDown(): void {
+		// 2 nodes, 4 shards, RF=1: round-robin assignment → node1→[0,2], node2→[1,3]
+		$schema = Util::createShardingSchema(new Set(['node1', 'node2']), 4, 1);
+
+		$this->assertEquals([0, 2], $schema->get(0)['shards']->toArray());
+		$this->assertEquals([1, 3], $schema->get(1)['shards']->toArray());
+
+		// node2 goes down — its shards 1 and 3 are lost (RF=1, no replicas)
+		// but the shard slots are reassigned to the surviving node to keep schema consistent
+		$activeNodes = new Set(['node1']);
+		$rebalanced = Util::rebalanceShardingScheme($schema, $activeNodes);
+
+		// Only the surviving node remains with all shard slots
+		$this->assertCount(1, $rebalanced);
+		$this->assertSame('node1', $rebalanced->get(0)['node']);
+		$this->assertEquals([0, 2, 1, 3], $rebalanced->get(0)['shards']->toArray());
+	}
 }

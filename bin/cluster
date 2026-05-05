@@ -18,7 +18,7 @@ fi
 for n in $(seq 1 $nodes); do
 	cat << EOF > $DIR/manticore-${n}.conf
 searchd {
-	buddy_path = manticore-executor /workdir/src/main.php --log-level=debugvv
+	buddy_path = manticore-executor /workdir/src/main.php
 	listen = 127.0.0.1:${n}9312
 	listen = 127.0.0.1:${n}9306:mysql
 	listen = 127.0.0.1:${n}9308:http
@@ -47,11 +47,11 @@ trap stop_processes SIGINT
 for n in $(seq 1 $nodes); do
 	test -d /var/lib/manticore/$n && rm -rf $_
 	mkdir -p /var/lib/manticore/$n
-	searchd --config "$DIR/manticore-${n}.conf" --nodetach > >(sed 's/^/['$n'] /') 2>&1 &
+	searchd --config "$DIR/manticore-${n}.conf" --logdebugvv --nodetach > >(sed 's/^/['$n'] /') 2>&1 &
 done
 
 # Wait for all searchd processes to start
-sleep 2
+sleep 5
 
 # Creating cluster
 mysql -h0 -P19306 -e 'CREATE CLUSTER c'

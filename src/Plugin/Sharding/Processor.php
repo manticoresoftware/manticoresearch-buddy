@@ -60,6 +60,14 @@ final class Processor extends BaseProcessor {
 			return false;
 		}
 
+		// Only check sharding cluster states when there is actually work to do —
+		// avoids a SHOW STATUS round-trip on every tick when the queue is idle.
+		if ($operator->getQueue()->hasPending($operator->node)
+			&& !Cluster::areAllShardingClustersPrimary($this->client)
+		) {
+			return false;
+		}
+
 		$operator->processQueue();
 
 		// heartbeat and mark current node state
@@ -74,6 +82,7 @@ final class Processor extends BaseProcessor {
 		}
 
 		// Next only on master
+		$operator->checkRebalanceStatus();
 		$operator->checkBalance();
 
 		return false;
