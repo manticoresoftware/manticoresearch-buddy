@@ -98,7 +98,6 @@ Model with prompt, transport options, and retrieval settings:
 ```sql
 CREATE CHAT MODEL support_assistant (
     model='openai:gpt-4o-mini',
-    style_prompt='Answer in Chinese language',
     api_key='sk-...',
     base_url='http://host.docker.internal:8787/v1',
     timeout=60,
@@ -112,7 +111,6 @@ Common options:
 | Option | Required | Description |
 |---|---:|---|
 | `model` | Yes | LLM model id in `provider:model` format |
-| `style_prompt` | No | Extra instruction prepended to response generation |
 | `description` | No | Stored description |
 | `api_key` | No | Provider API key passed to the `llm` extension |
 | `base_url` | No | Provider or proxy base URL |
@@ -315,7 +313,6 @@ INSERT INTO docs(id, title, content) VALUES
 
 CREATE CHAT MODEL assistant (
     model='openai:gpt-4o-mini',
-    style_prompt='Answer in one line.',
     retrieval_limit=5,
     max_document_length=3000
 );

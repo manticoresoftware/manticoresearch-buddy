@@ -48,7 +48,6 @@ class ConversationalPayloadTest extends TestCase {
 	public function testSQLCreateModelParsing(): void {
 		$query = "CREATE CHAT MODEL 'test_model' (
 			model = 'openai:gpt-4',
-			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5
 		)";
 
@@ -59,7 +58,6 @@ class ConversationalPayloadTest extends TestCase {
 			[
 				'identifier' => 'test_model',
 				'model' => 'openai:gpt-4',
-				'style_prompt' => 'You are a helpful assistant.',
 				'retrieval_limit' => 5,
 			]
 		);
@@ -144,7 +142,6 @@ class ConversationalPayloadTest extends TestCase {
 	public function testSQLCreateModelParsingWithFlatOptions(): void {
 		$query = "CREATE CHAT MODEL advanced_assistant (
 			model='openai:gpt-4o',
-			style_prompt='You are a helpful assistant specializing in search technology',
 			api_key='sk-test',
 			base_url='http://host.docker.internal:8787/v1',
 			timeout=60,

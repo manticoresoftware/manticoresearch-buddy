@@ -45,7 +45,6 @@ class IntegrationTest extends TestCase {
 	public function testFullCreateModelFlow(): void {
 		$query = "CREATE CHAT MODEL 'test_model' (
 			model = 'openai:gpt-4',
-			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5
 		)";
 
@@ -65,7 +64,6 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('create_model', $payload->action);
 		$this->assertEquals('test_model', $payload->params['identifier']);
 		$this->assertEquals('openai:gpt-4', $payload->params['model']);
-		$this->assertEquals('You are a helpful assistant.', $payload->params['style_prompt']);
 		$this->assertEquals(5, $payload->params['retrieval_limit']);
 	}
 
@@ -206,7 +204,6 @@ class IntegrationTest extends TestCase {
 		// 1. Create model
 		$createQuery = "CREATE CHAT MODEL 'lifecycle_test' (
 			model = 'openai:gpt-4o-mini',
-			style_prompt = 'You are a test assistant.',
 			retrieval_limit = 3
 		)";
 
@@ -226,7 +223,6 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('create_model', $createPayload->action);
 		$this->assertEquals('lifecycle_test', $createPayload->params['identifier']);
 		$this->assertEquals('openai:gpt-4o-mini', $createPayload->params['model']);
-		$this->assertEquals('You are a test assistant.', $createPayload->params['style_prompt']);
 		$this->assertEquals(3, $createPayload->params['retrieval_limit']);
 
 		// 2. Show models

@@ -525,7 +525,6 @@ class ConversationValidationTest extends TestCase {
 	public function testValidModelConfiguration(): void {
 		$query = "CREATE CHAT MODEL 'test_model' (
 			model = 'openai:gpt-4',
-			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5,
 			max_document_length = 4000
 		)";

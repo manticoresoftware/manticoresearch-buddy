@@ -47,7 +47,6 @@ class ConversationalSearchSqlTest extends TestCase {
 		$result = static::runSqlQuery(
 			"CREATE CHAT MODEL '{$modelName}' (
 				model = 'openai:gpt-4',
-				style_prompt = 'You are a helpful assistant.',
 				retrieval_limit = 5
 			)"
 		);
@@ -94,7 +93,6 @@ class ConversationalSearchSqlTest extends TestCase {
 		$result = static::runSqlQuery(
 			"CREATE CHAT MODEL '{$modelName}' (
 				model = 'openai:gpt-4',
-				style_prompt = 'Test assistant',
 				retrieval_limit = 3
 			)"
 		);
@@ -146,7 +144,6 @@ class ConversationalSearchSqlTest extends TestCase {
 		$result = static::runSqlQuery(
 			"CREATE CHAT MODEL '{$modelName}' (
 				model = 'openai:gpt-4',
-				style_prompt = 'Security test assistant',
 				retrieval_limit = 3
 			)"
 		);
@@ -191,7 +188,6 @@ class ConversationalSearchSqlTest extends TestCase {
 		$result = static::runSqlQuery(
 			"CREATE CHAT MODEL '{$modelName}' (
 				model = 'openai:gpt-4',
-				style_prompt = 'History test assistant',
 				retrieval_limit = 3
 			)"
 		);
@@ -300,7 +296,6 @@ class ConversationalSearchSqlTest extends TestCase {
 		$result = static::runSqlQuery(
 			"CREATE CHAT MODEL '{$modelName}' (
 				model = 'openai:gpt-4',
-				style_prompt = 'Concurrent test assistant',
 				retrieval_limit = 3
 			)"
 		);

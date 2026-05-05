@@ -22,7 +22,6 @@ final class ModelConfigValidator {
 	private const array MODEL_FIELDS = [
 		'model',
 		'description',
-		'style_prompt',
 		'api_key',
 		'base_url',
 		'timeout',
@@ -31,11 +30,11 @@ final class ModelConfigValidator {
 	];
 
 	/**
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 	 *   max_document_length?: string|int} $config
 	 *
-	 * @return array{name: string, model: string, description?: string, style_prompt?: string,
+	 * @return array{name: string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 	 *   max_document_length?: string|int}
 	 * @throws QueryParseError
@@ -57,7 +56,7 @@ final class ModelConfigValidator {
 			$createConfig[$field] = $config[$field];
 		}
 
-		/** @var array{name: string, model: string, description?: string, style_prompt?: string,
+		/** @var array{name: string, model: string, description?: string,
 		 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 		 *   max_document_length?: string|int} $createConfig
 		 */
@@ -84,7 +83,7 @@ final class ModelConfigValidator {
 	}
 
 	/**
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 	 *   max_document_length?: string|int} $config
 	 *
@@ -98,7 +97,7 @@ final class ModelConfigValidator {
 	}
 
 	/**
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 	 *   max_document_length?: string|int} $config
 	 *
@@ -114,7 +113,7 @@ final class ModelConfigValidator {
 	}
 
 	/**
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 	 *   max_document_length?: string|int} $config
 	 *
@@ -141,7 +140,7 @@ final class ModelConfigValidator {
 	}
 
 	/**
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 	 *   max_document_length?: string|int} $config
 	 *
@@ -168,7 +167,7 @@ final class ModelConfigValidator {
 	}
 
 	/**
-	 * @param array{identifier:string, model: string, description?: string, style_prompt?: string,
+	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 	 *   max_document_length?: string|int} $config
 	 *

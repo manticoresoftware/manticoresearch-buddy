@@ -26,7 +26,6 @@ class ConversationalTest extends TestCase {
 			"CREATE CHAT MODEL 'test_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789',
-				style_prompt = 'You are a helpful assistant.',
 				retrieval_limit = 5,
 				max_document_length = 3000
 			)"
@@ -209,7 +208,6 @@ class ConversationalTest extends TestCase {
 		static::runSqlQuery(
 			"CREATE CHAT MODEL 'test_model' (
 			model = 'openai:gpt-4',
-			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5,
 			max_document_length = 0
 		)"
@@ -327,7 +325,6 @@ class ConversationalTest extends TestCase {
 			"CREATE CHAT MODEL 'lifecycle_model' (
 			model = 'openai:gpt-4',
 			api_key = 'sk-test-key-123456789',
-			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5
 		)"
 		);
@@ -383,7 +380,6 @@ class ConversationalTest extends TestCase {
 			"CREATE CHAT MODEL 'full_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789',
-				style_prompt = 'You are a helpful assistant with extensive knowledge.',
 				retrieval_limit = 10
 			)"
 		);

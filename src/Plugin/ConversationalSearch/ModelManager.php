@@ -62,7 +62,6 @@ class ModelManager {
 			name string,
 			description text,
 			model text,
-			style_prompt text,
 			settings json,
 			created_at bigint,
 			updated_at bigint
@@ -79,7 +78,7 @@ class ModelManager {
 	 * Create a new chat model
 	 *
 	 * @param HTTPClient $client
-	 * @param array{name: string, model: string, description?: string, style_prompt?:string, api_key?: string,
+	 * @param array{name: string, model: string, description?: string, api_key?: string,
 	 *   base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 	 *   max_document_length?: string|int} $config
 	 *
@@ -101,14 +100,13 @@ class ModelManager {
 		// Insert model
 		$currentTime = time();
 		$sql = sprintf(
-			'INSERT INTO %s (uuid, name, description, model, style_prompt, settings, created_at, updated_at) ' .
-			'VALUES (%s, %s, %s, %s, %s, %s, %d, %d)',
+			'INSERT INTO %s (uuid, name, description, model, settings, created_at, updated_at) ' .
+			'VALUES (%s, %s, %s, %s, %s, %d, %d)',
 			self::MODELS_TABLE,
 			$this->quote($modelUuid),
 			$this->quote($config['name']),
 			$this->quote($config['description'] ?? ''),
 			$this->quote($config['model']),
-			$this->quote($config['style_prompt'] ?? ''),
 			$this->quote($this->encodeSettings($settings)),
 			$currentTime,
 			$currentTime
@@ -172,7 +170,7 @@ class ModelManager {
 	 */
 	private function extractSettings(array $config): array {
 		/** @var array<int, string> $coreFields */
-		$coreFields = ['id', 'name', 'description', 'model', 'style_prompt'];
+		$coreFields = ['id', 'name', 'description', 'model'];
 		/** @var array<string, mixed> $settings */
 		$settings = [];
 
@@ -300,7 +298,6 @@ class ModelManager {
 	 *   name:string,
 	 *   description:string,
 	 *   model:string,
-	 *   style_prompt:string,
 	 *   settings:array{max_document_length:int}&array<string, mixed>,
 	 *   created_at:string,
 	 *   updated_at:string
@@ -310,7 +307,7 @@ class ModelManager {
 	private function findModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): ?array {
 		$sql
 			= /** @lang Manticore */
-			'SELECT id, uuid, name, description, model, style_prompt, settings, created_at, updated_at FROM '
+			'SELECT id, uuid, name, description, model, settings, created_at, updated_at FROM '
 			. self::MODELS_TABLE .
 			' WHERE (name = ' . $this->quote($modelNameOrUuid) . ' OR uuid = ' . $this->quote($modelNameOrUuid) . ')';
 
@@ -325,7 +322,6 @@ class ModelManager {
 		 *   name:string,
 		 *   description:string,
 		 *   model:string,
-		 *   style_prompt:string,
 		 *   settings:mixed,
 		 *   created_at:string,
 		 *   updated_at:string
@@ -342,7 +338,6 @@ class ModelManager {
 		 *   name:string,
 		 *   description:string,
 		 *   model:string,
-		 *   style_prompt:string,
 		 *   settings:array{max_document_length:int}&array<string, mixed>,
 		 *   created_at:string,
 		 *   updated_at:string
@@ -391,7 +386,6 @@ class ModelManager {
 	 *   name:string,
 	 *   description:string,
 	 *   model:string,
-	 *   style_prompt:string,
 	 *   settings:array{max_document_length:int}&array<string, mixed>,
 	 *   created_at:string,
 	 *   updated_at:string

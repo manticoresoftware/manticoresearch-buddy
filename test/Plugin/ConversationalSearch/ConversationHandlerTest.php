@@ -80,7 +80,6 @@ class ConversationHandlerTest extends TestCase {
 	public function testCreateModelSuccess(): void {
 		$query = "CREATE CHAT MODEL 'test_model' (
 			model = 'openai:gpt-4',
-			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5
 		)";
 
@@ -193,7 +192,6 @@ class ConversationHandlerTest extends TestCase {
 				'data' => [[
 					'uuid' => 'test-uuid',
 					'name' => 'test_model',
-					'style_prompt' => 'You are a helpful assistant.',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000,"api_key":"sk-test"}',
 					'created_at' => '2023-01-01 00:00:00',
 				]],
@@ -254,7 +252,6 @@ class ConversationHandlerTest extends TestCase {
 				'data' => [[
 					'uuid' => 'test-uuid',
 					'name' => 'test_model',
-					'style_prompt' => 'You are a helpful assistant.',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
 					'created_at' => '2023-01-01 00:00:00',
 				]],
@@ -450,7 +447,6 @@ class ConversationHandlerTest extends TestCase {
 	public function testCreateModelWithEncryptionIntegration(): void {
 		$query = "CREATE CHAT MODEL 'encrypted_test_model' (
 			model = 'openai:gpt-4',
-			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5
 		)";
 
@@ -522,7 +518,6 @@ class ConversationHandlerTest extends TestCase {
 				'data' => [[
 					'uuid' => 'encrypted-uuid-123',
 					'name' => 'encrypted_test_model',
-					'style_prompt' => 'You are a helpful assistant.',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
 					'created_at' => '2023-01-01 00:00:00',
 				]],
@@ -553,7 +548,6 @@ class ConversationHandlerTest extends TestCase {
 		try {
 			$query = "CREATE CHAT MODEL 'keyfile_test_model' (
 				model = 'openai:gpt-4',
-				style_prompt = 'You are a helpful assistant.',
 				retrieval_limit = 5
 			)";
 
@@ -647,7 +641,6 @@ class ConversationHandlerTest extends TestCase {
 				'data' => [[
 					'uuid' => 'model-uuid',
 					'name' => 'test_model',
-					'style_prompt' => 'You are a helpful assistant.',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
 					'created_at' => '2023-01-01 00:00:00',
 				]],
@@ -795,7 +788,6 @@ class ConversationHandlerTest extends TestCase {
 				'data' => [[
 					'uuid' => 'model-uuid',
 					'name' => 'test_model',
-					'style_prompt' => 'You are a helpful assistant.',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
 					'created_at' => '2023-01-01 00:00:00',
 				]],
@@ -872,7 +864,6 @@ class ConversationHandlerTest extends TestCase {
 			'uuid' => 'model-uuid',
 			'name' => 'test_model',
 			'model' => 'openai:gpt-4',
-			'style_prompt' => '',
 			'settings' => ['retrieval_limit' => 5],
 			'created_at' => '',
 			'updated_at' => '',

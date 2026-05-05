@@ -54,7 +54,6 @@ class ConversationalSearchTest extends TestCase {
 	public function testCreateModelEndToEnd(): void {
 		$query = "CREATE CHAT MODEL 'functional_test_model' (
 			model = 'openai:gpt-4',
-			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5
 		)";
 
@@ -180,7 +179,6 @@ class ConversationalSearchTest extends TestCase {
 					'uuid' => 'test-uuid-123',
 					'name' => 'functional_test_model',
 					'model' => 'openai:gpt-4',
-					'style_prompt' => 'You are a helpful assistant.',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
 				]],
 			]]
@@ -239,7 +237,6 @@ class ConversationalSearchTest extends TestCase {
 					'name' => 'functional_test_model',
 					'description' => '',
 					'model' => 'openai:gpt-4',
-					'style_prompt' => '',
 					'settings' => '{"max_document_length":2000}',
 					'created_at' => '1234567890',
 					'updated_at' => '1234567890',

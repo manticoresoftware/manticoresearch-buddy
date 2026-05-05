@@ -21,7 +21,6 @@ final class SearchContext {
 	 *   uuid:string,
 	 *   name:string,
 	 *   model:string,
-	 *   style_prompt:string,
 	 *   settings:array<string, mixed>,
 	 *   created_at:string,
 	 *   updated_at:string

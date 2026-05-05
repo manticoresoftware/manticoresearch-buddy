@@ -80,7 +80,6 @@ class ModelManagerTest extends TestCase {
 		$config = [
 			'name' => 'test_model',
 			'model' => 'openai:gpt-4',
-			'style_prompt' => 'You are helpful',
 			'api_key' => 'sk-test',
 			'base_url' => 'http://host.docker.internal:8787/v1',
 			'retrieval_limit' => '5',
@@ -146,7 +145,6 @@ class ModelManagerTest extends TestCase {
 								'name' => 'test_model',
 								'description' => 'Test chat Model',
 								'model' => 'openai:gpt-4',
-								'style_prompt' => 'You are helpful',
 								'settings' => json_encode(
 									[
 										'api_key' => 'sk-test',
@@ -169,7 +167,6 @@ class ModelManagerTest extends TestCase {
 			->willReturn($mockResponse);
 
 		/** @var array{id:string, uuid:string, name:string,model:string,
-		 * style_prompt:string,
 		 * description:string,
 		 * settings:array{api_key:string, base_url:string, retrieval_limit:int, max_document_length:int},
 		 * created_at:string,updated_at:string} $result
@@ -458,7 +455,6 @@ class ModelManagerTest extends TestCase {
 		$config = [
 			'name' => 'test_model',
 			'model' => 'openai:gpt-4',
-			'style_prompt' => 'You are helpful',
 			'api_key' => 'sk-test',
 			'base_url' => 'http://host.docker.internal:8787/v1',
 			'retrieval_limit' => 8,
@@ -476,7 +472,6 @@ class ModelManagerTest extends TestCase {
 		$this->assertEquals(2000, $result['max_document_length']);
 		$this->assertArrayNotHasKey('name', $result);
 		$this->assertArrayNotHasKey('model', $result);
-		$this->assertArrayNotHasKey('style_prompt', $result);
 	}
 
 	/**
@@ -585,7 +580,6 @@ class ModelManagerTest extends TestCase {
 								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
 								'model' => 'openai:gpt-4',
-								'style_prompt' => 'You are helpful',
 								'settings' => null,
 								'created_at' => 1234567890,
 							],

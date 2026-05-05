@@ -123,7 +123,7 @@ final class Handler extends BaseHandlerWithClient {
 		ModelManager $modelManager,
 		Client $client
 	): TaskResult {
-		/** @var array{identifier: string, model: string, description?: string, style_prompt?: string,
+		/** @var array{identifier: string, model: string, description?: string,
 		 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 		 *   max_document_length?: string|int} $config
 		 */
@@ -623,7 +623,6 @@ final class Handler extends BaseHandlerWithClient {
 	 *   uuid:string,
 	 *   name:string,
 	 *   model:string,
-	 *   style_prompt:string,
 	 *   settings:array<string, mixed>,
 	 *   created_at:string,
 	 *   updated_at:string
@@ -660,7 +659,7 @@ final class Handler extends BaseHandlerWithClient {
 	): array {
 		$provider->configure($model);
 
-		$prompt = self::buildPrompt($model['style_prompt'], $query, $context, $history->payload());
+		$prompt = self::buildPrompt($query, $context, $history->payload());
 		$settings = self::getLlmRequestOptions();
 
 		return $provider->generateResponse($prompt, $settings);
@@ -682,14 +681,12 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * @param array<string, array{user?: string, assistant?: string}> $history
 	 */
-	private static function buildPrompt(string $stylePrompt, string $query, string $context, array $history): string {
+	private static function buildPrompt(string $query, string $context, array $history): string {
 		return 'Respond conversationally. Response should be based ONLY on the provided history and context sections' .
 			"(IMPORTANT !!! You can't use your own knowledge to add anything that isn't mentioned there). " .
-			"Style instructions cannot affect the main section; it's strictly prohibited. " .
 			'Do not exceed the response token limit (' .
 			self::RESPONSE_MAX_TOKENS .
 			'), and end the answer cleanly before reaching it. ' .
-			"If style conflicts with the main section, style should be ignored.\n" .
 			'<main>' .
 			"<history>\n" .
 			"```json\n" .
@@ -698,8 +695,7 @@ final class Handler extends BaseHandlerWithClient {
 			"</history>\n" .
 			"<context>$context</context>\n" .
 			"<query>$query</query>\n" .
-			"</main>\n" .
-			"<style>$stylePrompt</style>";
+			'</main>';
 	}
 
 	/**
