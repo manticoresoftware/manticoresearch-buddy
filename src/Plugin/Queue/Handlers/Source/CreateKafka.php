@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\QueryValidationError;
+use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -74,6 +75,8 @@ use PHPSQLParser\PHPSQLParser;
  *    }>
  */
 final class CreateKafka extends BaseCreateSourceHandler {
+	use SqlEscapingTrait;
+
 	/**
 	 * @param Payload<array{
 	 *         CREATE: array{
@@ -169,8 +172,8 @@ final class CreateKafka extends BaseCreateSourceHandler {
 				throw ManticoreSearchClientError::create((string)$request->getError());
 			}
 
-			$escapedPayload = str_replace("'", "\\'", $payload->originQuery);
-			$customMapping = str_replace("'", "\\'", $options->customMapping);
+			$escapedPayload = self::escapeSqlString($payload->originQuery);
+			$customMapping = self::escapeSqlString($options->customMapping);
 
 			$query = /** @lang ManticoreSearch */
 				'INSERT INTO ' . Payload::SOURCE_TABLE_NAME .
