@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 use JsonException;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Throwable;
 
 final class ConversationRouter {
 
@@ -57,6 +58,8 @@ final class ConversationRouter {
 
 	/**
 	 * @param array<string, array{user?: string, assistant?: string}> $historyPayload
+	 *
+	 * @throws ManticoreSearchClientError
 	 */
 	private function buildPrompt(string $userQuery, array $historyPayload): string {
 		return 'You route a user message in a retrieval-augmented conversation.' . "\n\n"
@@ -88,7 +91,7 @@ final class ConversationRouter {
 			. $this->formatConversationHistory($historyPayload)
 			. "\n"
 			. "    <Question>\n"
-			. "  {$userQuery}";
+			. "  $userQuery";
 	}
 
 	/**
@@ -171,7 +174,7 @@ final class ConversationRouter {
 		try {
 			/** @var mixed $decoded */
 			$decoded = simdjson_decode($arguments, true);
-		} catch (\Throwable $e) {
+		} catch (Throwable $e) {
 			throw ManticoreSearchClientError::create(
 				'Conversation routing returned invalid tool arguments: ' . $e->getMessage()
 			);
@@ -246,7 +249,7 @@ final class ConversationRouter {
 		foreach ($historyPayload as $turn) {
 			if (isset($turn['user'])) {
 				$historyLines[] = '    '
-					. $this->encodeJson(['user' => $turn['user']], 'Conversation routing prompt encoding failed');
+					. $this->encodeJson(['user' => $turn['user']]);
 			}
 
 			if (!isset($turn['assistant'])) {
@@ -254,7 +257,7 @@ final class ConversationRouter {
 			}
 
 			$historyLines[] = '    '
-				. $this->encodeJson(['assistant' => $turn['assistant']], 'Conversation routing prompt encoding failed');
+				. $this->encodeJson(['assistant' => $turn['assistant']]);
 		}
 
 		return implode("\n", $historyLines);
@@ -262,13 +265,14 @@ final class ConversationRouter {
 
 	/**
 	 * @param array<string, mixed> $data
+	 *
 	 * @throws ManticoreSearchClientError
 	 */
-	private function encodeJson(array $data, string $errorPrefix): string {
+	private function encodeJson(array $data): string {
 		try {
 			return json_encode($data, JSON_THROW_ON_ERROR);
 		} catch (JsonException $e) {
-			throw ManticoreSearchClientError::create($errorPrefix . ': ' . $e->getMessage());
+			throw ManticoreSearchClientError::create('Conversation routing prompt encoding failed' . ': ' . $e->getMessage());
 		}
 	}
 }

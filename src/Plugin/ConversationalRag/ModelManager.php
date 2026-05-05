@@ -169,7 +169,6 @@ class ModelManager {
 	 * @param array<string, mixed> $config
 	 *
 	 * @return array<string, mixed>
-	 * @throws ManticoreSearchClientError
 	 */
 	private function extractSettings(array $config): array {
 		/** @var array<int, string> $coreFields */

@@ -10,8 +10,6 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
-use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
-
 final readonly class ConversationHistory {
 	/**
 	 * @param array<int, ConversationMessage> $messages
@@ -73,7 +71,6 @@ final readonly class ConversationHistory {
 
 	/**
 	 * @return array{search_query: string, exclude_query: string, excluded_ids: string}|null
-	 * @throws ManticoreSearchClientError
 	 */
 	public function latestSearchContext(): ?array {
 		for ($i = sizeof($this->messages) - 1; $i >= 0; $i--) {
@@ -83,10 +80,6 @@ final readonly class ConversationHistory {
 				|| $message->searchQuery === ''
 			) {
 				continue;
-			}
-
-			if ($message->excludedIds !== '') {
-				$this->decodeExcludedIds($message->excludedIds);
 			}
 
 			return [
@@ -101,33 +94,5 @@ final readonly class ConversationHistory {
 
 	private function formatHistoryTimestamp(int $turnIndex): string {
 		return gmdate('Y-m-d\TH:i:s', $turnIndex) . '.000000Z';
-	}
-
-	/**
-	 * @return array<int, string|int>
-	 * @throws ManticoreSearchClientError
-	 */
-	private function decodeExcludedIds(string $rawExcludedIds): array {
-		try {
-			$decoded = simdjson_decode($rawExcludedIds, true);
-		} catch (\Throwable $e) {
-			throw ManticoreSearchClientError::create(
-				'Invalid JSON stored in excluded_ids: ' . $e->getMessage()
-			);
-		}
-		if (!is_array($decoded)) {
-			throw ManticoreSearchClientError::create('Invalid JSON stored in excluded_ids');
-		}
-
-		$excludedIds = [];
-		foreach ($decoded as $excludedId) {
-			if (!is_int($excludedId) && !is_string($excludedId)) {
-				throw ManticoreSearchClientError::create('Invalid JSON stored in excluded_ids');
-			}
-
-			$excludedIds[] = $excludedId;
-		}
-
-		return $excludedIds;
 	}
 }

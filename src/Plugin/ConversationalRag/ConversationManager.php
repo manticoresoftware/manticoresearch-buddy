@@ -67,7 +67,7 @@ class ConversationManager {
 	 * @param int $tokensUsed
 	 *
 	 * @return void
-	 * @throws ManticoreSearchClientError|\JsonException
+	 * @throws ManticoreSearchClientError
 	 */
 	public function saveMessage(
 		string $conversationUuid,

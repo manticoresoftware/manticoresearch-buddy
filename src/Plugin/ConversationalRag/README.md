@@ -1,18 +1,11 @@
-# ConversationalRag Plugin
+# Conversational RAG
 
-The `ConversationalRag` plugin adds SQL-managed conversational RAG to Manticore Buddy.
-It combines:
+The `ConversationalRag` plugin adds SQL-managed retrieval-augmented chat to
+Manticore Buddy. It searches an existing vectorized table, builds context from
+matched documents, and asks an LLM to answer using that context and the current
+conversation history.
 
-- vector search over a table with `FLOAT_VECTOR` fields
-- conversation history tracking
-- LLM-based intent classification and response generation
-- the `llm` PHP extension for provider access
-
-This document is based on the current plugin implementation in Buddy, the `llm-php-ext` API, and the CLT coverage used for the basic conversational RAG flow.
-
-## What Is Supported
-
-Supported SQL commands:
+Supported commands:
 
 - `CREATE RAG MODEL`
 - `SHOW RAG MODELS`
@@ -20,213 +13,92 @@ Supported SQL commands:
 - `DROP RAG MODEL`
 - `CALL CONVERSATIONAL_RAG`
 
-Supported model storage and runtime behavior:
+## How It Works
 
-- `model` is required and must use `provider:model` format
-- `style_prompt` is optional
-- Buddy-specific setting:
-  - `retrieval_limit`
-- `max_document_length` controls per-document context truncation
-- response tuning is internal to the plugin; final answers are capped at 4096 tokens
-- extension-level transport options are passed through from model settings to `new Llm($model, $options)`
-  - supported keys are `api_key`, `base_url`, and `timeout`
+At query time `CALL CONVERSATIONAL_RAG` does this:
 
-## Quick Start
+1. Loads the RAG model configuration.
+2. Loads conversation history for the provided conversation UUID, or creates a
+   new UUID when none is provided.
+3. Inspects the target table and selects a `FLOAT_VECTOR` field.
+4. Routes the user message with the LLM:
+   - run a new search
+   - answer from previous search context
+   - or answer without search when retrieval is not needed
+5. Runs KNN search with the selected vector field.
+6. Builds the prompt context from the selected vector field's `from='...'`
+   source fields.
+7. Generates the final answer with the configured LLM.
+8. Stores the user and assistant messages in conversation history.
 
-### 1. Prepare a table with embeddings
+The `fields` argument in `CALL CONVERSATIONAL_RAG` is a historical name. It
+means "which `FLOAT_VECTOR` field to use for KNN", not "which fields to return".
+Search results are selected with `SELECT *`, but vector columns are stripped
+from the returned `sources` payload.
 
-The RAG query searches an existing table and expects at least:
+## Table Requirements
 
-- one `FLOAT_VECTOR` field
-- auto-embedding source fields configured on that vector field with `from='...'`
-
-Example:
-
-```sql
-CREATE TABLE docs (
-    id BIGINT,
-    content TEXT,
-    title TEXT,
-    embedding_vector FLOAT_VECTOR
-        knn_type='hnsw'
-        hnsw_similarity='cosine'
-        model_name='sentence-transformers/all-MiniLM-L6-v2'
-        from='content,title'
-) TYPE='rt';
-```
-
-If your embedding model requires a remote API key, configure that on the table itself. The CLT flow uses:
+The searched table must contain at least one `FLOAT_VECTOR` field with
+auto-embedding source fields:
 
 ```sql
 CREATE TABLE docs (
     id BIGINT,
-    content TEXT,
     title TEXT,
-    embedding_vector FLOAT_VECTOR
+    content TEXT,
+    embedding FLOAT_VECTOR
         knn_type='hnsw'
         hnsw_similarity='cosine'
-        model_name='sentence-transformers/all-MiniLM-L6-v2'
-        from='content,title'
-        api_key='${OPENAI_API_KEY}'
+        model_name='onnx-models/all-MiniLM-L12-v2-onnx'
+        from='title,content'
 ) TYPE='rt';
 ```
 
-### 2. Create a RAG model
+`from='title,content'` matters for two reasons:
+
+- Manticore uses it to build embeddings for the vector field.
+- Conversational RAG uses the same fields to build the text context sent to the
+  LLM.
+
+With multiple vector fields, each vector field may use different source fields:
+
+```sql
+CREATE TABLE docs (
+    id BIGINT,
+    title TEXT,
+    content TEXT,
+    title_embedding FLOAT_VECTOR
+        knn_type='hnsw'
+        hnsw_similarity='cosine'
+        model_name='onnx-models/all-MiniLM-L12-v2-onnx'
+        from='title',
+    content_embedding FLOAT_VECTOR
+        knn_type='hnsw'
+        hnsw_similarity='cosine'
+        model_name='onnx-models/all-MiniLM-L12-v2-onnx'
+        from='content'
+) TYPE='rt';
+```
+
+If `CALL CONVERSATIONAL_RAG` does not specify a vector field, the first detected
+`FLOAT_VECTOR` field is used.
+
+## Create A Model
 
 Minimal model:
 
 ```sql
-CREATE RAG MODEL test_assistant (
+CREATE RAG MODEL assistant (
     model='openai:gpt-4o-mini'
 );
 ```
 
-Model with proxy and custom LLM options:
+Model with prompt, transport options, and retrieval settings:
 
 ```sql
-CREATE RAG MODEL proxy_assistant (
+CREATE RAG MODEL support_assistant (
     model='openai:gpt-4o-mini',
-    style_prompt='You are a helpful assistant specializing in search technology',
-    api_key='sk-proxy-or-openai-key',
-    base_url='http://host.docker.internal:8787/v1',
-    timeout=60,
-    retrieval_limit=5,
-    max_document_length=3000
-);
-```
-
-### 3. Ask a question
-
-```sql
-CALL CONVERSATIONAL_RAG(
-    'What is vector search?',
-    'docs',
-    'test_assistant'
-);
-```
-
-With an explicit conversation UUID:
-
-```sql
-CALL CONVERSATIONAL_RAG(
-    'Can you explain more?',
-    'docs',
-    'test_assistant',
-    'test-conv-12345678-1234-1234-1234-123456789abc'
-);
-```
-
-## How LLM Configuration Works
-
-The plugin uses the `llm` PHP extension.
-
-The extension constructor is:
-
-```php
-new Llm(string $model, array $options = [])
-```
-
-Documented extension options include:
-
-- `api_key`
-- `base_url`
-- `timeout`
-
-The extension README documents support for multiple providers, including:
-
-- `openai`
-- `anthropic`
-- `openrouter`
-- `vertex`
-- `bedrock`
-- `workers-ai`
-- `deepseek`
-- `zai`
-
-Buddy passes model options to the extension like this:
-
-1. It loads model `settings`
-2. It extracts Buddy-managed fields such as `retrieval_limit`
-3. It forwards the remaining settings to the extension constructor
-
-### API key
-
-You can provide the API key in either of these ways:
-
-- via the extension's environment variable support, such as `OPENAI_API_KEY`
-- via model `api_key`
-
-Example:
-
-```sql
-CREATE RAG MODEL api_key_assistant (
-    model='openai:gpt-4o-mini',
-    api_key='sk-...'
-);
-```
-
-### Custom base URL
-
-Use `base_url`.
-
-Example for an OpenAI-compatible proxy:
-
-```sql
-CREATE RAG MODEL local_proxy_assistant (
-    model='openai:gpt-4o-mini',
-    api_key='local-proxy-key',
-    base_url='http://host.docker.internal:8787/v1'
-);
-```
-
-### Timeout
-
-Use `timeout`.
-
-Example:
-
-```sql
-CREATE RAG MODEL slow_backend_assistant (
-    model='openai:gpt-4o-mini',
-    base_url='http://host.docker.internal:8787/v1',
-    timeout=60
-);
-```
-
-## Model Identifier Format
-
-Buddy stores the full model id from `model` and validates `provider:model` format on create.
-
-Supported pattern:
-
-```sql
-model='openai:gpt-4o-mini'
-```
-
-Examples in this document use `openai`, but provider support is defined by the installed `llm` extension rather than by a hardcoded provider whitelist in Buddy.
-
-## CREATE RAG MODEL
-
-### Required fields
-
-- `model`
-
-### Common optional fields
-
-- `description`
-- `style_prompt`
-- `api_key`
-- `base_url`
-- `timeout`
-- `retrieval_limit`
-- `max_document_length`
-
-The model identifier always comes from `CREATE RAG MODEL <identifier>`. Use `description` for descriptive text inside the body. `name` inside the body is not supported.
-
-```sql
-CREATE RAG MODEL advanced_assistant (
-    model='openai:gpt-4o',
-    style_prompt='You are a helpful assistant specializing in search technology',
+    style_prompt='Answer in Chinese language',
     api_key='sk-...',
     base_url='http://host.docker.internal:8787/v1',
     timeout=60,
@@ -235,223 +107,256 @@ CREATE RAG MODEL advanced_assistant (
 );
 ```
 
-Validation enforced by Buddy:
+The model name comes from `CREATE RAG MODEL <name>`. A `name` option inside the
+body is not supported.
 
-- `retrieval_limit`: `1..50`
-- `max_document_length`: `0` disables truncation; otherwise `100..65536`
+Common options:
 
-### Returned result
+| Option | Required | Description |
+|---|---:|---|
+| `model` | Yes | LLM model id in `provider:model` format |
+| `style_prompt` | No | Extra instruction prepended to response generation |
+| `description` | No | Stored description |
+| `api_key` | No | Provider API key passed to the `llm` extension |
+| `base_url` | No | Provider or proxy base URL |
+| `timeout` | No | LLM request timeout |
+| `retrieval_limit` | No | Number of documents requested from KNN, `1..50` |
+| `max_document_length` | No | Per-document context limit; `0` disables truncation |
 
-`CREATE RAG MODEL` returns one row with one column:
-
-- `uuid`
-
-## SHOW RAG MODELS
-
-```sql
-SHOW RAG MODELS;
-```
-
-Returned columns:
-
-- `uuid`
-- `name`
-- `model`
-- `created_at`
-
-## DESCRIBE RAG MODEL
-
-By name:
+`model` is validated as `provider:model`, for example:
 
 ```sql
-DESCRIBE RAG MODEL test_assistant;
+model='openai:gpt-4o-mini'
 ```
 
-By UUID:
+Provider support comes from the installed `llm` PHP extension. Buddy forwards
+provider options such as `api_key`, `base_url`, and `timeout` to that extension.
 
-```sql
-DESCRIBE RAG MODEL '550e8400-e29b-41d4-a716-446655440000';
+`api_key` is optional when the provider key is available in Buddy's environment.
+For example, a Docker Compose service can expose provider keys like this:
+
+```yaml
+environment:
+  - OPENAI_API_KEY=${OPENAI_API_KEY}
+  - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
 ```
 
-Returned columns:
+If `api_key` is not set in `CREATE RAG MODEL`, the `llm` extension can use the
+matching provider environment variable. Pass `api_key` only when you want the
+model configuration to override the environment.
 
-- `property`
-- `value`
+## Ask Questions
 
-Settings are flattened as:
-
-- `settings.retrieval_limit`
-- `settings.max_document_length`
-- `settings.base_url`
-- `settings.timeout`
-- `settings.api_key`
-
-## DROP RAG MODEL
-
-By name:
-
-```sql
-DROP RAG MODEL test_assistant;
-```
-
-By UUID:
-
-```sql
-DROP RAG MODEL '550e8400-e29b-41d4-a716-446655440000';
-```
-
-Safe delete:
-
-```sql
-DROP RAG MODEL IF EXISTS test_assistant;
-```
-
-## CALL CONVERSATIONAL_RAG
-
-Syntax:
-
-```sql
-CALL CONVERSATIONAL_RAG(
-    'user query',
-    'table_name',
-    'model_name_or_uuid',
-    'optional_conversation_uuid',
-    'optional_fields'
-);
-```
-
-Positional parameters:
-
-| Position | Parameter | Required | Description |
-|---:|---|---:|---|
-| 1 | `query` | Yes | User question |
-| 2 | `table` | Yes | Table to search |
-| 3 | `model_name_or_uuid` | Yes | RAG model name or UUID |
-| 4 | `conversation_uuid` | No | 4th positional argument. Pass `''` when you want to set `fields` without a conversation id |
-| 5 | `fields` | No | 5th positional argument. FLOAT_VECTOR field used for KNN search |
-
-`CALL CONVERSATIONAL_RAG` supports positional arguments only.
-
-```sql
-CALL CONVERSATIONAL_RAG(
-    'user query',
-    'table_name',
-    'model_name_or_uuid',
-    '',
-    'title_embedding'
-);
-```
-
-Notes:
-
-- when `fields` is provided, that `FLOAT_VECTOR` field is used for KNN search
-- otherwise the first detected `FLOAT_VECTOR` field is used
-- context fields are auto-detected from the selected vector field's `from='...'` setting
-- missing fields are skipped and logged as warnings
-- empty or whitespace-only field values are skipped
-
-## Response Format
-
-`CALL CONVERSATIONAL_RAG` returns:
-
-- `conversation_uuid`
-- `user_query`
-- `search_query`
-- `response`
-- `sources`
-
-Example shape:
-
-```json
-{
-  "conversation_uuid": "generated-or-provided-uuid",
-  "user_query": "What is vector search?",
-  "search_query": "vector search, embeddings, similarity search",
-  "response": "AI-generated response text",
-  "sources": "[{\"id\":1,\"title\":\"Doc Title\",\"content\":\"...\"}]"
-}
-```
-
-## Search and Context Behavior
-
-Conversation flow includes:
-
-- LLM-based intent classification
-- KNN search over a detected `FLOAT_VECTOR` field
-- optional exclusion of previously rejected or already shown items
-- context building from the selected vector field's auto-embedding source fields
-- context truncation using `max_document_length`
-
-Buddy-specific search settings:
-
-- `retrieval_limit`: number of documents retrieved for KNN
-- `max_document_length`: per-document context budget; `0` disables truncation
-
-`max_document_length` directly affects result quality and cost:
-
-- smaller values reduce prompt size and spend, but can hide useful context
-- larger values improve context completeness, but increase token usage
-- `0` disables truncation entirely and should be used carefully with large documents
-
-## Tested Examples
-
-The basic end-to-end flow covered by CLT includes:
-
-1. create a vectorized `docs` table
-2. insert documents
-3. create a minimal RAG model
-4. create an advanced RAG model with transport options
-5. run `SHOW RAG MODELS`
-6. run `DESCRIBE RAG MODEL`
-7. run `CALL CONVERSATIONAL_RAG`
-8. drop the models
-
-Representative examples from that flow:
-
-```sql
-CREATE RAG MODEL test_assistant (
-    model='openai:gpt-4o-mini'
-);
-```
-
-```sql
-CREATE RAG MODEL advanced_assistant (
-    model='openai:gpt-4o',
-    style_prompt='You are a helpful assistant specializing in search technology',
-    api_key='proxy-key',
-    base_url='http://host.docker.internal:8787/v1',
-    timeout=60,
-    retrieval_limit=5,
-    max_document_length=3000
-);
-```
+Basic call:
 
 ```sql
 CALL CONVERSATIONAL_RAG(
     'What is vector search?',
     'docs',
-    'test_assistant'
+    'assistant'
 );
 ```
 
-## Recommended Usage
-
-For production usage with an OpenAI-compatible proxy, prefer this pattern:
+Continue a conversation:
 
 ```sql
-CREATE RAG MODEL assistant (
-    model='openai:gpt-4o-mini',
-    style_prompt='You answer only from the provided context.',
-    api_key='proxy-key',
-    base_url='http://host.docker.internal:8787/v1',
-    timeout=60,
-    retrieval_limit=5,
-    max_document_length=0
+CALL CONVERSATIONAL_RAG(
+    'Can you explain it with an example?',
+    'docs',
+    'assistant',
+    'docs-chat-001'
 );
 ```
 
-This keeps:
+Use a specific vector field for KNN:
 
-- provider transport settings in `settings`
-- Buddy search controls in `settings`
-- prompt behavior in `style_prompt`
+```sql
+CALL CONVERSATIONAL_RAG(
+    'Find documents where the title is about vector search',
+    'docs',
+    'assistant',
+    '',
+    'title_embedding'
+);
+```
+
+When the fifth argument is provided, Buddy validates that the field exists and is
+a `FLOAT_VECTOR`. If it is omitted, Buddy detects the first `FLOAT_VECTOR` field
+from `SHOW CREATE TABLE`.
+
+## CALL Syntax
+
+```sql
+CALL CONVERSATIONAL_RAG(
+    'query',
+    'table',
+    'model_name_or_uuid',
+    'conversation_uuid',
+    'vector_field'
+);
+```
+
+Arguments are positional only:
+
+| Position | Argument | Required | Description |
+|---:|---|---:|---|
+| 1 | `query` | Yes | User question |
+| 2 | `table` | Yes | Table to search |
+| 3 | `model_name_or_uuid` | Yes | RAG model name or UUID |
+| 4 | `conversation_uuid` | No | Existing conversation id, or empty string |
+| 5 | `fields` / vector field | No | `FLOAT_VECTOR` field used in `knn(...)` |
+
+The fifth argument is stored internally as `fields` for compatibility with the
+current parser, but it must be a single vector field name.
+
+## Search And Context Details
+
+KNN search uses this shape:
+
+```sql
+SELECT *, knn_dist() as knn_dist
+FROM <table>
+WHERE knn(<vector_field>, <k>, '<search query>')
+  AND knn_dist < <threshold>
+LIMIT <retrieval_limit>
+```
+
+Behavior:
+
+- `retrieval_limit` controls the final `LIMIT`.
+- The default KNN threshold is currently `0.8`.
+- If the conversation route includes an exclusion query, Buddy first finds
+  matching IDs with a stricter KNN threshold and excludes those IDs from the
+  main search.
+- The final `sources` include normal result fields and `knn_dist`.
+- `FLOAT_VECTOR` columns are removed from `sources` to avoid returning large
+  embedding payloads.
+- LLM context is built only from the selected vector field's `from='...'`
+  source fields.
+
+`max_document_length` applies per source document:
+
+- `0` disables truncation.
+- `100..65536` truncates each document context to that many characters.
+- Smaller values reduce prompt size.
+- Larger values preserve more source text but increase token usage.
+
+## Response
+
+`CALL CONVERSATIONAL_RAG` returns one row with these columns:
+
+| Column | Description |
+|---|---|
+| `conversation_uuid` | Existing or generated conversation id |
+| `user_query` | Original user query |
+| `search_query` | Standalone search query used for retrieval |
+| `response` | LLM answer |
+| `sources` | JSON string containing retrieved source rows |
+
+Example response shape:
+
+```json
+{
+  "conversation_uuid": "docs-chat-001",
+  "user_query": "What is vector search?",
+  "search_query": "vector search, embeddings, similarity search",
+  "response": "Vector search finds similar items by comparing embeddings...",
+  "sources": "[{\"id\":1,\"title\":\"Vector Search\",\"content\":\"...\",\"knn_dist\":0.12}]"
+}
+```
+
+Vector fields are intentionally absent from `sources`.
+
+## Model Management
+
+List models:
+
+```sql
+SHOW RAG MODELS;
+```
+
+Describe a model:
+
+```sql
+DESCRIBE RAG MODEL assistant;
+```
+
+Describe by UUID:
+
+```sql
+DESCRIBE RAG MODEL '550e8400-e29b-41d4-a716-446655440000';
+```
+
+Drop a model:
+
+```sql
+DROP RAG MODEL assistant;
+```
+
+Drop safely:
+
+```sql
+DROP RAG MODEL IF EXISTS assistant;
+```
+
+## Complete Example
+
+```sql
+CREATE TABLE docs (
+    id BIGINT,
+    title TEXT,
+    content TEXT,
+    embedding FLOAT_VECTOR
+        knn_type='hnsw'
+        hnsw_similarity='cosine'
+        model_name='onnx-models/all-MiniLM-L12-v2-onnx'
+        from='title,content'
+) TYPE='rt';
+
+INSERT INTO docs(id, title, content) VALUES
+    (1, 'Vector search', 'Vector search compares embeddings to find semantically similar documents.'),
+    (2, 'Full-text search', 'Full-text search matches terms and phrases in indexed text.');
+
+CREATE RAG MODEL assistant (
+    model='openai:gpt-4o-mini',
+    style_prompt='Answer only from the provided context.',
+    retrieval_limit=5,
+    max_document_length=3000
+);
+
+CALL CONVERSATIONAL_RAG(
+    'How is vector search different from full-text search?',
+    'docs',
+    'assistant',
+    'search-demo-1'
+);
+
+CALL CONVERSATIONAL_RAG(
+    'Which one is better for semantic similarity?',
+    'docs',
+    'assistant',
+    'search-demo-1'
+);
+```
+
+## Troubleshooting
+
+`Table '<table>' has no FLOAT_VECTOR field`
+
+The table does not contain a vector field. Add a `FLOAT_VECTOR` field before
+using it with RAG.
+
+`FLOAT_VECTOR field '<field>' not found in table '<table>'`
+
+The fifth `CALL CONVERSATIONAL_RAG` argument names a field that is not a vector
+field in the target table.
+
+`FLOAT_VECTOR field '<field>' has no auto-embedding source fields`
+
+The vector field does not have `from='...'`. Add source fields so Buddy knows
+which text fields to use for LLM context.
+
+`Search query must contain at least one term`
+
+The routed standalone search query is empty. This usually means the input query
+was empty or the routing LLM returned invalid search text.
