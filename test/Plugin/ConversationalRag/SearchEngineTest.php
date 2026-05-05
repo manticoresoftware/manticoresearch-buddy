@@ -359,7 +359,7 @@ class SearchEngineTest extends TestCase {
 
 		$this->assertSame('SHOW CREATE TABLE test_table', $sqlQueries[0]);
 		$this->assertStringContainsString('LIMIT 1', $sqlQueries[1]);
-		$this->assertCount(1, $result);
+		$this->assertCount(2, $result);
 	}
 
 	/**
@@ -410,93 +410,6 @@ class SearchEngineTest extends TestCase {
 		);
 		$this->assertStringNotContainsString("OPTION fusion_method='rrf'", $searchSql);
 		$this->assertCount(1, $result);
-	}
-
-	/**
-	 * @throws ManticoreSearchClientError
-	 * @throws ManticoreSearchResponseError
-	 */
-	public function testPerformSearchUsesRequestedVectorFieldsAndMergesResults(): void {
-		$mockClient = $this->createMock(HTTPClient::class);
-		$searchEngine = $this->createSearchEngine($mockClient);
-		$schemaResponse = $this->createSchemaResponse(
-			"CREATE TABLE docs (\n"
-			. "content text,\n"
-			. "brand text,\n"
-			. "embedding_content float_vector from='content',\n"
-			. "embedding_brand float_vector from='brand'\n)"
-		);
-		$contentSearchResponse = $this->createDataResponse(
-			[
-				[
-					'id' => 1,
-					'content' => 'Intel Core i7',
-					'brand' => 'Intel',
-					'knn_dist' => 0.40,
-				],
-				[
-					'id' => 2,
-					'content' => 'Intel Core i5',
-					'brand' => 'Intel',
-					'knn_dist' => 0.20,
-				],
-			]
-		);
-		$brandSearchResponse = $this->createDataResponse(
-			[
-				[
-					'id' => 1,
-					'content' => 'Intel Core i7',
-					'brand' => 'Intel',
-					'knn_dist' => 0.10,
-				],
-				[
-					'id' => 3,
-					'content' => 'AMD Ryzen 7',
-					'brand' => 'AMD',
-					'knn_dist' => 0.30,
-				],
-			]
-		);
-
-		$sqlQueries = [];
-		$mockClient->expects($this->exactly(3))
-			->method('sendRequest')
-			->willReturnCallback(
-				function (string $sql) use (
-					$schemaResponse,
-					$contentSearchResponse,
-					$brandSearchResponse,
-					&$sqlQueries
-				): Response {
-					$sqlQueries[] = $sql;
-
-					return match (sizeof($sqlQueries)) {
-						1 => $schemaResponse,
-						2 => $contentSearchResponse,
-						3 => $brandSearchResponse,
-						default => throw new Exception('Unexpected sendRequest call count'),
-					};
-				}
-			);
-
-		$result = $searchEngine->search(
-			'docs',
-			'intel cpu',
-			[],
-			[
-				'model' => 'openai:gpt-3.5-turbo',
-				'settings' => ['retrieval_limit' => 2],
-			],
-			0.8,
-			'embedding_content,embedding_brand'
-		);
-
-		$this->assertStringContainsString("knn(embedding_content, 2, 'intel cpu')", $sqlQueries[1]);
-		$this->assertStringContainsString("knn(embedding_brand, 2, 'intel cpu')", $sqlQueries[2]);
-		$this->assertCount(2, $result);
-		$this->assertSame(1, $result[0]['id']);
-		$this->assertSame(2, $result[1]['id']);
 	}
 
 	/**

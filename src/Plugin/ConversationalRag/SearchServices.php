@@ -9,22 +9,14 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation;
+namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
-final class ConversationRequest {
+final class SearchServices {
 
 	public function __construct(
-		public string $query,
-		public string $table,
-		public string $modelUuid,
-		public string $conversationUuid = '',
-		public string $fields = ''
+		public ConversationManager $conversationManager,
+		public LlmProvider $provider,
+		public SearchEngine $searchEngine
 	) {
-	}
-
-	public function withConversationUuid(string $conversationUuid): self {
-		$clone = clone $this;
-		$clone->conversationUuid = $conversationUuid;
-		return $clone;
 	}
 }

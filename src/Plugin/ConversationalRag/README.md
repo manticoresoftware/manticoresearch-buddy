@@ -427,7 +427,11 @@ CREATE RAG MODEL advanced_assistant (
 ```
 
 ```sql
-CALL CONVERSATIONAL_RAG('suggest me good CPU','docs_merged','test_assistant','c1', 'embedding_content,embedding_brand');
+CALL CONVERSATIONAL_RAG(
+    'What is vector search?',
+    'docs',
+    'test_assistant'
+);
 ```
 
 ## Recommended Usage

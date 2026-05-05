@@ -11,7 +11,6 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Search\TableSchemaInspector;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
@@ -26,10 +25,10 @@ class SearchEngine {
 	use SqlEscapingTrait;
 
 	private const int DEFAULT_RETRIEVAL_LIMIT = 5;
-	private TableSchemaInspector $schemaInspector;
+	/** @var array<string, TableSchema> */
+	private array $schemaCache = [];
 
 	public function __construct(private readonly HTTPClient $client) {
-		$this->schemaInspector = new TableSchemaInspector($client);
 	}
 
 	/**
@@ -68,6 +67,10 @@ class SearchEngine {
 		string $excludeQuery,
 		TableSchema $schema
 	): array {
+		if (empty($excludeQuery) || $excludeQuery === 'none') {
+			return [];
+		}
+
 		$excludeEscaped = $this->escapeString($excludeQuery);
 		$sql
 			= /** @lang manticore */
@@ -102,7 +105,82 @@ class SearchEngine {
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	public function inspectTableSchema(string $table): TableSchema {
-		return $this->schemaInspector->inspect($table);
+		if (isset($this->schemaCache[$table])) {
+			return $this->schemaCache[$table];
+		}
+
+		$this->schemaCache[$table] = $this->inspectCreateTableSchema(
+			$table,
+			$this->getCreateTableStatement($table)
+		);
+		return $this->schemaCache[$table];
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 */
+	private function inspectCreateTableSchema(string $table, string $createTable): TableSchema {
+		$vectorDefinitions = $this->extractVectorFieldDefinitions($createTable);
+		if ($vectorDefinitions === []) {
+			throw ManticoreSearchClientError::create("Table '$table' has no FLOAT_VECTOR field");
+		}
+
+		$vectorFields = array_keys($vectorDefinitions);
+		$vectorField = $vectorFields[0];
+		$vectorDefinition = $vectorDefinitions[$vectorField];
+		if (!preg_match("/\\bfrom\\s*=\\s*'([^']+)'/i", $vectorDefinition, $matches)) {
+			throw ManticoreSearchClientError::create(
+				"FLOAT_VECTOR field '$vectorField' has no auto-embedding source fields"
+			);
+		}
+
+		$contentFields = trim($matches[1]);
+		if ($contentFields === '') {
+			throw ManticoreSearchClientError::create(
+				"FLOAT_VECTOR field '$vectorField' has empty auto-embedding source fields"
+			);
+		}
+
+		return new TableSchema($vectorField, $vectorFields, $contentFields);
+	}
+
+	/**
+	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
+	 */
+	private function getCreateTableStatement(string $table): string {
+		$response = $this->client->sendRequest("SHOW CREATE TABLE $table");
+		if ($response->hasError()) {
+			throw ManticoreSearchResponseError::create('Show create table inspection failed: ' . $response->getError());
+		}
+
+		/** @var array<int, array{data: array<int, array<string, mixed>>}> $result */
+		$result = $response->getResult();
+		foreach ($result[0]['data'][0] as $value) {
+			if (is_string($value) && str_contains(strtoupper($value), 'CREATE TABLE')) {
+				return $value;
+			}
+		}
+
+		throw ManticoreSearchResponseError::create('Show create table inspection returned no CREATE TABLE statement');
+	}
+
+	/**
+	 * @return array<string, string>
+	 */
+	private function extractVectorFieldDefinitions(string $createTable): array {
+		$pattern = '/(?:^|[\s,(])`?(?P<field>[A-Za-z_][A-Za-z0-9_]*)`?\s+FLOAT_VECTOR\b(?P<definition>.*?)
+			(?=,\s*`?[A-Za-z_][A-Za-z0-9_]*`?\s+[A-Za-z_]|\n\)|\)\s|$)/isx';
+		$matchCount = preg_match_all($pattern, $createTable, $matches, PREG_SET_ORDER);
+		if ($matchCount === false || $matchCount === 0) {
+			return [];
+		}
+
+		$vectorFields = [];
+		foreach ($matches as $match) {
+			$vectorFields[$match['field']] = $match['definition'];
+		}
+
+		return $vectorFields;
 	}
 
 	/**
@@ -122,20 +200,15 @@ class SearchEngine {
 		string $searchQuery,
 		array $excludedIds,
 		array $modelConfig,
-		float $threshold,
-		string $requestedFields = ''
+		float $threshold
 	): array {
-		$schema = $this->inspectTableSchema($table);
-		$searchVectorFields = $this->resolveSearchVectorFields($requestedFields, $schema);
-
 		return $this->runVectorSearch(
 			$table,
 			$searchQuery,
 			$excludedIds,
 			$modelConfig,
 			$threshold,
-			$schema,
-			$searchVectorFields
+			$this->inspectTableSchema($table)
 		);
 	}
 
@@ -146,7 +219,6 @@ class SearchEngine {
 	 * @param array{model: string, settings:array<string, mixed>} $modelConfig
 	 * @param float $threshold
 	 * @param TableSchema $schema
-	 * @param array<int, string> $searchVectorFields
 	 *
 	 * @return array<int, array<string, mixed>>
 	 * @throws ManticoreSearchClientError
@@ -158,44 +230,10 @@ class SearchEngine {
 		array $excludedIds,
 		array $modelConfig,
 		float $threshold,
-		TableSchema $schema,
-		array $searchVectorFields
+		TableSchema $schema
 	): array {
 		$retrievalLimit = $this->getRetrievalLimit($modelConfig);
-		[$knnK, $excludeClause] = $this->buildSearchParams($retrievalLimit, $excludedIds);
-		$mergedById = [];
-		foreach ($searchVectorFields as $vectorField) {
-			$rows = $this->executeVectorSearch(
-				$table, $vectorField, $searchQuery, $knnK, $threshold, $retrievalLimit, $excludeClause, $excludedIds
-			);
-			$this->mergeRowsByBestDistance($mergedById, $rows);
-		}
 
-		$merged = array_values($mergedById);
-		usort(
-			$merged,
-			function (array $left, array $right): int {
-				$leftDist = $this->extractKnnDistance($left);
-				$rightDist = $this->extractKnnDistance($right);
-				return $leftDist <=> $rightDist;
-			}
-		);
-
-		if (sizeof($merged) > $retrievalLimit) {
-			$merged = array_slice($merged, 0, $retrievalLimit);
-		}
-
-		Buddy::debugv('RAG: └─ Merged results after vector fusion: ' . sizeof($merged));
-		return $this->filterVectorFields($merged, $schema);
-	}
-
-	/**
-	 * @param int $retrievalLimit
-	 * @param array<int, string|int> $excludedIds
-	 *
-	 * @return array{int, string}
-	 */
-	private function buildSearchParams(int $retrievalLimit, array $excludedIds): array {
 		$knnK = $retrievalLimit;
 		$excludeClause = '';
 		if (!empty($excludedIds)) {
@@ -203,29 +241,9 @@ class SearchEngine {
 			$excludeClause = 'id NOT IN (' . implode(',', $safeExcludeIds) . ')';
 			$knnK += sizeof($excludedIds) + 5;
 		}
-
-		return [$knnK, $excludeClause];
-	}
-
-	/**
-	 * @param array<int, string|int> $excludedIds
-	 * @return array<int, array<string, mixed>>
-	 * @throws ManticoreSearchResponseError
-	 * @throws ManticoreSearchClientError
-	 */
-	private function executeVectorSearch(
-		string $table,
-		string $vectorField,
-		string $searchQuery,
-		int $knnK,
-		float $threshold,
-		int $retrievalLimit,
-		string $excludeClause,
-		array $excludedIds
-	): array {
 		$sql = $this->buildVectorSearchSql(
 			$table,
-			$vectorField,
+			$schema->vectorField,
 			$searchQuery,
 			$knnK,
 			$threshold,
@@ -235,7 +253,6 @@ class SearchEngine {
 
 		Buddy::debugv("\nRAG: [DEBUG KNN SEARCH]");
 		Buddy::debugv("RAG: ├─ Search query: '$searchQuery'");
-		Buddy::debugv("RAG: ├─ Vector field: $vectorField");
 		Buddy::debugv('RAG: ├─ Excluded IDs: [' . implode(', ', $excludedIds) . ']');
 		Buddy::debugv("RAG: ├─ retrieval_limit: $retrievalLimit");
 		Buddy::debugv("RAG: ├─ Threshold: $threshold");
@@ -248,77 +265,10 @@ class SearchEngine {
 
 		/** @var array<int, array{data: array<int, array<string, mixed>>}> $responseResult */
 		$responseResult = $response->getResult();
-		$rows = $responseResult[0]['data'] ?? [];
-		Buddy::debugv('RAG: ├─ Results found: ' . sizeof($rows));
-		return $rows;
-	}
+		$result = $responseResult[0]['data'] ?? [];
+		Buddy::debugv('RAG: └─ Results found: ' . sizeof($result));
 
-	/**
-	 * @param array<string, array<string, mixed>> $mergedById
-	 * @param array<int, array<string, mixed>> $rows
-	 */
-	private function mergeRowsByBestDistance(array &$mergedById, array $rows): void {
-		foreach ($rows as $row) {
-			if (!isset($row['id']) || !is_scalar($row['id'])) {
-				continue;
-			}
-
-			$rowId = (string)$row['id'];
-			if (!isset($mergedById[$rowId])) {
-				$mergedById[$rowId] = $row;
-				continue;
-			}
-
-			$currentDist = $this->extractKnnDistance($mergedById[$rowId]);
-			$newDist = $this->extractKnnDistance($row);
-			if ($newDist >= $currentDist) {
-				continue;
-			}
-
-			$mergedById[$rowId] = $row;
-		}
-	}
-
-	/**
-	 * @param string $requestedFields
-	 * @param TableSchema $schema
-	 *
-	 * @return array<int, string>
-	 */
-	private function resolveSearchVectorFields(string $requestedFields, TableSchema $schema): array {
-		if ($requestedFields === '') {
-			return [$schema->vectorField];
-		}
-
-		$fields = array_values(
-			array_filter(
-				array_map('trim', explode(',', $requestedFields)),
-				static fn (string $field): bool => $field !== ''
-			)
-		);
-		if ($fields === []) {
-			return [$schema->vectorField];
-		}
-
-		$selectedVectorFields = array_values(array_intersect($fields, $schema->vectorFields));
-		if ($selectedVectorFields !== []) {
-			return $selectedVectorFields;
-		}
-
-		return [$schema->vectorField];
-	}
-
-	/**
-	 * @param array<string, mixed> $row
-	 *
-	 * @return float
-	 */
-	private function extractKnnDistance(array $row): float {
-		if (!isset($row['knn_dist']) || !is_numeric($row['knn_dist'])) {
-			return INF;
-		}
-
-		return (float)$row['knn_dist'];
+		return $this->filterVectorFields($result, $schema);
 	}
 
 	/**

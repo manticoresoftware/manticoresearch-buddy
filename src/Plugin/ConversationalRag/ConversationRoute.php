@@ -9,22 +9,19 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation;
+namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
 final class ConversationRoute {
 
 	public const string ANSWER_FROM_HISTORY = 'ANSWER_FROM_HISTORY';
 	public const string SEARCH = 'SEARCH';
-	public const string DIRECT_SEARCH = 'DIRECT_SEARCH';
-	public const string DERIVE_THEN_SEARCH = 'DERIVE_THEN_SEARCH';
 	public const string REJECT = 'REJECT';
 
 	public function __construct(
 		public string $route,
-		public string $searchQuery,
+		public string $standaloneQuestion,
 		public string $excludeQuery,
-		public string $reason,
-		public string $deriveTask = ''
+		public string $reason
 	) {
 	}
 }

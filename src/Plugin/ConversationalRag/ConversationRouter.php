@@ -9,16 +9,13 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation;
+namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
 use JsonException;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Handler;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Tool\LlmToolCallArgumentsReader;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 
-final class ConversationSearchRouter {
+final class ConversationRouter {
 
 	private const string TOOL_NAME = 'route_conversation';
 
@@ -51,7 +48,7 @@ final class ConversationSearchRouter {
 		$route = $this->parseRoute($response['tool_calls']);
 		Buddy::debugv("\nRAG: [DEBUG CONVERSATION ROUTE]");
 		Buddy::debugv("RAG: ├─ Route: $route->route");
-		Buddy::debugv("RAG: ├─ Standalone question: '$route->searchQuery'");
+		Buddy::debugv("RAG: ├─ Standalone question: '$route->standaloneQuestion'");
 		Buddy::debugv("RAG: ├─ Exclude query: '$route->excludeQuery'");
 		Buddy::debugv("RAG: └─ Reason: $route->reason");
 
@@ -136,9 +133,55 @@ final class ConversationSearchRouter {
 	 * @throws ManticoreSearchClientError
 	 */
 	private function parseRoute(array $toolCalls): ConversationRoute {
-		return $this->createRoute(
-			(new LlmToolCallArgumentsReader())->read($toolCalls, 'Conversation routing')
-		);
+		if ($toolCalls === []) {
+			throw ManticoreSearchClientError::create('Conversation routing returned no tool calls');
+		}
+
+		return $this->createRoute($this->extractToolCallArguments($toolCalls[0]));
+	}
+
+	/**
+	 * @return array{route?: mixed, standalone_question?: mixed, exclude_query?: mixed, reason?: mixed}
+	 *
+	 * @throws ManticoreSearchClientError
+	 */
+	private function extractToolCallArguments(mixed $toolCall): array {
+		if (!$toolCall instanceof \ToolCall) {
+			throw ManticoreSearchClientError::create('Conversation routing returned invalid tool call');
+		}
+
+		$arguments = $toolCall->getArguments();
+		if (is_array($arguments)) {
+			return $arguments;
+		}
+
+		if (is_string($arguments)) {
+			return $this->decodeToolCallArguments($arguments);
+		}
+
+		throw ManticoreSearchClientError::create('Conversation routing returned invalid tool arguments');
+	}
+
+	/**
+	 * @return array{route?: mixed, standalone_question?: mixed, exclude_query?: mixed, reason?: mixed}
+	 *
+	 * @throws ManticoreSearchClientError
+	 */
+	private function decodeToolCallArguments(string $arguments): array {
+		try {
+			/** @var mixed $decoded */
+			$decoded = simdjson_decode($arguments, true);
+		} catch (\Throwable $e) {
+			throw ManticoreSearchClientError::create(
+				'Conversation routing returned invalid tool arguments: ' . $e->getMessage()
+			);
+		}
+
+		if (!is_array($decoded)) {
+			throw ManticoreSearchClientError::create('Conversation routing returned invalid tool arguments');
+		}
+
+		return $decoded;
 	}
 
 	/**

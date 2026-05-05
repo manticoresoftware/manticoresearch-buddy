@@ -9,63 +9,19 @@
   program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationHistory;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationMessage;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationRoute;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationSearchRouter;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Conversation\ConversationSearchWithResearchRouter;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationHistory;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationMessage;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationRoute;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\ConversationRouter;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\LlmProvider;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-final class ConversationRoutingTest extends TestCase {
-
-	public function testRoutesStrategyForDerivedSearch(): void {
-		$router = new ConversationSearchWithResearchRouter();
-
-		/** @var MockObject&LlmProvider $provider */
-		$provider = $this->createMock(LlmProvider::class);
-		$provider->expects($this->once())
-			->method('generateToolCall')
-			->with(
-				$this->callback(
-					static fn (string $prompt): bool => str_contains($prompt, 'RAG routing classifier')
-						&& str_contains($prompt, '<user_query>CPUs for MSI B150</user_query>')
-				),
-				$this->callback(
-					static fn (array $tool): bool => $tool['name'] === 'route_conversation_strategy'
-						&& $tool['parameters']['properties']['strategy']['enum'] === [
-							ConversationRoute::DIRECT_SEARCH,
-							ConversationRoute::DERIVE_THEN_SEARCH,
-							ConversationRoute::ANSWER_FROM_HISTORY,
-							ConversationRoute::REJECT,
-						]
-				)
-			)
-			->willReturn(
-				$this->strategyToolResponse(
-					ConversationRoute::DERIVE_THEN_SEARCH,
-					'',
-					'Derive concrete searchable compatibility facts for MSI B150 CPUs',
-					'Compatibility needs derived facts.'
-				)
-			);
-
-		$route = $router->route(
-			'CPUs for MSI B150',
-			new ConversationHistory([]),
-			$provider,
-			['model' => 'openai:gpt-4']
-		);
-
-		$this->assertSame(ConversationRoute::DERIVE_THEN_SEARCH, $route->route);
-		$this->assertSame('', $route->searchQuery);
-		$this->assertSame('Derive concrete searchable compatibility facts for MSI B150 CPUs', $route->deriveTask);
-	}
+final class ConversationRouterTest extends TestCase {
 
 	public function testRoutesSearchWithStandaloneQuestion(): void {
-		$router = new ConversationSearchRouter();
+		$router = new ConversationRouter();
 		$modelConfig = ['model' => 'openai:gpt-4'];
 
 		/** @var MockObject&LlmProvider $provider */
@@ -109,12 +65,12 @@ final class ConversationRoutingTest extends TestCase {
 		);
 
 		$this->assertEquals(ConversationRoute::SEARCH, $route->route);
-		$this->assertEquals('What is the cast of Game of Thrones?', $route->searchQuery);
+		$this->assertEquals('What is the cast of Game of Thrones?', $route->standaloneQuestion);
 		$this->assertEquals('', $route->excludeQuery);
 	}
 
 	public function testRoutesExplicitExclusionSeparatelyFromSearchQuestion(): void {
-		$router = new ConversationSearchRouter();
+		$router = new ConversationRouter();
 
 		/** @var MockObject&LlmProvider $provider */
 		$provider = $this->createMock(LlmProvider::class);
@@ -131,12 +87,12 @@ final class ConversationRoutingTest extends TestCase {
 		$route = $router->route('I already saw breaking bad', $this->history(), $provider, ['model' => 'openai:gpt-4']);
 
 		$this->assertEquals(ConversationRoute::SEARCH, $route->route);
-		$this->assertEquals('What are some good TV shows to watch?', $route->searchQuery);
+		$this->assertEquals('What are some good TV shows to watch?', $route->standaloneQuestion);
 		$this->assertEquals('Breaking Bad', $route->excludeQuery);
 	}
 
 	public function testRoutesAnswerFromHistory(): void {
-		$router = new ConversationSearchRouter();
+		$router = new ConversationRouter();
 
 		/** @var MockObject&LlmProvider $provider */
 		$provider = $this->createMock(LlmProvider::class);
@@ -153,12 +109,12 @@ final class ConversationRoutingTest extends TestCase {
 		$route = $router->route('which one is fantasy?', $this->history(), $provider, ['model' => 'openai:gpt-4']);
 
 		$this->assertEquals(ConversationRoute::ANSWER_FROM_HISTORY, $route->route);
-		$this->assertEquals('', $route->searchQuery);
+		$this->assertEquals('', $route->standaloneQuestion);
 		$this->assertEquals('', $route->excludeQuery);
 	}
 
 	public function testRoutesExplicitReject(): void {
-		$router = new ConversationSearchRouter();
+		$router = new ConversationRouter();
 
 		/** @var MockObject&LlmProvider $provider */
 		$provider = $this->createMock(LlmProvider::class);
@@ -175,12 +131,12 @@ final class ConversationRoutingTest extends TestCase {
 		$route = $router->route('No, not these.', $this->history(), $provider, ['model' => 'openai:gpt-4']);
 
 		$this->assertEquals(ConversationRoute::REJECT, $route->route);
-		$this->assertEquals('', $route->searchQuery);
+		$this->assertEquals('', $route->standaloneQuestion);
 		$this->assertEquals('', $route->excludeQuery);
 	}
 
 	public function testThrowsWhenSearchRouteHasEmptyStandaloneQuestion(): void {
-		$router = new ConversationSearchRouter();
+		$router = new ConversationRouter();
 
 		/** @var MockObject&LlmProvider $provider */
 		$provider = $this->createMock(LlmProvider::class);
@@ -193,7 +149,7 @@ final class ConversationRoutingTest extends TestCase {
 	}
 
 	public function testThrowsWhenToolCallHasInvalidShape(): void {
-		$router = new ConversationSearchRouter();
+		$router = new ConversationRouter();
 
 		/** @var MockObject&LlmProvider $provider */
 		$provider = $this->createMock(LlmProvider::class);
@@ -219,7 +175,7 @@ final class ConversationRoutingTest extends TestCase {
 	}
 
 	public function testParsesExtensionToolCallArguments(): void {
-		$router = new ConversationSearchRouter();
+		$router = new ConversationRouter();
 		$toolCall = $this->createMock(ToolCall::class);
 		$toolCall->method('getArguments')
 			->willReturn(
@@ -252,11 +208,11 @@ final class ConversationRoutingTest extends TestCase {
 		$route = $router->route('What is RAG?', new ConversationHistory([]), $provider, ['model' => 'openai:gpt-4']);
 
 		$this->assertEquals(ConversationRoute::SEARCH, $route->route);
-		$this->assertEquals('What is RAG?', $route->searchQuery);
+		$this->assertEquals('What is RAG?', $route->standaloneQuestion);
 	}
 
 	public function testParsesRawJsonToolCallArguments(): void {
-		$router = new ConversationSearchRouter();
+		$router = new ConversationRouter();
 		$toolCall = $this->createMock(ToolCall::class);
 		$toolCall->method('getArguments')
 			->willReturn(
@@ -292,7 +248,7 @@ final class ConversationRoutingTest extends TestCase {
 		$route = $router->route('What is RAG?', new ConversationHistory([]), $provider, ['model' => 'openai:gpt-4']);
 
 		$this->assertEquals(ConversationRoute::SEARCH, $route->route);
-		$this->assertEquals('What is RAG?', $route->searchQuery);
+		$this->assertEquals('What is RAG?', $route->standaloneQuestion);
 	}
 
 	private function history(): ConversationHistory {
@@ -325,43 +281,6 @@ final class ConversationRoutingTest extends TestCase {
 						'standalone_question' => $standaloneQuestion,
 						'exclude_query' => $excludeQuery,
 						'reason' => $reason,
-					],
-					JSON_THROW_ON_ERROR
-				)
-			);
-
-		return [
-			'success' => true,
-			'content' => '',
-			'tool_calls' => [$toolCall],
-			'metadata' => [
-				'tokens_used' => 10,
-				'input_tokens' => 8,
-				'output_tokens' => 2,
-				'response_time_ms' => 1,
-				'finish_reason' => 'tool_calls',
-			],
-		];
-	}
-
-	/**
-	 * @return array{success:true, content:string, tool_calls:array<int, mixed>, metadata:array<string, int|string>}
-	 */
-	private function strategyToolResponse(
-		string $strategy,
-		string $searchQuery,
-		string $deriveTask,
-		string $reason
-	): array {
-		$toolCall = $this->createMock(ToolCall::class);
-		$toolCall->method('getArguments')
-			->willReturn(
-				json_encode(
-					[
-						'strategy' => $strategy,
-						'reason' => $reason,
-						'search_query' => $searchQuery,
-						'derive_task' => $deriveTask,
 					],
 					JSON_THROW_ON_ERROR
 				)

@@ -187,7 +187,7 @@ class ModelManager {
 
 		$maxDocumentLength = $settings['max_document_length'] ?? null;
 		if (!is_int($maxDocumentLength) && !is_string($maxDocumentLength) && $maxDocumentLength !== null) {
-			throw ManticoreSearchClientError::create('max_document_length must be an integer');
+			$maxDocumentLength = null;
 		}
 
 		$settings['max_document_length'] = $this->normalizeMaxDocumentLength($maxDocumentLength);
@@ -205,7 +205,7 @@ class ModelManager {
 			return $maxDocumentLength;
 		}
 
-		throw ManticoreSearchClientError::create('max_document_length must be 0 or an integer between 100 and 65536');
+		return self::DEFAULT_MAX_DOCUMENT_LENGTH;
 	}
 
 	/**
