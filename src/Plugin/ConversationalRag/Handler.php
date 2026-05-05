@@ -273,11 +273,13 @@ final class Handler extends BaseHandlerWithClient {
 
 		/** @var array{max_document_length:int} $settings */
 		$settings = $model['settings'];
+		$vectorFieldInfo = $searchEngine->inspectVectorFieldInfo($request->table, $request->fields);
 		$searchContext = new SearchContext(
 			$request,
 			$conversationHistory,
 			$model,
-			$route
+			$route,
+			$vectorFieldInfo
 		);
 		[$searchResults, $queries, $excludedIds] = self::performSearch(
 			$searchContext, $services
@@ -287,9 +289,7 @@ final class Handler extends BaseHandlerWithClient {
 		$maxDocumentLength = $settings['max_document_length'];
 		$context = '';
 		if ($searchResults !== []) {
-			$schema = $searchEngine->inspectTableSchema($request->table);
-			$contentFields = $request->fields !== '' ? $request->fields : $schema->contentFields;
-			$context = self::buildContext($searchResults, $contentFields, $maxDocumentLength);
+			$context = self::buildContext($searchResults, $vectorFieldInfo->sourceFields, $maxDocumentLength);
 		}
 		self::logContextBuilding($searchResults, $context, $maxDocumentLength);
 		$response = self::generateResponse(
@@ -463,7 +463,8 @@ final class Handler extends BaseHandlerWithClient {
 			$queries['search_query'],
 			$excludedIds,
 			$context->model,
-			0.8
+			0.8,
+			$context->vectorFieldInfo
 		);
 
 		return [$searchResults, $queries, $excludedIds];
@@ -511,13 +512,17 @@ final class Handler extends BaseHandlerWithClient {
 		$excludedIds = [];
 		if ($queries['exclude_query'] !== '') {
 			$excludedIds = $services->searchEngine->getExcludedIds(
-				$context->request->table, $queries['exclude_query']
+				$context->request->table, $queries['exclude_query'], $context->vectorFieldInfo->name
 			);
 		}
 
 		$searchResults = $services->searchEngine->search(
-			$context->request->table, $queries['search_query'], $excludedIds,
-			$context->model, 0.8
+			$context->request->table,
+			$queries['search_query'],
+			$excludedIds,
+			$context->model,
+			0.8,
+			$context->vectorFieldInfo
 		);
 
 		return [$searchResults, $queries, $excludedIds];

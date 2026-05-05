@@ -10,7 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchEngine;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\TableSchema;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\VectorFieldInfo;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
@@ -34,7 +34,7 @@ class SearchEngineTest extends TestCase {
 		putenv('SEARCHD_CONFIG=/etc/manticore/manticore.conf');
 	}
 
-	public function testInspectTableSchemaDetectsFloatVector(): void {
+	public function testInspectVectorFieldInfoDetectsFloatVector(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$searchEngine = new SearchEngine($mockClient);
 
@@ -48,9 +48,9 @@ class SearchEngineTest extends TestCase {
 			->with('SHOW CREATE TABLE test_table')
 			->willReturn($mockResponse);
 
-		$result = $searchEngine->inspectTableSchema('test_table');
+		$result = $searchEngine->inspectVectorFieldInfo('test_table');
 
-		$this->assertEquals('embedding', $result->vectorField);
+		$this->assertEquals('embedding', $result->name);
 	}
 
 	private function createSchemaResponse(string $createTable): Response {
@@ -64,7 +64,7 @@ class SearchEngineTest extends TestCase {
 		);
 	}
 
-	public function testInspectTableSchemaDetectsCommonVectorNames(): void {
+	public function testInspectVectorFieldInfoDetectsCommonVectorNames(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$searchEngine = new SearchEngine($mockClient);
 
@@ -78,12 +78,12 @@ class SearchEngineTest extends TestCase {
 			->with('SHOW CREATE TABLE test_table')
 			->willReturn($mockResponse);
 
-		$result = $searchEngine->inspectTableSchema('test_table');
+		$result = $searchEngine->inspectVectorFieldInfo('test_table');
 
-		$this->assertEquals('content_embedding', $result->vectorField);
+		$this->assertEquals('content_embedding', $result->name);
 	}
 
-	public function testInspectTableSchemaFailsWithoutVectorFields(): void {
+	public function testInspectVectorFieldInfoFailsWithoutVectorFields(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$searchEngine = new SearchEngine($mockClient);
 
@@ -97,7 +97,7 @@ class SearchEngineTest extends TestCase {
 			->willReturn($mockResponse);
 
 		$this->expectException(ManticoreSearchClientError::class);
-		$searchEngine->inspectTableSchema('test_table');
+		$searchEngine->inspectVectorFieldInfo('test_table');
 	}
 
 	public function testPerformVectorSearchSuccessful(): void {
@@ -403,6 +403,7 @@ class SearchEngineTest extends TestCase {
 		);
 
 		$searchSql = $sqlQueries[1];
+		$this->assertStringContainsString('SELECT *, knn_dist() as knn_dist FROM docs', $searchSql);
 		$this->assertStringContainsString(
 			"WHERE knn(embedding_vector, 5, 'Market Capitalization vs Net Asset Value, "
 				. "difference between market cap and NAV, how to calculate Market Cap and NAV')",
@@ -415,7 +416,7 @@ class SearchEngineTest extends TestCase {
 	/**
 	 * @throws ReflectionException
 	 */
-	public function testInspectTableSchemaFindsVectorFields(): void {
+	public function testInspectVectorFieldInfoFindsVectorFields(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$searchEngine = $this->createSearchEngine($mockClient);
 
@@ -431,41 +432,77 @@ class SearchEngineTest extends TestCase {
 			->with('SHOW CREATE TABLE test_table')
 			->willReturn($mockResponse);
 
-		$result = $searchEngine->inspectTableSchema('test_table');
+		$result = $searchEngine->inspectVectorFieldInfo('test_table');
 
-		$this->assertSame('embedding', $result->vectorField);
-		$this->assertCount(2, $result->vectorFields);
-		$this->assertContains('embedding', $result->vectorFields);
-		$this->assertContains('title_embedding', $result->vectorFields);
+		$this->assertSame('embedding', $result->name);
+		$this->assertSame('content', $result->sourceFields);
 	}
 
-	/**
-	 * @throws ReflectionException
-	 */
-	public function testFilterVectorFieldsRemovesEmbeddings(): void {
-		$searchEngine = $this->createSearchEngine($this->createMock(HTTPClient::class));
+	public function testInspectVectorFieldInfoUsesSpecifiedVectorField(): void {
+		$mockClient = $this->createMock(HTTPClient::class);
+		$searchEngine = $this->createSearchEngine($mockClient);
 
-		$testResults = [
+		$mockResponse = $this->createSchemaResponse(
+			"CREATE TABLE test_table (\nid bigint,\ncontent text,\ntitle text,\n"
+			. "embedding float_vector from='content',\n"
+			. "title_embedding float_vector from='title'\n)"
+		);
+
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->with('SHOW CREATE TABLE test_table')
+			->willReturn($mockResponse);
+
+		$result = $searchEngine->inspectVectorFieldInfo('test_table', 'title_embedding');
+
+		$this->assertSame('title_embedding', $result->name);
+		$this->assertSame('title', $result->sourceFields);
+	}
+
+	public function testSearchUsesSpecifiedVectorFieldInKnnQuery(): void {
+		$mockClient = $this->createMock(HTTPClient::class);
+		$searchEngine = $this->createSearchEngine($mockClient);
+		$searchResponse = $this->createDataResponse(
 			[
-				'id' => 1,
-				'content' => 'Test content',
-				'embedding' => '[0.1, 0.2, 0.3]',
-				'title' => 'Test title',
-			],
-		];
+				[
+					'id' => 1,
+					'title' => 'Market cap article',
+					'embedding' => '[0.1, 0.2, 0.3]',
+					'title_embedding' => '[0.4, 0.5, 0.6]',
+					'knn_dist' => 0.1,
+				],
+			]
+		);
 
-		// Use reflection to access private method
-		$reflection = new ReflectionClass($searchEngine);
-		$method = $reflection->getMethod('filterVectorFields');
+		$sqlQueries = [];
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->willReturnCallback(
+				function (string $sql) use ($searchResponse, &$sqlQueries): Response {
+					$sqlQueries[] = $sql;
+					return $searchResponse;
+				}
+			);
 
-		$result = $method->invoke($searchEngine, $testResults, new TableSchema('embedding', ['embedding'], 'content'));
+		$result = $searchEngine->search(
+			'docs',
+			'Market Capitalization',
+			[],
+			$this->createDefaultModelConfig(),
+			0.8,
+			new VectorFieldInfo('title_embedding', 'title', ['embedding', 'title_embedding'])
+		);
 
-		$this->assertIsArray($result);
-		$this->assertCount(1, $result);
-		$this->assertArrayHasKey('id', $result[0]);
-		$this->assertArrayHasKey('content', $result[0]);
-		$this->assertArrayHasKey('title', $result[0]);
+		$this->assertStringContainsString(
+			"WHERE knn(title_embedding, 5, 'Market Capitalization')",
+			$sqlQueries[0]
+		);
+		$this->assertStringContainsString(
+			'SELECT *, knn_dist() as knn_dist FROM docs',
+			$sqlQueries[0]
+		);
 		$this->assertArrayNotHasKey('embedding', $result[0]);
+		$this->assertArrayNotHasKey('title_embedding', $result[0]);
 	}
 
 	/**
@@ -573,7 +610,7 @@ class SearchEngineTest extends TestCase {
 		$this->assertIsArray($result);
 		$this->assertCount(1, $result);
 		$this->assertEquals(3, $result[0]['id']);
-		$this->assertArrayNotHasKey('embedding', $result[0]); // Should be filtered out
+		$this->assertArrayNotHasKey('embedding', $result[0]);
 	}
 
 	/**
@@ -739,7 +776,7 @@ class SearchEngineTest extends TestCase {
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testInspectTableSchemaFindsAutoEmbeddingSourceFields(): void {
+	public function testInspectVectorFieldInfoFindsAutoEmbeddingSourceFields(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$searchEngine = $this->createSearchEngine($mockClient);
 
@@ -753,10 +790,10 @@ class SearchEngineTest extends TestCase {
 			->with('SHOW CREATE TABLE docs')
 			->willReturn($schemaResponse);
 
-		$this->assertEquals('content,title', $searchEngine->inspectTableSchema('docs')->contentFields);
+		$this->assertEquals('content,title', $searchEngine->inspectVectorFieldInfo('docs')->sourceFields);
 	}
 
-	public function testPerformSearchPropagatesMissingTableSchemaError(): void {
+	public function testPerformSearchPropagatesMissingVectorFieldInfoError(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
 		$searchEngine = $this->createSearchEngine($mockClient);
 

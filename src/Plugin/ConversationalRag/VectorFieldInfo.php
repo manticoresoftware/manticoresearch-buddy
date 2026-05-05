@@ -11,14 +11,14 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalRag;
 
-final readonly class TableSchema {
+final readonly class VectorFieldInfo {
 	/**
 	 * @param array<int, string> $vectorFields
 	 */
 	public function __construct(
-		public string $vectorField,
-		public array $vectorFields,
-		public string $contentFields
+		public string $name,
+		public string $sourceFields,
+		public array $vectorFields
 	) {
 	}
 }

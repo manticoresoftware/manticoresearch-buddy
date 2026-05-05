@@ -25,8 +25,9 @@ class SearchEngine {
 	use SqlEscapingTrait;
 
 	private const int DEFAULT_RETRIEVAL_LIMIT = 5;
-	/** @var array<string, TableSchema> */
-	private array $schemaCache = [];
+	private const string FIELD_IDENTIFIER_PATTERN = '/^[A-Za-z_][A-Za-z0-9_]*$/';
+	/** @var array<string, VectorFieldInfo> */
+	private array $fieldInfoCache = [];
 
 	public function __construct(private readonly HTTPClient $client) {
 	}
@@ -36,27 +37,35 @@ class SearchEngine {
 	 *
 	 * @param string $table
 	 * @param string $excludeQuery
+	 * @param string $vectorField
 	 *
 	 * @return array<int, string|int>
 	 * @throws ManticoreSearchResponseError|ManticoreSearchClientError
 	 */
 	public function getExcludedIds(
 		string $table,
-		string $excludeQuery
+		string $excludeQuery,
+		string $vectorField = ''
 	): array {
 		if (empty($excludeQuery) || $excludeQuery === 'none') {
 			return [];
 		}
 
+		if ($vectorField === '') {
+			$vectorField = $this->inspectVectorFieldInfo($table)->name;
+		}
+
 		return $this->findExcludedIds(
-			$table, $excludeQuery, $this->inspectTableSchema($table)
+			$table,
+			$excludeQuery,
+			$vectorField
 		);
 	}
 
 	/**
 	 * @param string $table
 	 * @param string $excludeQuery
-	 * @param TableSchema $schema
+	 * @param string $vectorField
 	 *
 	 * @return array<int, string|int>
 	 * @throws ManticoreSearchClientError
@@ -65,7 +74,7 @@ class SearchEngine {
 	private function findExcludedIds(
 		string $table,
 		string $excludeQuery,
-		TableSchema $schema
+		string $vectorField
 	): array {
 		if (empty($excludeQuery) || $excludeQuery === 'none') {
 			return [];
@@ -75,13 +84,13 @@ class SearchEngine {
 		$sql
 			= /** @lang manticore */
 			"SELECT id, knn_dist() as knn_dist FROM {$table}
-				WHERE knn($schema->vectorField, 15, '$excludeEscaped')
+				WHERE knn($vectorField, 15, '$excludeEscaped')
 				AND knn_dist < 0.75";
 
 		Buddy::debugv("\nRAG: [DEBUG EXCLUSION QUERY]");
 		Buddy::debugv("RAG: ├─ Exclude query: '$excludeQuery'");
 		Buddy::debugv("RAG: ├─ Table: $table");
-		Buddy::debugv("RAG: ├─ Vector field: $schema->vectorField");
+		Buddy::debugv("RAG: ├─ Vector field: $vectorField");
 		Buddy::debugv('RAG: ├─ Threshold: 0.75');
 		Buddy::debugv("RAG: ├─ Final SQL: $sql");
 
@@ -104,44 +113,44 @@ class SearchEngine {
 	/**
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
-	public function inspectTableSchema(string $table): TableSchema {
-		if (isset($this->schemaCache[$table])) {
-			return $this->schemaCache[$table];
+	public function inspectVectorFieldInfo(string $table, string $vectorField = ''): VectorFieldInfo {
+		if ($vectorField !== '' && preg_match(self::FIELD_IDENTIFIER_PATTERN, $vectorField) !== 1) {
+			throw ManticoreSearchClientError::create("Invalid vector field '$vectorField'");
 		}
 
-		$this->schemaCache[$table] = $this->inspectCreateTableSchema(
-			$table,
-			$this->getCreateTableStatement($table)
-		);
-		return $this->schemaCache[$table];
-	}
+		$cacheKey = $vectorField === '' ? $table : "$table:$vectorField";
+		if (isset($this->fieldInfoCache[$cacheKey])) {
+			return $this->fieldInfoCache[$cacheKey];
+		}
 
-	/**
-	 * @throws ManticoreSearchClientError
-	 */
-	private function inspectCreateTableSchema(string $table, string $createTable): TableSchema {
+		$createTable = $this->getCreateTableStatement($table);
 		$vectorDefinitions = $this->extractVectorFieldDefinitions($createTable);
 		if ($vectorDefinitions === []) {
 			throw ManticoreSearchClientError::create("Table '$table' has no FLOAT_VECTOR field");
 		}
 
 		$vectorFields = array_keys($vectorDefinitions);
-		$vectorField = $vectorFields[0];
-		$vectorDefinition = $vectorDefinitions[$vectorField];
+		$selectedField = $vectorField !== '' ? $vectorField : $vectorFields[0];
+		if (!isset($vectorDefinitions[$selectedField])) {
+			throw ManticoreSearchClientError::create("FLOAT_VECTOR field '$selectedField' not found in table '$table'");
+		}
+
+		$vectorDefinition = $vectorDefinitions[$selectedField];
 		if (!preg_match("/\\bfrom\\s*=\\s*'([^']+)'/i", $vectorDefinition, $matches)) {
 			throw ManticoreSearchClientError::create(
-				"FLOAT_VECTOR field '$vectorField' has no auto-embedding source fields"
+				"FLOAT_VECTOR field '$selectedField' has no auto-embedding source fields"
 			);
 		}
 
 		$contentFields = trim($matches[1]);
 		if ($contentFields === '') {
 			throw ManticoreSearchClientError::create(
-				"FLOAT_VECTOR field '$vectorField' has empty auto-embedding source fields"
+				"FLOAT_VECTOR field '$selectedField' has empty auto-embedding source fields"
 			);
 		}
 
-		return new TableSchema($vectorField, $vectorFields, $contentFields);
+		$this->fieldInfoCache[$cacheKey] = new VectorFieldInfo($selectedField, $contentFields, $vectorFields);
+		return $this->fieldInfoCache[$cacheKey];
 	}
 
 	/**
@@ -191,6 +200,7 @@ class SearchEngine {
 	 * @param array<int, string|int> $excludedIds
 	 * @param array{model: string, settings:array<string, mixed>} $modelConfig
 	 * @param float $threshold
+	 * @param VectorFieldInfo|null $vectorFieldInfo
 	 *
 	 * @return array<int, array<string, mixed>>
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
@@ -200,15 +210,20 @@ class SearchEngine {
 		string $searchQuery,
 		array $excludedIds,
 		array $modelConfig,
-		float $threshold
+		float $threshold,
+		?VectorFieldInfo $vectorFieldInfo = null
 	): array {
+		if ($vectorFieldInfo === null) {
+			$vectorFieldInfo = $this->inspectVectorFieldInfo($table);
+		}
+
 		return $this->runVectorSearch(
 			$table,
 			$searchQuery,
 			$excludedIds,
 			$modelConfig,
 			$threshold,
-			$this->inspectTableSchema($table)
+			$vectorFieldInfo
 		);
 	}
 
@@ -218,7 +233,7 @@ class SearchEngine {
 	 * @param array<int, string|int> $excludedIds
 	 * @param array{model: string, settings:array<string, mixed>} $modelConfig
 	 * @param float $threshold
-	 * @param TableSchema $schema
+	 * @param VectorFieldInfo $vectorFieldInfo
 	 *
 	 * @return array<int, array<string, mixed>>
 	 * @throws ManticoreSearchClientError
@@ -230,7 +245,7 @@ class SearchEngine {
 		array $excludedIds,
 		array $modelConfig,
 		float $threshold,
-		TableSchema $schema
+		VectorFieldInfo $vectorFieldInfo
 	): array {
 		$retrievalLimit = $this->getRetrievalLimit($modelConfig);
 
@@ -243,7 +258,7 @@ class SearchEngine {
 		}
 		$sql = $this->buildVectorSearchSql(
 			$table,
-			$schema->vectorField,
+			$vectorFieldInfo->name,
 			$searchQuery,
 			$knnK,
 			$threshold,
@@ -268,7 +283,25 @@ class SearchEngine {
 		$result = $responseResult[0]['data'] ?? [];
 		Buddy::debugv('RAG: └─ Results found: ' . sizeof($result));
 
-		return $this->filterVectorFields($result, $schema);
+		return $this->stripVectorFields($result, $vectorFieldInfo->vectorFields);
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $results
+	 * @param array<int, string> $vectorFields
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function stripVectorFields(array $results, array $vectorFields): array {
+		return array_map(
+			function (array $result) use ($vectorFields): array {
+				foreach ($vectorFields as $field) {
+					unset($result[$field]);
+				}
+				return $result;
+			},
+			$results
+		);
 	}
 
 	/**
@@ -323,29 +356,6 @@ class SearchEngine {
 	private function buildKnnWhereSql(string $vectorField, int $knnK, string $searchQuery): string {
 		$searchEscaped = $this->escapeString($searchQuery);
 		return "knn($vectorField, $knnK, '$searchEscaped')";
-	}
-
-	/**
-	 * Remove embedding vector fields from search results (matches original php_rag behavior)
-	 *
-	 * @param array<int, array<string, mixed>> $results
-	 * @param TableSchema $schema
-	 *
-	 * @return array<int, array<string, mixed>>
-	 */
-	private function filterVectorFields(array $results, TableSchema $schema): array {
-		if (empty($results)) {
-			return $results;
-		}
-
-		return array_map(
-			function ($result) use ($schema) {
-				foreach ($schema->vectorFields as $field) {
-					unset($result[$field]);
-				}
-				return $result;
-			}, $results
-		);
 	}
 
 }

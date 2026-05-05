@@ -20,6 +20,7 @@ use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\Payload as RagPayload;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchContext;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchEngine;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\SearchServices;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalRag\VectorFieldInfo;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
@@ -696,7 +697,7 @@ class ConversationHandlerTest extends TestCase {
 				...$initResponses, // initializeTables
 				$modelResponse, // getModelByUuidOrName
 				$historyResponse, // getConversationMessages
-				$schemaResponse, // inspectTableSchema for main search
+				$schemaResponse, // inspectVectorFieldInfo for main search
 				$searchResponse, // performSearchWithExcludedIds
 				$saveUserContextResponse, // saveMessage user with context
 				$saveAssistantResponse, // saveMessage assistant
@@ -876,11 +877,13 @@ class ConversationHandlerTest extends TestCase {
 			'created_at' => '',
 			'updated_at' => '',
 		];
+		$vectorFieldInfo = new VectorFieldInfo('embedding', 'content', ['embedding']);
 		$context = new SearchContext(
 			new ConversationRequest('Which one was the crime drama?', 'docs', 'model-uuid', 'conv-uuid'),
 			$history,
 			$model,
-			$route
+			$route,
+			$vectorFieldInfo
 		);
 
 		$searchEngine = $this->createMock(SearchEngine::class);
@@ -891,7 +894,8 @@ class ConversationHandlerTest extends TestCase {
 				'What are some good TV shows to watch?',
 				['5696241144904548358'],
 				$model,
-				0.8
+				0.8,
+				$vectorFieldInfo
 			)
 			->willReturn([['id' => 1, 'content' => 'Breaking Bad is a crime drama.']]);
 

@@ -328,7 +328,7 @@ Positional parameters:
 | 2 | `table` | Yes | Table to search |
 | 3 | `model_name_or_uuid` | Yes | RAG model name or UUID |
 | 4 | `conversation_uuid` | No | 4th positional argument. Pass `''` when you want to set `fields` without a conversation id |
-| 5 | `fields` | No | 5th positional argument. Comma-separated fields used to build context |
+| 5 | `fields` | No | 5th positional argument. FLOAT_VECTOR field used for KNN search |
 
 `CALL CONVERSATIONAL_RAG` supports positional arguments only.
 
@@ -338,17 +338,17 @@ CALL CONVERSATIONAL_RAG(
     'table_name',
     'model_name_or_uuid',
     '',
-    'title,content'
+    'title_embedding'
 );
 ```
 
 Notes:
 
-- when `fields` is provided, those fields are used for context construction
-- otherwise context fields are auto-detected from the `from='...'` setting of the detected `FLOAT_VECTOR` field
+- when `fields` is provided, that `FLOAT_VECTOR` field is used for KNN search
+- otherwise the first detected `FLOAT_VECTOR` field is used
+- context fields are auto-detected from the selected vector field's `from='...'` setting
 - missing fields are skipped and logged as warnings
 - empty or whitespace-only field values are skipped
-- multiple fields are joined with `, `
 
 ## Response Format
 
@@ -379,7 +379,7 @@ Conversation flow includes:
 - LLM-based intent classification
 - KNN search over a detected `FLOAT_VECTOR` field
 - optional exclusion of previously rejected or already shown items
-- context building from explicit `fields` (when provided) or auto-detected embedding source fields
+- context building from the selected vector field's auto-embedding source fields
 - context truncation using `max_document_length`
 
 Buddy-specific search settings:

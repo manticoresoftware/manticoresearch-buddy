@@ -318,39 +318,40 @@ class ConversationalPayloadTest extends TestCase {
 	 * @throws QueryParseError
 	 */
 	public function testConversationParsingWithConversationUuidAndFields(): void {
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'conversation_1', 'title,content')";
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', 'conversation_1', 'title_embedding')";
 
 		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('conversation_1', $payload->params['conversation_uuid']);
-		$this->assertEquals('title,content', $payload->params['fields']);
+		$this->assertEquals('title_embedding', $payload->params['fields']);
 	}
 
 	/**
 	 * @throws QueryParseError
 	 */
 	public function testConversationParsingWithEmptyConversationUuidAndFields(): void {
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', '', 'title,content')";
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', '', 'title_embedding')";
 
 		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('', $payload->params['conversation_uuid']);
-		$this->assertEquals('title,content', $payload->params['fields']);
+		$this->assertEquals('title_embedding', $payload->params['fields']);
 	}
 
 	public function testConversationParsingTreatsEqualsAsPositionalConversationUuid(): void {
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', fields='title,content')";
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', fields='title_embedding')";
 
 		$payload = $this->parseSqlPayload($query);
-		$this->assertEquals("fields='title,content'", $payload->params['conversation_uuid']);
+		$this->assertEquals("fields='title_embedding'", $payload->params['conversation_uuid']);
 	}
 
 	public function testConversationParsingTreatsNamedStyleFiveArgsAsPositionalValues(): void {
-		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', conversation_uuid='', fields='title,content')";
+		$query = "CALL CONVERSATIONAL_RAG('test query', 'docs', 'model123', conversation_uuid='',"
+			. " fields='title_embedding')";
 
 		$payload = $this->parseSqlPayload($query);
 		$this->assertEquals("conversation_uuid=''", $payload->params['conversation_uuid']);
-		$this->assertEquals("fields='title,content'", $payload->params['fields']);
+		$this->assertEquals("fields='title_embedding'", $payload->params['fields']);
 	}
 
 }

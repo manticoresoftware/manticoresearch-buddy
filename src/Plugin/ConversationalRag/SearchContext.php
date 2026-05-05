@@ -27,12 +27,14 @@ final class SearchContext {
 	 *   updated_at:string
 	 * } $model
 	 * @param ConversationRoute $route
+	 * @param VectorFieldInfo $vectorFieldInfo
 	 */
 	public function __construct(
 		public ConversationRequest $request,
 		public ConversationHistory $history,
 		public array $model,
-		public ConversationRoute $route
+		public ConversationRoute $route,
+		public VectorFieldInfo $vectorFieldInfo
 	) {
 	}
 }
