@@ -19,11 +19,11 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelSuccess(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
+	public function testCreateChatModelSuccess(): void {
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'test_model'");
 
 		$result = static::runSqlQuery(
-			"CREATE RAG MODEL 'test_model' (
+			"CREATE CHAT MODEL 'test_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789',
 				style_prompt = 'You are a helpful assistant.',
@@ -35,20 +35,20 @@ class ConversationalTest extends TestCase {
 
 		// Verify the model was created by checking it exists
 		$this->assertQueryResult(
-			'SHOW RAG MODELS',
+			'SHOW CHAT MODELS',
 			['test_model']
 		);
 
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'test_model'");
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelRejectsNameFieldInBody(): void {
+	public function testCreateChatModelRejectsNameFieldInBody(): void {
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'test_model' (
-				name = 'Test RAG Model',
+			"CREATE CHAT MODEL 'test_model' (
+				name = 'Test Chat Model',
 				model = 'openai:gpt-4'
 			)",
 			"Unsupported field 'name'"
@@ -59,9 +59,9 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelRejectsTemperatureField(): void {
+	public function testCreateChatModelRejectsTemperatureField(): void {
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'bad_model' (
+			"CREATE CHAT MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				temperature = 0.3
@@ -73,9 +73,9 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelRejectsMaxTokensField(): void {
+	public function testCreateChatModelRejectsMaxTokensField(): void {
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'bad_model' (
+			"CREATE CHAT MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				max_tokens = 500
@@ -87,9 +87,9 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelInvalidKResults(): void {
+	public function testCreateChatModelInvalidKResults(): void {
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'bad_model' (
+			"CREATE CHAT MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				retrieval_limit = 100
@@ -101,9 +101,9 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelRejectsNonIntegerKResults(): void {
+	public function testCreateChatModelRejectsNonIntegerKResults(): void {
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'bad_model' (
+			"CREATE CHAT MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				retrieval_limit = 1.5
@@ -115,9 +115,9 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelInvalidTimeout(): void {
+	public function testCreateChatModelInvalidTimeout(): void {
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'bad_model' (
+			"CREATE CHAT MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				timeout = 65537
@@ -129,9 +129,9 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelRejectsNonIntegerTimeout(): void {
+	public function testCreateChatModelRejectsNonIntegerTimeout(): void {
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'bad_model' (
+			"CREATE CHAT MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				timeout = 1.5
@@ -143,9 +143,9 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelInvalidMaxDocumentLength(): void {
+	public function testCreateChatModelInvalidMaxDocumentLength(): void {
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'bad_model' (
+			"CREATE CHAT MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				max_document_length = 99
@@ -157,9 +157,9 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateRagModelRejectsNonIntegerMaxDocumentLength(): void {
+	public function testCreateChatModelRejectsNonIntegerMaxDocumentLength(): void {
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'bad_model' (
+			"CREATE CHAT MODEL 'bad_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				max_document_length = 1.5
@@ -171,43 +171,43 @@ class ConversationalTest extends TestCase {
 	/**
 	 * @throws Exception
 	 */
-	public function testShowRagModelsEmpty(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model1'");
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model2'");
+	public function testShowChatModelsEmpty(): void {
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'test_model1'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'test_model2'");
 
-		$result = static::runSqlQuery('SHOW RAG MODELS');
+		$result = static::runSqlQuery('SHOW CHAT MODELS');
 		$this->assertIsArray($result);
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testShowRagModelsWithData(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model1'");
+	public function testShowChatModelsWithData(): void {
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'test_model1'");
 
 		static::runSqlQuery(
-			"CREATE RAG MODEL 'test_model1' (
+			"CREATE CHAT MODEL 'test_model1' (
 			model = 'openai:gpt-4',
 			api_key = 'sk-test-key-123456789'
 		)"
 		);
 
 		$this->assertQueryResult(
-			'SHOW RAG MODELS',
+			'SHOW CHAT MODELS',
 			['test_model1', 'openai', 'gpt-4']
 		);
 
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model1'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'test_model1'");
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testDescribeRagModelSuccess(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
+	public function testDescribeChatModelSuccess(): void {
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'test_model'");
 
 		static::runSqlQuery(
-			"CREATE RAG MODEL 'test_model' (
+			"CREATE CHAT MODEL 'test_model' (
 			model = 'openai:gpt-4',
 			style_prompt = 'You are a helpful assistant.',
 			retrieval_limit = 5,
@@ -216,115 +216,115 @@ class ConversationalTest extends TestCase {
 		);
 
 		$this->assertQueryResult(
-			"DESCRIBE RAG MODEL 'test_model'",
+			"DESCRIBE CHAT MODEL 'test_model'",
 			['test_model', 'openai:gpt-4', '0']
 		);
 
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'test_model'");
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testDescribeRagModelNotFound(): void {
+	public function testDescribeChatModelNotFound(): void {
 		$this->assertQueryResultContainsError(
-			"DESCRIBE RAG MODEL 'non_existent_model'",
-			"RAG model 'non_existent_model' not found"
+			"DESCRIBE CHAT MODEL 'non_existent_model'",
+			"chat model 'non_existent_model' not found"
 		);
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testDropRagModelSuccess(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'test_model'");
+	public function testDropChatModelSuccess(): void {
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'test_model'");
 
 		static::runSqlQuery(
-			"CREATE RAG MODEL 'test_model' (
+			"CREATE CHAT MODEL 'test_model' (
 			model = 'openai:gpt-4',
 			api_key = 'sk-test-key-123456789'
 		)"
 		);
 
-		$result = static::runSqlQuery("DROP RAG MODEL 'test_model'");
+		$result = static::runSqlQuery("DROP CHAT MODEL 'test_model'");
 		$this->assertIsArray($result);
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testDropRagModelIfExistsNotFoundDoesNotError(): void {
-		$output = static::runSqlQuery("DROP RAG MODEL IF EXISTS 'non_existent_model'");
+	public function testDropChatModelIfExistsNotFoundDoesNotError(): void {
+		$output = static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'non_existent_model'");
 		$this->assertStringNotContainsString('ERROR', implode(PHP_EOL, $output));
 
-		$output = static::runSqlQuery('DROP RAG MODEL IF EXISTS non_existent_model');
+		$output = static::runSqlQuery('DROP CHAT MODEL IF EXISTS non_existent_model');
 		$this->assertStringNotContainsString('ERROR', implode(PHP_EOL, $output));
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testDropRagModelRejectsTrailingTokens(): void {
+	public function testDropChatModelRejectsTrailingTokens(): void {
 		$this->assertQueryResultContainsError(
-			'DROP RAG MODEL non_existent_model garbage',
-			'Invalid DROP RAG MODEL syntax'
+			'DROP CHAT MODEL non_existent_model garbage',
+			'Invalid DROP CHAT MODEL syntax'
 		);
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testDropRagModelQuotedNameContainingIfExistsStillErrorsWhenMissing(): void {
+	public function testDropChatModelQuotedNameContainingIfExistsStillErrorsWhenMissing(): void {
 		$this->assertQueryResultContainsError(
-			"DROP RAG MODEL 'my IF EXISTS model'",
-			"RAG model 'my IF EXISTS model' not found"
+			"DROP CHAT MODEL 'my IF EXISTS model'",
+			"chat model 'my IF EXISTS model' not found"
 		);
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testDropRagModelNotFound(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'non_existent_model'");
+	public function testDropChatModelNotFound(): void {
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'non_existent_model'");
 
 		$this->assertQueryResultContainsError(
-			"DROP RAG MODEL 'non_existent_model'",
-			"RAG model 'non_existent_model' not found"
+			"DROP CHAT MODEL 'non_existent_model'",
+			"chat model 'non_existent_model' not found"
 		);
 	}
 
 	/**
 	 * @throws Exception
 	 */
-	public function testCreateDuplicateRagModel(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'duplicate_model'");
+	public function testCreateDuplicateChatModel(): void {
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'duplicate_model'");
 
 		static::runSqlQuery(
-			"CREATE RAG MODEL 'duplicate_model' (
+			"CREATE CHAT MODEL 'duplicate_model' (
 			model = 'openai:gpt-4',
 			api_key = 'sk-test-key-123456789'
 		)"
 		);
 
 		$this->assertQueryResultContainsError(
-			"CREATE RAG MODEL 'duplicate_model' (
+			"CREATE CHAT MODEL 'duplicate_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789'
 			)",
-			"RAG model 'duplicate_model' already exists"
+			"chat model 'duplicate_model' already exists"
 		);
 
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'duplicate_model'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'duplicate_model'");
 	}
 
 	/**
 	 * @throws Exception
 	 */
 	public function testFullModelLifecycle(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'lifecycle_model'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'lifecycle_model'");
 
 		static::runSqlQuery(
-			"CREATE RAG MODEL 'lifecycle_model' (
+			"CREATE CHAT MODEL 'lifecycle_model' (
 			model = 'openai:gpt-4',
 			api_key = 'sk-test-key-123456789',
 			style_prompt = 'You are a helpful assistant.',
@@ -333,20 +333,20 @@ class ConversationalTest extends TestCase {
 		);
 
 		$this->assertQueryResult(
-			'SHOW RAG MODELS',
+			'SHOW CHAT MODELS',
 			['lifecycle_model']
 		);
 
 		$this->assertQueryResult(
-			"DESCRIBE RAG MODEL 'lifecycle_model'",
+			"DESCRIBE CHAT MODEL 'lifecycle_model'",
 			['lifecycle_model', 'openai', 'gpt-4']
 		);
 
-		static::runSqlQuery("DROP RAG MODEL 'lifecycle_model'");
+		static::runSqlQuery("DROP CHAT MODEL 'lifecycle_model'");
 
 		$this->assertQueryResultContainsError(
-			"DESCRIBE RAG MODEL 'lifecycle_model'",
-			"RAG model 'lifecycle_model' not found"
+			"DESCRIBE CHAT MODEL 'lifecycle_model'",
+			"chat model 'lifecycle_model' not found"
 		);
 	}
 
@@ -354,10 +354,10 @@ class ConversationalTest extends TestCase {
 	 * @throws Exception
 	 */
 	public function testCreateModelWithMinimalParameters(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'minimal_model'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'minimal_model'");
 
 		$result = static::runSqlQuery(
-			"CREATE RAG MODEL 'minimal_model' (
+			"CREATE CHAT MODEL 'minimal_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789'
 			)"
@@ -366,21 +366,21 @@ class ConversationalTest extends TestCase {
 
 		// Verify the model was created
 		$this->assertQueryResult(
-			'SHOW RAG MODELS',
+			'SHOW CHAT MODELS',
 			['minimal_model']
 		);
 
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'minimal_model'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'minimal_model'");
 	}
 
 	/**
 	 * @throws Exception
 	 */
 	public function testCreateModelWithAllParameters(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'full_model'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'full_model'");
 
 		$result = static::runSqlQuery(
-			"CREATE RAG MODEL 'full_model' (
+			"CREATE CHAT MODEL 'full_model' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key-123456789',
 				style_prompt = 'You are a helpful assistant with extensive knowledge.',
@@ -390,21 +390,21 @@ class ConversationalTest extends TestCase {
 		$this->assertIsArray($result);
 
 		$this->assertQueryResult(
-			"DESCRIBE RAG MODEL 'full_model'",
+			"DESCRIBE CHAT MODEL 'full_model'",
 			['full_model', 'You are a helpful assistant with extensive knowledge.']
 		);
 
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'full_model'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'full_model'");
 	}
 
 	/**
 	 * @throws Exception
 	 */
 	public function testRetrievalLimitBoundaryValues(): void {
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'k_min'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'k_min'");
 
 		$result1 = static::runSqlQuery(
-			"CREATE RAG MODEL 'k_min' (
+			"CREATE CHAT MODEL 'k_min' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				retrieval_limit = 1
@@ -412,17 +412,17 @@ class ConversationalTest extends TestCase {
 		);
 		$this->assertIsArray($result1);
 
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'k_min'");
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'k_max'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'k_min'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'k_max'");
 
 		$result2 = static::runSqlQuery(
-			"CREATE RAG MODEL 'k_max' (
+			"CREATE CHAT MODEL 'k_max' (
 				model = 'openai:gpt-4',
 				api_key = 'sk-test-key',
 				retrieval_limit = 50
 			)"
 		);
 		$this->assertIsArray($result2);
-		static::runSqlQuery("DROP RAG MODEL IF EXISTS 'k_max'");
+		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'k_max'");
 	}
 }
