@@ -17,7 +17,7 @@ use Manticoresearch\Buddy\Core\Task\Task;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class SettingsKibanaHandler extends BaseHandler {
+class PluginsKibanaHandler extends BaseHandler {
 
 	use Traits\QueryMapLoaderTrait;
 
@@ -36,9 +36,9 @@ class SettingsKibanaHandler extends BaseHandler {
 	 * @return Task
 	 */
 	public function run(): Task {
-		self::initQueryMap('Settings');
+		self::initQueryMap('Plugins');
 
-		return self::getResponseByQuery('Settings', $this->payload->path);
+		return self::getResponseByQuery('Plugins', $this->payload->path);
 	}
 
 	/**

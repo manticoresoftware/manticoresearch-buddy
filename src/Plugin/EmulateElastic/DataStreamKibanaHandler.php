@@ -13,13 +13,13 @@ namespace Manticoresearch\Buddy\Base\Plugin\EmulateElastic;
 
 use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Task\Task;
+use Manticoresearch\Buddy\Core\Task\TaskResult;
+use RuntimeException;
 
 /**
- * This is the parent class to handle erroneous Manticore queries
+ * Handles Data Stream requests in Opensearch requests
  */
-class SettingsKibanaHandler extends BaseHandler {
-
-	use Traits\QueryMapLoaderTrait;
+class DataStreamKibanaHandler extends BaseHandler {
 
 	/**
 	 *  Initialize the executor
@@ -34,11 +34,18 @@ class SettingsKibanaHandler extends BaseHandler {
 	 * Process the request and return self for chaining
 	 *
 	 * @return Task
+	 * @throws RuntimeException
 	 */
 	public function run(): Task {
-		self::initQueryMap('Settings');
+		$taskFn = static function (): TaskResult {
+			return TaskResult::raw(
+				[
+					'data_streams' => [],
+				]
+			);
+		};
 
-		return self::getResponseByQuery('Settings', $this->payload->path);
+		return Task::create($taskFn)->run();
 	}
 
 	/**

@@ -102,4 +102,5 @@ abstract class BaseEntityHandler extends BaseHandlerWithClient {
 			'result' => $result,
 		];
 	}
+
 }
