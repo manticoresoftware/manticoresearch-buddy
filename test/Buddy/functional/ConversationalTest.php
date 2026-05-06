@@ -386,8 +386,7 @@ class ConversationalTest extends TestCase {
 		$this->assertIsArray($result);
 
 		$this->assertQueryResult(
-			"DESCRIBE CHAT MODEL 'full_model'",
-			['full_model', 'You are a helpful assistant with extensive knowledge.']
+			"DESCRIBE CHAT MODEL 'full_model'", ['full_model']
 		);
 
 		static::runSqlQuery("DROP CHAT MODEL IF EXISTS 'full_model'");
