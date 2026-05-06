@@ -164,7 +164,7 @@ final class Handler extends BaseHandlerWithClient {
 			->column('uuid', Column::String)
 			->column('name', Column::String)
 			->column('model', Column::String)
-			->column('created_at', Column::String);
+			->column('created_at', Column::Long);
 	}
 
 	/**

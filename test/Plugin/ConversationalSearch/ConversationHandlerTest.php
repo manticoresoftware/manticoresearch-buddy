@@ -144,7 +144,7 @@ class ConversationHandlerTest extends TestCase {
 				'uuid' => 'test-uuid',
 				'name' => 'test_model',
 				'model' => 'openai:gpt-4',
-				'created_at' => '2023-01-01',
+				'created_at' => 1234567890,
 			]]]]
 		);
 		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
@@ -157,12 +157,17 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = (array)$result->getStruct();
 		$this->assertIsArray($struct);
-		/** @var array<int, array{data: array<int, array{uuid: string, name: string}>}> $struct */
+		/** @var array<int, array{
+		 *   columns: array<int, array<string, array{type: string}>>,
+		 *   data: array<int, array{uuid: string, name: string}>
+		 * }> $struct
+		 */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertCount(1, $struct[0]['data']);
 		$this->assertEquals('test-uuid', $struct[0]['data'][0]['uuid']);
 		$this->assertEquals('test_model', $struct[0]['data'][0]['name']);
+		$this->assertEquals([['created_at' => ['type' => 'long long']]], array_slice($struct[0]['columns'], -1));
 	}
 
 	public function testDescribeModelSuccess(): void {
