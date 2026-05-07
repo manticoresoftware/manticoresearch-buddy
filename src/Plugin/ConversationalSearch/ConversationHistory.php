@@ -1,0 +1,98 @@
+<?php declare(strict_types=1);
+
+/*
+  Copyright (c) 2025, Manticore Software LTD (https://manticoresearch.com)
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License version 2 or any later
+  version. You should have received a copy of the GPL license along with this
+  program; if you did not, you can find it at http://www.gnu.org/
+*/
+
+namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
+
+final readonly class ConversationHistory {
+	/**
+	 * @param array<int, ConversationMessage> $messages
+	 */
+	public function __construct(private array $messages) {
+	}
+
+	/**
+	 * @return array<int, ConversationMessage>
+	 */
+	public function messages(): array {
+		return $this->messages;
+	}
+
+	public function format(): string {
+		$history = '';
+		foreach ($this->messages as $message) {
+			$history .= $message->role . ': ' . $message->message . "\n";
+		}
+
+		return $history;
+	}
+
+	/**
+	 * @return array<string, array{user?: string, assistant?: string}>
+	 */
+	public function payload(int $maxExchanges = 10): array {
+		$maxMessages = $maxExchanges * 2;
+		$messages = $this->messages;
+		if (sizeof($messages) > $maxMessages) {
+			$messages = array_slice($messages, -$maxMessages);
+		}
+
+		$turns = [];
+		$currentTimestamp = null;
+		foreach ($messages as $message) {
+			if ($message->role === 'user') {
+				$currentTimestamp = $this->formatHistoryTimestamp(sizeof($turns));
+				$turns[$currentTimestamp] = [
+					'user' => $message->message,
+				];
+				continue;
+			}
+
+			if ($message->role !== 'assistant') {
+				continue;
+			}
+
+			if ($currentTimestamp === null) {
+				$currentTimestamp = $this->formatHistoryTimestamp(sizeof($turns));
+				$turns[$currentTimestamp] = [];
+			}
+
+			$turns[$currentTimestamp]['assistant'] = $message->message;
+		}
+
+		return $turns;
+	}
+
+	/**
+	 * @return array{search_query: string, exclude_query: string, excluded_ids: string}|null
+	 */
+	public function latestSearchContext(): ?array {
+		for ($i = sizeof($this->messages) - 1; $i >= 0; $i--) {
+			$message = $this->messages[$i];
+			if ($message->role !== 'user'
+				|| $message->intent === ConversationRoute::ANSWER_FROM_HISTORY
+				|| $message->searchQuery === ''
+			) {
+				continue;
+			}
+
+			return [
+				'search_query' => $message->searchQuery,
+				'exclude_query' => $message->excludeQuery,
+				'excluded_ids' => $message->excludedIds,
+			];
+		}
+
+		return null;
+	}
+
+	private function formatHistoryTimestamp(int $turnIndex): string {
+		return gmdate('Y-m-d\TH:i:s', $turnIndex) . '.000000Z';
+	}
+}

@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Replace;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
+use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
@@ -22,6 +23,8 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
 final class Handler extends BaseHandlerWithClient {
+	use SqlEscapingTrait;
+
 
 	/**
 	 * Initialize the executor
@@ -214,10 +217,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return string
 	 */
 	private static function escape(string $string): string {
-		if (str_contains($string, "'")) {
-			$string = str_replace("'", "\\'", $string);
-		}
-		return $string;
+		return self::escapeSqlString($string);
 	}
 
 	/**
