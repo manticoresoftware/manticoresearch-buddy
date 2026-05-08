@@ -185,7 +185,7 @@ final class Handler extends BaseHandler {
 		$descResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
 		$count = sizeof($descResult[0]['data']);
 		return TaskResult::withRow(['COUNT(*)' => $count])
-			->column('COUNT(*)', Column::String);
+			->column('COUNT(*)', Column::Long);
 	}
 
 	/**
@@ -199,7 +199,7 @@ final class Handler extends BaseHandler {
 		$descResult = $manticoreClient->sendRequest($query, $payload->path)->getResult();
 		$count = sizeof($descResult[0]['data']);
 		return TaskResult::withRow(['COUNT(*)' => $count])
-			->column('COUNT(*)', Column::String);
+			->column('COUNT(*)', Column::Long);
 	}
 
 	/**
