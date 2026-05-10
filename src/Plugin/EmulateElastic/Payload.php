@@ -105,9 +105,11 @@ final class Payload extends BasePayload {
 			case '_index_template':
 			case '_template':
 				if ($request->httpMethod !== 'PUT') {
-					// Need this to avoid sending the 404 response for Elasticdump's requests which causes its failure
 					$customError = InvalidNetworkRequestError::create('', true);
-					$customError->setResponseErrorCode(200);
+					if ($request->httpMethod !== 'HEAD') {
+						// Need this to avoid sending the 404 response for Elasticdump's requests which causes its failure
+						$customError->setResponseErrorCode(200);
+					}
 					throw $customError;
 				}
 				$self->table = end($pathParts);
