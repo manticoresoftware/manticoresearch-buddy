@@ -468,7 +468,7 @@ final class Metric {
 		// Iterate through files and accumulate their sizes
 		/** @var SplFileInfo $file */
 		foreach ($iterator as $file) {
-			if (strpos($file->getPathname(), $this->binlogDir) !== false
+			if (($this->binlogDir !== '' && strpos($file->getPathname(), $this->binlogDir) !== false)
 					||
 				!$file->isFile()
 					||
