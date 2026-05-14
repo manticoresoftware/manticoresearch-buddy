@@ -266,7 +266,7 @@ trait TestFunctionalTrait {
 		}
 		$matches = [];
 		// Getting the port value from the corresponding config line
-		preg_match("/listen = ([^:]*?):?([^:]+?)$portDiscriminator(\r|\n)/", static::$manticoreConf, $matches);
+		preg_match("/listen = ([^:]*?):([^:]+?)$portDiscriminator(\r|\n)/", static::$manticoreConf, $matches);
 		if (!isset($matches[2])) {
 			throw new Exception("$portType is not set in Manticore config");
 		}

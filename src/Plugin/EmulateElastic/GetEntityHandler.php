@@ -73,6 +73,7 @@ class GetEntityHandler extends BaseEntityHandler {
 		/** @var array{error?:string,0:array{data?:array<array{_source:string}>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error']) || !isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
+			//! try to get from query map ( map name from request info? )
 			return [
 				'_id' => $entityId,
 				'_index' => $entityIndex,

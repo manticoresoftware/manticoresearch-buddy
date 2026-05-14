@@ -114,7 +114,7 @@ final class QueryFilter extends BaseNode implements FilterNodeInterface {
 				}
 			}
 		}
-		return 	false;
+		return false;
 	}
 
 	/**
@@ -127,6 +127,6 @@ final class QueryFilter extends BaseNode implements FilterNodeInterface {
 				return true;
 			}
 		}
-		return true;
+		return false;
 	}
 }

@@ -30,6 +30,7 @@
 		}
 	},
 	"require": {
+        "composer/composer": "^2.9.6",
 		"manticoresoftware/telemetry": "^0.1.19",
 		"symfony/dependency-injection": "^6.1",
 		"manticoresoftware/buddy-core": "dev-main",
@@ -45,6 +46,9 @@
 		"kwn/php-rdkafka-stubs": "^2.2",
 		"swoole/ide-helper": "~5.0.0"
 	},
+    "conflict": {
+        "composer/composer": "<2.9.6"
+    },
 	"repositories": [
 		{
 			"type": "path",

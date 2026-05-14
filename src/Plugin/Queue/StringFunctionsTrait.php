@@ -13,12 +13,14 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Fields;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\BuddyTest\Lib\BuddyRequestError;
 
 trait StringFunctionsTrait {
+	use SqlEscapingTrait;
 
 	/**
 	 * @var array<string, string>
@@ -88,14 +90,14 @@ trait StringFunctionsTrait {
 			Fields::TYPE_INT, Fields::TYPE_BIGINT => (int)$fieldValue,
 			Fields::TYPE_TIMESTAMP => is_numeric($fieldValue)
 				? (int)$fieldValue
-				: "'" . self::escapeSting($fieldValue) . "'",
+				: self::quoteSqlString($fieldValue),
 			Fields::TYPE_BOOL => ((bool)$fieldValue) ? 1 : 0,
 			Fields::TYPE_FLOAT => (float)$fieldValue,
 			Fields::TYPE_TEXT, Fields::TYPE_STRING, Fields::TYPE_JSON =>
-				"'" . $this->escapeSting($fieldValue) . "'",
+				self::quoteSqlString($fieldValue),
 			Fields::TYPE_MVA, Fields::TYPE_MVA64, Fields::TYPE_FLOAT_VECTOR =>
 				'(' . $this->prepareMvaField($fieldValue) . ')',
-			default => $this->escapeSting($fieldValue)
+			default => self::escapeSqlString($fieldValue)
 		};
 	}
 
@@ -117,16 +119,6 @@ trait StringFunctionsTrait {
 		settype($fieldValue, 'string');
 		return $fieldValue;
 	}
-
-	/**
-	 * @param string $value
-	 *
-	 * @return string
-	 */
-	protected function escapeSting(string $value): string {
-		return str_replace("'", "\'", $value);
-	}
-
 
 	/**
 	 * Just for phpstan
