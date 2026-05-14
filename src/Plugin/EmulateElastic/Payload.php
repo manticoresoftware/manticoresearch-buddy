@@ -107,7 +107,8 @@ final class Payload extends BasePayload {
 				if ($request->httpMethod !== 'PUT') {
 					$customError = InvalidNetworkRequestError::create('', true);
 					if ($request->httpMethod !== 'HEAD') {
-						// Need this to avoid sending the 404 response for Elasticdump's requests which causes its failure
+						// Need this to avoid sending the 404 response
+						// for Elasticdump's requests which causes its failure
 						$customError->setResponseErrorCode(200);
 					}
 					throw $customError;
