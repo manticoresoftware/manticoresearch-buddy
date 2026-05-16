@@ -338,10 +338,32 @@ final class Table {
 		// Get the current shard schema
 		$schema = $this->getShardSchema();
 
+		// Collect internal replication clusters used by this table before we start
+		// dropping shards. Each entry maps cluster name -> last alive remove id so
+		// we can chain DELETE CLUSTER after the corresponding ALTER CLUSTER DROP.
+		/** @var Map<string,int> $internalClusterLastId */
+		$internalClusterLastId = new Map;
+		foreach ($schema as $row) {
+			foreach ($row['shards'] as $shard) {
+				$connections = $this->getConnectedNodes(new Set([$shard]));
+				if ($connections->count() <= 1) {
+					continue;
+				}
+				$internalClusterLastId->put(static::getClusterName($connections), 0);
+			}
+		}
+
 		// Iterate through all nodes and their shards
 		foreach ($schema as $row) {
 			$nodes->add($row['node']);
-			$ids = $this->cleanUpNode($queue, $row['node'], $row['shards'], $processedTables);
+			$ids = $this->cleanUpNode(
+				$queue,
+				$row['node'],
+				$row['shards'],
+				$processedTables,
+				'',
+				$internalClusterLastId
+			);
 			$queueIds->add(...$ids);
 		}
 
@@ -357,9 +379,86 @@ final class Table {
 			"
 		);
 
+		// After this table is removed from sharding_table, find which of the
+		// internal clusters it owned are now unused by any remaining sharded
+		// table and enqueue DELETE CLUSTER for those. This prevents empty
+		// internal replication clusters from lingering.
+		$dropClusterIds = $this->dropEmptyInternalClusters(
+			$queue,
+			$internalClusterLastId,
+			$nodes
+		);
+		$queueIds->add(...$dropClusterIds);
+
 		$result['nodes'] = $nodes;
 		$result['queue_ids'] = $queueIds;
 		return $result;
+	}
+
+	/**
+	 * Enqueue DELETE CLUSTER for each internal replication cluster the dropped
+	 * table owned that is no longer referenced by any remaining sharded table.
+	 *
+	 * @param Queue $queue
+	 * @param Map<string,int> $internalClusterLastId Cluster name -> last queued
+	 *  alive ALTER CLUSTER DROP id (so we can wait_for_id chain after it).
+	 * @param Set<string> $tableNodes Nodes that hosted shards for this table.
+	 * @return Set<int>
+	 */
+	protected function dropEmptyInternalClusters(
+		Queue $queue,
+		Map $internalClusterLastId,
+		Set $tableNodes
+	): Set {
+		/** @var Set<int> */
+		$ids = new Set;
+		if ($internalClusterLastId->count() === 0) {
+			return $ids;
+		}
+
+		// Determine which internal clusters are still used by other tables that
+		// remain in system.sharding_table.
+		$systemTable = $this->cluster->getSystemTableName($this->table);
+		$res = $this->client
+			->sendRequest("SELECT node, table, shards FROM {$systemTable}")
+			->getResult();
+		/** @var array{0:array{data?:array<array{node:string,table:string,shards:string}>}} $res */
+		$rows = $res[0]['data'] ?? [];
+
+		// Group by table -> shard -> nodes so we can compute the internal
+		// cluster names that each remaining table relies on.
+		$tableShardNodes = [];
+		foreach ($rows as $r) {
+			$shards = static::parseShards($r['shards']);
+			foreach ($shards as $s) {
+				$tableShardNodes[$r['table']][$s][] = $r['node'];
+			}
+		}
+
+		/** @var Set<string> */
+		$stillUsed = new Set;
+		foreach ($tableShardNodes as $perShard) {
+			foreach ($perShard as $shardNodes) {
+				if (count($shardNodes) <= 1) {
+					continue;
+				}
+				$stillUsed->add(static::getClusterName(new Set($shardNodes)));
+			}
+		}
+
+		$primaryNode = $tableNodes->sorted()->first() ?: $this->cluster->nodeId;
+		foreach ($internalClusterLastId as $clusterName => $waitForId) {
+			if ($stillUsed->contains($clusterName)) {
+				continue;
+			}
+			if ($waitForId > 0) {
+				$queue->setWaitForId($waitForId);
+			}
+			$internal = new Cluster($this->client, $clusterName, $primaryNode);
+			$ids[] = $internal->remove($queue);
+			$queue->resetWaitForId();
+		}
+		return $ids;
 	}
 	/**
 	 * Handle replication for the table and shard
@@ -1388,7 +1487,8 @@ final class Table {
 		string $nodeId,
 		Set $shards,
 		Set $processedTables,
-		string $operationGroup = ''
+		string $operationGroup = '',
+		?Map $internalClusterLastId = null
 	): Set {
 		/** @var Set<int> */
 		$queueIds = new Set;
@@ -1402,7 +1502,8 @@ final class Table {
 			if (sizeof($connections) > 1) {
 				$this->handleClusteredCleanUp(
 					$queue, $nodeId, $connections, $clusterName,
-					$table, $queueIds, $processedTables, $operationGroup
+					$table, $queueIds, $processedTables, $operationGroup,
+					$internalClusterLastId
 				);
 			} else {
 				$this->handleSingleNodeCleanUp($queue, $nodeId, $table, $queueIds, $operationGroup);
@@ -1433,7 +1534,8 @@ final class Table {
 		string $table,
 		Set $queueIds,
 		Set $processedTables,
-		string $operationGroup = ''
+		string $operationGroup = '',
+		?Map $internalClusterLastId = null
 	): void {
 		$aliveRemoveId = 0;
 		if (!$processedTables->contains($table)) {
@@ -1470,6 +1572,12 @@ final class Table {
 		$queue->setWaitForId($deadNodeRemoveId);
 		$queueIds[] = $queue->add($nodeId, "DROP TABLE IF EXISTS {$table}", '', $operationGroup);
 		$queue->resetWaitForId();
+
+		// Remember the last queued ALTER CLUSTER DROP id for this internal cluster so
+		// that the eventual DELETE CLUSTER can be chained after it.
+		if ($internalClusterLastId !== null) {
+			$internalClusterLastId->put($clusterName, $deadNodeRemoveId);
+		}
 	}
 
 	/**
