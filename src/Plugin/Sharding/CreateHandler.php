@@ -90,6 +90,9 @@ final class CreateHandler extends BaseHandlerWithClient {
 		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
 		$result = $resp->getResult();
 		if (isset($result[0]['data'][0])) {
+			if ($this->payload->quiet) {
+				return Task::create(static fn() => TaskResult::none())->run();
+			}
 			return static::getErrorTask(
 				"table '{$this->payload->table}': CREATE TABLE failed: table '{$this->payload->table}' already exists"
 			);

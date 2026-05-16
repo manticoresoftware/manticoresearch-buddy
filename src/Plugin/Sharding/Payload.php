@@ -102,6 +102,7 @@ final class Payload extends BasePayload {
 	 */
 	protected static function fromCreate(Request $request): static {
 		$pattern = '/(?:CREATE\s+TABLE|ALTER\s+TABLE)\s+'
+			. '(?P<ifNotExists>IF\s+NOT\s+EXISTS\s+)?'
 			. '(?:(?P<cluster>[^:\s]+):)?(?P<table>[^:\s\()]+)\s*'
 			. '(?:\((?P<structure>.+?)\)\s*)?'
 			. '(?P<extra>.*)/ius';
@@ -109,7 +110,7 @@ final class Payload extends BasePayload {
 			QueryParseError::throw('Failed to parse query');
 		}
 
-		/** @var array{table:string,cluster?:string,structure:string,extra:string} $matches */
+		/** @var array{table:string,cluster?:string,structure:string,extra:string,ifNotExists?:string} $matches */
 		$options = [];
 		if ($matches['extra']) {
 			$pattern = '/(?P<key>rf|shards|timeout)\s*=\s*\'(?P<value>[^\']*)\'/ius';
@@ -130,6 +131,7 @@ final class Payload extends BasePayload {
 		$self->structure = $matches['structure'];
 		$self->options = $options;
 		$self->extra = $matches['extra'];
+		$self->quiet = !empty($matches['ifNotExists']);
 		$self->validate();
 		return $self;
 	}
