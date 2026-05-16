@@ -98,6 +98,24 @@ final class CreateHandler extends BaseHandlerWithClient {
 			);
 		}
 
+		// Reject local sharded creation when the node is already part of a
+		// replication cluster: the sharding metadata tables (sharding_table /
+		// sharding_state / sharding_queue) belong to that cluster, so a local
+		// CREATE goes through but its sharding_table row is silently dropped
+		// (writes to a clustered table without the cluster: prefix don't land).
+		// Observability ends up broken (FAIL_017), so we surface the
+		// limitation up front.
+		if (!$this->payload->cluster) {
+			$clusterName = $this->getJoinedClusterName();
+			if ($clusterName !== '') {
+				return static::getErrorTask(
+					"Local sharded tables cannot be created on a node that is "
+					. "part of a replication cluster ('{$clusterName}'). "
+					. "Use CREATE TABLE {$clusterName}:{$this->payload->table} instead."
+				);
+			}
+		}
+
 		$nodeCount = 1;
 		// Check that cluster exists
 		if ($this->payload->cluster) {
@@ -127,6 +145,31 @@ final class CreateHandler extends BaseHandlerWithClient {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Return the name of the user-visible replication cluster this node belongs
+	 * to (the one that owns the sharding metadata tables), or '' when the node
+	 * is standalone. The sharding plugin also creates per-shard internal
+	 * clusters with md5-hash names, which we filter out here — only the
+	 * cluster that contains system.sharding_table is reported.
+	 *
+	 * @return string
+	 */
+	protected function getJoinedClusterName(): string {
+		/** @var array{0?:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_%_indexes'")
+			->getResult();
+		foreach ($res[0]['data'] ?? [] as $row) {
+			if (!str_contains($row['Value'], 'system.sharding_table')) {
+				continue;
+			}
+			if (preg_match('/^cluster_(.+)_indexes$/', $row['Counter'], $m)) {
+				return $m[1];
+			}
+		}
+		return '';
 	}
 
 	/**
