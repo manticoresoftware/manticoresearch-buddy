@@ -96,6 +96,18 @@ final class DropHandler extends BaseHandlerWithClient {
 		}
 
 		if (false === stripos($result[0]['data'][0]['Create Table'], "type='shard'")) {
+			// A cluster prefix on a non-sharded table is usually a regular
+			// replicated RT table that was added via ALTER CLUSTER ... ADD.
+			// Point the user at the correct command instead of leaking our
+			// internal "must be sharded" error.
+			if ($this->payload->cluster !== '') {
+				return $this->getErrorTask(
+					"table '{$this->payload->table}' is a regular table in cluster "
+					. "'{$this->payload->cluster}': "
+					. "use ALTER CLUSTER {$this->payload->cluster} DROP {$this->payload->table} "
+					. "to remove it from the cluster, then DROP TABLE {$this->payload->table}"
+				);
+			}
 			return $this->getErrorTask(
 				"table '{$this->payload->table}' is not sharded: "
 					. 'DROP SHARDED TABLE failed: '
