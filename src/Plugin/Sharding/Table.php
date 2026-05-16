@@ -1793,8 +1793,9 @@ final class Table {
 
 		// Finally generate create table
 		$structure = $this->structure ? "({$this->structure})" : '';
+		$tableExtras = $this->getTableLevelExtras();
 		return "CREATE TABLE `{$this->name}` {$structure}
-			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
+			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')} {$tableExtras}
 			";
 	}
 
@@ -1847,9 +1848,32 @@ final class Table {
 
 		// Finally generate create table
 		$structure = $this->structure ? "({$this->structure})" : '';
+		$tableExtras = $this->getTableLevelExtras();
 		return "CREATE TABLE `{$this->name}` {$structure}
-			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')}
+			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')} {$tableExtras}
 			";
+	}
+
+	/**
+	 * Subset of CREATE TABLE options that must be applied to BOTH the per-shard
+	 * tables and the public type='shard' wrapper so daemon-side schema validation
+	 * does not reject the wrapper as incompatible with its locals.
+	 *
+	 * For example, engine='columnar' changes attribute storage on the physical
+	 * shards; the wrapper must declare it too or the daemon rejects the wrapper
+	 * with 'local table ... is incompatible with shard table ...'.
+	 *
+	 * @return string
+	 */
+	protected function getTableLevelExtras(): string {
+		if (!$this->extra) {
+			return '';
+		}
+		$out = [];
+		if (preg_match("/engine\s*=\s*'[^']*'/i", $this->extra, $m)) {
+			$out[] = $m[0];
+		}
+		return implode(' ', $out);
 	}
 
 
