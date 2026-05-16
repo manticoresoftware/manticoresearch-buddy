@@ -47,6 +47,8 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 			$res = $client->sendRequest($sql)->getResult();
 			$rawRows = $res[0]['data'] ?? [];
 
+			$pendingByNode = static::getPendingShardsByNode($client);
+
 			$emptyResult = TaskResult::withData([])
 				->column('table', Column::String)
 				->column('shard', Column::Long)
@@ -75,7 +77,7 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 				}
 			}
 
-			$outputRows = static::buildOutputRows($rawRows, $shardNodes, $inactiveByCluster);
+			$outputRows = static::buildOutputRows($rawRows, $shardNodes, $inactiveByCluster, $pendingByNode);
 
 			return TaskResult::withData($outputRows)
 				->column('table', Column::String)
@@ -128,14 +130,21 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 	 * @param array<array{node:string,shards:string,cluster:string,table:string}> $rawRows
 	 * @param array<string, Set<string>> $shardNodes
 	 * @param array<string, Set<string>> $inactiveByCluster
+	 * @param array<string, array<string, Set<int>>> $pendingByNode
 	 * @return array<array{table:string,shard:int,node:string,status:string,cluster:string,replication_cluster:string,rf:int,rf_status:string}>
 	 */
-	protected static function buildOutputRows(array $rawRows, array $shardNodes, array $inactiveByCluster): array {
+	protected static function buildOutputRows(
+		array $rawRows,
+		array $shardNodes,
+		array $inactiveByCluster,
+		array $pendingByNode = []
+	): array {
 		$outputRows = [];
 		foreach ($rawRows as $row) {
 			$clusterName = $row['cluster'];
 			$inactive = $inactiveByCluster[$clusterName] ?? new Set;
 			$isActive = !$inactive->contains($row['node']);
+			$pendingShards = $pendingByNode[$row['node']][$row['table']] ?? null;
 
 			foreach (Table::parseShards($row['shards']) as $shard) {
 				$key = "{$clusterName}\0{$row['table']}\0{$shard}";
@@ -143,11 +152,21 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 				$rf = $allNodes->count();
 				$aliveCount = $allNodes->filter(fn($n) => !$inactive->contains($n))->count();
 
+				$isPending = $pendingShards !== null && $pendingShards->contains($shard);
+				if ($isPending) {
+					$shardStatus = 'pending';
+					// A pending physical shard is not actually serving yet,
+					// so the replication factor should reflect that.
+					$aliveCount = max(0, $aliveCount - 1);
+				} else {
+					$shardStatus = $isActive ? 'active' : 'inactive';
+				}
+
 				$outputRows[] = [
 					'table' => $row['table'],
 					'shard' => $shard,
 					'node' => $row['node'],
-					'status' => $isActive ? 'active' : 'inactive',
+					'status' => $shardStatus,
 					'cluster' => $clusterName,
 					'replication_cluster' => Table::getClusterName($allNodes),
 					'rf' => $rf,
@@ -165,5 +184,38 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 			fn($a, $b) => [$a['table'], $a['shard'], $a['node']] <=> [$b['table'], $b['shard'], $b['node']]
 		);
 		return $outputRows;
+	}
+
+	/**
+	 * Map each node to the set of (table, shard) pairs that still have a
+	 * queued physical-create operation pending (sharding_queue rows whose
+	 * status is not 'processed'). These shards exist in sharding_table as the
+	 * target placement, but the daemon has not yet created them on the node,
+	 * so they should be reported as 'pending' instead of 'active'.
+	 *
+	 * @param Client $client
+	 * @return array<string, array<string, Set<int>>> node -> table -> Set<shard>
+	 */
+	protected static function getPendingShardsByNode(Client $client): array {
+		$sql = "SELECT node, query FROM system.sharding_queue WHERE status != 'processed'";
+		/** @var array{0?:array{data?:array<array{node:string,query:string}>}} $res */
+		$res = $client->sendRequest($sql)->getResult();
+		$rows = $res[0]['data'] ?? [];
+		$out = [];
+		foreach ($rows as $row) {
+			if (!preg_match(
+				'/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?system\.([^\s`"]+?)_s(\d+)[`"]?/i',
+				$row['query'],
+				$m
+			)) {
+				continue;
+			}
+			$table = $m[1];
+			$shard = (int)$m[2];
+			$out[$row['node']] ??= [];
+			$out[$row['node']][$table] ??= new Set;
+			$out[$row['node']][$table]->add($shard);
+		}
+		return $out;
 	}
 }
