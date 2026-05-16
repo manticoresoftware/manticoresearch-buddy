@@ -109,7 +109,7 @@ final class CreateHandler extends BaseHandlerWithClient {
 			$clusterName = $this->getJoinedClusterName();
 			if ($clusterName !== '') {
 				return static::getErrorTask(
-					"Local sharded tables cannot be created on a node that is "
+					'Local sharded tables cannot be created on a node that is '
 					. "part of a replication cluster ('{$clusterName}'). "
 					. "Use CREATE TABLE {$clusterName}:{$this->payload->table} instead."
 				);
