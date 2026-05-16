@@ -282,7 +282,7 @@ final class Table {
 			$queueIds = new Set;
 			foreach ($nodeShardsMap as $node => $shards) {
 				// Even when no shards, we still create distributed table
-				$sql = $this->getCreateShardedTableSQL($shards);
+				$sql = $this->getCreateShardedTableSQL($shards, $node);
 				$rollbackSql = "DROP TABLE IF EXISTS {$this->name}";
 
 				// Use updated add method with rollback support
@@ -1267,7 +1267,7 @@ final class Table {
 				$queue->setWaitForId($lastDropId);
 			}
 
-			$sql = $this->getCreateShardedTableSQLWithSchema($row['shards'], $newSchema);
+			$sql = $this->getCreateShardedTableSQLWithSchema($row['shards'], $newSchema, $row['node']);
 			$lastQueueId = $queue->add($row['node'], $sql, "DROP TABLE IF EXISTS {$this->name}", $operationGroup);
 			$nodeTailIds[$row['node']] = $lastQueueId;
 		}
@@ -1738,9 +1738,19 @@ final class Table {
 	 * @param int $replicationFactor
 	 * @return Set<string>
 	 */
-	private function buildAgentDefinitions(Map $map, Set $shards, int $replicationFactor): Set {
+	private function buildAgentDefinitions(
+		Map $map,
+		Set $shards,
+		int $replicationFactor,
+		?string $targetNodeId = null
+	): Set {
 		$agents = new Set;
-		$currentNodeId = Node::findId($this->client);
+		// The wrapper SQL is generated on the sharding master for each remote
+		// target node. Filtering against the master's nodeId would silently
+		// drop the *master's* local shards from every other node's wrapper —
+		// producing wrappers with fewer shards on non-master nodes (FAIL_013).
+		// Use the target node id when supplied.
+		$currentNodeId = $targetNodeId ?? Node::findId($this->client);
 
 		foreach ($map as $shard => $nodeConnections) {
 			if ($replicationFactor === 1) {
@@ -1779,7 +1789,11 @@ final class Table {
 	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
 	 * @return string
 	 */
-	protected function getCreateShardedTableSQLWithSchema(Set $shards, Vector $schema): string {
+	protected function getCreateShardedTableSQLWithSchema(
+		Set $shards,
+		Vector $schema,
+		?string $targetNodeId = null
+	): string {
 		// Use the provided schema instead of querying database
 		$replicationFactor = $this->getReplicationFactor($schema);
 
@@ -1789,7 +1803,7 @@ final class Table {
 		// Build map of all shards and their nodes from the provided schema
 		$map = $this->buildShardNodesMapping($schema);
 
-		$agents = $this->buildAgentDefinitions($map, $shards, $replicationFactor);
+		$agents = $this->buildAgentDefinitions($map, $shards, $replicationFactor, $targetNodeId);
 
 		// Finally generate create table
 		$structure = $this->structure ? "({$this->structure})" : '';
@@ -1820,7 +1834,7 @@ final class Table {
 	 * @param Set<int> $shards
 	 * @return string
 	 */
-	protected function getCreateShardedTableSQL(Set $shards): string {
+	protected function getCreateShardedTableSQL(Set $shards, ?string $targetNodeId = null): string {
 		// For RF=1, we need ALL nodes and ALL their shards for the distributed table
 		// Not just the "external" ones based on current node's shards
 		$currentSchema = $this->getShardSchema();
@@ -1844,7 +1858,7 @@ final class Table {
 			}
 		}
 
-		$agents = $this->buildAgentDefinitions($map, $shards, $replicationFactor);
+		$agents = $this->buildAgentDefinitions($map, $shards, $replicationFactor, $targetNodeId);
 
 		// Finally generate create table
 		$structure = $this->structure ? "({$this->structure})" : '';
