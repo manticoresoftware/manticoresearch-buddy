@@ -152,11 +152,11 @@ final class Payload extends BasePayload {
 					QueryParseError::throw("Duplicate parameter '{$key}' found");
 				}
 				$keys[$key] = true;
+				if ($optionMatch['value'] === '') {
+					QueryParseError::throw("Parameter '{$key}' requires to have a value");
+				}
 				if (trim($optionMatch['value'], '0123456789') !== '') {
 					QueryParseError::throw("Parameter '{$key}' requires to have a numeric value");
-				}
-				if (empty($value)) {
-					QueryParseError::throw("Parameter '{$key}' requires to have a value");
 				}
 
 				$options[$key] = (int)$optionMatch['value'];
