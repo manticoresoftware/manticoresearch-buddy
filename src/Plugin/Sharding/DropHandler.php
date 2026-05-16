@@ -113,7 +113,32 @@ final class DropHandler extends BaseHandlerWithClient {
 			);
 		}
 
+		// If the sharded table belongs to a cluster, require the user to
+		// reference it with the cluster prefix so the drop is unambiguous.
+		$actualCluster = $this->getTableCluster($this->payload->table);
+		if ($actualCluster !== '' && $actualCluster !== $this->payload->cluster) {
+			return $this->getErrorTask(
+				"table '{$this->payload->table}' belongs to cluster "
+				. "'{$actualCluster}': use DROP TABLE {$actualCluster}:{$this->payload->table}"
+			);
+		}
+
 		return null;
+	}
+
+	/**
+	 * Look up which replication cluster a sharded table belongs to via
+	 * system.sharding_table. Returns '' when not clustered.
+	 *
+	 * @param string $table
+	 * @return string
+	 */
+	protected function getTableCluster(string $table): string {
+		$q = "SELECT cluster FROM system.sharding_table WHERE `table` = '{$table}' LIMIT 1";
+		$resp = $this->manticoreClient->sendRequest($q);
+		/** @var array{0:array{data?:array{0:array{cluster:string}}}} $result */
+		$result = $resp->getResult();
+		return $result[0]['data'][0]['cluster'] ?? '';
 	}
 
 	/**
