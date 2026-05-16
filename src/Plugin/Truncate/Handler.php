@@ -42,7 +42,7 @@ final class Handler extends BaseHandlerWithClient
 				);
 			}
 
-			$shards = $this->manticoreClient->getTableShards($this->payload->table);
+			$shards = $this->getShards($this->payload->table);
 			$requests = [];
 			foreach ($shards as $shard) {
 				$requests[] = [
@@ -57,5 +57,45 @@ final class Handler extends BaseHandlerWithClient
 		};
 
 		return Task::create($taskFn)->run();
+	}
+
+	/**
+	 * Parse local and agent shards from a distributed or sharded table schema.
+	 *
+	 * The vendor's Client::getTableShards() only recognizes the legacy
+	 * type='distributed' form. Sharded tables use type='shard', so we parse
+	 * SHOW CREATE TABLE directly here to support both.
+	 *
+	 * @param string $table
+	 * @return array<array{name:string,url:string}>
+	 */
+	private function getShards(string $table): array {
+		/** @var array{0:array{data:array<array{"Create Table":string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW CREATE TABLE $table OPTION force=1")
+			->getResult();
+		$tableSchema = $res[0]['data'][0]['Create Table'] ?? '';
+		if (!$tableSchema) {
+			throw GenericError::create("There is no such table: {$table}");
+		}
+		if (!str_contains($tableSchema, "type='distributed'")
+			&& !str_contains($tableSchema, "type='shard'")) {
+			throw GenericError::create("Table {$table} is not a distributed or sharded table");
+		}
+		if (!preg_match_all("/local='(?P<local>[^']+)'|agent='(?P<agent>[^']+)'/ius", $tableSchema, $m)) {
+			throw GenericError::create('Failed to match shards from the schema');
+		}
+		$shards = [];
+		foreach (array_filter($m['local']) as $name) {
+			$shards[] = ['name' => $name, 'url' => ''];
+		}
+		foreach (array_filter($m['agent']) as $agent) {
+			$ex = explode('|', $agent);
+			$host = strtok($ex[0], ':');
+			$port = (int)strtok(':');
+			$name = (string)strtok(':');
+			$shards[] = ['name' => $name, 'url' => "$host:$port"];
+		}
+		return $shards;
 	}
 }
