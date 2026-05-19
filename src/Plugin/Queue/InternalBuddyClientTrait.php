@@ -9,17 +9,15 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\Queue\Models\Show;
+namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 
-/**
- * @template T of array
- * @extends Model<T>
- */
-class ShowMaterializedViewsModel extends Model {
+trait InternalBuddyClientTrait {
+	protected static function getSystemClient(Client $client): Client {
+		$buddyClient = clone $client;
+		$buddyClient->setDelegatedUser('system.buddy');
 
-	public function getHandlerClass(): string {
-		return 'Handlers\\View\\ListViewsHandler';
+		return $buddyClient;
 	}
 }

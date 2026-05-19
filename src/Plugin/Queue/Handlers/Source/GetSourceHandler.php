@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseGetHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
@@ -60,8 +61,8 @@ final class GetSourceHandler extends BaseGetHandler {
 		return 'Source';
 	}
 
-	protected function getTableName(): string {
-		return Payload::SOURCE_TABLE_NAME;
+	protected function getTableName(string $name): string {
+		return ResourceTable::name(ResourceTable::RESOURCE_SOURCE, $name);
 	}
 
 	/**

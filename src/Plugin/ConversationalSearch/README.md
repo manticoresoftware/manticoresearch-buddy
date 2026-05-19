@@ -185,7 +185,7 @@ from `SHOW CREATE TABLE`.
 CALL CHAT(
     'query',
     'table',
-    'model_name_or_uuid',
+    'model_name',
     'conversation_uuid',
     'vector_field'
 );
@@ -197,7 +197,7 @@ Arguments are positional only:
 |---:|---|---:|---|
 | 1 | `query` | Yes | User question |
 | 2 | `table` | Yes | Table to search |
-| 3 | `model_name_or_uuid` | Yes | chat model name or UUID |
+| 3 | `model_name` | Yes | chat model name |
 | 4 | `conversation_uuid` | No | Existing conversation id, or empty string |
 | 5 | `fields` / vector field | No | `FLOAT_VECTOR` field used in `knn(...)` |
 
@@ -273,12 +273,6 @@ Describe a model:
 
 ```sql
 DESCRIBE CHAT MODEL assistant;
-```
-
-Describe by UUID:
-
-```sql
-DESCRIBE CHAT MODEL '550e8400-e29b-41d4-a716-446655440000';
 ```
 
 Drop a model:

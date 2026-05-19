@@ -130,7 +130,7 @@ class IntegrationTest extends TestCase {
 		);
 
 		$this->assertEquals('describe_model', $payload->action);
-		$this->assertEquals('test_model', $payload->params['model_name_or_uuid']);
+		$this->assertEquals('test_model', $payload->params['model_name']);
 	}
 
 	public function testFullDropModelFlow(): void {
@@ -150,7 +150,7 @@ class IntegrationTest extends TestCase {
 		);
 
 		$this->assertEquals('drop_model', $payload->action);
-		$this->assertEquals('test_model', $payload->params['model_name_or_uuid']);
+		$this->assertEquals('test_model', $payload->params['model_name']);
 	}
 
 	public function testConversationalSearchFlowNewSearch(): void {
@@ -172,7 +172,7 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('conversation', $payload->action);
 		$this->assertEquals('What is machine learning?', $payload->params['query']);
 		$this->assertEquals('docs', $payload->params['table']);
-		$this->assertEquals('test_model', $payload->params['model_uuid']);
+		$this->assertEquals('test_model', $payload->params['model_name']);
 	}
 
 	public function testConversationalSearchFlowWithTable(): void {
@@ -194,7 +194,7 @@ class IntegrationTest extends TestCase {
 		$this->assertEquals('conversation', $payload->action);
 		$this->assertEquals('Search this table', $payload->params['query']);
 		$this->assertEquals('my_table', $payload->params['table']);
-		$this->assertEquals('test_model', $payload->params['model_uuid']);
+		$this->assertEquals('test_model', $payload->params['model_name']);
 		$this->assertEquals('conversation_1', $payload->params['conversation_uuid']);
 	}
 
@@ -256,7 +256,7 @@ class IntegrationTest extends TestCase {
 		);
 
 		$this->assertEquals('describe_model', $describePayload->action);
-		$this->assertEquals('lifecycle_test', $describePayload->params['model_name_or_uuid']);
+		$this->assertEquals('lifecycle_test', $describePayload->params['model_name']);
 
 		// 4. Use model in conversation
 		$chatPayload = ChatPayload::fromRequest(
@@ -274,7 +274,7 @@ class IntegrationTest extends TestCase {
 
 		$this->assertEquals('conversation', $chatPayload->action);
 		$this->assertEquals('Test query', $chatPayload->params['query']);
-		$this->assertEquals('lifecycle_test', $chatPayload->params['model_uuid']);
+		$this->assertEquals('lifecycle_test', $chatPayload->params['model_name']);
 
 		// 5. Drop model
 		$dropPayload = ChatPayload::fromRequest(
@@ -291,7 +291,7 @@ class IntegrationTest extends TestCase {
 		);
 
 		$this->assertEquals('drop_model', $dropPayload->action);
-		$this->assertEquals('lifecycle_test', $dropPayload->params['model_name_or_uuid']);
+		$this->assertEquals('lifecycle_test', $dropPayload->params['model_name']);
 	}
 
 	public function testErrorHandlingInvalidSyntax(): void {

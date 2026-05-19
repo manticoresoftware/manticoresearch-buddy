@@ -93,6 +93,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-truncate',
 	'manticoresoftware/buddy-plugin-metrics',
 	'manticoresoftware/buddy-plugin-conversational-search',
+	'manticoresoftware/buddy-plugin-plugins-auth-permissions',
 ];
 // Filtering out the plugins that we don't need
 if (!empty($opts['enable-plugin'])) {

@@ -11,8 +11,10 @@
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationMessage;
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\BuddyTest\Trait\TestFunctionalTrait;
 use PHPUnit\Framework\TestCase;
@@ -34,20 +36,21 @@ class ConversationManagerIntegrationTest extends TestCase {
 	public function setUp(): void {
 		// Create a real client connected to the test Manticore instance
 		$this->client = new Client('http://127.0.0.1:' . static::getListenHttpPort());
-		$this->conversationManager = new ConversationManager($this->client);
+		$this->client->sendRequest(
+			'DROP TABLE IF EXISTS ' . ResourceTable::name(ResourceTable::RESOURCE_CHAT_HISTORY, 'test_model')
+		);
+		$this->conversationManager = new ConversationManager($this->client, 'test_model');
 	}
 
 	/**
 	 * Test complete conversation flow with real database
 	 *
 	 * @throws ManticoreSearchClientError
+	 * @throws QueryParseError
 	 * @throws JsonException
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testCompleteConversationFlowWithRealDatabase(): void {
-		// Initialize the conversations table
-		$this->conversationManager->initializeTable($this->client);
-
 		// Save a user message
 		$this->saveUser(
 			'test-conversation-1',
@@ -102,9 +105,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testMultipleConversationExchangesWithSearchContext(): void {
-		// Initialize the conversations table
-		$this->conversationManager->initializeTable($this->client);
-
 		// First exchange with search context
 		$this->saveUser(
 			'test-conversation-2',
@@ -168,9 +168,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testContentQuestionIntentFiltering(): void {
-		// Initialize the conversations table
-		$this->conversationManager->initializeTable($this->client);
-
 		// Regular search question
 		$this->saveUser(
 			'test-conversation-3',
@@ -262,9 +259,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testEmptyConversationHandling(): void {
-		// Initialize the conversations table
-		$this->conversationManager->initializeTable($this->client);
-
 		// Test history for non-existent conversation
 		$history = $this->getConversationHistory('non-existent-conversation');
 		$this->assertEquals('', $history);
@@ -288,9 +282,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testSpecialCharactersAndLongMessages(): void {
-		// Initialize the conversations table
-		$this->conversationManager->initializeTable($this->client);
-
 		// Message with special characters
 		$specialMessage = "This message contains: quotes 'single' and \"double\", " .
 			"newlines\nand\ttabs, backslashes\\, and unicode: ñáéíóú 🚀";
@@ -323,9 +314,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testJsonExcludedIdsHandling(): void {
-		// Initialize the conversations table
-		$this->conversationManager->initializeTable($this->client);
-
 		$excludedIds = ['10', '20', '30', '40', '50'];
 		$this->saveUser(
 			'test-conversation-5',
@@ -357,9 +345,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testTableCreationWithRealDatabase(): void {
-		// This should create the table without errors
-		$this->conversationManager->initializeTable($this->client);
-
 		// Verify table exists by trying to insert into it
 		$this->saveUser(
 			'test-conversation-6',
@@ -409,7 +394,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 */
 	private function saveUser(
 		string $conversationUuid,
-		string $modelUuid,
+		string $modelName,
 		string $message,
 		int $tokensUsed,
 		string $intent,
@@ -419,7 +404,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 	): void {
 		$this->conversationManager->saveMessage(
 			$conversationUuid,
-			$modelUuid,
+			$modelName,
 			ConversationMessage::userWithExcludedIds(
 				$message,
 				$intent,
@@ -436,14 +421,14 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 */
 	private function saveAssistant(
 		string $conversationUuid,
-		string $modelUuid,
+		string $modelName,
 		string $message,
 		int $tokensUsed,
 		string $intent
 	): void {
 		$this->conversationManager->saveMessage(
 			$conversationUuid,
-			$modelUuid,
+			$modelName,
 			ConversationMessage::assistant($message, $intent),
 			$tokensUsed
 		);

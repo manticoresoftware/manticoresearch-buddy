@@ -11,11 +11,12 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
-use Random\RandomException;
 use Throwable;
 
 /**
@@ -23,56 +24,7 @@ use Throwable;
  */
 class ModelManager {
 	use SqlEscapingTrait;
-
-	public const string MODELS_TABLE = 'system.chat_models';
 	private const int DEFAULT_MAX_DOCUMENT_LENGTH = 2000;
-	private bool $tablesInitialized = false;
-
-	/**
-	 * Initialize database tables
-	 *
-	 * @param HTTPClient $client
-	 *
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	public function initializeTables(HTTPClient $client): void {
-		if ($this->tablesInitialized) {
-			return;
-		}
-
-		$this->createModelsTable($client);
-
-		$this->tablesInitialized = true;
-	}
-
-	/**
-	 * Create chat models table
-	 *
-	 * @param HTTPClient $client
-	 *
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private function createModelsTable(HTTPClient $client): void {
-		$sql
-			= /** @lang Manticore */
-			'CREATE TABLE IF NOT EXISTS ' . self::MODELS_TABLE . ' (
-			uuid string,
-			name string,
-			description text,
-			model text,
-			settings json,
-			created_at bigint,
-			updated_at bigint
-		)';
-
-		$response = $client->sendRequest($sql);
-		if ($response->hasError()) {
-			throw ManticoreSearchClientError::create('Failed to create models table: ' . $response->getError());
-		}
-	}
-
 
 	/**
 	 * Create a new chat model
@@ -82,15 +34,15 @@ class ModelManager {
 	 *   base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
 	 *   max_document_length?: string|int} $config
 	 *
-	 * @return string Model ID
-	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError|RandomException
+	 * @return string Model name
+	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError|QueryParseError
 	 */
 	public function createModel(HTTPClient $client, array $config): string {
 		$modelName = $config['name'];
-		$modelUuid = $this->generateUuid();
+		$tableName = ResourceTable::name(ResourceTable::RESOURCE_CHAT_MODEL, $modelName);
 
 		// Check if the model already exists
-		if ($this->modelExists($client, $modelName)) {
+		if ($client->hasTable($tableName)) {
 			throw ManticoreSearchClientError::create("chat model '$modelName' already exists");
 		}
 
@@ -99,11 +51,12 @@ class ModelManager {
 
 		// Insert model
 		$currentTime = time();
+		$this->createModelTable($client, $tableName);
+
 		$sql = sprintf(
-			'INSERT INTO %s (uuid, name, description, model, settings, created_at, updated_at) ' .
-			'VALUES (%s, %s, %s, %s, %s, %d, %d)',
-			self::MODELS_TABLE,
-			$this->quote($modelUuid),
+			'INSERT INTO %s (name, description, model, settings, created_at, updated_at) ' .
+			'VALUES (%s, %s, %s, %s, %d, %d)',
+			$tableName,
 			$this->quote($config['name']),
 			$this->quote($config['description'] ?? ''),
 			$this->quote($config['model']),
@@ -117,48 +70,43 @@ class ModelManager {
 			throw ManticoreSearchClientError::create('Failed to create model: ' . $response->getError());
 		}
 
-		return $modelUuid;
+		new ConversationManager($client, $modelName);
+
+		return $modelName;
 	}
 
 	/**
-	 * Generate a UUID v4
-	 *
-	 * @return string
-	 * @throws RandomException
+	 * @throws ManticoreSearchClientError
 	 */
-	private function generateUuid(): string {
-		$data = random_bytes(16);
-		$data[6] = chr(ord($data[6]) & 0x0f | 0x40); // Version 4
-		$data[8] = chr(ord($data[8]) & 0x3f | 0x80); // Variant 10
-		return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
-	}
-
-	/**
-	 * Check if model exists
-	 *
-	 * @param HTTPClient $client
-	 * @param string $modelName
-	 *
-	 * @return bool
-	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
-	 */
-	private function modelExists(HTTPClient $client, string $modelName): bool {
-		$sql = sprintf(
-		/** @lang Manticore */            'SELECT COUNT(*) as count FROM %s WHERE name = %s',
-			self::MODELS_TABLE,
-			$this->quote($modelName)
-		);
+	private function createModelTable(HTTPClient $client, string $tableName): void {
+		$sql
+			= /** @lang Manticore */
+			'CREATE TABLE IF NOT EXISTS ' . $tableName . ' (
+			name string,
+			description text,
+			model text,
+			settings json,
+			created_at bigint,
+			updated_at bigint
+		)';
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
-			throw ManticoreSearchClientError::create('Failed to check model existence: ' . $response->getError());
+			throw ManticoreSearchClientError::create('Failed to create model table: ' . $response->getError());
+		}
+	}
+
+	/**
+	 * @return list<string>
+	 * @throws ManticoreSearchClientError|QueryParseError
+	 */
+	private function getModelTableNames(HTTPClient $client): array {
+		$modelNames = [];
+		foreach (ResourceTable::list($client, ResourceTable::TABLE_PREFIX_CHAT_MODEL) as $tableName) {
+			$modelNames[] = substr($tableName, strlen(ResourceTable::TABLE_PREFIX_CHAT_MODEL));
 		}
 
-		/** @var array<int, array{data: array<int, array{count: int}>}> $result */
-		$result = $response->getResult();
-		$data = $result[0]['data'] ?? [];
-
-		return !empty($data) && ($data[0]['count'] ?? 0) > 0;
+		return $modelNames;
 	}
 
 	/**
@@ -175,7 +123,7 @@ class ModelManager {
 		$settings = [];
 
 		foreach ($config as $key => $value) {
-			if (in_array($key, $coreFields)) {
+			if (in_array($key, $coreFields, true)) {
 				continue;
 			}
 
@@ -226,75 +174,100 @@ class ModelManager {
 	 *
 	 * @param HTTPClient $client
 	 *
-	 * @return array<int, array{id: string, uuid: string, name: string,
+	 * @return array<int, array{id: string, name: string,
 	 *   description: string, model: string, created_at: string}>
 	 * @throws ManticoreSearchResponseError
 	 * @throws ManticoreSearchClientError
 	 */
 	public function getAllModels(HTTPClient $client): array {
-		$sql
-			= /** @lang manticore */
-			'SELECT id, uuid, name, description, model, created_at
-				FROM ' . self::MODELS_TABLE . '
-				ORDER BY created_at DESC';
+		$models = [];
+		foreach ($this->getModelTableNames($client) as $modelName) {
+			$tableName = ResourceTable::name(ResourceTable::RESOURCE_CHAT_MODEL, $modelName);
+			try {
+				$model = $this->readModelInfo($client, $tableName);
+			} catch (ManticoreSearchResponseError $e) {
+				if ($this->isPermissionDenied($e->getResponseError())) {
+					continue;
+				}
 
-		$response = $client->sendRequest($sql);
-		if ($response->hasError()) {
-			throw ManticoreSearchResponseError::create('Failed to get all models: ' . $response->getError());
+				throw $e;
+			}
+			if ($model === null) {
+				continue;
+			}
+
+			unset($model['settings'], $model['updated_at']);
+			/** @var array{id: string, name: string, description: string, model: string, created_at: string} $model */
+			$models[] = $model;
 		}
 
-		/** @var array<int, array{data: array<int, array{id: string, uuid: string, name: string,
-		 *   description: string, model: string, created_at: string}>}> $result
-		 */
-		$result = $response->getResult();
-		return $result[0]['data'];
+		usort($models, static fn(array $left, array $right): int => $right['created_at'] <=> $left['created_at']);
+
+		return $models;
+	}
+
+	private function isPermissionDenied(string $error): bool {
+		return stripos($error, 'Permission denied for user') !== false;
 	}
 
 	/**
-	 * Delete chat model by UUID or name
+	 * Delete chat model by name
 	 *
 	 * @param HTTPClient $client
-	 * @param string $modelUuidOrName
+	 * @param string $modelName
 	 * @param bool $ifExists
 	 *
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
+	 * @throws QueryParseError
 	 */
-	public function deleteModelByUuidOrName(
+	public function deleteModel(
 		HTTPClient $client,
-		string $modelUuidOrName,
+		string $modelName,
 		bool $ifExists = false
 	): void {
-		$model = $this->findModelByUuidOrName($client, $modelUuidOrName);
-		if ($model === null) {
+		$tableName = ResourceTable::name(ResourceTable::RESOURCE_CHAT_MODEL, $modelName);
+		if (!$client->hasTable($tableName)) {
 			if ($ifExists) {
 				return;
 			}
 
-			throw ManticoreSearchClientError::create("chat model '$modelUuidOrName' not found");
+			throw ManticoreSearchClientError::create("chat model '$modelName' not found");
 		}
 
-		// Soft delete by setting is_active = false
 		$sql = sprintf(
-		/** @lang Manticore */            'DELETE FROM %s WHERE uuid = %s',
-			self::MODELS_TABLE,
-			$this->quote($model['uuid'])
+			/** @lang Manticore */
+			'DROP TABLE IF EXISTS %s',
+			$tableName
 		);
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
 			throw ManticoreSearchClientError::create('Failed to delete model: ' . $response->getError());
 		}
+
+		$this->dropModelHistoryTable($client, $modelName);
 	}
 
 	/**
-	 * @param HTTPClient $client
-	 * @param string $modelNameOrUuid
-	 *
+	 * @throws ManticoreSearchClientError|QueryParseError
+	 */
+	private function dropModelHistoryTable(HTTPClient $client, string $modelName): void {
+		$sql = /** @lang Manticore */
+			'DROP TABLE IF EXISTS ' . ResourceTable::name(ResourceTable::RESOURCE_CHAT_HISTORY, $modelName);
+
+		$response = $client->sendRequest($sql);
+		if ($response->hasError()) {
+			throw ManticoreSearchClientError::create(
+				'Failed to drop conversation history table: ' . $response->getError()
+			);
+		}
+	}
+
+	/**
 	 * @return array{
 	 *   id:string,
-	 *   uuid:string,
 	 *   name:string,
 	 *   description:string,
 	 *   model:string,
@@ -304,29 +277,21 @@ class ModelManager {
 	 * }|null
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
-	private function findModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): ?array {
+	private function readModelInfo(
+		HTTPClient $client,
+		string $tableName
+	): ?array {
 		$sql
 			= /** @lang Manticore */
-			'SELECT id, uuid, name, description, model, settings, created_at, updated_at FROM '
-			. self::MODELS_TABLE .
-			' WHERE (name = ' . $this->quote($modelNameOrUuid) . ' OR uuid = ' . $this->quote($modelNameOrUuid) . ')';
+			'SELECT * FROM ' . $tableName . ' LIMIT 1';
 
 		$response = $client->sendRequest($sql);
 		if ($response->hasError()) {
-			throw  ManticoreSearchResponseError::create('Failed to get model by UUID/name: ' . $response->getError());
+			$error = (string)$response->getError();
+			throw ManticoreSearchResponseError::create('Failed to get model: ' . $error);
 		}
 
-		/** @var array<int, array{data: array<int, array{
-		 *   id:string,
-		 *   uuid:string,
-		 *   name:string,
-		 *   description:string,
-		 *   model:string,
-		 *   settings:mixed,
-		 *   created_at:string,
-		 *   updated_at:string
-		 * }>}> $data
-		 */
+		/** @var array<int, array{data: array<int, array<string, mixed>>}> $data */
 		$data = $response->getResult();
 		if (empty($data[0]['data'])) {
 			return null;
@@ -334,7 +299,6 @@ class ModelManager {
 
 		/** @var array{
 		 *   id:string,
-		 *   uuid:string,
 		 *   name:string,
 		 *   description:string,
 		 *   model:string,
@@ -375,14 +339,13 @@ class ModelManager {
 	}
 
 	/**
-	 * Get model by name or UUID (returns environment variable names, does not resolve them)
+	 * Get model by name (returns environment variable names, does not resolve them)
 	 *
 	 * @param HTTPClient $client
-	 * @param string $modelNameOrUuid Model name or UUID
+	 * @param string $modelName Model name
 	 *
 	 * @return array{
 	 *   id:string,
-	 *   uuid:string,
 	 *   name:string,
 	 *   description:string,
 	 *   model:string,
@@ -392,12 +355,13 @@ class ModelManager {
 	 * }
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
-	public function getModelByUuidOrName(HTTPClient $client, string $modelNameOrUuid): array {
-		$model = $this->findModelByUuidOrName($client, $modelNameOrUuid);
-		if ($model !== null) {
-			return $model;
+	public function getModel(HTTPClient $client, string $modelName): array {
+		$tableName = ResourceTable::name(ResourceTable::RESOURCE_CHAT_MODEL, $modelName);
+		$model = $this->readModelInfo($client, $tableName);
+		if ($model === null) {
+			throw ManticoreSearchClientError::create("chat model '$modelName' not found");
 		}
 
-		throw ManticoreSearchClientError::create("chat model '$modelNameOrUuid' not found");
+		return $model;
 	}
 }

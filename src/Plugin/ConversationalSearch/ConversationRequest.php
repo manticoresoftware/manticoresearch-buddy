@@ -16,7 +16,7 @@ final class ConversationRequest {
 	public function __construct(
 		public string $query,
 		public string $table,
-		public string $modelUuid,
+		public string $modelName,
 		public string $conversationUuid = '',
 		public string $fields = ''
 	) {

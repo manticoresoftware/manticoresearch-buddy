@@ -10,6 +10,7 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Handler as ChatHandler;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ModelManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Payload as ChatPayload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
@@ -69,14 +70,21 @@ class ConversationalSearchTest extends TestCase {
 				]
 			)
 		);
-
 		$handler = new ChatHandler($payload);
-
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-		$modelExistsResponse = $this->createResponse([['data' => [['count' => 0]]]]);
+		$mockClient->method('hasTable')->with('system.chat_model_functional_test_model')->willReturn(false);
 		$insertResponse = $this->createResponse([['total' => 1, 'error' => '', 'warning' => '']]);
-		$this->configureClientWithInitialization($mockClient, [$modelExistsResponse, $insertResponse]);
+		$createResourceResponse = $this->createResponse();
+		$createHistoryResponse = $this->createResponse();
+		$this->configureClientWithInitialization(
+			$mockClient,
+			[
+				$createResourceResponse,
+				$insertResponse,
+				$createHistoryResponse,
+			]
+		);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -90,12 +98,11 @@ class ConversationalSearchTest extends TestCase {
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = (array)$result->getStruct();
 		$this->assertIsArray($struct);
-		/** @var array<int, array{data: array<int, array{uuid: string}>}> $struct */
+		/** @var array<int, array{data: array<int, array{name: string}>}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertCount(1, $struct[0]['data']);
-		$this->assertArrayHasKey('uuid', $struct[0]['data'][0]);
-		$this->assertIsString($struct[0]['data'][0]['uuid']);
+		$this->assertSame('functional_test_model', $struct[0]['data'][0]['name']);
 	}
 
 	public function testShowModelsEndToEnd(): void {
@@ -111,13 +118,11 @@ class ConversationalSearchTest extends TestCase {
 				]
 			)
 		);
-
 		$handler = new ChatHandler($payload);
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-		$selectResponse = $this->createResponse([['data' => [], 'total' => 0, 'error' => '', 'warning' => '']]);
-		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
+		$this->configureClientWithInitialization($mockClient, [$this->createResponse([['data' => []]])]);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -145,7 +150,6 @@ class ConversationalSearchTest extends TestCase {
 			return;
 		}
 
-		$this->assertArrayHasKey('uuid', $data[0]);
 		$this->assertArrayHasKey('name', $data[0]);
 		$this->assertArrayHasKey('model', $data[0]);
 	}
@@ -166,30 +170,30 @@ class ConversationalSearchTest extends TestCase {
 			)
 		);
 
-		$handler = new ChatHandler($payload);
-
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
+		$mockClient->method('hasTable')->with('system.chat_model_functional_test_model')->willReturn(true);
 		$selectResponse = $this->createResponse(
 			[[
 				'total' => 1,
 				'error' => '',
 				'warning' => '',
 				'data' => [[
-					'uuid' => 'test-uuid-123',
+					'id' => '1',
 					'name' => 'functional_test_model',
+					'description' => '',
 					'model' => 'openai:gpt-4',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
+					'created_at' => '2023-01-01 00:00:00',
+					'updated_at' => '2023-01-01 00:00:00',
 				]],
 			]]
 		);
 		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
 
-		$handler->setManticoreClient($mockClient);
-		$task = $handler->run();
-
-		$this->assertTrue($task->isSucceed());
-		$result = $task->getResult();
+		$method = new ReflectionMethod(ChatHandler::class, 'describeModel');
+		$method->setAccessible(true);
+		$result = $method->invoke(null, $payload, new ModelManager(), $mockClient);
 
 		$this->assertInstanceOf(TaskResult::class, $result);
 		/** @var array<int, array<string, mixed>> $struct */
@@ -202,8 +206,14 @@ class ConversationalSearchTest extends TestCase {
 		$this->assertGreaterThan(0, sizeof($data));
 
 		// Should have property-value pairs for the model description
-		$this->assertEquals('uuid', $data[0]['property']);
-		$this->assertIsString($data[0]['value']);
+		$nameRows = array_values(
+			array_filter(
+				$data,
+				static fn(array $row): bool => $row['property'] === 'name'
+			)
+		);
+		$this->assertCount(1, $nameRows);
+		$this->assertSame('functional_test_model', $nameRows[0]['value']);
 	}
 
 	public function testDropModelEndToEnd(): void {
@@ -226,25 +236,13 @@ class ConversationalSearchTest extends TestCase {
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-		$getModelResponse = $this->createResponse(
-			[[
-				'total' => 1,
-				'error' => '',
-				'warning' => '',
-				'data' => [[
-					'id' => '1',
-					'uuid' => 'test-uuid-123',
-					'name' => 'functional_test_model',
-					'description' => '',
-					'model' => 'openai:gpt-4',
-					'settings' => '{"max_document_length":2000}',
-					'created_at' => '1234567890',
-					'updated_at' => '1234567890',
-				]],
-			]]
-		);
+		$mockClient->method('hasTable')->with('system.chat_model_functional_test_model')->willReturn(true);
 		$deleteModelResponse = $this->createResponse([['total' => 1, 'error' => '', 'warning' => '']]);
-		$this->configureClientWithInitialization($mockClient, [$getModelResponse, $deleteModelResponse]);
+		$dropHistoryResponse = $this->createResponse();
+		$this->configureClientWithInitialization(
+			$mockClient,
+			[$deleteModelResponse, $dropHistoryResponse]
+		);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -309,8 +307,8 @@ class ConversationalSearchTest extends TestCase {
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-		$selectResponse = $this->createResponse([['total' => 0, 'error' => '', 'warning' => '']]);
-		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
+		$mockClient->method('hasTable')->with('system.chat_model_non_existent_model')->willReturn(false);
+		$this->configureClientWithInitialization($mockClient);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -318,6 +316,7 @@ class ConversationalSearchTest extends TestCase {
 		$this->assertFalse($task->isSucceed());
 		$error = $task->getError();
 		$this->assertInstanceOf(\Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError::class, $error);
+		$this->assertSame("chat model 'non_existent_model' not found", $error->getResponseError());
 	}
 
 	public function testDropNonExistentModelEndToEnd(): void {
@@ -340,8 +339,8 @@ class ConversationalSearchTest extends TestCase {
 
 		// Mock the HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-		$getModelResponse = $this->createResponse([['total' => 0, 'error' => '', 'warning' => '']]);
-		$this->configureClientWithInitialization($mockClient, [$getModelResponse]);
+		$mockClient->method('hasTable')->with('system.chat_model_non_existent_model')->willReturn(false);
+		$this->configureClientWithInitialization($mockClient);
 
 		$handler->setManticoreClient($mockClient);
 		$task = $handler->run();
@@ -370,12 +369,8 @@ class ConversationalSearchTest extends TestCase {
 	 * @param array<int, Response> $extraResponses
 	 */
 	private function configureClientWithInitialization(HTTPClient $mockClient, array $extraResponses = []): void {
-		$mockClient->expects($this->exactly(2 + sizeof($extraResponses)))
+		$mockClient->expects($this->exactly(sizeof($extraResponses)))
 			->method('sendRequest')
-			->willReturnOnConsecutiveCalls(
-				$this->createResponse(),
-				$this->createResponse(),
-				...$extraResponses
-			);
+			->willReturnOnConsecutiveCalls(...$extraResponses);
 	}
 }

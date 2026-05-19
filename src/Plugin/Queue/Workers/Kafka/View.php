@@ -44,8 +44,12 @@ class View {
 	 * @throws GenericError
 	 */
 	public function run(): bool {
+		$rows = $this->prepareValues($this->read());
+		if ($rows === []) {
+			return $this->truncateBuffer();
+		}
 
-		if ($this->insert($this->prepareValues($this->read()))) {
+		if ($this->insert($rows)) {
 			return true;
 		}
 
@@ -121,10 +125,12 @@ class View {
 		if ($request->hasError()) {
 			Buddy::debug('Error occurred during inserting to destination table. Reason:' . $request->getError());
 		}
+		return $this->truncateBuffer();
+	}
+
+	private function truncateBuffer(): bool {
 		$sql = "TRUNCATE TABLE $this->buffer";
-
 		$request = $this->client->sendRequest($sql);
-
 		if ($request->hasError()) {
 			Buddy::debug('Error truncating buffer table. Reason:' . $request->getError());
 			return false;

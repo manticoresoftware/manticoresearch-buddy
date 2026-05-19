@@ -200,7 +200,7 @@ class ConversationalPayloadTest extends TestCase {
 		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('describe_model', $payload->action);
-		$this->assertEquals('sfa-2742-dshd6', $payload->params['model_name_or_uuid']);
+		$this->assertEquals('sfa-2742-dshd6', $payload->params['model_name']);
 	}
 
 	/**
@@ -212,7 +212,7 @@ class ConversationalPayloadTest extends TestCase {
 		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('drop_model', $payload->action);
-		$this->assertEquals('test_model', $payload->params['model_name_or_uuid']);
+		$this->assertEquals('test_model', $payload->params['model_name']);
 	}
 
 	/**
@@ -224,7 +224,7 @@ class ConversationalPayloadTest extends TestCase {
 		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('drop_model', $payload->action);
-		$this->assertEquals('advanced_assistant', $payload->params['model_name_or_uuid']);
+		$this->assertEquals('advanced_assistant', $payload->params['model_name']);
 		$this->assertEquals('1', $payload->params['if_exists']);
 	}
 
@@ -243,20 +243,20 @@ class ConversationalPayloadTest extends TestCase {
 		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('drop_model', $payload->action);
-		$this->assertEquals('my IF EXISTS model', $payload->params['model_name_or_uuid']);
+		$this->assertEquals('my IF EXISTS model', $payload->params['model_name']);
 		$this->assertArrayNotHasKey('if_exists', $payload->params);
 	}
 
 	/**
 	 * @throws QueryParseError
 	 */
-	public function testSQLDropModelUnquotedUuidParsing(): void {
+	public function testSQLDropModelUnquotedHyphenatedNameParsing(): void {
 		$query = 'DROP CHAT MODEL 550e8400-e29b-41d4-a716-446655440000';
 
 		$payload = $this->parseSqlPayload($query);
 
 		$this->assertEquals('drop_model', $payload->action);
-		$this->assertEquals('550e8400-e29b-41d4-a716-446655440000', $payload->params['model_name_or_uuid']);
+		$this->assertEquals('550e8400-e29b-41d4-a716-446655440000', $payload->params['model_name']);
 	}
 
 	public function testHTTPNotSupported(): void {
@@ -309,14 +309,14 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals('conversation', $payload->action);
 		$this->assertEquals("I'm like programming, lets talk about it", $payload->params['query']);
 		$this->assertEquals('docs', $payload->params['table']);
-		$this->assertEquals('test_model', $payload->params['model_uuid']);
+		$this->assertEquals('test_model', $payload->params['model_name']);
 		$this->assertEquals('conversation_1', $payload->params['conversation_uuid']);
 	}
 
 	/**
 	 * @throws QueryParseError
 	 */
-	public function testConversationParsingWithoutConversationUuid(): void {
+	public function testConversationParsingWithoutConversationName(): void {
 		$query = "CALL CHAT('test query', 'docs', 'model123')";
 
 		$payload = $this->parseSqlPayload($query);
@@ -324,14 +324,14 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals('conversation', $payload->action);
 		$this->assertEquals('test query', $payload->params['query']);
 		$this->assertEquals('docs', $payload->params['table']);
-		$this->assertEquals('model123', $payload->params['model_uuid']);
+		$this->assertEquals('model123', $payload->params['model_name']);
 		$this->assertArrayNotHasKey('conversation_uuid', $payload->params);
 	}
 
 	/**
 	 * @throws QueryParseError
 	 */
-	public function testConversationParsingWithConversationUuid(): void {
+	public function testConversationParsingWithConversationName(): void {
 		$query = "CALL CHAT('test query', 'docs', 'model123', 'conversation_1')";
 
 		$payload = $this->parseSqlPayload($query);
@@ -342,7 +342,7 @@ class ConversationalPayloadTest extends TestCase {
 	/**
 	 * @throws QueryParseError
 	 */
-	public function testConversationParsingWithConversationUuidAndFields(): void {
+	public function testConversationParsingWithConversationNameAndFields(): void {
 		$query = "CALL CHAT('test query', 'docs', 'model123', 'conversation_1', 'title_embedding')";
 
 		$payload = $this->parseSqlPayload($query);
@@ -354,7 +354,7 @@ class ConversationalPayloadTest extends TestCase {
 	/**
 	 * @throws QueryParseError
 	 */
-	public function testConversationParsingWithEmptyConversationUuidAndFields(): void {
+	public function testConversationParsingWithEmptyConversationNameAndFields(): void {
 		$query = "CALL CHAT('test query', 'docs', 'model123', '', 'title_embedding')";
 
 		$payload = $this->parseSqlPayload($query);
@@ -363,7 +363,7 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals('title_embedding', $payload->params['fields']);
 	}
 
-	public function testConversationParsingTreatsEqualsAsPositionalConversationUuid(): void {
+	public function testConversationParsingTreatsEqualsAsPositionalConversationName(): void {
 		$query = "CALL CHAT('test query', 'docs', 'model123', fields='title_embedding')";
 
 		$payload = $this->parseSqlPayload($query);

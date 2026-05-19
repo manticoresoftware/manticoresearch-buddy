@@ -11,7 +11,9 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseDropHandler;
+use Manticoresearch\Buddy\Base\Plugin\Queue\InternalBuddyClientTrait;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -49,17 +51,17 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
  *   }>
  */
 final class DropSourceHandler extends BaseDropHandler {
+	use InternalBuddyClientTrait;
 
 	/**
-	 * @param string $name
 	 * @param string $tableName
 	 * @return int
 	 * @throws ManticoreSearchClientError
 	 */
-	protected function processDrop(string $name, string $tableName): int {
+	protected function processDrop(string $tableName): int {
 		$manticoreClient = $this->manticoreClient;
 		$sql = /** @lang Manticore */
-			"SELECT * FROM $tableName WHERE match('@name \"$name\"')";
+			"SELECT * FROM $tableName";
 
 
 		$result = $manticoreClient->sendRequest($sql);
@@ -75,41 +77,42 @@ final class DropSourceHandler extends BaseDropHandler {
 				$this->payload::$processor
 					->execute('stopWorkerById', [$sourceRow['full_name']]);
 
-				self::removeSourceRowData($sourceRow, $manticoreClient);
+				self::suspendSourceViews($sourceRow['full_name'], $manticoreClient);
+				self::dropBufferTable($sourceRow, $manticoreClient);
 				$removed++;
 			}
 		}
 
+		$dropResponse = $manticoreClient->sendRequest("DROP TABLE IF EXISTS $tableName");
+		if ($dropResponse->hasError()) {
+			throw ManticoreSearchClientError::create((string)$dropResponse->getError());
+		}
 
 		return $removed;
 	}
 
 	/**
 	 * @param array<string, string> $sourceRow
-	 * @param Client $client
 	 * @throws ManticoreSearchClientError
 	 */
-	protected static function removeSourceRowData(array $sourceRow, Client $client): void {
+	private static function dropBufferTable(array $sourceRow, Client $client): void {
+		$systemClient = self::getSystemClient($client);
+		$dropBufferRequest = $systemClient->sendRequest("DROP TABLE IF EXISTS {$sourceRow['buffer_table']}");
+		unset($systemClient);
+		if ($dropBufferRequest->hasError()) {
+			throw ManticoreSearchClientError::create((string)$dropBufferRequest->getError());
+		}
+	}
 
-		$queries = [
-			/** @lang Manticore */
-			"DROP TABLE {$sourceRow['buffer_table']}",
-			/** @lang Manticore */
-			'UPDATE '.Payload::VIEWS_TABLE_NAME.' SET suspended=1 '.
-			"WHERE match('@source_name \"{$sourceRow['full_name']}\"')",
-			/** @lang Manticore */
-			'DELETE FROM '.Payload::SOURCE_TABLE_NAME." WHERE id = {$sourceRow['id']}",
-		];
-
-		foreach ($queries as $query) {
+	/**
+	 * @throws ManticoreSearchClientError
+	 */
+	private static function suspendSourceViews(string $sourceFullName, Client $client): void {
+		foreach (ResourceTable::list($client, ResourceTable::TABLE_PREFIX_MATERIALIZED_VIEW) as $viewsTable) {
+			$query = /** @lang Manticore */
+				"UPDATE $viewsTable SET suspended=1 WHERE match('@source_name \"$sourceFullName\"')";
 			$request = $client->sendRequest($query);
 			if ($request->hasError()) {
-				if (str_contains(
-					(string)$request->getError(),
-					"unknown table '".Payload::VIEWS_TABLE_NAME."' in update request"
-				)) {
-					continue;
-				}
 				throw ManticoreSearchClientError::create((string)$request->getError());
 			}
 		}
@@ -153,7 +156,7 @@ final class DropSourceHandler extends BaseDropHandler {
 		return $parsedPayload['DROP']['sub_tree'][1]['sub_tree'][0]['no_quotes']['parts'][0];
 	}
 
-	protected function getTableName(): string {
-		return Payload::SOURCE_TABLE_NAME;
+	protected function getTableName(string $name): string {
+		return ResourceTable::name(ResourceTable::RESOURCE_SOURCE, $name);
 	}
 }

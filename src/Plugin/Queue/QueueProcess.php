@@ -11,16 +11,20 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\BaseCreateSourceHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Workers\Kafka\KafkaWorker;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Process\Process;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Throwable;
 
 class QueueProcess extends BaseProcessor {
+	use InternalBuddyClientTrait;
+
 	/** @return array{0: callable, 1: int}[]  */
 	public function start(): array {
 		parent::start();
@@ -41,21 +45,35 @@ class QueueProcess extends BaseProcessor {
 	 * @throws \Exception
 	 */
 	public function runPool(): void {
+		$systemClient = self::getSystemClient($this->client);
 
-		if (!$this->client->hasTable(Payload::SOURCE_TABLE_NAME)) {
+		$sourceTables = ResourceTable::list($systemClient, ResourceTable::TABLE_PREFIX_SOURCE);
+		if ($sourceTables === []) {
 			Buddy::debug('Queue source table does not exist. Exiting queue process pool');
 			return;
 		}
 
-		if (!$this->client->hasTable(Payload::VIEWS_TABLE_NAME)) {
+		$viewTables = ResourceTable::list($systemClient, ResourceTable::TABLE_PREFIX_MATERIALIZED_VIEW);
+		if ($viewTables === []) {
 			Buddy::debug('Queue views table does not exist. Exiting queue process pool');
 			return;
 		}
 
+		foreach ($sourceTables as $sourceTable) {
+			$this->runSourceTablePool($systemClient, $sourceTable, $viewTables);
+		}
+		unset($systemClient);
+	}
+
+	/**
+	 * @param list<string> $viewTables
+	 * @throws GenericError
+	 */
+	private function runSourceTablePool(Client $systemClient, string $sourceTable, array $viewTables): void {
 		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
-			" WHERE match('@type \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\"') LIMIT 99999";
-		$results = $this->client->sendRequest($sql);
+			"SELECT * FROM $sourceTable " .
+			"WHERE match('@type \"" . BaseCreateSourceHandler::SOURCE_TYPE_KAFKA . "\"') LIMIT 99999";
+		$results = $systemClient->sendRequest($sql);
 
 		if ($results->hasError()) {
 			Buddy::debug("Can't get sources. Exit worker pool. Reason: " . $results->getError());
@@ -67,32 +85,58 @@ class QueueProcess extends BaseProcessor {
 		}
 
 		foreach ($results->getResult()[0]['data'] as $instance) {
+			$this->runSourceInstance($systemClient, $instance, $viewTables);
+		}
+	}
+
+	/**
+	 * @param array<string, string> $instance
+	 * @param list<string> $viewTables
+	 * @throws GenericError
+	 */
+	private function runSourceInstance(Client $systemClient, array $instance, array $viewTables): void {
+		$viewSearchResult = $this->findViewBySourceName($systemClient, $viewTables, (string)$instance['full_name']);
+		if ($viewSearchResult === null) {
+			Buddy::debug("Can't find view with source_name {$instance['full_name']}");
+			return;
+		}
+
+		if (!empty($viewSearchResult['data'][0]['suspended'])) {
+			Buddy::debugvv("Worker {$instance['full_name']} is suspended. Skip running");
+			return;
+		}
+
+		$instance['destination_name'] = $viewSearchResult['data'][0]['destination_name'];
+		$instance['query'] = $viewSearchResult['data'][0]['query'];
+		$this->execute('runWorker',	[$instance]);
+	}
+
+	/**
+	 * @param list<string> $viewTables
+	 * @return array{data:array<int,array<string,string>>}|null
+	 * @throws GenericError
+	 */
+	private function findViewBySourceName(Client $systemClient, array $viewTables, string $sourceName): ?array {
+		foreach ($viewTables as $viewTable) {
 			$sql = /** @lang ManticoreSearch */
-				'SELECT * FROM ' . Payload::VIEWS_TABLE_NAME .
-				" WHERE match('@source_name \"{$instance['full_name']}\"')";
-			$results = $this->client->sendRequest($sql);
+				"SELECT * FROM $viewTable WHERE match('@source_name \"$sourceName\"')";
+			$results = $systemClient->sendRequest($sql);
 
 			if ($results->hasError()) {
 				throw GenericError::create('Error during getting view. Exit worker. Reason: ' . $results->getError());
 			}
 
 			$results = $results->getResult();
-			/** @var array{data:array<int,array<string,string>>} $resultStruct */
-			$resultStruct = $results[0];
-			if (is_array($resultStruct) && !isset($resultStruct['data'][0])) {
-				Buddy::debug("Can't find view with source_name {$instance['full_name']}");
+			/** @var array{data:array<int,array<string,string>>} $viewSearchResult */
+			$viewSearchResult = $results[0];
+			if (!isset($viewSearchResult['data'][0])) {
 				continue;
 			}
 
-			if (!empty($resultStruct['data'][0]['suspended'])) {
-				Buddy::debugvv("Worker {$instance['full_name']} is suspended. Skip running");
-				continue;
-			}
-
-			$instance['destination_name'] = $resultStruct['data'][0]['destination_name'];
-			$instance['query'] = $resultStruct['data'][0]['query'];
-			$this->execute('runWorker',	[$instance]);
+			return $viewSearchResult;
 		}
+
+		return null;
 	}
 
 	/**
@@ -112,7 +156,9 @@ class QueueProcess extends BaseProcessor {
 	public function runWorker(array $instance, bool $shouldStart = true): void {
 		Buddy::debugvv('Start worker ' . $instance['full_name']);
 		try {
-			$kafkaWorker = new KafkaWorker($this->client, $instance);
+			$systemClient = self::getSystemClient($this->client);
+			$kafkaWorker = new KafkaWorker($systemClient, $instance);
+			unset($systemClient);
 			$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
 			// Add worker to the pool and automatically start it
 			$this->process->addWorker($worker, $shouldStart);

@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
@@ -71,59 +72,45 @@ final class AlterViewHandler extends BaseHandlerWithClient {
 		$taskFn = function (): TaskResult {
 
 
-			$viewsTable = Payload::VIEWS_TABLE_NAME;
-
-			if (!$this->manticoreClient->hasTable($viewsTable)) {
-				return TaskResult::none();
-			}
-
 			$parsedPayload = $this->payload->model->getPayload();
 			$name = strtolower($parsedPayload['VIEW']['no_quotes']['parts'][0] ?? '');
+			$viewsTable = ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $name);
 
-			$sql = /** @lang manticore */
-				"SELECT * FROM $viewsTable WHERE match('@name \"$name\"')";
-			$rawResult = $this->manticoreClient->sendRequest($sql);
-			if ($rawResult->hasError()) {
-				throw ManticoreSearchClientError::create((string)$rawResult->getError());
+				$sql = /** @lang manticore */
+					"SELECT * FROM $viewsTable";
+			$viewRowsResponse = $this->manticoreClient->sendRequest($sql);
+			if ($viewRowsResponse->hasError()) {
+				throw ManticoreSearchClientError::create((string)$viewRowsResponse->getError());
 			}
 
-			return $this->processAlter($rawResult);
+			return $this->processAlter($viewRowsResponse);
 		};
 
 		return Task::create($taskFn)->run();
 	}
 
 	/**
-	 * @param Response $rawResult
+	 * @param Response $viewRowsResponse
 	 * @return TaskResult
 	 * @throws ManticoreSearchClientError
 	 */
-	private function processAlter(Response $rawResult): TaskResult {
+	private function processAlter(Response $viewRowsResponse): TaskResult {
 
 		$ids = [];
-		$result = $rawResult->getResult();
+		$result = $viewRowsResponse->getResult();
 		if (isset($result[0])) {
 			/** @var array{data:array<int,array<string,string>>} $resultStruct */
 			$resultStruct = $result[0];
+			$sourceInstances = $this->getSourceInstancesByFullName($resultStruct['data']);
 			foreach ($resultStruct['data'] as $row) {
 				$ids[] = $row['id'];
 
-				$sourceQuery /** @lang Manticore */ = 'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
-					" WHERE match('@full_name \"{$row['source_name']}\"')";
-				$instance = $this->manticoreClient->sendRequest($sourceQuery);
-				if ($instance->hasError()) {
-					throw ManticoreSearchClientError::create((string)$instance->getError());
-				}
-
-				$instanceResult = $instance->getResult();
-				/** @var array{data:array<int,array<string,string>>} $instanceResultStruct */
-				$instanceResultStruct = $instanceResult[0];
-				if (is_array($instanceResultStruct) && empty($instanceResultStruct['data'])) {
+				if (!isset($sourceInstances[$row['source_name']])) {
 					return TaskResult::withError(
 						"Can't ALTER view without referred source. Create source ({$row['source_name']}) first"
 					);
 				}
-				$this->handleProcessWorkers($instanceResultStruct['data'][0], $row);
+				$this->handleProcessWorkers($sourceInstances[$row['source_name']], $row);
 			}
 
 			if ($ids !== []) {
@@ -131,6 +118,42 @@ final class AlterViewHandler extends BaseHandlerWithClient {
 			}
 		}
 		return TaskResult::withTotal(sizeof($ids));
+	}
+
+	/**
+	 * @param array<int,array<string,string>> $viewRows
+	 * @return array<string,array<string,string>>
+	 * @throws ManticoreSearchClientError
+	 */
+	private function getSourceInstancesByFullName(array $viewRows): array {
+		if ($viewRows === []) {
+			return [];
+		}
+
+		$sourceTable = ResourceTable::name(
+			ResourceTable::RESOURCE_SOURCE,
+			$this->getSourceNameFromFullName($viewRows[0]['source_name'])
+		);
+		$sql = /** @lang ManticoreSearch */
+			"SELECT * FROM $sourceTable LIMIT 99999";
+		$response = $this->manticoreClient->sendRequest($sql);
+		if ($response->hasError()) {
+			throw ManticoreSearchClientError::create((string)$response->getError());
+		}
+
+		$instances = [];
+		$result = $response->getResult();
+		/** @var array{data:array<int,array<string,string>>} $resultStruct */
+		$resultStruct = $result[0];
+		foreach ($resultStruct['data'] as $source) {
+			$instances[$source['full_name']] = $source;
+		}
+
+		return $instances;
+	}
+
+	private function getSourceNameFromFullName(string $sourceFullName): string {
+		return (string)preg_replace('/_\d+$/', '', $sourceFullName);
 	}
 
 
@@ -212,7 +235,8 @@ final class AlterViewHandler extends BaseHandlerWithClient {
 	private function updateViewsStatus(array $ids): void {
 		$option = strtolower($this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][0]['base_expr']);
 		$value = $this->getParsedPayload()['VIEW']['options'][0]['sub_tree'][2]['base_expr'];
-		$viewsTable = Payload::VIEWS_TABLE_NAME;
+		$viewName = strtolower($this->getParsedPayload()['VIEW']['no_quotes']['parts'][0]);
+		$viewsTable = ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $viewName);
 
 		$stringIds = implode(',', $ids);
 		$sql = /** @lang manticore */
