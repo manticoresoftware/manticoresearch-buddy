@@ -285,8 +285,8 @@ final class Payload extends BasePayload {
 			throw QueryParseError::create('You cannot set rf greater than 1 when creating single node sharded table.');
 		}
 
-		if (isset($this->options['timeout']) && $this->options['timeout'] < 0) {
-			throw QueryParseError::create('You cannot set timeout less than 0');
+		if (isset($this->options['timeout']) && $this->options['timeout'] < 1) {
+			throw QueryParseError::create('You cannot set timeout less than 1 second');
 		}
 	}
 
