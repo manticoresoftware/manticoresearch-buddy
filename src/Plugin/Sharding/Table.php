@@ -1891,25 +1891,19 @@ final class Table {
 	}
 
 	/**
-	 * Subset of CREATE TABLE options that must be applied to BOTH the per-shard
-	 * tables and the public type='shard' wrapper so daemon-side schema validation
-	 * does not reject the wrapper as incompatible with its locals.
+	 * Forward CREATE TABLE options to BOTH the per-shard tables and the public
+	 * type='shard' wrapper so daemon-side schema validation does not reject
+	 * the wrapper as incompatible with its locals.
 	 *
-	 * For example, engine='columnar' changes attribute storage on the physical
-	 * shards; the wrapper must declare it too or the daemon rejects the wrapper
-	 * with 'local table ... is incompatible with shard table ...'.
+	 * $this->extra is what's left after Payload stripped the sharding-control
+	 * options (shards, rf, timeout) — i.e. user-supplied options like
+	 * engine='columnar', min_infix_len='N', morphology='...', etc., all of
+	 * which are also schema-validated between wrapper and locals.
 	 *
 	 * @return string
 	 */
 	protected function getTableLevelExtras(): string {
-		if (!$this->extra) {
-			return '';
-		}
-		$out = [];
-		if (preg_match("/engine\s*=\s*'[^']*'/i", $this->extra, $m)) {
-			$out[] = $m[0];
-		}
-		return implode(' ', $out);
+		return $this->extra ?: '';
 	}
 
 
