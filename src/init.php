@@ -90,6 +90,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-autocomplete',
 	'manticoresoftware/buddy-plugin-cli-table',
 	'manticoresoftware/buddy-plugin-truncate',
+	'manticoresoftware/buddy-plugin-optimize',
 	'manticoresoftware/buddy-plugin-metrics',
 	'manticoresoftware/buddy-plugin-conversational-search',
 ];
