@@ -135,6 +135,53 @@ final class DropHandler extends BaseHandlerWithClient {
 			);
 		}
 
+		// Refuse to drop a clustered sharded table while any of its cluster
+		// members are unreachable. Otherwise the synchronous metadata DELETE
+		// commits, queue items stall on the dead node, and the alive nodes
+		// are left with a public wrapper + physical shards + no metadata to
+		// re-issue the DROP against (FAIL_020). Better to ask the operator
+		// to bring the missing node up first.
+		if ($actualCluster !== '') {
+			$err = $this->checkClusterFullyReachable($actualCluster);
+			if ($err !== null) {
+				return $this->getErrorTask($err);
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Compare the cluster's persistent member list (cluster_<name>_nodes_set)
+	 * with the current Galera view size (cluster_<name>_size). When fewer
+	 * members are alive than expected, return a user-facing error string;
+	 * return null when all members are reachable or status is unknown.
+	 *
+	 * @param string $cluster
+	 * @return ?string
+	 */
+	protected function checkClusterFullyReachable(string $cluster): ?string {
+		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_nodes_set'")
+			->getResult();
+		$nodesSet = $res[0]['data'][0]['Value'] ?? '';
+		if ($nodesSet === '') {
+			return null;
+		}
+		$expected = count(array_filter(array_map('trim', explode(',', $nodesSet))));
+
+		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_size'")
+			->getResult();
+		$size = (int)($res[0]['data'][0]['Value'] ?? 0);
+
+		if ($size < $expected) {
+			return "cluster '{$cluster}' has unreachable members "
+				. "({$size} of {$expected} alive): refusing to DROP — "
+				. 'retry when all cluster members are reachable';
+		}
 		return null;
 	}
 
