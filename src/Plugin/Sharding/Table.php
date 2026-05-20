@@ -1829,9 +1829,8 @@ final class Table {
 
 		// Finally generate create table
 		$structure = $this->structure ? "({$this->structure})" : '';
-		$tableExtras = $this->getTableLevelExtras();
 		return "CREATE TABLE `{$this->name}` {$structure}
-			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')} {$tableExtras}
+			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')} {$this->extra}
 			";
 	}
 
@@ -1883,27 +1882,14 @@ final class Table {
 		$agents = $this->buildAgentDefinitions($map, $shards, $replicationFactor, $targetNodeId);
 
 		// Finally generate create table
+		// $this->extra is what Payload left after stripping shards/rf/timeout —
+		// user-supplied options like engine='columnar', min_infix_len='N',
+		// morphology='...' that the daemon's schema validator compares between
+		// wrapper and locals, so they must appear on both.
 		$structure = $this->structure ? "({$this->structure})" : '';
-		$tableExtras = $this->getTableLevelExtras();
 		return "CREATE TABLE `{$this->name}` {$structure}
-			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')} {$tableExtras}
+			type='shard' {$locals->sorted()->join(' ')} {$agents->sorted()->join(' ')} {$this->extra}
 			";
-	}
-
-	/**
-	 * Forward CREATE TABLE options to BOTH the per-shard tables and the public
-	 * type='shard' wrapper so daemon-side schema validation does not reject
-	 * the wrapper as incompatible with its locals.
-	 *
-	 * $this->extra is what's left after Payload stripped the sharding-control
-	 * options (shards, rf, timeout) — i.e. user-supplied options like
-	 * engine='columnar', min_infix_len='N', morphology='...', etc., all of
-	 * which are also schema-validated between wrapper and locals.
-	 *
-	 * @return string
-	 */
-	protected function getTableLevelExtras(): string {
-		return $this->extra ?: '';
 	}
 
 

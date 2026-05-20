@@ -10,6 +10,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Optimize;
 
+use Manticoresearch\Buddy\Base\Lib\ShardSchemaTrait;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -17,6 +18,8 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 
 final class Handler extends BaseHandlerWithClient
 {
+	use ShardSchemaTrait;
+
 	public function __construct(public Payload $payload) {
 	}
 
@@ -28,7 +31,7 @@ final class Handler extends BaseHandlerWithClient
 				);
 			}
 
-			$shards = $this->getShards($this->payload->table);
+			$shards = $this->getShards($this->manticoreClient, $this->payload->table);
 			$requests = [];
 			foreach ($shards as $shard) {
 				$requests[] = [
@@ -43,41 +46,5 @@ final class Handler extends BaseHandlerWithClient
 		};
 
 		return Task::create($taskFn)->run();
-	}
-
-	/**
-	 * Parse local and agent shards from a distributed or sharded table schema.
-	 *
-	 * @param string $table
-	 * @return array<array{name:string,url:string}>
-	 */
-	private function getShards(string $table): array {
-		/** @var array{0:array{data:array<array{"Create Table":string}>}} $res */
-		$res = $this->manticoreClient
-			->sendRequest("SHOW CREATE TABLE $table OPTION force=1")
-			->getResult();
-		$tableSchema = $res[0]['data'][0]['Create Table'] ?? '';
-		if (!$tableSchema) {
-			throw GenericError::create("There is no such table: {$table}");
-		}
-		if (!str_contains($tableSchema, "type='distributed'")
-			&& !str_contains($tableSchema, "type='shard'")) {
-			throw GenericError::create("Table {$table} is not a distributed or sharded table");
-		}
-		if (!preg_match_all("/local='(?P<local>[^']+)'|agent='(?P<agent>[^']+)'/ius", $tableSchema, $m)) {
-			throw GenericError::create('Failed to match shards from the schema');
-		}
-		$shards = [];
-		foreach (array_filter($m['local']) as $name) {
-			$shards[] = ['name' => $name, 'url' => ''];
-		}
-		foreach (array_filter($m['agent']) as $agent) {
-			$ex = explode('|', $agent);
-			$host = strtok($ex[0], ':');
-			$port = (int)strtok(':');
-			$name = (string)strtok(':');
-			$shards[] = ['name' => $name, 'url' => "$host:$port"];
-		}
-		return $shards;
 	}
 }
