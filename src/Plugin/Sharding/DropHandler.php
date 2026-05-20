@@ -152,15 +152,39 @@ final class DropHandler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * Compare the cluster's persistent member list (cluster_<name>_nodes_set)
-	 * with the current Galera view size (cluster_<name>_size). When fewer
-	 * members are alive than expected, return a user-facing error string;
-	 * return null when all members are reachable or status is unknown.
+	 * Refuse the DROP unless the cluster is fully healthy for writes:
+	 * - status='primary' (cluster has quorum and a primary view),
+	 * - local node_state='synced' (we're not mid-SST / desynced),
+	 * - size == count(nodes_set) (no member is currently unreachable).
+	 *
+	 * Returning null means "go ahead". Any non-null string is the
+	 * user-facing error explaining which condition failed.
 	 *
 	 * @param string $cluster
 	 * @return ?string
 	 */
 	protected function checkClusterFullyReachable(string $cluster): ?string {
+		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_status'")
+			->getResult();
+		$status = $res[0]['data'][0]['Value'] ?? '';
+		if ($status !== '' && $status !== 'primary') {
+			return "cluster '{$cluster}' is not in primary view (status='{$status}'): "
+				. 'refusing to DROP — retry when the cluster is fully synced';
+		}
+
+		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_node_state'")
+			->getResult();
+		$nodeState = $res[0]['data'][0]['Value'] ?? '';
+		if ($nodeState !== '' && $nodeState !== 'synced') {
+			return "cluster '{$cluster}' local node is not synced "
+				. "(node_state='{$nodeState}'): refusing to DROP — "
+				. 'retry when the cluster is fully synced';
+		}
+
 		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
 		$res = $this->manticoreClient
 			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_nodes_set'")
@@ -180,7 +204,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		if ($size < $expected) {
 			return "cluster '{$cluster}' has unreachable members "
 				. "({$size} of {$expected} alive): refusing to DROP — "
-				. 'retry when all cluster members are reachable';
+				. 'retry when the cluster is fully synced';
 		}
 		return null;
 	}
