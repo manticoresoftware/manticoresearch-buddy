@@ -1793,12 +1793,17 @@ final class Table {
 				$agents->add("agent='{$remoteConnections->join('|')}'");
 			} else {
 				// RF>=2: Create agents for ALL shards with ALL replicas (including current node)
-				// This is the key fix: include ALL replicas in each agent entry
+				// This is the key fix: include ALL replicas in each agent entry.
+				// Append [retry_count=2,ha_strategy=noerrors] so the daemon
+				// fails over to a live mirror within the same query when one
+				// of the replicas is unreachable. Without these options the
+				// default strategy is random and the first read after a node
+				// dies returns partial data (FAIL_010-D).
 				if ($nodeConnections->count() <= 0) {
 					continue;
 				}
 
-				$agents->add("agent='{$nodeConnections->join('|')}'");
+				$agents->add("agent='{$nodeConnections->join('|')}[retry_count=2,ha_strategy=noerrors]'");
 			}
 		}
 
