@@ -357,7 +357,15 @@ class ModelManager {
 	 */
 	public function getModel(HTTPClient $client, string $modelName): array {
 		$tableName = ResourceTable::name(ResourceTable::RESOURCE_CHAT_MODEL, $modelName);
-		$model = $this->readModelInfo($client, $tableName);
+		try {
+			$model = $this->readModelInfo($client, $tableName);
+		} catch (ManticoreSearchResponseError $e) {
+			if (str_contains($e->getResponseError(), "unknown local table(s) '$tableName'")) {
+				throw ManticoreSearchClientError::create("chat model '$modelName' not found");
+			}
+
+			throw $e;
+		}
 		if ($model === null) {
 			throw ManticoreSearchClientError::create("chat model '$modelName' not found");
 		}
