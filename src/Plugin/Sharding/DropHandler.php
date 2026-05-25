@@ -193,7 +193,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		if ($nodesSet === '') {
 			return null;
 		}
-		$expected = count(array_filter(array_map('trim', explode(',', $nodesSet))));
+		$expected = sizeof(array_filter(array_map('trim', explode(',', $nodesSet))));
 
 		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
 		$res = $this->manticoreClient
