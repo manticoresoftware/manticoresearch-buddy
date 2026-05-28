@@ -274,9 +274,7 @@ final class Table {
 			$clusterMap = $schema->reduce($reduceFn, new Map);
 
 			// Now process all postponed pending tables to attach to each cluster
-			foreach ($clusterMap as $cluster) {
-				$cluster->processPendingTables($queue, $operationGroup);
-			}
+			$this->flushPendingClusterTables($queue, $clusterMap, $operationGroup);
 
 			/** @var Set<int> */
 			$queueIds = new Set;
@@ -626,6 +624,11 @@ final class Table {
 				return;
 			}
 
+			// Keep system.sharding_table on the last committed placement until the
+			// queued physical shard moves and wrapper recreation finish. During the
+			// rebalance window the new placement lives only in state.
+			$this->storePendingRebalanceScheme($newSchema);
+
 			// Mark as committed — nodes will now start processing queue items for this group
 			$state->set("rebalance_committed:{$this->name}", $operationGroup);
 			$state->set($rebalanceKey, 'queued');
@@ -776,6 +779,9 @@ final class Table {
 		$rebalanceKey = "rebalance:{$this->name}";
 		$state->set($rebalanceKey, 'idle');
 		$state->delete("rebalance_group:{$this->name}");
+		$state->delete("rebalance_committed:{$this->name}");
+		$state->delete("rebalance_queue_ids:{$this->name}");
+		$state->delete(self::getPendingRebalanceSchemeStateKey($this->name));
 		$this->clearStopSignal();
 		return true;
 	}
@@ -836,6 +842,9 @@ final class Table {
 			// Mark as failed with rollback info
 			$state->set($rebalanceKey, 'failed');
 			$state->delete("rebalance_group:{$this->name}");
+			$state->delete("rebalance_committed:{$this->name}");
+			$state->delete("rebalance_queue_ids:{$this->name}");
+			$state->delete(self::getPendingRebalanceSchemeStateKey($this->name));
 
 			// Store error information for debugging
 			$errorInfo = [
@@ -986,6 +995,23 @@ final class Table {
 	}
 
 	/**
+	 * Flush any postponed ALTER CLUSTER ADD/DROP work and return the last live
+	 * queue id that wrapper recreation must wait on.
+	 * @param Queue $queue
+	 * @param Map<string,Cluster> $clusterMap
+	 * @param string $operationGroup
+	 * @return int
+	 */
+	private function flushPendingClusterTables(Queue $queue, Map $clusterMap, string $operationGroup = ''): int {
+		$lastQueueId = 0;
+		foreach ($clusterMap as $cluster) {
+			$lastQueueId = max($lastQueueId, $cluster->processPendingTables($queue, $operationGroup));
+		}
+
+		return $lastQueueId;
+	}
+
+	/**
 	 * Rebalance shards for a single node
 	 * @param Queue $queue
 	 * @param array{node:string,shards:Set<int>,connections:Set<string>} $row
@@ -1089,12 +1115,30 @@ final class Table {
 			fn ($row) => $inactiveNodes->contains($row['node'])
 		);
 
-		// Process affected shards for rebalancing
-		$this->processAffectedShards($queue, $affectedSchema, $newSchema, $shardNodesMap, $clusterMap, $operationGroup);
+		// Process affected shards for rebalancing and then flush the postponed
+		// ALTER CLUSTER ADD work that actually materializes the missing replicas on
+		// surviving nodes.
+		$clusterMap = $this->processAffectedShards(
+			$queue,
+			$affectedSchema,
+			$newSchema,
+			$shardNodesMap,
+			$clusterMap,
+			$operationGroup
+		);
+		$lastLiveQueueId = $this->flushPendingClusterTables($queue, $clusterMap, $operationGroup);
 
-		// Update schema in database FIRST, then create distributed tables
-		$this->updateScheme($newSchema);
-		return $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
+		// Recreate public shard wrappers from the target layout, but leave
+		// system.sharding_table untouched until the queued work has finished.
+		// The wrapper DROP/CREATE chain must also wait for the last live shard
+		// bootstrap/attach query, otherwise checkRebalanceStatus() can complete
+		// while a surviving node still lacks the physical shard table.
+		if ($lastLiveQueueId > 0) {
+			$queue->setWaitForId($lastLiveQueueId);
+		}
+		$nodeTailIds = $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
+		$queue->resetWaitForId();
+		return $nodeTailIds;
 	}
 
 	/**
@@ -1153,13 +1197,12 @@ final class Table {
 			);
 		}
 
-		// Update schema in database ONLY AFTER all shard movements complete
-		// CRITICAL: Wait for all shard movements to complete before updating schema
+		// Wrapper recreation should wait for shard-move queue items, but the
+		// committed metadata stays on the old layout until the whole rebalance is
+		// finished and Operator::checkRebalanceStatus() commits the pending scheme.
 		if ($lastMoveQueueId > 0) {
 			$queue->setWaitForId($lastMoveQueueId);
 		}
-
-		$this->updateScheme($newSchema);
 
 		$nodeTailIds = $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
 
@@ -1221,19 +1264,18 @@ final class Table {
 			}
 		}
 
-		// Flush pending ALTER CLUSTER ADD for all new clusters
-		foreach ($clusterMap as $cluster) {
-			$cluster->processPendingTables($queue, $operationGroup);
-		}
+		// Flush pending ALTER CLUSTER ADD for all new clusters and include that tail
+		// in the wrapper wait chain; otherwise the public table can be recreated
+		// before the newly added replica has actually been attached.
+		$lastQueueId = max($lastQueueId, $this->flushPendingClusterTables($queue, $clusterMap, $operationGroup));
 
-		// Defer schema update until all queue operations complete so that the next
-		// checkBalance tick does not see the new node in the schema while it is still
-		// inactive (which would trigger a spurious handleFailedNodesRebalance and a
-		// wrong ALTER CLUSTER DROP on the not-yet-existing cluster).
+		// Recreate wrappers after the queued shard/cluster work, but do not commit
+		// the new metadata layout yet. Keeping system.sharding_table on the last
+		// committed placement avoids reporting a healthy new topology before the
+		// physical shard tables exist.
 		if ($lastQueueId > 0) {
 			$queue->setWaitForId($lastQueueId);
 		}
-		$this->updateScheme($newSchema);
 		$nodeTailIds = $this->createDistributedTablesFromSchema($queue, $newSchema, $operationGroup);
 		$queue->resetWaitForId();
 		return $nodeTailIds;
@@ -1924,6 +1966,35 @@ final class Table {
 			$this->client->sendRequest($query);
 		}
 
+		return $this;
+	}
+
+	/**
+	 * State key that holds the target rebalance placement until the queue finishes.
+	 * @param string $tableName
+	 * @return string
+	 */
+	public static function getPendingRebalanceSchemeStateKey(string $tableName): string {
+		return "rebalance_pending_scheme:{$tableName}";
+	}
+
+	/**
+	 * Persist the target rebalance placement separately from the committed schema.
+	 * @param Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $scheme
+	 * @return static
+	 */
+	protected function storePendingRebalanceScheme(Vector $scheme): static {
+		$rows = [];
+		foreach ($scheme as $row) {
+			$shards = $row['shards']->toArray();
+			sort($shards);
+			$rows[] = [
+				'node' => $row['node'],
+				'shards' => array_map('intval', $shards),
+			];
+		}
+
+		$this->state->set(self::getPendingRebalanceSchemeStateKey($this->name), $rows);
 		return $this;
 	}
 

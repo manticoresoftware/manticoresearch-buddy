@@ -124,7 +124,7 @@ final class State {
 		foreach (($res[0]['data'] ?? []) as $row) {
 			$list[] = [
 				'key' => $row['key'],
-				'value' => simdjson_decode($row['value'], true),
+				'value' => $this->normalizeFetchedValue($row['value']),
 			];
 		}
 
@@ -144,14 +144,35 @@ final class State {
 			->getResult();
 		/** @var array{0:array{data:array{0?:array{value:string}}}} $res */
 		$value = $res[0]['data'][0]['value'] ?? null;
-		if (is_string($value)) {
-			$value = trim($value);
-			// Manticore returns unquoted string for empty string
-			if (!str_starts_with($value, '{') && !str_ends_with($value, '}')) {
-				return $value;
-			}
+		return isset($value) ? $this->normalizeFetchedValue($value) : null;
+	}
+
+	/**
+	 * Manticore returns raw scalars for value[0] projections, but JSON strings/objects
+	 * are also possible when the first item itself is structured. Decode only when the
+	 * payload still looks like JSON and otherwise keep the raw scalar.
+	 */
+	private function normalizeFetchedValue(mixed $value): mixed {
+		if (!is_string($value)) {
+			return $value;
 		}
-		return isset($value) ? simdjson_decode($value, true) : null;
+
+		$value = trim($value);
+		if ($value === '') {
+			return $value;
+		}
+
+		$firstChar = $value[0];
+		$looksLikeJson = $firstChar === '{' || $firstChar === '[' || $firstChar === '"';
+		if (!$looksLikeJson) {
+			return $value;
+		}
+
+		try {
+			return simdjson_decode($value, true);
+		} catch (\Throwable) {
+			return $value;
+		}
 	}
 
 	/**

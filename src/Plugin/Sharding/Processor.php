@@ -60,9 +60,13 @@ final class Processor extends BaseProcessor {
 			return false;
 		}
 
-		// Only check sharding cluster states when there is actually work to do —
-		// avoids a SHOW STATUS round-trip on every tick when the queue is idle.
+		// Only gate queue processing on internal-cluster readiness for ordinary
+		// work. During an in-flight rebalance/failover we must keep processing the
+		// queue even while some internal clusters are non-primary, otherwise the
+		// queued bootstrap/drop/recreate steps can never run and the rebalance
+		// deadlocks forever.
 		if ($operator->getQueue()->hasPending($operator->node)
+			&& !$operator->hasInFlightRebalance()
 			&& !Cluster::areAllShardingClustersPrimary($this->client)
 		) {
 			return false;

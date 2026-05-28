@@ -608,26 +608,29 @@ final class Queue {
 	 * @return bool
 	 */
 	protected function isGroupCommitted(string $operationGroup): bool {
-		if (isset($this->committedGroups[$operationGroup])) {
-			return $this->committedGroups[$operationGroup];
+		if (($this->committedGroups[$operationGroup] ?? false) === true) {
+			return true;
 		}
 
-		// Query state table for rebalance_committed:* keys matching this group
-		$stateTable = $this->cluster->getSystemTableName('system.sharding_state');
-		$query = "SELECT `value` FROM {$stateTable} WHERE `key` LIKE 'rebalance_committed:%' LIMIT 100";
+		// Query state table for rebalance_committed:* keys matching this group.
+		// Negative results are intentionally not cached because the master can still
+		// finish publishing the commit marker shortly after queue items become visible.
+		// Read the locally replicated state table instead of the cluster-prefixed alias.
+		// During failover/rebalance the local state already has the commit marker, while
+		// cluster-prefixed reads can lag or be unavailable exactly when workers need to
+		// decide whether they may start consuming the rebalance group.
+		$query = 'SELECT value[0] AS value FROM system.sharding_state '
+			. "WHERE REGEX(`key`, 'rebalance_committed:.+') LIMIT 100";
 		/** @var array{0?:array{data?:array<array{value:string}>}} */
 		$res = $this->client->sendRequest($query)->getResult();
 
 		foreach ($res[0]['data'] ?? [] as $row) {
-			/** @var string $decoded */
-			$decoded = json_decode(trim((string)$row['value'], '[]'), true);
-			if ($decoded === $operationGroup) {
+			if (trim((string)$row['value']) === $operationGroup) {
 				$this->committedGroups[$operationGroup] = true;
 				return true;
 			}
 		}
 
-		$this->committedGroups[$operationGroup] = false;
 		return false;
 	}
 

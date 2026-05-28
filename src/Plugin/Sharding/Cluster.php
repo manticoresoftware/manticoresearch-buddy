@@ -374,22 +374,23 @@ final class Cluster {
 	 * Process pending tables to add and drop in current cluster
 	 * @param Queue $queue
 	 * @param string|null $operationGroup Optional operation group for rollback
-	 * @return static
+	 * @return int Last queued id added while flushing pending tables
 	 * @throws RuntimeException
 	 * @throws ManticoreSearchClientError
 	 */
-	public function processPendingTables(Queue $queue, ?string $operationGroup = null): static {
+	public function processPendingTables(Queue $queue, ?string $operationGroup = null): int {
+		$lastQueueId = 0;
 		if ($this->tablesToDetach->count()) {
-			$this->removeTables($queue, $this->tablesToDetach->toArray(), $operationGroup);
+			$lastQueueId = $this->removeTables($queue, $this->tablesToDetach->toArray(), $operationGroup);
 			$this->tablesToDetach = new Set;
 		}
 
 		if ($this->tablesToAttach->count()) {
-			$this->addTables($queue, $this->tablesToAttach->toArray(), $operationGroup);
+			$lastQueueId = $this->addTables($queue, $this->tablesToAttach->toArray(), $operationGroup);
 			$this->tablesToAttach = new Set;
 		}
 
-		return $this;
+		return $lastQueueId;
 	}
 
 	/**

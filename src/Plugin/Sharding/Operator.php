@@ -177,6 +177,8 @@ final class Operator {
 			Buddy::info("Cleaning up uncommitted rebalance for table {$name}, group {$group}");
 			$this->getQueue()->purgeOperationGroup($group);
 			$this->state->delete("rebalance_group:{$name}");
+			$this->state->delete("rebalance_queue_ids:{$name}");
+			$this->state->delete(Table::getPendingRebalanceSchemeStateKey($name));
 			$this->state->set("rebalance:{$name}", 'idle');
 		}
 	}
@@ -354,6 +356,7 @@ final class Operator {
 					$this->state->delete("rebalance_queue_ids:{$name}");
 					$this->state->delete("rebalance_committed:{$name}");
 					$this->state->delete("rebalance_group:{$name}");
+					$this->state->delete(Table::getPendingRebalanceSchemeStateKey($name));
 					$this->state->set("rebalance:{$name}", 'idle');
 					$qStatus = $queueRow['status'];
 					Buddy::info("Rebalancing failed for table {$name}: node {$node} id {$queueId} status {$qStatus}");
@@ -361,6 +364,7 @@ final class Operator {
 				}
 			}
 
+			$this->commitPendingRebalanceScheme($name);
 			$this->state->delete("rebalance_queue_ids:{$name}");
 			$this->state->delete("rebalance_committed:{$name}");
 			$this->state->delete("rebalance_group:{$name}");
@@ -368,6 +372,72 @@ final class Operator {
 			Buddy::info("Rebalancing completed for table {$name}");
 		}
 		return $this;
+	}
+
+	/**
+	 * Whether any rebalance is currently in flight on this cluster.
+	 * Queued/running/paused rebalances must keep queue processing alive even if
+	 * some internal sharding clusters are temporarily non-primary, otherwise the
+	 * failover queue deadlocks and can never heal itself.
+	 * @return bool
+	 */
+	public function hasInFlightRebalance(): bool {
+		$list = $this->state->listRegex('rebalance:.+');
+		foreach ($list as $row) {
+			$status = $row['value'] ?? null;
+			if (is_string($status) && in_array($status, ['queued', 'running', 'paused'], true)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Apply the pending rebalance placement to system.sharding_table once all
+	 * queue-backed physical and wrapper operations have completed.
+	 * @param string $name
+	 * @return void
+	 */
+	protected function commitPendingRebalanceScheme(string $name): void {
+		$pending = $this->state->get(Table::getPendingRebalanceSchemeStateKey($name));
+		if (!is_array($pending)) {
+			return;
+		}
+
+		$table = $this->getCluster()->getSystemTableName('system.sharding_table');
+		$clusterName = $this->getCluster()->name;
+		$this->client->sendRequest(
+			"
+			DELETE FROM {$table}
+			WHERE
+			cluster = '{$clusterName}'
+			AND
+			table = '{$name}'
+			"
+		);
+
+		foreach ($pending as $row) {
+			if (!is_array($row) || !isset($row['node']) || !isset($row['shards']) || !is_array($row['shards'])) {
+				continue;
+			}
+			$shards = array_map('intval', $row['shards']);
+			sort($shards);
+			if (!$shards) {
+				continue;
+			}
+			$shardsMva = implode(',', $shards);
+			$this->client->sendRequest(
+				"
+				INSERT INTO {$table}
+				(`cluster`, `node`, `table`, `shards`)
+				VALUES
+				('{$clusterName}', '{$row['node']}', '{$name}', ({$shardsMva}))
+				"
+			);
+		}
+
+		$this->state->delete(Table::getPendingRebalanceSchemeStateKey($name));
 	}
 
 	/**
