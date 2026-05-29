@@ -8,6 +8,18 @@ tables used by plugins.
 The plugin runs only as a fallback when Manticore returns an error for a
 `GRANT` or `REVOKE` query that targets a supported plugin resource.
 
+## Internal Buddy Requests
+
+`PluginsAuthPermissions` only morphs user-facing permission queries. It does
+not make plugin runtime requests run as `system.buddy`.
+
+Plugin code that must access internal system tables on behalf of Buddy should
+use the plugin-side system client helper, for example Queue's
+`InternalBuddyClientTrait::getSystemClient()`. That helper clones the current
+Manticore client and sets the delegated user to `system.buddy`, so internal
+operations such as Queue buffer table reads/writes are executed as Buddy while
+the original user request still keeps its own identity.
+
 ## Supported Resources
 
 | Resource | Internal table |

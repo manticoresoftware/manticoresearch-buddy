@@ -49,6 +49,11 @@ final class QueueKafkaFunctionalTest extends TestCase {
 		$this->assertQueryResult('SHOW SOURCES', $this->source);
 		$this->assertQueryResult('SHOW SOURCE ' . $this->source, 'CREATE SOURCE ' . $this->source);
 		$this->assertQueryResult('SHOW MATERIALIZED VIEW ' . $this->view, 'suspended: 0');
+		$this->assertQueryResultContainsError(
+			'CREATE MATERIALIZED VIEW ' . $this->view . ' TO ' . $this->destination . ' AS ' .
+			'SELECT id, term AS name, abbrev AS short_name FROM ' . $this->source,
+			"View $this->view already exist"
+		);
 
 		static::runSqlQuery('ALTER MATERIALIZED VIEW ' . $this->view . ' suspended=1');
 		$this->assertQueryResult('SHOW MATERIALIZED VIEW ' . $this->view, 'suspended: 1');

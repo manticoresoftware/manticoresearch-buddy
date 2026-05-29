@@ -53,9 +53,7 @@ final class EventHandler {
 	 */
 	private static function getErrorResponseFormat(?Request $request, Throwable $e): RequestFormat {
 		$format = $request?->format ?? RequestFormat::JSON;
-		// Heuristic: SQL-over-HTTP uses `path_query=/sql?...` and ends up with query params in Request::$path.
-		// SQL-over-MySQL uses an empty path_query, so Request::$path is empty.
-		if ($format !== RequestFormat::SQL || $request === null || !str_contains($request->path, '?')) {
+		if ($format !== RequestFormat::SQL || $request === null || $request->httpMethod === '') {
 			return $format;
 		}
 		if (!($e instanceof HasDaemonLogEntity)) {

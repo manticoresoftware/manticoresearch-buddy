@@ -185,12 +185,7 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError
 	 */
 	private function checkAndCreateViews(string $viewName): void {
-		try {
-			$this->checkViewName($viewName);
-		} catch (ManticoreSearchClientError) {
-			return;
-		}
-
+		$this->checkViewName($viewName);
 		$tableName = ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $viewName);
 		$sql = /** @lang ManticoreSearch */
 			'CREATE TABLE ' . $tableName .
