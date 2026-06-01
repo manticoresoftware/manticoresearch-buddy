@@ -1,8 +1,8 @@
 # Manticore Buddy validation rules
 
-These rules are migrated from the original `AGENTS.md` gatekeeper instructions.
-
 ## Docker-only rule
+
+All build, dependency, lint, static-analysis, and test commands must run inside the Docker `buddy` service.
 
 All tests, builds, linting, static analysis, and Composer operations must run strictly inside the Docker `buddy` service from `docker-compose-dev.yml`.
 

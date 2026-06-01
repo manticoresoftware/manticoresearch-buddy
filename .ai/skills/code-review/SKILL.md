@@ -64,7 +64,7 @@ Typical quick review scope:
 - narrow local refactor with no behavior change
 - one small behavior change with obvious intent and low blast radius
 
-Do not use quick review when the change touches architecture boundaries, shared code, Swoole/runtime state, config loading, security-sensitive behavior, dependencies, public contracts, or multiple features.
+Do not use quick review when the change touches architecture boundaries, shared code, Swoole/runtime state, config loading, JSON parsing, security-sensitive behavior, dependencies, public contracts, or multiple features.
 
 For quick review, the user's immediate request may act as the change summary if intent is obvious. Ask for a separate summary only when intent is unclear enough to affect the review.
 
@@ -84,7 +84,7 @@ A plain request to `review`, `code review`, or `review current changes` means on
 
 1. Use `behavior-review` evidence gathering to retrieve the diff, read current file state, trace real consumers, and understand behavior before judging code.
 2. Apply this `code-review` workflow for behavior correctness, repository rules, security, severity, validation evidence, and formal findings.
-3. Apply `repo-review` focus areas for Buddy-specific Swoole state, core/plugin boundary, config loading, invariant masking, and validation cost.
+3. Apply `repo-review` focus areas for Buddy-specific Swoole state, core/plugin boundary, config/JSON parsing, invariant masking, and validation cost.
 
 Quick/full mode controls output depth, not which workflows are skipped.
 
@@ -174,7 +174,7 @@ Review in this order:
 
 1. Architecture boundaries.
 2. Runtime safety, especially Swoole state.
-3. Config and `simdjson_decode()` compliance.
+3. JSON parsing compliance: every JSON parse uses `simdjson_decode()`; `json_decode()` is forbidden everywhere.
 4. Invariants and defensive noise.
 5. Silent failures.
 6. Duplication.
@@ -237,7 +237,7 @@ Typical examples:
 - security vulnerability or sensitive data leak
 - architecture boundary violation
 - unsafe Swoole shared state
-- config/`simdjson_decode()` violation
+- JSON parsing violation: any use of `json_decode()` instead of `simdjson_decode()`
 - silent failure
 - invariant masking or internal fallback
 - broken validation or likely validation breakage
@@ -324,7 +324,7 @@ Reviewer must verify:
 - [ ] Tests checked for behavior coverage, not only implementation coverage.
 - [ ] `buddy-core` boundary respected.
 - [ ] JSON-only configs.
-- [ ] `simdjson_decode()` used.
+- [ ] All JSON parsing uses `simdjson_decode()`; no `json_decode()` usage in touched code, tests, fixtures, helpers, or examples.
 - [ ] No silent failures.
 - [ ] No Swoole shared-state risks.
 - [ ] No single-use interfaces.

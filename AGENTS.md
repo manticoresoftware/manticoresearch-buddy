@@ -25,7 +25,7 @@ A plain request to “review” means behavior review + code review + repo-speci
 - Do not commit unless explicitly instructed.
 - When running build, lint, static analysis, Composer, or tests, run them inside the Docker `buddy` service only.
 - Treat static properties, globals, and singletons as shared state under Swoole.
-- Configs and static data must be JSON files parsed with `simdjson_decode()` only.
+- All JSON parsing must use `simdjson_decode()` only; `json_decode()` is forbidden everywhere.
 - Do not introduce silent failures, internal fallback masking, or unsafe cross-request mutable state.
 
 ## Tool-specific adapters
@@ -43,7 +43,3 @@ They must not define independent repository rules. They should route agents here
 5. tool-specific adapter files
 
 If instructions conflict, follow the higher-precedence file and report the conflict.
-
-## Original source
-
-The original full rule dump was preserved before migration in `AGENTS_bkp.md`.

@@ -47,9 +47,10 @@ While applying the shared rules, pay special attention to these Buddy risks:
    - Check whether logic belongs in `buddy-core` or in a plugin.
    - Do not let convenience edits blur reusable logic and plugin-specific logic.
 
-3. **Configuration loading**
+3. **Configuration and JSON parsing**
    - Config and static data handling is a common source of rule violations.
    - Confirm JSON/static-data handling follows the authoritative repository rules.
+   - Treat any `json_decode()` usage as a Buddy rule violation; all JSON parsing must use `simdjson_decode()`.
 
 4. **Invariant masking**
    - Watch for internal fallbacks, null-patching, swallowed exceptions, and guards for impossible states.

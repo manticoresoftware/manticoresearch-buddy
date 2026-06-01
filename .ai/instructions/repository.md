@@ -1,8 +1,6 @@
 # Manticore Buddy repository rules
 
-These rules are migrated from the original `AGENTS.md` gatekeeper instructions.
-
-They apply during both code writing and code review. When writing code, use these rules as design constraints before implementation, not as an after-the-fact review checklist. Codestyle is handled by tooling; these rules protect behavior, architecture, security, invariants, runtime safety, and maintainability.
+These rules apply during both code writing and code review. When writing code, use these rules as design constraints before implementation, not as an after-the-fact review checklist. Codestyle is handled by tooling; these rules protect behavior, architecture, security, invariants, runtime safety, and maintainability.
 
 ## Common code-writing and review workflow
 
@@ -51,11 +49,12 @@ Agents are strictly forbidden from changing these files:
 
 Boundary violation is a **BLOCKER**.
 
-### Configuration rules
+### Configuration and JSON parsing rules
 
 - Configs and static data must be JSON files.
 - PHP array configs using `require` or `include` are forbidden.
-- JSON must be parsed using `simdjson_decode()` only.
+- All JSON parsing must use `simdjson_decode()` only.
+- `json_decode()` is forbidden everywhere, including request payloads, API responses, tests, fixtures, helpers, and examples.
 
 Any violation is a **BLOCKER**.
 
