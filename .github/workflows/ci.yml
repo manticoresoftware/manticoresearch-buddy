@@ -55,9 +55,13 @@ jobs:
           if [[ "${{ steps.check_branch.outputs.exists }}" == "true" ]]; then
             BRANCH="${{ steps.current_branch.outputs.branch }}"
 
-            fix=$(echo "$BRANCH" | tr '/' '_')
-            DOCKER_TAG=$(echo "$fix" | sed 's/[^a-zA-Z0-9_.-]//g')
-            IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-${DOCKER_TAG,,}"
+            if [[ "$BRANCH" == "main" ]]; then
+              IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-latest"
+            else
+              fix=$(echo "$BRANCH" | tr '/' '_')
+              DOCKER_TAG=$(echo "$fix" | sed 's/[^a-zA-Z0-9_.-]//g')
+              IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-${DOCKER_TAG,,}"
+            fi
           else
             IMAGE="ghcr.io/manticoresoftware/manticoresearch:test-kit-latest"
           fi
