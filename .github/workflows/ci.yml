@@ -43,7 +43,7 @@ jobs:
           if [[ "${{ steps.check_branch.outputs.exists }}" == "true" ]]; then
             REF="${{ steps.current_branch.outputs.branch }}"
           else
-            REF="master"
+            REF="main"
           fi
           echo "ref=${REF}" >> $GITHUB_OUTPUT
           echo "Ref: ${REF}" >> $GITHUB_STEP_SUMMARY
@@ -210,7 +210,7 @@ jobs:
   clt:
     name: Run CLT tests
     needs: [test_kit, ref_detection]
-    uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@master
+    uses: manticoresoftware/manticoresearch/.github/workflows/clt_tests.yml@main
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
