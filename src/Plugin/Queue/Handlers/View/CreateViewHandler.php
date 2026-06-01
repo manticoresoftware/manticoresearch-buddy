@@ -123,7 +123,7 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 			}
 
 
-			$this->checkAndCreateViews($viewName);
+			$this->checkViewName($viewName);
 
 			if (!$this->manticoreClient->hasTable($destinationTableName)) {
 				return TaskResult::withError('Destination table non exist');
@@ -138,6 +138,8 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 			if (is_array($result[0]) && empty($result[0]['data'])) {
 				throw ManticoreSearchClientError::create('Chosen source not exist');
 			}
+
+			$this->createViewsTable($viewName);
 
 			unset($parsedPayload['CREATE'], $parsedPayload['VIEW']);
 			/** @var array{data:array<int,array<string,string>>} $resultStruct */
@@ -184,8 +186,7 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	private function checkAndCreateViews(string $viewName): void {
-		$this->checkViewName($viewName);
+	private function createViewsTable(string $viewName): void {
 		$tableName = ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $viewName);
 		$sql = /** @lang ManticoreSearch */
 			'CREATE TABLE ' . $tableName .

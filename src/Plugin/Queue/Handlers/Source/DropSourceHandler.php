@@ -108,14 +108,16 @@ final class DropSourceHandler extends BaseDropHandler {
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function suspendSourceViews(string $sourceFullName, Client $client): void {
-		foreach (ResourceTable::list($client, ResourceTable::TABLE_PREFIX_MATERIALIZED_VIEW) as $viewsTable) {
+		$systemClient = self::getSystemClient($client);
+		foreach (ResourceTable::list($systemClient, ResourceTable::TABLE_PREFIX_MATERIALIZED_VIEW) as $viewsTable) {
 			$query = /** @lang Manticore */
 				"UPDATE $viewsTable SET suspended=1 WHERE match('@source_name \"$sourceFullName\"')";
-			$request = $client->sendRequest($query);
+			$request = $systemClient->sendRequest($query);
 			if ($request->hasError()) {
 				throw ManticoreSearchClientError::create((string)$request->getError());
 			}
 		}
+		unset($systemClient);
 	}
 
 	/**

@@ -80,6 +80,23 @@ final class QueueKafkaFunctionalTest extends TestCase {
 		$this->assertQueryResult('SHOW MATERIALIZED VIEW ' . $this->view, 'suspended: 0');
 	}
 
+	public function testCreateMaterializedViewCanRetryAfterMissingDestinationIsCreated(): void {
+		$this->cleanupObjects();
+		$this->createSource($this->group, 1);
+
+		$query = 'CREATE MATERIALIZED VIEW ' . $this->view . ' TO ' . $this->destination . ' AS ' .
+			'SELECT id, term AS name, abbrev AS short_name FROM ' . $this->source;
+		$this->assertQueryResultContainsError($query, 'Destination table non exist');
+
+		static::runSqlQuery(
+			'CREATE TABLE ' . $this->destination .
+			' (id bigint, name text, short_name text)'
+		);
+		static::runSqlQuery($query);
+
+		$this->assertQueryResult('SHOW MATERIALIZED VIEW ' . $this->view, 'suspended: 0');
+	}
+
 	private function cleanupObjects(): void {
 		static::runSqlQuery('DROP MATERIALIZED VIEW ' . $this->view);
 		static::runSqlQuery('DROP SOURCE ' . $this->source);
