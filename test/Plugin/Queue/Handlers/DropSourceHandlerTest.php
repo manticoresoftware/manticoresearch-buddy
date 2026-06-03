@@ -10,8 +10,8 @@
  */
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source\DropSourceHandler;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\BuddyTest\Plugin\Queue\Handlers\DropSourceHandlerClientRecords;
+use Manticoresearch\BuddyTest\Plugin\Queue\Handlers\DropSourceHandlerRecordingClient;
 use PHPUnit\Framework\TestCase;
 
 final class DropSourceHandlerTest extends TestCase {
@@ -37,38 +37,5 @@ final class DropSourceHandlerTest extends TestCase {
 			$records->requests
 		);
 		$this->assertSame('alice', $client->getDelegatedUser());
-	}
-}
-
-final class DropSourceHandlerClientRecords {
-	/** @var list<array{query:string,user:?string}> */
-	public array $requests = [];
-}
-
-final class DropSourceHandlerRecordingClient extends Client {
-	public function __construct(private DropSourceHandlerClientRecords $records) {
-		parent::__construct();
-	}
-
-	public function sendRequest(
-		string $request,
-		?string $path = null,
-		bool $disableAgentHeader = false,
-		string $requestMethod = 'POST',
-	): Response {
-		$this->records->requests[] = ['query' => $request, 'user' => $this->delegatedUser];
-
-		if ($request === 'SHOW TABLES FROM system') {
-			return Response::fromBody(
-				'[{"error":"","warning":"","total":1,"data":[' .
-				'{"Table":"system.materialized_view_orders","Type":"rt"}]}]'
-			);
-		}
-
-		return Response::fromBody('[{"error":"","warning":"","total":0,"data":[]}]');
-	}
-
-	public function getDelegatedUser(): ?string {
-		return $this->delegatedUser;
 	}
 }
