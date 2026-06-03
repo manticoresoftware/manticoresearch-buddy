@@ -60,6 +60,18 @@ final class Processor extends BaseProcessor {
 			return false;
 		}
 
+		// Only gate queue processing on internal-cluster readiness for ordinary
+		// work. During an in-flight rebalance/failover we must keep processing the
+		// queue even while some internal clusters are non-primary, otherwise the
+		// queued bootstrap/drop/recreate steps can never run and the rebalance
+		// deadlocks forever.
+		if ($operator->getQueue()->hasPending($operator->node)
+			&& !$operator->hasInFlightRebalance()
+			&& !Cluster::areAllShardingClustersPrimary($this->client)
+		) {
+			return false;
+		}
+
 		$operator->processQueue();
 
 		// heartbeat and mark current node state
@@ -74,6 +86,7 @@ final class Processor extends BaseProcessor {
 		}
 
 		// Next only on master
+		$operator->checkRebalanceStatus();
 		$operator->checkBalance();
 
 		return false;

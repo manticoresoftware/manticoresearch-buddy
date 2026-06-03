@@ -10,6 +10,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Truncate;
 
+use Manticoresearch\Buddy\Base\Lib\ShardSchemaTrait;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -17,6 +18,7 @@ use Manticoresearch\Buddy\Core\Task\TaskResult;
 
 final class Handler extends BaseHandlerWithClient
 {
+	use ShardSchemaTrait;
 
 	/**
 	 * Initialize the executor
@@ -35,14 +37,13 @@ final class Handler extends BaseHandlerWithClient
 	 */
 	public function run(): Task {
 		$taskFn = function (): TaskResult {
-			$tableExists = $this->manticoreClient->hasTable($this->payload->table);
-			if (!$tableExists) {
+			if (!$this->manticoreClient->hasTable($this->payload->table)) {
 				throw GenericError::create(
 					"Table {$this->payload->table} does not exist"
 				);
 			}
 
-			$shards = $this->manticoreClient->getTableShards($this->payload->table);
+			$shards = $this->getShards($this->manticoreClient, $this->payload->table);
 			$requests = [];
 			foreach ($shards as $shard) {
 				$requests[] = [

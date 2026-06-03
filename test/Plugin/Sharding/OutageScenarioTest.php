@@ -185,8 +185,8 @@ class OutageScenarioTest extends TestCase {
 
 		$newSchema = Util::rebalanceShardingScheme($initialSchema, $activeNodes);
 
-		// For RF=1, if we can't maintain proper distribution, we should:
-		// Put all orphaned shards on remaining node (degraded but functional)
+		// For RF=1, data on dead node is lost but shard slots are reassigned
+		// to keep the schema consistent
 
 		$this->assertEquals(1, $newSchema->count(), 'Should have 1 remaining node');
 
@@ -194,15 +194,13 @@ class OutageScenarioTest extends TestCase {
 		$this->assertNotNull($remainingNode, 'Remaining node should not be null');
 		$this->assertEquals('node1', $remainingNode['node'], 'Remaining node should be node1');
 
-		// The remaining node should have all orphaned shards assigned to it
-		// This is degraded mode but keeps the system functional
+		// All shard slots assigned to surviving node (data for 2,3 is lost but slots exist)
 		$this->assertTrue($remainingNode['shards']->contains(0), 'Should have original shard 0');
 		$this->assertTrue($remainingNode['shards']->contains(1), 'Should have original shard 1');
 		$this->assertTrue($remainingNode['shards']->contains(2), 'Should have orphaned shard 2');
 		$this->assertTrue($remainingNode['shards']->contains(3), 'Should have orphaned shard 3');
 
-		// All shards should be accounted for
-		$this->assertEquals(4, $remainingNode['shards']->count(), 'All shards should be on remaining node');
+		$this->assertEquals(4, $remainingNode['shards']->count(), 'All shard slots on remaining node');
 	}
 
 	/**
@@ -239,14 +237,14 @@ class OutageScenarioTest extends TestCase {
 		// Should have 2 remaining nodes
 		$this->assertEquals(2, $newSchema->count(), 'Should have 2 remaining nodes');
 
-		// All shards should still be available
+		// All shard slots should still be in schema (data for shard 2 is lost
+		// but slot is reassigned to a surviving node)
 		$allShards = new Set();
 		foreach ($newSchema as $row) {
 			$allShards->add(...$row['shards']);
 		}
-		$this->assertEquals(new Set([0, 1, 2, 3]), $allShards, 'All shards should be redistributed');
+		$this->assertEquals(new Set([0, 1, 2, 3]), $allShards, 'All shard slots should be redistributed');
 
-		// Orphaned shard 2 should be redistributed to one of the remaining nodes
 		$node1Shards = null;
 		$node3Shards = null;
 		foreach ($newSchema as $row) {
@@ -260,7 +258,7 @@ class OutageScenarioTest extends TestCase {
 		$this->assertNotNull($node1Shards, 'Node1 should be in schema');
 		$this->assertNotNull($node3Shards, 'Node3 should be in schema');
 
-		// One of the nodes should have picked up the orphaned shard 2
+		// Orphaned shard 2 should be assigned to one of the remaining nodes
 		$this->assertTrue(
 			$node1Shards->contains(2) || $node3Shards->contains(2),
 			'Orphaned shard 2 should be assigned to one of the remaining nodes'

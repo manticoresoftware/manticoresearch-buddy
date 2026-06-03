@@ -1,7 +1,7 @@
 # EmulateElastic Plugin
 
 ## Description
-Implemenents Elasticsearch-like API endpoints emulation. 
+Implemenents Elasticsearch-like API endpoints emulation.
 
 ## Examples
 - `/_bulk '{ "index": { "table" : "table1", "_id" : "1" } }\n{ "f" : "abc"}\n`

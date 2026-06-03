@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\Buddy;
 use RuntimeException;
 use Swoole\Coroutine;
 
@@ -89,9 +90,30 @@ final class CreateHandler extends BaseHandlerWithClient {
 		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
 		$result = $resp->getResult();
 		if (isset($result[0]['data'][0])) {
+			if ($this->payload->quiet) {
+				return Task::create(static fn() => TaskResult::none())->run();
+			}
 			return static::getErrorTask(
 				"table '{$this->payload->table}': CREATE TABLE failed: table '{$this->payload->table}' already exists"
 			);
+		}
+
+		// Reject local sharded creation when the node is already part of a
+		// replication cluster: the sharding metadata tables (sharding_table /
+		// sharding_state / sharding_queue) belong to that cluster, so a local
+		// CREATE goes through but its sharding_table row is silently dropped
+		// (writes to a clustered table without the cluster: prefix don't land).
+		// Observability ends up broken (FAIL_017), so we surface the
+		// limitation up front.
+		if (!$this->payload->cluster) {
+			$clusterName = $this->getJoinedClusterName();
+			if ($clusterName !== '') {
+				return static::getErrorTask(
+					'Local sharded tables cannot be created on a node that is '
+					. "part of a replication cluster ('{$clusterName}'). "
+					. "Use CREATE TABLE {$clusterName}:{$this->payload->table} instead."
+				);
+			}
 		}
 
 		$nodeCount = 1;
@@ -126,6 +148,31 @@ final class CreateHandler extends BaseHandlerWithClient {
 	}
 
 	/**
+	 * Return the name of the user-visible replication cluster this node belongs
+	 * to (the one that owns the sharding metadata tables), or '' when the node
+	 * is standalone. The sharding plugin also creates per-shard internal
+	 * clusters with md5-hash names, which we filter out here — only the
+	 * cluster that contains system.sharding_table is reported.
+	 *
+	 * @return string
+	 */
+	protected function getJoinedClusterName(): string {
+		/** @var array{0?:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_%_indexes'")
+			->getResult();
+		foreach ($res[0]['data'] ?? [] as $row) {
+			if (!str_contains($row['Value'], 'system.sharding_table')) {
+				continue;
+			}
+			if (preg_match('/^cluster_(.+)_indexes$/', $row['Counter'], $m)) {
+				return $m[1];
+			}
+		}
+		return '';
+	}
+
+	/**
 	 * Get and run task that we should run on error
 	 * @param string $message
 	 * @return Task
@@ -156,13 +203,27 @@ final class CreateHandler extends BaseHandlerWithClient {
 				/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
 				$value = simdjson_decode($result[0]['data'][0]['value'] ?? '[]', true);
 
-				/** @var array{result:string,status?:string,type?:string} $value */
+			// FLOW EXPLANATION:
+			// 1. Table->shard() creates initial state with status='processing', result=null
+			// 2. Operator->checkTableStatus() monitors queue completion
+			// 3. When all queue items processed, sets status='done' and result=response_body
+			// 4. We wait for BOTH status completion AND result to be set
+			// 5. Only then we can safely call Response::fromBody() with non-null result
+
+			/** @var array{result:?string,status?:string,type?:string} $value */
 				$type = $value['type'] ?? 'unknown';
 				$status = $value['status'] ?? 'processing';
-				if ($type === 'create' && $status !== 'processing') {
-					return TaskResult::fromResponse(Response::fromBody($value['result']));
+				$result = $value['result'] ?? null;
+
+			// Only proceed when:
+			// - Type is 'create' (table creation)
+			// - Status is not 'processing' (operation completed)
+			// - Result is not null (response body is available)
+				if ($type === 'create' && $status !== 'processing' && $result !== null) {
+					return TaskResult::fromResponse(Response::fromBody($result));
 				}
 				if ((time() - $ts) > $timeout) {
+					Buddy::debugvv("Sharding: CreateHandler timeout exceeded for table {$payload->table}");
 					break;
 				}
 				Coroutine::sleep(1);
