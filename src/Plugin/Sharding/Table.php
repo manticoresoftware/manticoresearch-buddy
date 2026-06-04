@@ -560,6 +560,12 @@ final class Table {
 			$state->set($rebalanceKey, 'running');
 			$state->set("rebalance_group:{$this->name}", $operationGroup);
 
+			// Drop orphaned items from previous, no-longer-committed rebalance groups (e.g. a
+			// failed node's deferred cleanup whose commit flag was removed when that rebalance
+			// finalized). Left in place they sit behind the commit gate and deadlock this
+			// rebalance's items through their wait_for chain.
+			$queue->purgeStaleRebalanceGroups();
+
 			$schema = $this->getShardSchema();
 			$allNodes = $this->cluster->getNodes();
 			$inactiveNodes = $this->cluster->getInactiveNodes();

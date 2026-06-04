@@ -646,4 +646,45 @@ final class Queue {
 		);
 		Buddy::debugvv("Purged uncommitted operation group: {$operationGroup}");
 	}
+
+	/**
+	 * Drop leftover queue items from rebalance groups that are no longer committed.
+	 *
+	 * When a node fails, the failover rebalance queues that node's own cleanup (drop its
+	 * stale shards, leave its old clusters) but the node is down so those items stay
+	 * 'created'. Once the rebalance finalizes it deletes its commit flag — so on rejoin
+	 * those items are orphaned: the commit gate skips them forever (their group is no
+	 * longer committed) and the next rebalance's items deadlock behind them via wait_for.
+	 * A superseding rebalance makes them obsolete, so purge any rebalance_* group that is
+	 * not currently committed before planning the new one.
+	 * @return void
+	 */
+	public function purgeStaleRebalanceGroups(): void {
+		// Collect the set of groups that are still committed (one per table).
+		$stateTable = $this->cluster->getSystemTableName('system.sharding_state');
+		$committed = [];
+		/** @var array{0?:array{data?:array<array{value:string}>}} */
+		$cres = $this->client->sendRequest(
+			"SELECT value[0] AS value FROM {$stateTable} WHERE REGEX(`key`, '^rebalance_committed:')"
+		)->getResult();
+		foreach ($cres[0]['data'] ?? [] as $row) {
+			$committed[(string)$row['value']] = true;
+		}
+
+		// Find the distinct rebalance_* groups currently present in the queue.
+		$table = $this->cluster->getSystemTableName($this->table);
+		/** @var array{0?:array{data?:array<array{operation_group:string}>}} */
+		$gres = $this->client->sendRequest(
+			"SELECT operation_group, COUNT(*) AS cnt FROM {$table} "
+			. "WHERE REGEX(operation_group, '^rebalance_') GROUP BY operation_group LIMIT 1000"
+		)->getResult();
+		foreach ($gres[0]['data'] ?? [] as $row) {
+			$group = (string)$row['operation_group'];
+			if ($group === '' || isset($committed[$group])) {
+				continue;
+			}
+			$this->purgeOperationGroup($group);
+			Buddy::info("Purged superseded rebalance group: {$group}");
+		}
+	}
 }
