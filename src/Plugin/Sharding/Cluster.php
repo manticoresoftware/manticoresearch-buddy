@@ -2,6 +2,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
+use Ds\Map;
 use Ds\Set;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -16,8 +17,13 @@ final class Cluster {
 	/** @var Set<string> $nodes set of all nodes that belong the the cluster */
 	protected Set $nodes;
 
-	/** @var Set<string> $tablesToAttach set of all tables that we need to add to the cluster */
-	protected Set $tablesToAttach;
+	/**
+	 * @var Map<string,string> $tablesToAttach map of table => node that holds the table's data.
+	 * The ALTER CLUSTER ADD for a table MUST run on a node that holds its data, otherwise the
+	 * executing node's (possibly empty) copy is replicated over the populated replicas — wiping
+	 * the data. So we remember the owner node per table and add per-owner, not on one cluster node.
+	 */
+	protected Map $tablesToAttach;
 
 	/** @var Set<string> $tablesToDetach set of all tables that we need to detach from the cluster */
 	protected Set $tablesToDetach;
@@ -34,7 +40,7 @@ final class Cluster {
 		protected string $nodeId
 	) {
 		$this->nodes = new Set;
-		$this->tablesToAttach = new Set;
+		$this->tablesToAttach = new Map;
 		$this->tablesToDetach = new Set;
 	}
 
@@ -279,13 +285,27 @@ final class Cluster {
 	 * @return int
 	 */
 	public function addTables(Queue $queue, array $tables, ?string $operationGroup = null): int {
+		return $this->addTablesOnNode($queue, $this->nodeId, $tables, $operationGroup);
+	}
+
+	/**
+	 * Enqueue ALTER CLUSTER ADD on a specific node. The node MUST hold the data of the
+	 * tables being added — the executing node's copy is what replicates to the rest of the
+	 * cluster, so adding from an empty node overwrites and destroys populated replicas.
+	 * @param Queue $queue
+	 * @param string $node node that holds the tables' data and runs the ALTER
+	 * @param array<string> $tables
+	 * @param string|null $operationGroup Optional operation group for rollback
+	 * @return int
+	 */
+	public function addTablesOnNode(Queue $queue, string $node, array $tables, ?string $operationGroup = null): int {
 		if (empty($tables)) {
 			throw new \Exception('Tables must be passed to add');
 		}
 		$tablesStr = implode(',', $tables);
 		$query = "ALTER CLUSTER {$this->name} ADD {$tablesStr}";
 		$rollback = "ALTER CLUSTER {$this->name} DROP {$tablesStr}";
-		return $queue->add($this->nodeId, $query, $rollback, $operationGroup);
+		return $queue->add($node, $query, $rollback, $operationGroup);
 	}
 
 	/**
@@ -345,11 +365,13 @@ final class Cluster {
 	 * Add pending table operation that we will process later in single shot
 	 * @param string $table
 	 * @param TableOperation $operation
+	 * @param string|null $ownerNode node that holds the table's data; the ALTER CLUSTER ADD
+	 *  must run there. Defaults to this cluster's node when not given (e.g. empty/new tables).
 	 * @return static
 	 */
-	public function addPendingTable(string $table, TableOperation $operation): static {
+	public function addPendingTable(string $table, TableOperation $operation, ?string $ownerNode = null): static {
 		if ($operation === TableOperation::Attach) {
-			$this->tablesToAttach->add($table);
+			$this->tablesToAttach->put($table, $ownerNode ?? $this->nodeId);
 		} else {
 			$this->tablesToDetach->add($table);
 		}
@@ -364,7 +386,7 @@ final class Cluster {
 	 */
 	public function hasPendingTable(string $table, TableOperation $operation): bool {
 		if ($operation === TableOperation::Attach) {
-			return $this->tablesToAttach->contains($table);
+			return $this->tablesToAttach->hasKey($table);
 		}
 
 		return $this->tablesToDetach->contains($table);
@@ -386,8 +408,20 @@ final class Cluster {
 		}
 
 		if ($this->tablesToAttach->count()) {
-			$lastQueueId = $this->addTables($queue, $this->tablesToAttach->toArray(), $operationGroup);
-			$this->tablesToAttach = new Set;
+			// Group tables by the node that holds their data and run one ALTER CLUSTER ADD per
+			// owner node, ON that node. Running it elsewhere replicates an empty copy over the
+			// populated replicas and destroys the data (proven: ADD on a non-holder wipes it).
+			/** @var Map<string,array<string>> $byNode */
+			$byNode = new Map;
+			foreach ($this->tablesToAttach as $table => $node) {
+				$tables = $byNode->get($node, []);
+				$tables[] = $table;
+				$byNode->put($node, $tables);
+			}
+			foreach ($byNode as $node => $tables) {
+				$lastQueueId = $this->addTablesOnNode($queue, $node, $tables, $operationGroup);
+			}
+			$this->tablesToAttach = new Map;
 		}
 
 		return $lastQueueId;

@@ -515,7 +515,10 @@ final class Table {
 		/** @var Cluster $cluster */
 		$table = $this->getShardName($shard);
 		if (!$cluster->hasPendingTable($table, TableOperation::Attach)) {
-			$cluster->addPendingTable($table, TableOperation::Attach);
+			// $node is the shard's data holder (the alive replica). Record it as the table's
+			// owner so the ALTER CLUSTER ADD runs there and the populated copy — not an empty
+			// one — is what replicates to the other members.
+			$cluster->addPendingTable($table, TableOperation::Attach, $node);
 			$sql = $this->getCreateTableShardSQL($shard);
 			$rollbackSql = "DROP TABLE IF EXISTS {$table}";
 			$queue->add($node, $sql, $rollbackSql, $operationGroup);
