@@ -949,12 +949,21 @@ final class Table {
 			)
 		);
 
-		// Preload current cluster map with configuration
-		foreach ($shardNodesMap as $connections) {
+		// Preload current cluster map with configuration.
+		// Only preload clusters that PHYSICALLY exist. After a failover the placement
+		// metadata (system.sharding_table) can be ahead of the actual Galera clusters,
+		// so the md5(target-nodes) cluster may not exist yet. If we preload it blindly,
+		// handleReplication() treats it as existing and skips its CREATE CLUSTER, and
+		// the later ALTER CLUSTER ... ADD then fails forever with "unknown cluster",
+		// wedging the queue. Verify existence so the missing cluster gets created.
+		foreach ($shardNodesMap as $shard => $connections) {
 			$clusterName = static::getClusterName($connections);
 			$connections->sort();
 			$node = $connections->first();
 			$cluster = new Cluster($this->client, $clusterName, $node);
+			if (!$cluster->exists($clusterName)) {
+				continue;
+			}
 			$clusterMap[$clusterName] = $cluster;
 		}
 
