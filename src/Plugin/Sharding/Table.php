@@ -1237,51 +1237,84 @@ final class Table {
 	): array {
 		/** @var Map<string,Cluster> */
 		$clusterMap = new Map;
-		$lastQueueId = 0;
 
-		// For RF>=2, we add new nodes as replicas to existing shards
-		foreach ($newNodes as $newNode) {
-			// Find shards that should be replicated to this new node
-			$shardsForNewNode = $this->getShardsForNewNode($newSchema, $newNode);
-
-			foreach ($shardsForNewNode as $shard) {
-				// Create shard table on new node
-				$shardName = $this->getShardName($shard);
-				$rollback = "DROP TABLE IF EXISTS {$shardName}";
-				$lastQueueId = $queue->add(
-					$newNode, $this->getCreateTableShardSQL($shard), $rollback, $operationGroup
-				);
-
-				// Set up replication from existing nodes
-				$existingNodes = $this->getExistingNodesForShard($schema, $shard);
-				if ($existingNodes->count() <= 0) {
-					continue;
-				}
-
-				$connectedNodes = $existingNodes->merge(new Set([$newNode]));
-				$existingNodes->sort();
-				$primaryNode = $existingNodes->first();
-
-				$clusterMap = $this->handleReplication(
-					$primaryNode,
-					$queue,
-					$connectedNodes,
-					$clusterMap,
-					$shard,
-					$operationGroup
-				);
+		// Adding a node to a shard's replica set changes that set, and the internal
+		// cluster name is md5(sorted node set) — so the shard must MOVE from the cluster
+		// it currently lives in to the one for its target set. A shard table can belong
+		// to only one cluster, so this is detach-then-attach, exactly like the failover
+		// path (which detaches via cleanUpNode). Build the move plan straight from the
+		// deterministic newSchema instead of "old nodes ∪ new node" (which over-replicates
+		// and computes the wrong target cluster).
+		/** @var Set<int> */
+		$allShards = new Set;
+		foreach ($newSchema as $row) {
+			foreach ($row['shards'] as $shard) {
+				$allShards->add($shard);
 			}
 		}
 
-		// Flush pending ALTER CLUSTER ADD for all new clusters and include that tail
-		// in the wrapper wait chain; otherwise the public table can be recreated
-		// before the newly added replica has actually been attached.
-		$lastQueueId = max($lastQueueId, $this->flushPendingClusterTables($queue, $clusterMap, $operationGroup));
+		/** @var array<int,array{current:Set<string>,target:Set<string>}> */
+		$moves = [];
+		foreach ($allShards as $shard) {
+			$current = $this->getExistingNodesForShard($schema, $shard);
+			$target = $this->getExistingNodesForShard($newSchema, $shard);
+			$current->sort();
+			$target->sort();
+			$moves[$shard] = ['current' => $current, 'target' => $target];
+		}
 
-		// Recreate wrappers after the queued shard/cluster work, but do not commit
-		// the new metadata layout yet. Keeping system.sharding_table on the last
-		// committed placement avoids reporting a healthy new topology before the
-		// physical shard tables exist.
+		// 1) Detach each moving shard from its current cluster. ALTER CLUSTER DROP
+		//    replicates to all current members, so issue it once on a single holder.
+		$lastDetachId = 0;
+		foreach ($moves as $shard => $m) {
+			if ($m['current']->toArray() === $m['target']->toArray() || $m['current']->count() <= 1) {
+				continue;
+			}
+			$oldCluster = static::getClusterName($m['current']);
+			$cluster = new Cluster($this->client, $oldCluster, $m['current']->first());
+			$detachId = $cluster->removeTables($queue, [$this->getShardName($shard)], $operationGroup);
+			$lastDetachId = max($lastDetachId, $detachId);
+		}
+
+		// 2) Attach each moving shard to its target cluster. Prefer a primary that already
+		//    holds the data and is part of the target set so the cluster seeds locally;
+		//    joining nodes receive the shard through the ALTER CLUSTER ADD replication.
+		foreach ($moves as $shard => $m) {
+			if ($m['current']->toArray() === $m['target']->toArray() || $m['target']->count() <= 1) {
+				continue;
+			}
+			$common = $m['target']->filter(fn($n) => $m['current']->contains($n));
+			$primary = $common->count() ? $common->first() : $m['target']->first();
+			$clusterMap = $this->handleReplication(
+				$primary, $queue, $m['target'], $clusterMap, $shard, $operationGroup
+			);
+		}
+
+		// The ALTER CLUSTER ADD must run only after the shard has left its old cluster.
+		if ($lastDetachId > 0) {
+			$queue->setWaitForId($lastDetachId);
+		}
+		$lastQueueId = $this->flushPendingClusterTables($queue, $clusterMap, $operationGroup);
+		$queue->resetWaitForId();
+
+		// 3) Drop the shard from nodes that no longer host it. The detach already removed
+		//    it from the old cluster, so a plain DROP suffices — but wait for the attach so
+		//    we never drop the last live copy before the move has replicated.
+		$waitForDrop = max($lastDetachId, $lastQueueId);
+		foreach ($moves as $shard => $m) {
+			$losing = $m['current']->filter(fn($n) => !$m['target']->contains($n));
+			foreach ($losing as $node) {
+				if ($waitForDrop > 0) {
+					$queue->setWaitForId($waitForDrop);
+				}
+				$shardName = $this->getShardName($shard);
+				$queue->add($node, "DROP TABLE IF EXISTS {$shardName}", '', $operationGroup);
+				$queue->resetWaitForId();
+			}
+		}
+
+		// 4) Recreate public wrappers from the target layout after physical work completes,
+		//    keeping system.sharding_table on the committed placement until the queue drains.
 		if ($lastQueueId > 0) {
 			$queue->setWaitForId($lastQueueId);
 		}
