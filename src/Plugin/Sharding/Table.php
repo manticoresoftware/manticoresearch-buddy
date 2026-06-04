@@ -69,9 +69,15 @@ final class Table {
 			// connections = nodes sharing the first shard of this node.
 			// All shards on a node belong to clusters of the same RF size — picking
 			// any single shard gives the correct peer set without inflating it via union.
-			$firstShard = $shards->first();
+			// A node may legitimately hold NO shards (e.g. RF=1 with more nodes than
+			// shards), so guard against Set::first() throwing UnderflowException on an
+			// empty set — such a node simply has no connections.
 			/** @var Set<string> */
-			$connectedNodes = new Set($shardNodesMap[$firstShard] ?? []);
+			$connectedNodes = new Set();
+			if (!$shards->isEmpty()) {
+				$firstShard = $shards->first();
+				$connectedNodes = new Set($shardNodesMap[$firstShard] ?? []);
+			}
 			/** @var array{node:string,shards:string} $row */
 			$nodes->push(
 				[
