@@ -125,6 +125,237 @@ final class KnnHandlerTest extends TestCase {
 		Event::wait();
 	}
 
+	public function testHttpDocIdQuerySupportsSourceFalse(): void {
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => '{"table":"t","_source":false,"knn":{"field":"v","k":25,"doc_id":1}}',
+				'format' => RequestFormat::JSON,
+				'endpointBundle' => ManticoreEndpoint::Search,
+				'path' => 'search',
+			]
+		);
+
+		$this->assertTrue(Payload::hasMatch($request));
+		$payload = Payload::fromRequest($request);
+
+		$mockClient = $this->createMock(Client::class);
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->willReturnCallback(
+				function (string $query, ?string $endpoint = null): Response {
+					if ($query === 'SELECT * FROM t WHERE id = 1') {
+						return self::createDocResponse();
+					}
+
+					$this->assertSame(ManticoreEndpoint::Search->value, $endpoint);
+					$body = json_decode($query, true, 512, JSON_THROW_ON_ERROR);
+					$this->assertIsArray($body);
+					$this->assertArrayHasKey('_source', $body);
+					$this->assertFalse($body['_source']);
+
+					return self::createHttpKnnResponseWithoutSource();
+				}
+			);
+
+		$handler = new Handler($payload);
+		$handler->setManticoreClient($mockClient);
+
+		go(
+			function () use ($handler): void {
+				$task = $handler->run();
+				$task->wait(true);
+
+				$this->assertTrue($task->isSucceed());
+				$result = $task->getResult()->getStruct();
+				if (is_string($result)) {
+					$result = json_decode($result, true, 512, JSON_THROW_ON_ERROR);
+				}
+
+				/** @var array{hits:array{total:int, hits:array<int, array{_id:int}>}} $result */
+				$this->assertSame(24, $result['hits']['total']);
+				$this->assertSame([2, 3], array_column($result['hits']['hits'], '_id'));
+				$this->assertArrayNotHasKey('_source', $result['hits']['hits'][0]);
+			}
+		);
+		Event::wait();
+	}
+
+	public function testHttpDocIdQueryHonorsExplicitLimit(): void {
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' =>
+					'{"table":"t","limit":1,"knn":{"field":"v","k":25,"doc_id":1}}',
+				'format' => RequestFormat::JSON,
+				'endpointBundle' => ManticoreEndpoint::Search,
+				'path' => 'search',
+			]
+		);
+
+		$this->assertTrue(Payload::hasMatch($request));
+		$payload = Payload::fromRequest($request);
+
+		$mockClient = $this->createMock(Client::class);
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->willReturnCallback(
+				function (string $query, ?string $endpoint = null): Response {
+					if ($query === 'SELECT * FROM t WHERE id = 1') {
+						return self::createDocResponse();
+					}
+
+					$this->assertSame(ManticoreEndpoint::Search->value, $endpoint);
+					$body = json_decode($query, true, 512, JSON_THROW_ON_ERROR);
+					$this->assertIsArray($body);
+					$this->assertArrayHasKey('size', $body);
+					$this->assertSame(2, $body['size']);
+
+					return self::createHttpKnnResponse();
+				}
+			);
+
+		$handler = new Handler($payload);
+		$handler->setManticoreClient($mockClient);
+
+		go(
+			function () use ($handler): void {
+				$task = $handler->run();
+				$task->wait(true);
+
+				$this->assertTrue($task->isSucceed());
+				$result = $task->getResult()->getStruct();
+				if (is_string($result)) {
+					$result = json_decode($result, true, 512, JSON_THROW_ON_ERROR);
+				}
+
+				/** @var array{hits:array{total:int, hits:array<int, array{_id:int}>}} $result */
+				$this->assertSame([2], array_column($result['hits']['hits'], '_id'));
+				$this->assertSame(24, $result['hits']['total']);
+			}
+		);
+		Event::wait();
+	}
+
+	public function testHttpDocIdQuerySupportsSourceIncludesAndExcludes(): void {
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' =>
+					'{"table":"t","_source":{"excludes":["v"]},"knn":{"field":"v","k":25,"doc_id":1}}',
+				'format' => RequestFormat::JSON,
+				'endpointBundle' => ManticoreEndpoint::Search,
+				'path' => 'search',
+			]
+		);
+
+		$this->assertTrue(Payload::hasMatch($request));
+		$payload = Payload::fromRequest($request);
+
+		$mockClient = $this->createMock(Client::class);
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->willReturnCallback(
+				function (string $query, ?string $endpoint = null): Response {
+					if ($query === 'SELECT * FROM t WHERE id = 1') {
+						return self::createDocResponse();
+					}
+
+					$this->assertSame(ManticoreEndpoint::Search->value, $endpoint);
+					$body = json_decode($query, true, 512, JSON_THROW_ON_ERROR);
+					$this->assertIsArray($body);
+					$this->assertArrayHasKey('_source', $body);
+					$this->assertSame(['excludes' => ['v']], $body['_source']);
+
+					return self::createHttpKnnResponseWithoutVectorInSource();
+				}
+			);
+
+		$handler = new Handler($payload);
+		$handler->setManticoreClient($mockClient);
+
+		go(
+			function () use ($handler): void {
+				$task = $handler->run();
+				$task->wait(true);
+
+				$this->assertTrue($task->isSucceed());
+				$result = $task->getResult()->getStruct();
+				if (is_string($result)) {
+					$result = json_decode($result, true, 512, JSON_THROW_ON_ERROR);
+				}
+
+				/** @var array{hits:array{hits:array<int, array{_source:array<string,mixed>}>}} $result */
+				$this->assertArrayHasKey('_source', $result['hits']['hits'][0]);
+				$this->assertArrayNotHasKey('v', $result['hits']['hits'][0]['_source']);
+				$this->assertSame('doc2', $result['hits']['hits'][0]['_source']['f']);
+			}
+		);
+		Event::wait();
+	}
+
+	public function testHttpDocIdQueryAppliesOffsetAndMaxMatchesAfterRemovingSelf(): void {
+		$request = Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' =>
+					'{"table":"t","knn":{"field":"v","k":25,"doc_id":1},"limit":5,"offset":100,"max_matches":500}',
+				'format' => RequestFormat::JSON,
+				'endpointBundle' => ManticoreEndpoint::Search,
+				'path' => 'search',
+			]
+		);
+
+		$this->assertTrue(Payload::hasMatch($request));
+		$payload = Payload::fromRequest($request);
+
+		$mockClient = $this->createMock(Client::class);
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->willReturnCallback(
+				function (string $query, ?string $endpoint = null): Response {
+					if ($query === 'SELECT * FROM t WHERE id = 1') {
+						return self::createDocResponse();
+					}
+
+					$this->assertSame(ManticoreEndpoint::Search->value, $endpoint);
+					$body = json_decode($query, true, 512, JSON_THROW_ON_ERROR);
+					/** @var array{size:int, max_matches:int, knn:array{k:int, query_vector:array<int, float>}} $body */
+					$this->assertSame(106, $body['size']);
+					$this->assertSame(501, $body['max_matches']);
+					$this->assertSame(25, $body['knn']['k']);
+					$this->assertEquals([1.0, 0.0], $body['knn']['query_vector']);
+
+					return self::createLargeHttpKnnResponse(120);
+				}
+			);
+
+		$handler = new Handler($payload);
+		$handler->setManticoreClient($mockClient);
+
+		go(
+			function () use ($handler): void {
+				$task = $handler->run();
+				$task->wait(true);
+
+				$this->assertTrue($task->isSucceed());
+				$result = $task->getResult()->getStruct();
+				if (is_string($result)) {
+					$result = json_decode($result, true, 512, JSON_THROW_ON_ERROR);
+				}
+
+				/** @var array{hits:array{total:int, hits:array<int, array{_id:int}>}} $result */
+				$this->assertSame(119, $result['hits']['total']);
+				$this->assertSame([102, 103, 104, 105, 106], array_column($result['hits']['hits'], '_id'));
+			}
+		);
+		Event::wait();
+	}
+
 	private static function createDocResponse(): Response {
 		return Response::fromBody(
 			(string)json_encode(
@@ -161,6 +392,73 @@ final class KnnHandlerTest extends TestCase {
 							['id' => 1, 'distance' => 0],
 							['id' => 2, 'distance' => 1],
 							['id' => 3, 'distance' => 4],
+						],
+					],
+				]
+			)
+		);
+	}
+
+
+	private static function createLargeHttpKnnResponse(int $count): Response {
+		$hits = [];
+		for ($id = 1; $id <= $count; $id++) {
+			$hits[] = [
+				'_id' => $id,
+				'_score' => 1,
+				'_knn_dist' => $id - 1,
+				'_source' => ['f' => 'doc' . $id, 'v' => [$id, 0]],
+			];
+		}
+
+		return Response::fromBody(
+			(string)json_encode(
+				[
+					'took' => 0,
+					'timed_out' => false,
+					'hits' => [
+						'total' => $count,
+						'total_relation' => 'eq',
+						'hits' => $hits,
+					],
+				]
+			)
+		);
+	}
+
+	private static function createHttpKnnResponseWithoutVectorInSource(): Response {
+		return Response::fromBody(
+			(string)json_encode(
+				[
+					'took' => 0,
+					'timed_out' => false,
+					'hits' => [
+						'total' => 25,
+						'total_relation' => 'eq',
+						'hits' => [
+							['_id' => 1, '_score' => 1, '_knn_dist' => 0, '_source' => ['f' => 'doc1']],
+							['_id' => 2, '_score' => 1, '_knn_dist' => 1, '_source' => ['f' => 'doc2']],
+							['_id' => 3, '_score' => 1, '_knn_dist' => 4, '_source' => ['f' => 'doc3']],
+						],
+					],
+				]
+			)
+		);
+	}
+
+	private static function createHttpKnnResponseWithoutSource(): Response {
+		return Response::fromBody(
+			(string)json_encode(
+				[
+					'took' => 0,
+					'timed_out' => false,
+					'hits' => [
+						'total' => 25,
+						'total_relation' => 'eq',
+						'hits' => [
+							['_id' => 1, '_score' => 1, '_knn_dist' => 0],
+							['_id' => 2, '_score' => 1, '_knn_dist' => 1],
+							['_id' => 3, '_score' => 1, '_knn_dist' => 4],
 						],
 					],
 				]
