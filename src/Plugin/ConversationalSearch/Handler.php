@@ -686,7 +686,8 @@ final class Handler extends BaseHandlerWithClient {
 			"(IMPORTANT !!! You can't use your own knowledge to add anything that isn't mentioned there). " .
 			'Do not exceed the response token limit (' .
 			self::RESPONSE_MAX_TOKENS .
-			'), and end the answer cleanly before reaching it. ' .
+			'), and end the answer cleanly before reaching it.
+			Don\'t include to answer sentence *based on provided context* or similar. Just give direct answer. ' .
 			'<main>' .
 			"<history>\n" .
 			"```json\n" .
