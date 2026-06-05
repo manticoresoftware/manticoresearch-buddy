@@ -65,6 +65,14 @@ final class Queue {
 	}
 
 	/**
+	 * Read the wait-for id currently applied to newly added items
+	 * @return int
+	 */
+	public function getWaitForId(): int {
+		return $this->waitForId;
+	}
+
+	/**
 	 * Add new query for requested node to the queue
 	 * @param string $nodeId
 	 * @param string $query
@@ -218,15 +226,12 @@ final class Queue {
 			$status = $this->handleAlterClusterDropTableError($query['query'], $res);
 		}
 
-		// A JOIN CLUSTER rejected with "already exists" means this node still holds a stale,
-		// persisted copy of the cluster (it survived a restart). It can never state-transfer the
-		// writes it missed while down, so it diverges (keeps fewer rows). Drop the stale local
-		// copy here — only this node is touched, never the donor — and leave the item in 'error'
-		// so the queue retries the JOIN against a clean node and gets a fresh full SST.
-		if ($status === 'error'
-			&& $this->isJoinClusterQuery($query['query'])
-			&& $this->errorIndicatesClusterExists($res)) {
-			$this->resyncStaleClusterCopy($node, $query['query']);
+		// Special handling for DELETE CLUSTER: when we proactively clear a node's stale local
+		// copy before re-JOIN, a brand-new node has no such cluster ("unknown cluster"). That
+		// is exactly the desired post-state, not a failure — otherwise the item deadlocks the
+		// JOIN that waits on it.
+		if ($status === 'error' && $this->isDeleteClusterQuery($query['query'])) {
+			$status = $this->handleDeleteClusterError($res);
 		}
 
 		Buddy::debugvv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
@@ -443,60 +448,29 @@ final class Queue {
 	}
 
 	/**
-	 * Whether the query is a JOIN CLUSTER statement
+	 * Whether the query is a DELETE CLUSTER statement
 	 * @param string $query
 	 * @return bool
 	 */
-	protected function isJoinClusterQuery(string $query): bool {
-		return (bool)preg_match('/^\s*JOIN\s+CLUSTER\s+/i', $query);
+	protected function isDeleteClusterQuery(string $query): bool {
+		return (bool)preg_match('/^\s*DELETE\s+CLUSTER\s+/i', $query);
 	}
 
 	/**
-	 * Extract the cluster name from a JOIN CLUSTER statement
-	 * @param string $query
-	 * @return string|null
+	 * A DELETE CLUSTER that fails because the cluster is not present locally has already
+	 * reached its intended state (no stale copy), so treat it as processed.
+	 * @param Struct<int|string,mixed> $errorResult
+	 * @return string
 	 */
-	protected function extractJoinClusterName(string $query): ?string {
-		if (preg_match('/JOIN\s+CLUSTER\s+(\w+)\s+at\b/i', $query, $matches)) {
-			return $matches[1];
-		}
-		return null;
-	}
-
-	/**
-	 * Whether a query error indicates the cluster already exists on the node
-	 * @param Struct<int|string, mixed> $errorResult
-	 * @return bool
-	 */
-	protected function errorIndicatesClusterExists(Struct $errorResult): bool {
+	protected function handleDeleteClusterError(Struct $errorResult): string {
 		/** @var array{error?:string}|array{0?:array{error?:string}} $arr */
 		$arr = $errorResult;
 		$error = (string)($arr['error'] ?? ($arr[0]['error'] ?? ''));
-		return stripos($error, 'already exists') !== false;
-	}
-
-	/**
-	 * Drop a node's stale local copy of a cluster so the queued JOIN can retry and pull a fresh
-	 * full state transfer from the donor. Runs only on the node whose JOIN failed — the donor is
-	 * never touched. The JOIN item stays in 'error' and is retried by the normal queue mechanism.
-	 * @param Node $node
-	 * @param string $joinQuery
-	 * @return void
-	 */
-	protected function resyncStaleClusterCopy(Node $node, string $joinQuery): void {
-		$name = $this->extractJoinClusterName($joinQuery);
-		if ($name === null) {
-			return;
+		if (stripos($error, 'unknown cluster') !== false || stripos($error, 'no such cluster') !== false) {
+			Buddy::debugvv('DELETE CLUSTER: cluster not present locally, marking as processed');
+			return 'processed';
 		}
-		try {
-			$this->client->sendRequest("DELETE CLUSTER {$name}");
-			Buddy::info(
-				"[{$node->id}] JOIN CLUSTER {$name}: node held a stale copy; dropped it so the "
-				. 'retry re-syncs via a fresh SST'
-			);
-		} catch (\Throwable $e) {
-			Buddy::debugvv("Re-sync DELETE CLUSTER {$name} failed: " . $e->getMessage());
-		}
+		return 'error';
 	}
 
 	/**
