@@ -247,14 +247,24 @@ final class Cluster {
 	 * @return static
 	 */
 	public function addNodeIds(Queue $queue, array $nodeIds, ?string $operationGroup = null): static {
+		$baseWaitForId = $queue->getWaitForId();
 		foreach ($nodeIds as $node) {
 			$this->nodes->add($node);
-			// TODO: the pass is the subject to remove
+			// A node that previously held this cluster still has a stale copy persisted on disk
+			// (cluster state survives a restart). A plain JOIN is then rejected with "cluster
+			// already exists" and the node never state-transfers the writes it missed while down,
+			// so it diverges (keeps fewer rows). Drop any local copy first — a no-op on a brand
+			// new node, tolerated in Queue — then JOIN so the node gets a fresh SST from the
+			// donor ({$this->nodeId}, the surviving data holder).
+			$queue->setWaitForId($baseWaitForId);
+			$deleteId = $queue->add($node, "DELETE CLUSTER {$this->name}", '', $operationGroup);
+			$queue->setWaitForId($deleteId);
 			$query = "JOIN CLUSTER {$this->name} at '{$this->nodeId}' '{$this->name}' as " .
 				'path';
 			$rollback = "DELETE CLUSTER {$this->name}";
 			$queue->add($node, $query, $rollback, $operationGroup);
 		}
+		$queue->setWaitForId($baseWaitForId);
 		return $this;
 	}
 

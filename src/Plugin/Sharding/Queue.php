@@ -65,6 +65,14 @@ final class Queue {
 	}
 
 	/**
+	 * Read the wait-for id currently applied to newly added items
+	 * @return int
+	 */
+	public function getWaitForId(): int {
+		return $this->waitForId;
+	}
+
+	/**
 	 * Add new query for requested node to the queue
 	 * @param string $nodeId
 	 * @param string $query
@@ -216,6 +224,14 @@ final class Queue {
 		// Special handling for ALTER CLUSTER DROP TABLE commands
 		if ($status === 'error' && $this->isAlterClusterDropTableQuery($query['query'])) {
 			$status = $this->handleAlterClusterDropTableError($query['query'], $res);
+		}
+
+		// Special handling for DELETE CLUSTER: when we proactively clear a node's stale local
+		// copy before re-JOIN, a brand-new node has no such cluster ("unknown cluster"). That
+		// is exactly the desired post-state, not a failure — otherwise the item deadlocks the
+		// JOIN that waits on it.
+		if ($status === 'error' && $this->isDeleteClusterQuery($query['query'])) {
+			$status = $this->handleDeleteClusterError($res);
 		}
 
 		Buddy::debugvv("[{$node->id}] Queue query result [$status]: " . json_encode($res));
@@ -428,6 +444,32 @@ final class Queue {
 		}
 
 		// Tables are still in cluster but DROP failed - this is a real error
+		return 'error';
+	}
+
+	/**
+	 * Whether the query is a DELETE CLUSTER statement
+	 * @param string $query
+	 * @return bool
+	 */
+	protected function isDeleteClusterQuery(string $query): bool {
+		return (bool)preg_match('/^\s*DELETE\s+CLUSTER\s+/i', $query);
+	}
+
+	/**
+	 * A DELETE CLUSTER that fails because the cluster is not present locally has already
+	 * reached its intended state (no stale copy), so treat it as processed.
+	 * @param Struct<int|string,mixed> $errorResult
+	 * @return string
+	 */
+	protected function handleDeleteClusterError(Struct $errorResult): string {
+		/** @var array{error?:string}|array{0?:array{error?:string}} $arr */
+		$arr = $errorResult;
+		$error = (string)($arr['error'] ?? ($arr[0]['error'] ?? ''));
+		if (stripos($error, 'unknown cluster') !== false || stripos($error, 'no such cluster') !== false) {
+			Buddy::debugvv('DELETE CLUSTER: cluster not present locally, marking as processed');
+			return 'processed';
+		}
 		return 'error';
 	}
 
