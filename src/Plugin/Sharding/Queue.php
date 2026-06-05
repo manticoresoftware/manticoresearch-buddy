@@ -192,7 +192,41 @@ final class Queue {
 			}
 		}
 
+		// Defer ALTER CLUSTER ... ADD until its target internal cluster has re-formed a primary
+		// view on this node. During a rejoin/failover rebalance the queue keeps processing even
+		// while internal clusters are non-primary (to avoid deadlock), but issuing the ADD before
+		// the returning member has re-synced is premature: the daemon reports "nodes not ready"
+		// and, in the worst case, crashes in the SST donor setup (SetDonor4Joiner). Waiting here —
+		// without burning a try — lets the bootstrap + Galera reconnect bring the cluster primary
+		// first. Primary is reached independently of this ADD, so this cannot deadlock.
+		if ($this->isAlterClusterAddTableQuery($query['query'])
+			&& !$this->isQueryClusterPrimary($query['query'])) {
+			Buddy::debugvv("Sharding queue: defer {$query['id']} — target cluster not primary yet");
+			return true;
+		}
+
 		return !$this->attemptToUpdateStatus($query, 'processing', 0);
+	}
+
+	/**
+	 * Whether the internal cluster targeted by an ALTER CLUSTER statement is primary on this node.
+	 * Unknown/unparseable cluster -> treat as ready (do not block).
+	 * @param string $query
+	 * @return bool
+	 */
+	protected function isQueryClusterPrimary(string $query): bool {
+		$name = $this->extractClusterNameFromQuery($query);
+		if ($name === null) {
+			return true;
+		}
+		try {
+			$res = $this->client->sendRequest("SHOW STATUS LIKE 'cluster_{$name}_status'")->getResult();
+			/** @var array{0?:array{data?:array<array{Value?:string}>}} $res */
+			$status = $res[0]['data'][0]['Value'] ?? 'primary';
+			return $status === 'primary';
+		} catch (\Throwable $e) {
+			return true;
+		}
 	}
 
 	/**
