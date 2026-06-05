@@ -344,9 +344,19 @@ final class Util {
    * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}> It maintains original indexes
    */
 	private static function copyActiveNodeAssignments(Vector $schema, Set $nodes): Vector {
-		return $schema->filter(
-			fn ($row) => $nodes->contains($row['node'])
-		);
+		// Deep-clone the rows. filter() keeps the SAME Set references, and the downstream
+		// assignShardsToNodes() mutates 'shards' in place — which would corrupt the caller's
+		// original schema (the CURRENT placement the failover executor relies on to find the
+		// node that actually holds each shard's data). Cloning keeps the generator pure.
+		return $schema
+			->filter(fn ($row) => $nodes->contains($row['node']))
+			->map(
+				fn ($row) => [
+					'node' => $row['node'],
+					'shards' => $row['shards']->copy(),
+					'connections' => $row['connections']->copy(),
+				]
+			);
 	}
 
   /**
@@ -355,17 +365,21 @@ final class Util {
    * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
    */
 	private static function addNodesToSchema(Vector $schema, Set $nodes): Vector {
-		$schemaNodes = new Set($schema->map(fn ($row) => $row['node']));
+		// Work on a copy so we never append rows to the caller's vector.
+		$result = $schema->copy();
+		$schemaNodes = new Set($result->map(fn ($row) => $row['node']));
 		$newNodes = $nodes->diff($schemaNodes);
 		foreach ($newNodes as $node) {
-			$schema[] = [
-				'node' => $node,
-				'shards' => new Set,
-				'connections' => new Set,
-			];
+			$result->push(
+				[
+					'node' => $node,
+					'shards' => new Set,
+					'connections' => new Set,
+				]
+			);
 		}
 
-		return $schema;
+		return $result;
 	}
 
   /**
