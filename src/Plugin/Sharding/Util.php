@@ -194,8 +194,17 @@ final class Util {
 			return self::redistributeShardsForRF1($newSchema, $newNodes);
 		}
 
-		// For RF>=2, we can add replicas to new nodes
-		return self::addReplicasToNewNodes($newSchema, $newNodes);
+		// For RF>=2, recalculate a balanced schema across all nodes respecting the RF
+		$allNodes = new Set($newSchema->map(fn($row) => $row['node']));
+		$allNodes->sort();
+		$totalShards = self::getTotalUniqueShards($schema);
+		if ($totalShards > 0) {
+			$balancedSchema = self::initializeSchema($allNodes);
+			$nodeMap = self::initializeNodeMap($allNodes->count());
+			return self::assignNodesToSchema($balancedSchema, $nodeMap, $allNodes, $totalShards, $replicationFactor);
+		}
+
+		return $newSchema;
 	}
 
 	/**
@@ -328,82 +337,6 @@ final class Util {
 		return $newSchema;
 	}
 
-	/**
-	 * Collect all existing shards from non-new nodes
-	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
-	 * @param  Set<string> $newNodes
-	 * @return Set<int>
-	 */
-	private static function collectExistingShards(Vector $schema, Set $newNodes): Set {
-		$allShards = new Set();
-		foreach ($schema as $row) {
-			if ($newNodes->contains($row['node'])) {
-				continue;
-			}
-			$allShards->add(...$row['shards']);
-		}
-		return $allShards;
-	}
-
-	/**
-	 * Add all shards to new nodes for replication
-	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
-	 * @param  Set<string> $newNodes
-	 * @param  Set<int> $allShards
-	 * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
-	 */
-	private static function assignShardsToNewNodes(Vector $schema, Set $newNodes, Set $allShards): Vector {
-		foreach ($newNodes as $newNode) {
-			foreach ($schema as $index => $row) {
-				if ($row['node'] === $newNode) {
-					// Add all shards to the new node
-					foreach ($allShards as $shard) {
-						$row['shards']->add($shard);
-					}
-					$schema[$index] = $row;
-					break;
-				}
-			}
-		}
-		return $schema;
-	}
-
-	/**
-	 * Update connections for all nodes to include all nodes that have each shard
-	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
-	 * @param  Set<int> $allShards
-	 * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
-	 */
-	private static function updateShardConnections(Vector $schema, Set $allShards): Vector {
-		foreach ($allShards as $shard) {
-			$allNodesWithShard = self::findUsedNodesInCurrentReplication($schema, $shard);
-			foreach ($schema as $index => $row) {
-				if (!$row['shards']->contains($shard)) {
-					continue;
-				}
-				$schema[$index]['connections'] = $allNodesWithShard;
-			}
-		}
-		return $schema;
-	}
-
-	/**
-	 * Add replicas to new nodes for RF>=2
-	 * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}> $schema
-	 * @param  Set<string> $newNodes
-	 * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
-	 */
-	private static function addReplicasToNewNodes(Vector $schema, Set $newNodes): Vector {
-		// Collect all existing shards
-		$allShards = self::collectExistingShards($schema, $newNodes);
-
-		// For RF>=2, add all shards to new nodes for load balancing
-		// This maintains RF while distributing load across all nodes
-		$schema = self::assignShardsToNewNodes($schema, $newNodes, $allShards);
-
-		// Update connections for all nodes to include all nodes that have each shard
-		return self::updateShardConnections($schema, $allShards);
-	}
 
   /**
    * @param  Vector<array{node:string,shards:Set<int>,connections:Set<string>}>  $schema
@@ -411,9 +344,19 @@ final class Util {
    * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}> It maintains original indexes
    */
 	private static function copyActiveNodeAssignments(Vector $schema, Set $nodes): Vector {
-		return $schema->filter(
-			fn ($row) => $nodes->contains($row['node'])
-		);
+		// Deep-clone the rows. filter() keeps the SAME Set references, and the downstream
+		// assignShardsToNodes() mutates 'shards' in place — which would corrupt the caller's
+		// original schema (the CURRENT placement the failover executor relies on to find the
+		// node that actually holds each shard's data). Cloning keeps the generator pure.
+		return $schema
+			->filter(fn ($row) => $nodes->contains($row['node']))
+			->map(
+				fn ($row) => [
+					'node' => $row['node'],
+					'shards' => $row['shards']->copy(),
+					'connections' => $row['connections']->copy(),
+				]
+			);
 	}
 
   /**
@@ -422,17 +365,21 @@ final class Util {
    * @return Vector<array{node:string,shards:Set<int>,connections:Set<string>}>
    */
 	private static function addNodesToSchema(Vector $schema, Set $nodes): Vector {
-		$schemaNodes = new Set($schema->map(fn ($row) => $row['node']));
+		// Work on a copy so we never append rows to the caller's vector.
+		$result = $schema->copy();
+		$schemaNodes = new Set($result->map(fn ($row) => $row['node']));
 		$newNodes = $nodes->diff($schemaNodes);
 		foreach ($newNodes as $node) {
-			$schema[] = [
-				'node' => $node,
-				'shards' => new Set,
-				'connections' => new Set,
-			];
+			$result->push(
+				[
+					'node' => $node,
+					'shards' => new Set,
+					'connections' => new Set,
+				]
+			);
 		}
 
-		return $schema;
+		return $result;
 	}
 
   /**
@@ -461,7 +408,10 @@ final class Util {
 	private static function assignShardsToNodes(Vector $schema, Set $shards): Vector {
 		foreach ($shards as $shard) {
 			$node = self::findNodeWithMinimumShards($schema, $shard);
-		  // It will never happen, but for phpstan
+			// Shard already present on all active nodes (RF >= active node count) — nothing to reassign
+			if ($node === -1) {
+				continue;
+			}
 			if (!isset($schema[$node])) {
 				throw new RuntimeException("Inconsistency with schema node #{$node}");
 			}
@@ -486,6 +436,10 @@ final class Util {
 				fn ($a, $b) =>
 					$a['shards']->count() < $b['shards']->count() ? -1 : 1
 			);
+		// All active nodes already hold this shard — fully replicated, nothing to assign
+		if ($nodesToChoose->isEmpty()) {
+			return -1;
+		}
 		$index = $schema->find($nodesToChoose->first());
 		if (false === $index) {
 			throw new RuntimeException('Failed to find node to use');

@@ -95,7 +95,19 @@ final class DropHandler extends BaseHandlerWithClient {
 			);
 		}
 
-		if (false === stripos($result[0]['data'][0]['Create Table'], "type='distributed'")) {
+		if (false === stripos($result[0]['data'][0]['Create Table'], "type='shard'")) {
+			// A cluster prefix on a non-sharded table is usually a regular
+			// replicated RT table that was added via ALTER CLUSTER ... ADD.
+			// Point the user at the correct command instead of leaking our
+			// internal "must be sharded" error.
+			if ($this->payload->cluster !== '') {
+				return $this->getErrorTask(
+					"table '{$this->payload->table}' is a regular table in cluster "
+					. "'{$this->payload->cluster}': "
+					. "use ALTER CLUSTER {$this->payload->cluster} DROP {$this->payload->table} "
+					. "to remove it from the cluster, then DROP TABLE {$this->payload->table}"
+				);
+			}
 			return $this->getErrorTask(
 				"table '{$this->payload->table}' is not sharded: "
 					. 'DROP SHARDED TABLE failed: '
@@ -113,7 +125,103 @@ final class DropHandler extends BaseHandlerWithClient {
 			);
 		}
 
+		// If the sharded table belongs to a cluster, require the user to
+		// reference it with the cluster prefix so the drop is unambiguous.
+		$actualCluster = $this->getTableCluster($this->payload->table);
+		if ($actualCluster !== '' && $actualCluster !== $this->payload->cluster) {
+			return $this->getErrorTask(
+				"table '{$this->payload->table}' belongs to cluster "
+				. "'{$actualCluster}': use DROP TABLE {$actualCluster}:{$this->payload->table}"
+			);
+		}
+
+		// Refuse to drop a clustered sharded table while any of its cluster
+		// members are unreachable. Otherwise the synchronous metadata DELETE
+		// commits, queue items stall on the dead node, and the alive nodes
+		// are left with a public wrapper + physical shards + no metadata to
+		// re-issue the DROP against (FAIL_020). Better to ask the operator
+		// to bring the missing node up first.
+		if ($actualCluster !== '') {
+			$err = $this->checkClusterFullyReachable($actualCluster);
+			if ($err !== null) {
+				return $this->getErrorTask($err);
+			}
+		}
+
 		return null;
+	}
+
+	/**
+	 * Refuse the DROP unless the cluster is fully healthy for writes:
+	 * - status='primary' (cluster has quorum and a primary view),
+	 * - local node_state='synced' (we're not mid-SST / desynced),
+	 * - size == count(nodes_set) (no member is currently unreachable).
+	 *
+	 * Returning null means "go ahead". Any non-null string is the
+	 * user-facing error explaining which condition failed.
+	 *
+	 * @param string $cluster
+	 * @return ?string
+	 */
+	protected function checkClusterFullyReachable(string $cluster): ?string {
+		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_status'")
+			->getResult();
+		$status = $res[0]['data'][0]['Value'] ?? '';
+		if ($status !== '' && $status !== 'primary') {
+			return "cluster '{$cluster}' is not in primary view (status='{$status}'): "
+				. 'refusing to DROP — retry when the cluster is fully synced';
+		}
+
+		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_node_state'")
+			->getResult();
+		$nodeState = $res[0]['data'][0]['Value'] ?? '';
+		if ($nodeState !== '' && $nodeState !== 'synced') {
+			return "cluster '{$cluster}' local node is not synced "
+				. "(node_state='{$nodeState}'): refusing to DROP — "
+				. 'retry when the cluster is fully synced';
+		}
+
+		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_nodes_set'")
+			->getResult();
+		$nodesSet = $res[0]['data'][0]['Value'] ?? '';
+		if ($nodesSet === '') {
+			return null;
+		}
+		$expected = sizeof(array_filter(array_map('trim', explode(',', $nodesSet))));
+
+		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
+		$res = $this->manticoreClient
+			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_size'")
+			->getResult();
+		$size = (int)($res[0]['data'][0]['Value'] ?? 0);
+
+		if ($size < $expected) {
+			return "cluster '{$cluster}' has unreachable members "
+				. "({$size} of {$expected} alive): refusing to DROP — "
+				. 'retry when the cluster is fully synced';
+		}
+		return null;
+	}
+
+	/**
+	 * Look up which replication cluster a sharded table belongs to via
+	 * system.sharding_table. Returns '' when not clustered.
+	 *
+	 * @param string $table
+	 * @return string
+	 */
+	protected function getTableCluster(string $table): string {
+		$q = "SELECT cluster FROM system.sharding_table WHERE `table` = '{$table}' LIMIT 1";
+		$resp = $this->manticoreClient->sendRequest($q);
+		/** @var array{0:array{data?:array{0:array{cluster:string}}}} $result */
+		$result = $resp->getResult();
+		return $result[0]['data'][0]['cluster'] ?? '';
 	}
 
 	/**
