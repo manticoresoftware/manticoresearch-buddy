@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
 use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseDropHandler;
-use Manticoresearch\Buddy\Base\Plugin\Queue\InternalBuddyClientTrait;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -51,7 +50,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
  *   }>
  */
 final class DropSourceHandler extends BaseDropHandler {
-	use InternalBuddyClientTrait;
 
 	/**
 	 * @param string $tableName
@@ -96,7 +94,7 @@ final class DropSourceHandler extends BaseDropHandler {
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function dropBufferTable(array $sourceRow, Client $client): void {
-		$systemClient = self::getSystemClient($client);
+		$systemClient = $client->getSystemClient();
 		$dropBufferRequest = $systemClient->sendRequest("DROP TABLE IF EXISTS {$sourceRow['buffer_table']}");
 		unset($systemClient);
 		if ($dropBufferRequest->hasError()) {
@@ -108,7 +106,7 @@ final class DropSourceHandler extends BaseDropHandler {
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function suspendSourceViews(string $sourceFullName, Client $client): void {
-		$systemClient = self::getSystemClient($client);
+		$systemClient = $client->getSystemClient();
 		foreach (ResourceTable::list($systemClient, ResourceTable::TABLE_PREFIX_MATERIALIZED_VIEW) as $viewsTable) {
 			$query = /** @lang Manticore */
 				"UPDATE $viewsTable SET suspended=1 WHERE match('@source_name \"$sourceFullName\"')";

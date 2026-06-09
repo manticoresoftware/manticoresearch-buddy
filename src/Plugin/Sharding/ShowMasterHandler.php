@@ -62,6 +62,7 @@ class ShowMasterHandler extends BaseHandlerWithClient {
 				->column('status', Column::String);
 		};
 
-		return Task::create($taskFn, [$this->manticoreClient])->run();
+		// Sharding meta lives in system.* tables that users cannot access
+		return Task::create($taskFn, [$this->manticoreClient->getSystemClient()])->run();
 	}
 }

@@ -14,11 +14,22 @@ The plugin runs only as a fallback when Manticore returns an error for a
 not make plugin runtime requests run as `system.buddy`.
 
 Plugin code that must access internal system tables on behalf of Buddy should
-use the plugin-side system client helper, for example Queue's
-`InternalBuddyClientTrait::getSystemClient()`. That helper clones the current
+use the core `Client::getSystemClient()` helper. It clones the current
 Manticore client and sets the delegated user to `system.buddy`, so internal
-operations such as Queue buffer table reads/writes are executed as Buddy while
-the original user request still keeps its own identity.
+operations such as Queue buffer table reads/writes or sharding metadata
+access are executed as Buddy while the original user request still keeps its
+own identity.
+
+## Explicit Permission Checks
+
+Statements the daemon cannot parse (e.g. cluster-prefixed sharded
+`CREATE TABLE c:t (...) shards=2 rf=2`) skip the daemon-side permission check
+and arrive at Buddy ungated. Plugins handling such statements must gate them
+explicitly via the core `ManticoreSearch\Permissions::isActionAllowed()`,
+which reads the user's permissions through `SHOW PERMISSIONS FOR '<user>'`
+and mirrors the daemon's rule evaluation: the first rule matching the action
+and target (exactly or by `*`/`?` wildcard) decides, and no match means deny.
+An empty user means auth is disabled and everything is allowed.
 
 ## Supported Resources
 

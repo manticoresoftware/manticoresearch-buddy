@@ -23,7 +23,6 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Throwable;
 
 class QueueProcess extends BaseProcessor {
-	use InternalBuddyClientTrait;
 
 	/** @return array{0: callable, 1: int}[]  */
 	public function start(): array {
@@ -45,7 +44,7 @@ class QueueProcess extends BaseProcessor {
 	 * @throws \Exception
 	 */
 	public function runPool(): void {
-		$systemClient = self::getSystemClient($this->client);
+		$systemClient = $this->client->getSystemClient();
 
 		$sourceTables = ResourceTable::list($systemClient, ResourceTable::TABLE_PREFIX_SOURCE);
 		if ($sourceTables === []) {
@@ -156,7 +155,7 @@ class QueueProcess extends BaseProcessor {
 	public function runWorker(array $instance, bool $shouldStart = true): void {
 		Buddy::debugvv('Start worker ' . $instance['full_name']);
 		try {
-			$systemClient = self::getSystemClient($this->client);
+			$systemClient = $this->client->getSystemClient();
 			$kafkaWorker = new KafkaWorker($systemClient, $instance);
 			unset($systemClient);
 			$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
