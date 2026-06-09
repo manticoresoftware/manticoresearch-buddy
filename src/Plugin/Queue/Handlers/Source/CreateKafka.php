@@ -13,7 +13,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
 use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\ViewRecordCreator;
-use Manticoresearch\Buddy\Base\Plugin\Queue\InternalBuddyClientTrait;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
@@ -78,13 +77,12 @@ use PHPSQLParser\PHPSQLParser;
  */
 final class CreateKafka extends BaseCreateSourceHandler {
 	use SqlEscapingTrait;
-	use InternalBuddyClientTrait;
 
 	/**
 	 * @throws ManticoreSearchClientError|\PHPSQLParser\exceptions\UnsupportedFeatureException
 	 */
 	public static function handle(Payload $payload, Client $manticoreClient): TaskResult {
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		$options = self::parseOptions($payload);
 
 		if (!empty($options->partitionList) && $options->numConsumers > 1) {

@@ -34,6 +34,9 @@ final class DescHandler extends BaseHandlerWithClient {
 	public function run(): Task {
 		$taskFn = function (): TaskResult {
 			$table = $this->payload->table;
+			// The DESC on the user-facing table runs as the user, so the daemon
+			// enforces read permission; the physical shards are system.* tables,
+			// so their introspection runs as system.buddy.
 			// TODO: think about the way to refactor it and remove duplication
 			$q = "DESC {$table} OPTION force=1";
 			$resp = $this->manticoreClient->sendRequest($q);
@@ -46,7 +49,7 @@ final class DescHandler extends BaseHandlerWithClient {
 			}
 
 			$q = $this->buildShardQuery($shard);
-			$resp = $this->manticoreClient->sendRequest($q);
+			$resp = $this->manticoreClient->getSystemClient()->sendRequest($q);
 			return TaskResult::fromResponse($resp);
 		};
 		$task = Task::create($taskFn, []);
@@ -89,7 +92,7 @@ final class DescHandler extends BaseHandlerWithClient {
 	 * @return string|null
 	 */
 	private function findShardFromAgent(array $data): ?string {
-		$currentNode = Node::findId($this->manticoreClient);
+		$currentNode = Node::findId($this->manticoreClient->getSystemClient());
 		foreach ($data as $row) {
 			if ($row['Type'] === 'local') {
 				continue;

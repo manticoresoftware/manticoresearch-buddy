@@ -67,7 +67,7 @@ final class Processor extends BaseProcessor {
 		// deadlocks forever.
 		if ($operator->getQueue()->hasPending($operator->node)
 			&& !$operator->hasInFlightRebalance()
-			&& !Cluster::areAllShardingClustersPrimary($this->client)
+			&& !Cluster::areAllShardingClustersPrimary($this->client->getSystemClient())
 		) {
 			return false;
 		}
@@ -132,7 +132,9 @@ final class Processor extends BaseProcessor {
 	 */
 	protected function getOperator(): Operator {
 		if (!isset($this->operator)) {
-			$this->operator = new Operator($this->client, '');
+			// Background sharding work has no requesting user and operates on
+			// system.* tables, so it runs as the trusted Buddy user
+			$this->operator = new Operator($this->client->getSystemClient(), '');
 		}
 		return $this->operator;
 	}

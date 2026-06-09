@@ -90,7 +90,8 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 				->column('rf_status', Column::String);
 		};
 
-		return Task::create($taskFn, [$this->manticoreClient, $this->payload])->run();
+		// Sharding meta lives in system.* tables that users cannot access
+		return Task::create($taskFn, [$this->manticoreClient->getSystemClient(), $this->payload])->run();
 	}
 
 	/**
