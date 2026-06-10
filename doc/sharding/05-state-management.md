@@ -32,13 +32,22 @@ CREATE TABLE system.sharding_state (
 The system uses table-specific keys to track rebalancing operations:
 
 ```php
-// State key format
+// Core rebalance status
 $rebalanceKey = "rebalance:{$tableName}";
 
+// Operation group identifier — kept for the lifetime of the rebalance
+// (NOT deleted after queuing; used by new masters to detect incomplete rebalances)
+$groupKey = "rebalance_group:{$tableName}";
+
+// Commit flag — set after master finishes queuing ALL rebalance items.
+// Queue items are not processed until this key exists.
+// Cleared on rebalance completion or failure.
+$committedKey = "rebalance_committed:{$tableName}";
+
 // Examples
-"rebalance:users"     // For users table
-"rebalance:products"  // For products table
-"rebalance:logs"      // For logs table
+"rebalance:users"            // Status: idle | running | completed | failed
+"rebalance_group:users"      // Operation group ID for current rebalance
+"rebalance_committed:users"  // Present = group is committed and safe to execute
 ```
 
 ### State Values and Transitions
@@ -407,6 +416,38 @@ private function isMasterNode(): bool {
     $currentNode = Node::findId($this->client);
 
     return $masterNode === $currentNode;
+}
+```
+
+### Uncommitted Rebalance Cleanup on Master Takeover
+
+When a new master takes over (e.g., previous master died mid-queuing), it must detect and purge any operation groups that were never committed. A group is considered uncommitted if `rebalance_group:{table}` exists but `rebalance_committed:{table}` does not.
+
+```php
+/**
+ * Called during becomeMaster(). Finds operation groups without a matching
+ * committed flag and purges their queue items.
+ */
+protected function cleanupUncommittedRebalances(): void {
+    $state = new State($this->client);
+    $groups = $state->listRegex('rebalance_group:.*');
+
+    foreach ($groups as $item) {
+        $table = substr($item['key'], strlen('rebalance_group:'));
+        $committed = $state->get("rebalance_committed:{$table}");
+
+        if (!$committed) {
+            // Group was never committed — previous master died mid-queuing
+            $queue = new Queue($this->client);
+            $queue->purgeOperationGroup($item['value']);
+
+            // Clean up the orphaned group key
+            $state->set("rebalance_group:{$table}", null);
+            $state->set("rebalance:{$table}", 'failed');
+
+            Buddy::debugvv("Cleaned up uncommitted rebalance group for table {$table}");
+        }
+    }
 }
 ```
 

@@ -111,6 +111,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError|GenericError
 	 */
 	private static function knnHttpQuery(Client $manticoreClient, Payload $payload, string $queryVector): Response {
+		$requestedSize = $payload->size ?? 20;
 		$query = [
 			'table' => $payload->table,
 			'knn' => [
@@ -122,8 +123,12 @@ final class Handler extends BaseHandlerWithClient {
 					}, explode(',', $queryVector)
 				),
 			],
-			'size' => ($payload->size ?? 20) + 1,
+			'size' => $requestedSize + $payload->offset + 1,
 		];
+
+		if ($payload->maxMatches !== null) {
+			$query['max_matches'] = $payload->maxMatches + 1;
+		}
 
 		if ($payload->select !== []) {
 			$query['_source'] = $payload->select;
@@ -153,6 +158,8 @@ final class Handler extends BaseHandlerWithClient {
 
 			$hits[] = $v;
 		}
+
+		$hits = array_slice($hits, $payload->offset, $requestedSize);
 		$result['hits']['hits'] = $hits;
 		if ($removed > 0 && isset($result['hits']['total'])) {
 			$result['hits']['total'] -= $removed;

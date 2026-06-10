@@ -28,8 +28,8 @@ final class Payload extends BasePayload
 	public ?string $k = null;
 	public ?string $docId = null;
 
-	/** @var array<string> $select */
-	public array $select = [];
+	/** @var array<string>|array{excludes:array<string>}|false $select */
+	public array|bool $select = [];
 
 	/** @var ?string $table */
 	public ?string $table = null;
@@ -39,6 +39,8 @@ final class Payload extends BasePayload
 
 	public Endpoint $endpointBundle;
 	public ?int $size = null;
+	public int $offset = 0;
+	public ?int $maxMatches = null;
 
 	/**
 	 * Get description for this plugin
@@ -92,6 +94,10 @@ final class Payload extends BasePayload
 		$payload->size = isset($parsedPayload['size'])
 				? (int)$parsedPayload['size']
 				: (isset($parsedPayload['limit']) ? (int)$parsedPayload['limit'] : null);
+		$payload->offset = isset($parsedPayload['from'])
+				? (int)$parsedPayload['from']
+				: (isset($parsedPayload['offset']) ? (int)$parsedPayload['offset'] : 0);
+		$payload->maxMatches = isset($parsedPayload['max_matches']) ? (int)$parsedPayload['max_matches'] : null;
 	}
 
 	/**
