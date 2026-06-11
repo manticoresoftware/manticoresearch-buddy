@@ -20,8 +20,6 @@ trait EntityAliasTrait {
 	use QueryMapLoaderTrait;
 	use KibanaVersionTrait;
 
-	protected static string $defaulAliasTable = '_aliases';
-
 	/**
 	 *
 	 * @param string $index
@@ -37,7 +35,7 @@ trait EntityAliasTrait {
 		?string $aliasTable = null
 	): void {
 		if (!isset($aliasTable)) {
-			$aliasTable = self::$defaulAliasTable;
+			$aliasTable = parent::ALIAS_TABLE;
 		}
 		$query = "CREATE TABLE IF NOT EXISTS $aliasTable (index text, alias text) min_infix_len='2'";
 		$manticoreClient->sendRequest($query);
@@ -68,14 +66,14 @@ trait EntityAliasTrait {
 	 * @return array<mixed>
 	 */
 	protected static function getAliasData(HTTPClient $manticoreClient, string $query): array {
-		$showQuery = "SHOW TABLES LIKE '" . self::$defaulAliasTable . "'";
+		$showQuery = "SHOW TABLES LIKE '" . parent::ALIAS_TABLE . "'";
 		/** @var array{0?:array{data?:array<mixed>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($showQuery)->getResult();
 		if (!isset($queryResult[0])) {
 			return [];
 		}
 
-		$query = 'SELECT index, alias FROM ' . self::$defaulAliasTable . " WHERE MATCH('{$query}')";
+		$query = 'SELECT index, alias FROM ' . parent::ALIAS_TABLE . " WHERE MATCH('{$query}')";
 		/** @var array{0:array{data?:array<array{index:string,alias:string}>}} $queryResult */
 		$queryResult = $manticoreClient->sendRequest($query)->getResult();
 		if (!isset($queryResult[0]['data']) || !$queryResult[0]['data']) {

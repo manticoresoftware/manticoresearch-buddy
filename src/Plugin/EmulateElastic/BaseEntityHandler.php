@@ -16,8 +16,9 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 
 abstract class BaseEntityHandler extends BaseHandlerWithClient {
 
-	const ALIAS_TABLE = '_aliases';
-	const ENTITY_TABLE = '_kibana_entities';
+	const ALIAS_TABLE = 'system.kibana_aliases';
+	const ENTITY_TABLE = 'system.kibana_entities';
+	const TEMPLATE_TABLE = 'system.kibana_templates';
 
 	/**
 	 *  Initialize the executor

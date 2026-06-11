@@ -47,9 +47,10 @@ class CatHandler extends BaseHandlerWithClient {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			$pathParts = explode('/', $payload->path);
 			self::checkRequestValidity($pathParts);
-			$entityTable = "_{$pathParts[1]}";
+			$catEntity = $pathParts[1];
+			$entityTable = self::getCatEntityTable($catEntity);
 
-			if (in_array($pathParts[1], self::CAT_ENTITIES)) {
+			if (in_array($catEntity, self::CAT_ENTITIES)) {
 				if (!isset($pathParts[2])) {
 					$queryMapName = 'Plugins';
 					self::initQueryMap($queryMapName);
@@ -59,7 +60,7 @@ class CatHandler extends BaseHandlerWithClient {
 
 					return TaskResult::raw($catInfo);
 				}
-				if ($pathParts[1] === 'indices') {
+				if ($catEntity === 'indices') {
 					return TaskResult::raw(
 						self::buildCatIndicesInfo($manticoreClient, $pathParts[2])
 					);
@@ -76,8 +77,8 @@ class CatHandler extends BaseHandlerWithClient {
 
 			$catInfo = [];
 			foreach ($queryResult[0]['data'] as $entityInfo) {
-				$catInfo[] = match ($entityTable) {
-					'_templates' => self::buildCatTemplateRow($entityInfo),
+				$catInfo[] = match ($catEntity) {
+					'templates' => self::buildCatTemplateRow($entityInfo),
 					default => []
 				};
 			}
@@ -88,6 +89,17 @@ class CatHandler extends BaseHandlerWithClient {
 		return Task::create(
 			$taskFn, [$this->payload, $this->manticoreClient]
 		)->run();
+	}
+
+	/**
+	 * @param string $catEntity
+	 * @return string
+	 */
+	private static function getCatEntityTable(string $catEntity): string {
+		return match ($catEntity) {
+			'templates' => BaseEntityHandler::TEMPLATE_TABLE,
+			default => "_{$catEntity}",
+		};
 	}
 
 	/**
