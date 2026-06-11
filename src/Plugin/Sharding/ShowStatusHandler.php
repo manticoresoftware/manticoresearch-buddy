@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Ds\Set;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Permissions;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -38,7 +39,11 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 	 * @throws RuntimeException
 	 */
 	public function run(): Task {
-		$taskFn = static function (Client $client, Payload $payload): TaskResult {
+		$taskFn = static function (Client $userClient, Client $client, Payload $payload): TaskResult {
+			// The daemon filters SHOW TABLES by the requesting user's grants,
+			// so only sharded tables the user can access are reported
+			$visibleTables = Permissions::getAccessibleTables($userClient);
+
 			// Fetch raw rows from the sharding state table
 			$where = static::buildWhere($payload->cluster, $payload->table);
 			$sql = 'SELECT * FROM system.sharding_table' . ($where ? " WHERE {$where}" : '');
@@ -46,6 +51,9 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 			/** @var array{0?:array{data?:array<array{node:string,shards:string,cluster:string,table:string}>}} $res */
 			$res = $client->sendRequest($sql)->getResult();
 			$rawRows = $res[0]['data'] ?? [];
+			$rawRows = array_values(
+				array_filter($rawRows, static fn ($row) => isset($visibleTables[$row['table']]))
+			);
 
 			$pendingByNode = static::getPendingShardsByNode($client);
 
@@ -90,8 +98,12 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 				->column('rf_status', Column::String);
 		};
 
-		// Sharding meta lives in system.* tables that users cannot access
-		return Task::create($taskFn, [$this->manticoreClient->getSystemClient(), $this->payload])->run();
+		// Sharding meta lives in system.* tables that users cannot access:
+		// the user client is only used for the daemon-filtered visibility probe
+		return Task::create(
+			$taskFn,
+			[$this->manticoreClient, $this->manticoreClient->getSystemClient(), $this->payload]
+		)->run();
 	}
 
 	/**
