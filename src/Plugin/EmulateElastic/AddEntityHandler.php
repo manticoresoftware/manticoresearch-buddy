@@ -61,9 +61,10 @@ class AddEntityHandler extends BaseEntityHandler {
 		string $entityIndexAlias,
 		HTTPClient $manticoreClient
 	): void {
+		$systemClient = self::getSystemClient($manticoreClient);
 		$query = 'CREATE TABLE IF NOT EXISTS ' . parent::ENTITY_TABLE
 			. ' (_id string, _index string, _index_alias string, _type string, _source json)';
-		$manticoreClient->sendRequest($query);
+		$systemClient->sendRequest($query);
 		$updatedSource = str_replace('\\"', '\\\\"', $entitySource);
 		$query = 'INSERT INTO ' . parent::ENTITY_TABLE . '(_id, _index, _index_alias,  _type, _source) '
 			. "VALUES('{$entityId}', '{$entityIndex}', '{$entityIndexAlias}', '{$entityType}', '{$updatedSource}')";

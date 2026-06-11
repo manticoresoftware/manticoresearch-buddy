@@ -23,6 +23,7 @@ use RuntimeException;
  */
 class CatHandler extends BaseHandlerWithClient {
 
+	use InternalBuddyClientTrait;
 	use Traits\KibanaVersionTrait;
 	use Traits\QueryMapLoaderTrait;
 
@@ -70,7 +71,10 @@ class CatHandler extends BaseHandlerWithClient {
 			$entityNamePattern = $pathParts[2];
 			$query = "SELECT * FROM {$entityTable} WHERE MATCH('{$entityNamePattern}')";
 			/** @var array{0:array{data?:array<array{name:string,patterns:string,content:string}>}} $queryResult */
-			$queryResult = $manticoreClient->sendRequest($query)->getResult();
+			$requestClient = $catEntity === 'templates'
+				? self::getSystemClient($manticoreClient)
+				: $manticoreClient;
+			$queryResult = $requestClient->sendRequest($query)->getResult();
 			if (!isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
 				return TaskResult::raw([]);
 			}
