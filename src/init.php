@@ -114,4 +114,10 @@ Pluggable::setContainer($container);
 Pluggable::setCorePlugins($plugins);
 MetricThread::setContainer($container);
 
+// Warm the system client on the prototype: request clones copy the memoized
+// reference, so the whole process shares one SystemClient and its pool
+/** @var HTTPClient $manticoreClient */
+$manticoreClient = $container->get('manticoreClient');
+$manticoreClient->getSystemClient();
+
 return $container;

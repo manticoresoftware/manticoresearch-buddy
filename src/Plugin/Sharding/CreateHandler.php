@@ -11,9 +11,9 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Closure;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Permissions;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -135,10 +135,10 @@ final class CreateHandler extends BaseHandlerWithClient {
 	/**
 	 * Validate that the requested cluster exists and has enough nodes
 	 * for the requested replication factor
-	 * @param Client $systemClient
+	 * @param SystemClient $systemClient
 	 * @return ?Task
 	 */
-	protected function validateClusterAndRf(Client $systemClient): ?Task {
+	protected function validateClusterAndRf(SystemClient $systemClient): ?Task {
 		$nodeCount = 1;
 		// Check that cluster exists
 		if ($this->payload->cluster) {
@@ -177,10 +177,10 @@ final class CreateHandler extends BaseHandlerWithClient {
 	 * clusters with md5-hash names, which we filter out here — only the
 	 * cluster that contains system.sharding_table is reported.
 	 *
-	 * @param Client $client
+	 * @param SystemClient $client
 	 * @return string
 	 */
-	protected function getJoinedClusterName(Client $client): string {
+	protected function getJoinedClusterName(SystemClient $client): string {
 		/** @var array{0?:array{data?:array<array{Counter:string,Value:string}>}} $res */
 		$res = $client
 			->sendRequest("SHOW STATUS LIKE 'cluster_%_indexes'")
@@ -215,7 +215,7 @@ final class CreateHandler extends BaseHandlerWithClient {
 	 * @return Closure
 	 */
 	protected static function getShardingFn(): Closure {
-		return static function (Payload $payload, Client $client): TaskResult {
+		return static function (Payload $payload, SystemClient $client): TaskResult {
 			$ts = time();
 			$value = [];
 			$timeout = $payload->getShardingTimeout();

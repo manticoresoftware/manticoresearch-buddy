@@ -155,9 +155,9 @@ class QueueProcess extends BaseProcessor {
 	public function runWorker(array $instance, bool $shouldStart = true): void {
 		Buddy::debugvv('Start worker ' . $instance['full_name']);
 		try {
-			$systemClient = $this->client->getSystemClient();
-			$kafkaWorker = new KafkaWorker($systemClient, $instance);
-			unset($systemClient);
+			// The worker runs in a forked process: hand it a cloned client with a
+			// fresh connection pool so parent and child never share sockets
+			$kafkaWorker = new KafkaWorker(clone $this->client->getSystemClient(), $instance);
 			$worker = Process::createWorker($kafkaWorker, $instance['full_name']);
 			// Add worker to the pool and automatically start it
 			$this->process->addWorker($worker, $shouldStart);

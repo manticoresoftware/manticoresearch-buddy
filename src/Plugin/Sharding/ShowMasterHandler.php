@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Permissions;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -37,7 +38,7 @@ class ShowMasterHandler extends BaseHandlerWithClient {
 	 * @throws RuntimeException
 	 */
 	public function run(): Task {
-		$taskFn = static function (Client $userClient, Client $client): TaskResult {
+		$taskFn = static function (Client $userClient, SystemClient $client): TaskResult {
 			$emptyResult = TaskResult::withData([])
 				->column('node', Column::String)
 				->column('status', Column::String);
