@@ -87,12 +87,10 @@ final class CreateHandler extends BaseHandlerWithClient {
 
 		// All sharding work is async and runs as system.buddy, so the daemon
 		// cannot enforce the user's permissions later: gate here, before any
-		// state is touched or anything is enqueued.
+		// state is touched or anything is enqueued. The probe runs on the
+		// user-delegated client, so the daemon itself evaluates the rules.
 		$systemClient = $this->manticoreClient->getSystemClient();
-		$isAllowed = Permissions::isActionAllowed(
-			$systemClient, $this->payload->user, Permissions::ACTION_SCHEMA, $this->payload->table
-		);
-		if (!$isAllowed) {
+		if (!Permissions::hasSchemaAccess($this->manticoreClient, $this->payload->table)) {
 			return static::getErrorTask(
 				"Permission denied for user '{$this->payload->user}': "
 				. "requires schema permission on table '{$this->payload->table}'"

@@ -25,11 +25,19 @@ own identity.
 Statements the daemon cannot parse (e.g. cluster-prefixed sharded
 `CREATE TABLE c:t (...) shards=2 rf=2`) skip the daemon-side permission check
 and arrive at Buddy ungated. Plugins handling such statements must gate them
-explicitly via the core `ManticoreSearch\Permissions::isActionAllowed()`,
-which reads the user's permissions through `SHOW PERMISSIONS FOR '<user>'`
-and mirrors the daemon's rule evaluation: the first rule matching the action
-and target (exactly or by `*`/`?` wildcard) decides, and no match means deny.
-An empty user means auth is disabled and everything is allowed.
+explicitly via the core `ManticoreSearch\Permissions` helpers, which delegate
+all rule evaluation to the daemon:
+
+- `hasSchemaAccess($userClient, $table)` — probes the daemon with a bare
+  `ALTER TABLE t` (an option-less no-op) on the user-delegated client. The
+  daemon checks permissions before table existence, so "permission denied"
+  means no access, while success or any other error means the permission
+  check has already passed.
+- `getAccessibleTables($userClient)` — runs `SHOW TABLES`, which the daemon
+  filters by the user's grants; use it to filter listings.
+
+With auth disabled there is no delegated user, the probes run as Buddy
+itself, and everything is allowed.
 
 ## Supported Resources
 

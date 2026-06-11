@@ -75,11 +75,9 @@ final class DropHandler extends BaseHandlerWithClient {
 	protected function validate(): ?Task {
 		// The actual drop is async and runs as system.buddy, so the daemon
 		// cannot enforce the user's permissions later: gate here, before any
-		// state is touched or anything is enqueued.
-		$isAllowed = Permissions::isActionAllowed(
-			$this->systemClient, $this->payload->user, Permissions::ACTION_SCHEMA, $this->payload->table
-		);
-		if (!$isAllowed) {
+		// state is touched or anything is enqueued. The probe runs on the
+		// user-delegated client, so the daemon itself evaluates the rules.
+		if (!Permissions::hasSchemaAccess($this->manticoreClient, $this->payload->table)) {
 			return $this->getErrorTask(
 				"Permission denied for user '{$this->payload->user}': "
 				. "requires schema permission on table '{$this->payload->table}'"
