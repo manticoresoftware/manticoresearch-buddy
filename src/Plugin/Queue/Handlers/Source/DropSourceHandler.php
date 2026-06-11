@@ -94,9 +94,8 @@ final class DropSourceHandler extends BaseDropHandler {
 	 * @throws ManticoreSearchClientError
 	 */
 	private static function dropBufferTable(array $sourceRow, Client $client): void {
-		$systemClient = $client->getSystemClient();
-		$dropBufferRequest = $systemClient->sendRequest("DROP TABLE IF EXISTS {$sourceRow['buffer_table']}");
-		unset($systemClient);
+		$dropBufferRequest = $client->getSystemClient()
+			->sendRequest("DROP TABLE IF EXISTS {$sourceRow['buffer_table']}");
 		if ($dropBufferRequest->hasError()) {
 			throw ManticoreSearchClientError::create((string)$dropBufferRequest->getError());
 		}

@@ -12,9 +12,9 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Closure;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Permissions;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -22,8 +22,8 @@ use RuntimeException;
 use Swoole\Coroutine;
 
 final class DropHandler extends BaseHandlerWithClient {
-	/** Client that runs internal sharding meta queries as system.buddy */
-	private Client $systemClient;
+	/** Privileged client for internal sharding meta queries */
+	private SystemClient $systemClient;
 
 	/**
 	 * Initialize the executor

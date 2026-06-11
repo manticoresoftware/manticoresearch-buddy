@@ -14,11 +14,12 @@ The plugin runs only as a fallback when Manticore returns an error for a
 not make plugin runtime requests run as `system.buddy`.
 
 Plugin code that must access internal system tables on behalf of Buddy should
-use the core `Client::getSystemClient()` helper. It clones the current
-Manticore client and sets the delegated user to `system.buddy`, so internal
-operations such as Queue buffer table reads/writes or sharding metadata
-access are executed as Buddy while the original user request still keeps its
-own identity.
+use the core `Client::getSystemClient()` helper. It returns a memoized
+`SystemClient` — a client permanently bound to the `system.buddy` identity —
+so internal operations such as Queue buffer table reads/writes or sharding
+metadata access are executed as Buddy while the original user request still
+keeps its own identity. A `SystemClient` cannot be re-delegated: calling
+`setDelegatedUser()` on it throws.
 
 ## Explicit Permission Checks
 
