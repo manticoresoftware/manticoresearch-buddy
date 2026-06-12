@@ -12,7 +12,9 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Closure;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Permissions;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -20,6 +22,9 @@ use RuntimeException;
 use Swoole\Coroutine;
 
 final class DropHandler extends BaseHandlerWithClient {
+	/** Privileged client for internal sharding meta queries */
+	private SystemClient $systemClient;
+
 	/**
 	 * Initialize the executor
 	 *
@@ -36,6 +41,7 @@ final class DropHandler extends BaseHandlerWithClient {
 	 * @throws RuntimeException
 	 */
 	public function run(): Task {
+		$this->systemClient = $this->manticoreClient->getSystemClient();
 		$task = $this->validate();
 		if ($task) {
 			return $task;
@@ -67,9 +73,20 @@ final class DropHandler extends BaseHandlerWithClient {
 	 * @return ?Task
 	 */
 	protected function validate(): ?Task {
+		// The actual drop is async and runs as system.buddy, so the daemon
+		// cannot enforce the user's permissions later: gate here, before any
+		// state is touched or anything is enqueued. The probe runs on the
+		// user-delegated client, so the daemon itself evaluates the rules.
+		if (!Permissions::hasSchemaAccess($this->manticoreClient, $this->payload->table)) {
+			return $this->getErrorTask(
+				"Permission denied for user '{$this->payload->user}': "
+				. "requires schema permission on table '{$this->payload->table}'"
+			);
+		}
+
 		// Try to validate that we do not create the same table we have
 		$q = "SHOW CREATE TABLE {$this->payload->table} OPTION force=1";
-		$resp = $this->manticoreClient->sendRequest($q);
+		$resp = $this->systemClient->sendRequest($q);
 		/**
 		 * @var array{
 		 *  0: array{
@@ -165,7 +182,7 @@ final class DropHandler extends BaseHandlerWithClient {
 	 */
 	protected function checkClusterFullyReachable(string $cluster): ?string {
 		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
-		$res = $this->manticoreClient
+		$res = $this->systemClient
 			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_status'")
 			->getResult();
 		$status = $res[0]['data'][0]['Value'] ?? '';
@@ -175,7 +192,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		}
 
 		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
-		$res = $this->manticoreClient
+		$res = $this->systemClient
 			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_node_state'")
 			->getResult();
 		$nodeState = $res[0]['data'][0]['Value'] ?? '';
@@ -186,7 +203,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		}
 
 		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
-		$res = $this->manticoreClient
+		$res = $this->systemClient
 			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_nodes_set'")
 			->getResult();
 		$nodesSet = $res[0]['data'][0]['Value'] ?? '';
@@ -196,7 +213,7 @@ final class DropHandler extends BaseHandlerWithClient {
 		$expected = sizeof(array_filter(array_map('trim', explode(',', $nodesSet))));
 
 		/** @var array{0:array{data?:array<array{Counter:string,Value:string}>}} $res */
-		$res = $this->manticoreClient
+		$res = $this->systemClient
 			->sendRequest("SHOW STATUS LIKE 'cluster_{$cluster}_size'")
 			->getResult();
 		$size = (int)($res[0]['data'][0]['Value'] ?? 0);
@@ -218,7 +235,7 @@ final class DropHandler extends BaseHandlerWithClient {
 	 */
 	protected function getTableCluster(string $table): string {
 		$q = "SELECT cluster FROM system.sharding_table WHERE `table` = '{$table}' LIMIT 1";
-		$resp = $this->manticoreClient->sendRequest($q);
+		$resp = $this->systemClient->sendRequest($q);
 		/** @var array{0:array{data?:array{0:array{cluster:string}}}} $result */
 		$result = $resp->getResult();
 		return $result[0]['data'][0]['cluster'] ?? '';
@@ -233,7 +250,7 @@ final class DropHandler extends BaseHandlerWithClient {
 	protected function getTableState(string $table): array {
 		// TODO: think about the way to refactor it and remove duplication
 		$q = "select value[0] as value from system.sharding_state where `key` = 'table:{$table}'";
-		$resp = $this->manticoreClient->sendRequest($q);
+		$resp = $this->systemClient->sendRequest($q);
 
 		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
 		$result = $resp->getResult();

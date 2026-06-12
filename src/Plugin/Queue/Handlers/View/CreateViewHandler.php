@@ -11,22 +11,15 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
-use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
-use Manticoresearch\Buddy\Core\Tool\Buddy;
-use PHPSQLParser\PHPSQLCreator;
-use PHPSQLParser\exceptions\UnsupportedFeatureException;
 
 final class CreateViewHandler extends BaseHandlerWithClient {
-	use SqlEscapingTrait;
-
-
 	/**
 	 * Initialize the executor
 	 *
@@ -110,11 +103,10 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 
 		/**
 		 * @return TaskResult
-		 * @throws ManticoreSearchClientError|GenericError|UnsupportedFeatureException
+		 * @throws ManticoreSearchClientError|GenericError
 		 */
 		$taskFn = function (): TaskResult {
 			$payload = $this->payload;
-
 
 			$parsedPayload = $payload->model->getPayload();
 
@@ -122,7 +114,6 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 			 * @var string $tableName
 			 */
 			$tableName = $parsedPayload['FROM'][0]['table'];
-			$manticoreClient = $this->manticoreClient;
 			$sourceName = strtolower($tableName);
 			$viewName = strtolower($parsedPayload['VIEW']['no_quotes']['parts'][0]);
 			$destinationTableName = strtolower($parsedPayload['VIEW']['to']['no_quotes']['parts'][0]);
@@ -132,33 +123,36 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 			}
 
 
-			self::checkAndCreateViews($manticoreClient);
-			self::checkViewName($viewName, $manticoreClient);
+			$this->checkViewName($viewName);
 
-			if (!self::checkDestinationTable($destinationTableName, $manticoreClient)) {
+			if (!$this->manticoreClient->hasTable($destinationTableName)) {
 				return TaskResult::withError('Destination table non exist');
 			}
 
 
 			$sql = /** @lang ManticoreSearch */
-				'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
-				" WHERE name='$sourceName'";
+				'SELECT * FROM ' . ResourceTable::name(ResourceTable::RESOURCE_SOURCE, $sourceName);
 
-			$result = $manticoreClient->sendRequest($sql)->getResult();
+			$result = $this->manticoreClient->sendRequest($sql)->getResult();
 
 			if (is_array($result[0]) && empty($result[0]['data'])) {
 				throw ManticoreSearchClientError::create('Chosen source not exist');
 			}
+
+			$this->createViewsTable($viewName);
 
 			unset($parsedPayload['CREATE'], $parsedPayload['VIEW']);
 			/** @var array{data:array<int,array<string,string>>} $resultStruct */
 			$resultStruct = $result[0];
 			$sourceRecords = $resultStruct['data'];
 
-			$newViews = self::createViewRecords(
-				$manticoreClient, $viewName, $parsedPayload,
-				$sourceName, $payload->originQuery,
-				$destinationTableName, sizeof($sourceRecords)
+			$newViews = (new ViewRecordCreator($this->manticoreClient))->create(
+				$viewName,
+				$parsedPayload,
+				$sourceName,
+				$payload->originQuery,
+				$destinationTableName,
+				sizeof($sourceRecords)
 			);
 
 			foreach ($sourceRecords as $source) {
@@ -175,114 +169,31 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @param Client $client
-	 * @param string $viewName
-	 * @param array<string, array<int, array<array<string, mixed>>>|string> $parsedQuery
-	 * @param string $sourceName
-	 * @param string $originalQuery
-	 * @param string $destinationTableName
-	 * @param int $iterations
-	 * @param int $startFrom
-	 * @param int $suspended
-	 *
-	 * @return array<string, array<string, string>>
-	 * @throws ManticoreSearchClientError
-	 * @throws UnsupportedFeatureException|GenericError
-	 */
-	public static function createViewRecords(
-		Client $client,
-		string $viewName,
-		array  $parsedQuery,
-		string $sourceName,
-		string $originalQuery,
-		string $destinationTableName,
-		int    $iterations,
-		int    $startFrom = 0,
-		int    $suspended = 0
-	): array {
-
-		$results = [];
-
-		for ($i = $startFrom; $i < $iterations; $i++) {
-			$bufferTableName = Payload::BUFFER_TABLE_PREFIX.$sourceName."_$i";
-			$sourceFullName = "{$sourceName}_$i";
-
-			$parsedQuery['FROM'][0]['table'] = $bufferTableName;
-			$parsedQuery['FROM'][0]['no_quotes']['parts'] = [$bufferTableName];
-			$parsedQuery['FROM'][0]['base_expr'] = $bufferTableName;
-
-			$query = '';
-			try {
-				$query = (new PHPSQLCreator())->create($parsedQuery);
-			} catch (\Exception $exception) {
-				$message = "Can\'t compile SELECT query from ".json_encode($parsedQuery);
-				Buddy::debugvv($message);
-				Buddy::debugvv($exception->getMessage());
-				GenericError::throw($message);
-			}
-
-			$escapedQuery = self::escapeSqlString($query);
-			$escapedOriginalQuery = self::escapeSqlString($originalQuery);
-
-			$sql = /** @lang ManticoreSearch */
-				'INSERT INTO ' . Payload::VIEWS_TABLE_NAME .
-				'(id, name, source_name, destination_name, query, original_query, suspended) VALUES ' .
-				"(0,'$viewName','$sourceFullName', '$destinationTableName'," .
-				"'$escapedQuery','$escapedOriginalQuery', $suspended)";
-
-			$response = $client->sendRequest($sql);
-			if ($response->hasError()) {
-				throw ManticoreSearchClientError::create((string)$response->getError());
-			}
-
-			$results[$sourceFullName]['destination_name'] = $destinationTableName;
-			$results[$sourceFullName]['query'] = $query;
-		}
-
-		return $results;
-	}
-
-	/**
-	 * @param string $viewName
-	 * @param Client $manticoreClient
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	public static function checkViewName(string $viewName, Client $manticoreClient): void {
-		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . Payload::VIEWS_TABLE_NAME . " WHERE match('@name \"" . $viewName . "\"')";
-
-		$record = $manticoreClient->sendRequest($sql)->getResult();
-		if (is_array($record[0]) && $record[0]['total']) {
+	private function checkViewName(string $viewName): void {
+		if ($this->manticoreClient->hasTable(
+			ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $viewName)
+		)) {
 			throw ManticoreSearchClientError::create("View $viewName already exist");
 		}
 	}
 
 	/**
-	 * @param string $tableName
-	 * @param Client $manticoreClient
-	 * @return bool
-	 */
-	public static function checkDestinationTable(string $tableName, Client $manticoreClient): bool {
-		return $manticoreClient->hasTable($tableName);
-	}
-
-	/**
-	 * @param Client $manticoreClient
+	 * @param string $viewName
+	 *
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	public static function checkAndCreateViews(Client $manticoreClient): void {
-		if ($manticoreClient->hasTable(Payload::VIEWS_TABLE_NAME)) {
-			return;
-		}
-
+	private function createViewsTable(string $viewName): void {
+		$tableName = ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $viewName);
 		$sql = /** @lang ManticoreSearch */
-			'CREATE TABLE ' . Payload::VIEWS_TABLE_NAME .
+			'CREATE TABLE ' . $tableName .
 			' (id bigint, name text attribute indexed, source_name text, destination_name text, ' .
 			'query text, original_query text, suspended bool)';
 
-		$request = $manticoreClient->sendRequest($sql);
+		$request = $this->manticoreClient->sendRequest($sql);
 		if ($request->hasError()) {
 			throw ManticoreSearchClientError::create((string)$request->getError());
 		}

@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
 
 use JsonException;
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
@@ -63,12 +64,8 @@ final class Handler extends BaseHandlerWithClient {
 			// Initialize components with the client
 			$modelManager = new ModelManager();
 			$provider = $injectedProvider ?? new LlmProvider();
-			$conversationManager = new ConversationManager($client);
 			$conversationRouter = new ConversationRouter();
 			$searchEngine = new SearchEngine($client);
-
-			// Ensure database tables exist
-			self::initializeTables($modelManager, $conversationManager, $client);
 
 			// Route to appropriate handler based on action
 			return match ($payload->action) {
@@ -78,32 +75,13 @@ final class Handler extends BaseHandlerWithClient {
 				Payload::ACTION_DROP_MODEL => self::dropModel($payload, $modelManager, $client),
 				Payload::ACTION_CONVERSATION => self::handleConversation(
 					$payload, $modelManager, $provider,
-					$conversationManager, $conversationRouter, $searchEngine, $client
+					$conversationRouter, $searchEngine, $client
 				),
 				default => throw QueryParseError::create("Unknown action: $payload->action")
 			};
 		};
 
 		return Task::create($taskFn, [$this->payload, $this->manticoreClient, $this->llmProvider])->run();
-	}
-
-	/**
-	 * Initialize database tables if they don't exist
-	 *
-	 * @param ModelManager $modelManager
-	 * @param ConversationManager $conversationManager
-	 * @param Client $client
-	 *
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	private static function initializeTables(
-		ModelManager $modelManager,
-		ConversationManager $conversationManager,
-		Client $client
-	): void {
-		$modelManager->initializeTables($client);
-		$conversationManager->initializeTable($client);
 	}
 
 	/**
@@ -116,7 +94,6 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return TaskResult
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError|QueryParseError
-	 * @throws RandomException
 	 */
 	private static function createModel(
 		Payload $payload,
@@ -131,10 +108,10 @@ final class Handler extends BaseHandlerWithClient {
 		$createConfig = (new ModelConfigValidator())->validate($config);
 
 		// Create model
-		$uuid = $modelManager->createModel($client, $createConfig);
+		$modelName = $modelManager->createModel($client, $createConfig);
 
-		return TaskResult::withRow(['uuid' => $uuid])
-			->column('uuid', Column::String);
+		return TaskResult::withRow(['name' => $modelName])
+			->column('name', Column::String);
 	}
 
 	/**
@@ -153,7 +130,6 @@ final class Handler extends BaseHandlerWithClient {
 		$data = [];
 		foreach ($models as $model) {
 			$data[] = [
-				'uuid' => $model['uuid'],
 				'name' => $model['name'],
 				'model' => $model['model'],
 				'created_at' => $model['created_at'],
@@ -161,7 +137,6 @@ final class Handler extends BaseHandlerWithClient {
 		}
 
 		return TaskResult::withData($data)
-			->column('uuid', Column::String)
 			->column('name', Column::String)
 			->column('model', Column::String)
 			->column('created_at', Column::Long);
@@ -178,8 +153,13 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	private static function describeModel(Payload $payload, ModelManager $modelManager, Client $client): TaskResult {
-		$modelNameOrUuid = $payload->params['model_name_or_uuid'];
-		$model = $modelManager->getModelByUuidOrName($client, $modelNameOrUuid);
+		$modelName = $payload->params['model_name'];
+
+		$tableName = ResourceTable::name(ResourceTable::RESOURCE_CHAT_MODEL, $modelName);
+		if (!$client->hasTable($tableName)) {
+			throw ManticoreSearchClientError::create("chat model '$modelName' not found");
+		}
+		$model = $modelManager->getModel($client, $modelName);
 
 		$data = [];
 		foreach ($model as $key => $value) {
@@ -218,14 +198,15 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @return TaskResult
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
+	 * @throws QueryParseError
 	 */
 	private static function dropModel(Payload $payload, ModelManager $modelManager, Client $client): TaskResult {
-		$modelNameOrUuid = $payload->params['model_name_or_uuid'];
+		$modelName = $payload->params['model_name'];
 		$ifExists = ($payload->params['if_exists'] ?? '') === '1';
 
-		$modelManager->deleteModelByUuidOrName(
+		$modelManager->deleteModel(
 			$client,
-			$modelNameOrUuid,
+			$modelName,
 			$ifExists
 		);
 		return TaskResult::none();
@@ -237,7 +218,6 @@ final class Handler extends BaseHandlerWithClient {
 	 * @param Payload $payload
 	 * @param ModelManager $modelManager
 	 * @param LlmProvider $provider
-	 * @param ConversationManager $conversationManager
 	 * @param ConversationRouter $conversationRouter
 	 * @param SearchEngine $searchEngine
 	 * @param Client $client
@@ -250,7 +230,6 @@ final class Handler extends BaseHandlerWithClient {
 		Payload $payload,
 		ModelManager $modelManager,
 		LlmProvider $provider,
-		ConversationManager $conversationManager,
 		ConversationRouter $conversationRouter,
 		SearchEngine $searchEngine,
 		Client $client
@@ -262,7 +241,8 @@ final class Handler extends BaseHandlerWithClient {
 
 		$conversationUuid = $request->conversationUuid;
 		self::validateTable($client, $request->table);
-		$model = $modelManager->getModelByUuidOrName($client, $request->modelUuid);
+		$model = $modelManager->getModel($client, $request->modelName);
+		$conversationManager = new ConversationManager($client, $model['name']);
 		$services = new SearchServices($conversationManager, $provider, $searchEngine);
 
 		$conversationHistory = $conversationManager->getConversationMessages($conversationUuid);
@@ -317,7 +297,7 @@ final class Handler extends BaseHandlerWithClient {
 			$tokensUsed
 		);
 		self::saveConversationMessages(
-			$conversationManager, $request, $model['uuid'], $turn
+			$conversationManager, $request, $model['name'], $turn
 		);
 
 		return TaskResult::withRow(
@@ -358,7 +338,7 @@ final class Handler extends BaseHandlerWithClient {
 		return new ConversationRequest(
 			$payload->params['query'] ?? '',
 			$payload->params['table'] ?? '',
-			$payload->params['model_uuid'] ?? '',
+			$payload->params['model_name'] ?? '',
 			$payload->params['conversation_uuid'] ?? '',
 			$payload->params['fields'] ?? ''
 		);
@@ -620,7 +600,6 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * @param array{
 	 *   id:string,
-	 *   uuid:string,
 	 *   name:string,
 	 *   model:string,
 	 *   settings:array<string, mixed>,
@@ -703,7 +682,7 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @param ConversationManager $conversationManager
 	 * @param ConversationRequest $request
-	 * @param string $modelUuid
+	 * @param string $modelName
 	 * @param ConversationTurn $turn
 	 *
 	 * @return void
@@ -713,21 +692,21 @@ final class Handler extends BaseHandlerWithClient {
 	private static function saveConversationMessages(
 		ConversationManager $conversationManager,
 		ConversationRequest $request,
-		string $modelUuid,
+		string $modelName,
 		ConversationTurn $turn
 	): void {
 		$conversationUuid = $request->conversationUuid;
 		if ($turn->route === ConversationRoute::ANSWER_FROM_HISTORY) {
 			$conversationManager->saveMessage(
 				$conversationUuid,
-				$modelUuid,
+				$modelName,
 				ConversationMessage::user($request->query, $turn->route)
 			);
 		} else {
 			$stringExcludedIds = array_map('strval', $turn->excludedIds);
 			$conversationManager->saveMessage(
 				$conversationUuid,
-				$modelUuid,
+				$modelName,
 				ConversationMessage::userWithExcludedIds(
 					$request->query,
 					$turn->route,
@@ -745,7 +724,7 @@ final class Handler extends BaseHandlerWithClient {
 
 		$conversationManager->saveMessage(
 			$conversationUuid,
-			$modelUuid,
+			$modelName,
 			ConversationMessage::assistant($turn->responseText, $turn->route),
 			$turn->tokensUsed
 		);

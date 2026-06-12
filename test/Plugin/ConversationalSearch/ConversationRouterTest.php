@@ -33,9 +33,9 @@ final class ConversationRouterTest extends TestCase {
 			->method('generateToolCall')
 			->with(
 				$this->callback(
-					static fn (string $prompt): bool => str_contains($prompt, '    <Conversation history>')
+					static fn (string $prompt): bool => str_contains($prompt, '<Conversation history>')
 						&& str_contains($prompt, '{"user":"tv shows?"}')
-						&& str_contains($prompt, '    <Question>')
+						&& str_contains($prompt, '<Question>')
 						&& str_contains($prompt, 'what is the cast in GoT?')
 				),
 				$this->callback(

@@ -66,12 +66,13 @@ class GetEntityHandler extends BaseEntityHandler {
 	 * }
 	 */
 	public static function get(string $entityId, string $entityIndex, HTTPClient $manticoreClient): array {
+		$systemClient = self::getSystemClient($manticoreClient);
 		$query = 'SELECT _source FROM `' . self::ENTITY_TABLE . "` WHERE _id='{$entityId}'";
 		if ($entityIndex) {
 			$query  .= " AND _index='{$entityIndex}'";
 		}
 		/** @var array{error?:string,0:array{data?:array<array{_source:string}>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error']) || !isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
 			//! try to get from query map ( map name from request info? )
 			return [

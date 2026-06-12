@@ -38,34 +38,32 @@ abstract class BaseDropHandler extends BaseHandlerWithClient {
 	public function run(): Task {
 
 		$name = $this->getName($this->payload);
-		$tableName = $this->getTableName();
+		$tableName = $this->getTableName($name);
 
 		/**
-		 * @param string $name
 		 * @param string $tableName
 		 * @return TaskResult
 		 */
-		$taskFn = function (string $name, string $tableName): TaskResult {
+		$taskFn = function (string $tableName): TaskResult {
 			$manticoreClient = $this->manticoreClient;
 			if (!$manticoreClient->hasTable($tableName)) {
 				return TaskResult::none();
 			}
 
-			return TaskResult::withTotal($this->processDrop($name, $tableName));
+			return TaskResult::withTotal($this->processDrop($tableName));
 		};
 
 		return Task::create(
 			$taskFn,
-			[$name, $tableName]
+			[$tableName]
 		)->run();
 	}
 
 	/**
-	 * @param string $name
 	 * @param string $tableName
 	 * @return int
 	 */
-	abstract protected function processDrop(string $name, string $tableName): int;
+	abstract protected function processDrop(string $tableName): int;
 
 	/**
 	 * @param Payload<T> $payload
@@ -76,6 +74,6 @@ abstract class BaseDropHandler extends BaseHandlerWithClient {
 	/**
 	 * @return string
 	 */
-	abstract protected function getTableName(): string;
+	abstract protected function getTableName(string $name): string;
 
 }

@@ -15,7 +15,6 @@ use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use PHPUnit\Framework\TestCase;
 
 final class KafkaViewWorkerTest extends TestCase {
-
 	public function testRunUsesDefaultSqlEndpointAndInsertsRows(): void {
 		$client = $this->createMock(Client::class);
 		$buffer = 'kafka_buffer';
@@ -73,6 +72,61 @@ final class KafkaViewWorkerTest extends TestCase {
 				[$this->equalTo($expectedTruncate)]
 			)
 			->willReturnOnConsecutiveCalls($descResponse, $readResponse, $okResponse, $okResponse);
+
+		$view = new View($client, $buffer, $destination, $query);
+		$this->assertTrue($view->run());
+	}
+
+	public function testRunTruncatesBufferWhenViewQueryReturnsNoRows(): void {
+		$client = $this->createMock(Client::class);
+		$buffer = 'kafka_buffer';
+		$destination = 'kafka_destination';
+		$query = "SELECT id, name FROM $buffer WHERE id < 0";
+
+		$descResponse = Response::fromBody(
+			(string)json_encode(
+				[[
+				'error' => '',
+				'warning' => '',
+				'total' => 2,
+				'data' => [
+				['Field' => 'id', 'Type' => 'int'],
+				['Field' => 'name', 'Type' => 'string'],
+				],
+				]]
+			)
+		);
+
+		$readResponse = Response::fromBody(
+			(string)json_encode(
+				[[
+				'error' => '',
+				'warning' => '',
+				'total' => 0,
+				'data' => [],
+				]]
+			)
+		);
+
+		$okResponse = Response::fromBody(
+			(string)json_encode(
+				[[
+				'error' => '',
+				'warning' => '',
+				'total' => 0,
+				'data' => [],
+				]]
+			)
+		);
+
+		$client->expects($this->exactly(3))
+			->method('sendRequest')
+			->withConsecutive(
+				[$this->equalTo('DESC ' . $destination)],
+				[$this->equalTo($query)],
+				[$this->equalTo("TRUNCATE TABLE $buffer")]
+			)
+			->willReturnOnConsecutiveCalls($descResponse, $readResponse, $okResponse);
 
 		$view = new View($client, $buffer, $destination, $query);
 		$this->assertTrue($view->run());

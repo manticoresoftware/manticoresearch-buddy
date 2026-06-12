@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
@@ -46,7 +47,6 @@ abstract class BaseCreateSourceHandler extends BaseHandlerWithClient {
 		 */
 		$taskFn = static function (Payload $payload, Client $manticoreClient): TaskResult {
 
-			self::checkAndCreateSource($manticoreClient);
 			return static::handle($payload, $manticoreClient);
 		};
 
@@ -59,13 +59,14 @@ abstract class BaseCreateSourceHandler extends BaseHandlerWithClient {
 	/**
 	 * @throws ManticoreSearchClientError
 	 */
-	protected static function checkAndCreateSource(Client $manticoreClient): void {
-		if ($manticoreClient->hasTable(Payload::SOURCE_TABLE_NAME)) {
+	protected static function checkAndCreateSource(Client $manticoreClient, string $sourceName): void {
+		$tableName = ResourceTable::name(ResourceTable::RESOURCE_SOURCE, $sourceName);
+		if ($manticoreClient->hasTable($tableName)) {
 			return;
 		}
 
 		$sql = /** @lang ManticoreSearch */
-			'CREATE TABLE ' . Payload::SOURCE_TABLE_NAME .
+			'CREATE TABLE ' . $tableName .
 			' (id bigint, type text, name text attribute indexed, '.
 			'full_name text, buffer_table text, attrs json, custom_mapping json, original_query text)';
 

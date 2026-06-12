@@ -13,6 +13,8 @@ namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Ds\Set;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Permissions;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -38,7 +40,11 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 	 * @throws RuntimeException
 	 */
 	public function run(): Task {
-		$taskFn = static function (Client $client, Payload $payload): TaskResult {
+		$taskFn = static function (Client $userClient, SystemClient $client, Payload $payload): TaskResult {
+			// The daemon filters SHOW TABLES by the requesting user's grants,
+			// so only sharded tables the user can access are reported
+			$visibleTables = Permissions::getAccessibleTables($userClient);
+
 			// Fetch raw rows from the sharding state table
 			$where = static::buildWhere($payload->cluster, $payload->table);
 			$sql = 'SELECT * FROM system.sharding_table' . ($where ? " WHERE {$where}" : '');
@@ -46,6 +52,9 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 			/** @var array{0?:array{data?:array<array{node:string,shards:string,cluster:string,table:string}>}} $res */
 			$res = $client->sendRequest($sql)->getResult();
 			$rawRows = $res[0]['data'] ?? [];
+			$rawRows = array_values(
+				array_filter($rawRows, static fn ($row) => isset($visibleTables[$row['table']]))
+			);
 
 			$pendingByNode = static::getPendingShardsByNode($client);
 
@@ -90,7 +99,12 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 				->column('rf_status', Column::String);
 		};
 
-		return Task::create($taskFn, [$this->manticoreClient, $this->payload])->run();
+		// Sharding meta lives in system.* tables that users cannot access:
+		// the user client is only used for the daemon-filtered visibility probe
+		return Task::create(
+			$taskFn,
+			[$this->manticoreClient, $this->manticoreClient->getSystemClient(), $this->payload]
+		)->run();
 	}
 
 	/**
@@ -111,11 +125,11 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 	 * For each unique cluster name in the raw rows, fetch inactive nodes via SHOW STATUS.
 	 * Returns map: clusterName → Set<string> of inactive node IDs.
 	 *
-	 * @param Client $client
+	 * @param SystemClient $client
 	 * @param array<array{cluster:string,...}> $rawRows
 	 * @return array<string, Set<string>>
 	 */
-	protected static function getInactiveNodesByCluster(Client $client, array $rawRows): array {
+	protected static function getInactiveNodesByCluster(SystemClient $client, array $rawRows): array {
 		$clusters = array_unique(array_column($rawRows, 'cluster'));
 		$result   = [];
 		foreach ($clusters as $name) {
@@ -193,10 +207,10 @@ class ShowStatusHandler extends BaseHandlerWithClient {
 	 * target placement, but the daemon has not yet created them on the node,
 	 * so they should be reported as 'pending' instead of 'active'.
 	 *
-	 * @param Client $client
+	 * @param SystemClient $client
 	 * @return array<string, array<string, Set<int>>> node -> table -> Set<shard>
 	 */
-	protected static function getPendingShardsByNode(Client $client): array {
+	protected static function getPendingShardsByNode(SystemClient $client): array {
 		$sql = "SELECT node, query FROM system.sharding_queue WHERE status != 'processed'";
 		/** @var array{0?:array{data?:array<array{node:string,query:string}>}} $res */
 		$res = $client->sendRequest($sql)->getResult();

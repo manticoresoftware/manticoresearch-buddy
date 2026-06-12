@@ -71,6 +71,7 @@ class TableKibanaHandler extends BaseEntityHandler {
 					'timed_out' => false,
 					'took' => 0,
 				];
+				$systemClient = self::getSystemClient($manticoreClient);
 				$query = 'SELECT * FROM ' . parent::ENTITY_TABLE;
 				$searchConds = [];
 				self::extractSearchConds($payloadBody, $searchConds);
@@ -78,7 +79,7 @@ class TableKibanaHandler extends BaseEntityHandler {
 					$typeExpr = implode(' OR ', array_map(fn ($v) => "_type='{$v}'", $searchConds['type']));
 					$query .= " WHERE {$typeExpr}";
 				}
-				$queryResult = $manticoreClient->sendRequest($query)->getResult();
+				$queryResult = $systemClient->sendRequest($query)->getResult();
 				self::postprocessQueryResult($queryResult, $searchConds, $resp);
 			}
 

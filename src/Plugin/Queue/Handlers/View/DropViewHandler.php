@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseDropHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
@@ -69,10 +70,10 @@ final class DropViewHandler extends BaseDropHandler {
 	/**
 	 * @throws ManticoreSearchClientError
 	 */
-	protected function processDrop(string $name, string $tableName): int {
+	protected function processDrop(string $tableName): int {
 		$manticoreClient = $this->manticoreClient;
 		$sql = /** @lang Manticore */
-			"SELECT * FROM $tableName WHERE match('@name \"$name\"')";
+			"SELECT * FROM $tableName";
 
 		$result = $manticoreClient->sendRequest($sql);
 
@@ -84,16 +85,13 @@ final class DropViewHandler extends BaseDropHandler {
 		if (is_array($result->getResult()[0])) {
 			foreach ($result->getResult()[0]['data'] as $row) {
 				$this->payload::$processor->execute('stopWorkerById', [$row['source_name']]);
-
-				$sql = /** @lang Manticore */
-					"DELETE FROM $tableName WHERE id = " . $row['id'];
-				$request = $manticoreClient->sendRequest($sql);
-				if ($request->hasError()) {
-					throw ManticoreSearchClientError::create((string)$request->getError());
-				}
-
 				$removed++;
 			}
+		}
+
+		$dropResponse = $manticoreClient->sendRequest("DROP TABLE IF EXISTS $tableName");
+		if ($dropResponse->hasError()) {
+			throw ManticoreSearchClientError::create((string)$dropResponse->getError());
 		}
 
 		return $removed;
@@ -155,7 +153,7 @@ final class DropViewHandler extends BaseDropHandler {
 		return $parsedPayload['DROP']['sub_tree'][2]['sub_tree'][0]['no_quotes']['parts'][0];
 	}
 
-	protected function getTableName(): string {
-		return Payload::VIEWS_TABLE_NAME;
+	protected function getTableName(string $name): string {
+		return ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $name);
 	}
 }

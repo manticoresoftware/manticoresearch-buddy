@@ -18,7 +18,6 @@ final class SearchContext {
 	 * @param ConversationHistory $history
 	 * @param array{
 	 *   id:string,
-	 *   uuid:string,
 	 *   name:string,
 	 *   model:string,
 	 *   settings:array<string, mixed>,

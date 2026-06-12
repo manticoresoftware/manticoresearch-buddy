@@ -213,6 +213,7 @@ The response JSON structure:
 |-|-|
 | `type` | Set to `json response` if the request type was `unknown json request` and `sql response` for `unknown sql request`. |
 | `message` | A JSON object potentially containing an `error` message for displaying and/or logging. This is what Manticore Search will forward to the end-user. |
+| `log` | Optional object describing a log entity to be handled by Manticore Search (for example, flushed into `auth.log`). |
 | `error_code` | An integer representing the HTTP error code which will be a part of the HTTP response to the user making a JSON over HTTP request. For SQL over HTTP/mysql communications, this field is ignored. |
 | `version` | Indicates the current protocol version being used. Current version is 3. |
 | `content_type` | Optional string that defines the Content-Type header value for the reply to the client. |

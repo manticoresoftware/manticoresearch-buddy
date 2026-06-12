@@ -21,6 +21,6 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 class ShowSourcesModel extends Model {
 
 	public function getHandlerClass(): string {
-		return 'Handlers\\Source\\ViewSourceHandler';
+		return 'Handlers\\Source\\ListSourceHandler';
 	}
 }

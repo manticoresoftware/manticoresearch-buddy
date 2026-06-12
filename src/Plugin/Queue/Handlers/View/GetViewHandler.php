@@ -11,6 +11,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseGetHandler;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 
@@ -76,8 +77,8 @@ final class GetViewHandler extends BaseGetHandler {
 		return 'View';
 	}
 
-	protected function getTableName(): string {
-		return Payload::VIEWS_TABLE_NAME;
+	protected function getTableName(string $name): string {
+		return ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $name);
 	}
 
 	protected function getFields(): array {

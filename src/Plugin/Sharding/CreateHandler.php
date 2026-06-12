@@ -11,8 +11,9 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Closure;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Permissions;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -44,7 +45,7 @@ final class CreateHandler extends BaseHandlerWithClient {
 		$taskFn = $this->getShardingFn();
 		$task = Task::create(
 			$taskFn,
-			[$this->payload, $this->manticoreClient]
+			[$this->payload, $this->manticoreClient->getSystemClient()]
 		);
 		/** @var array{
 		 * table:array{cluster:string,name:string,structure:string,extra:string},
@@ -84,9 +85,21 @@ final class CreateHandler extends BaseHandlerWithClient {
 			);
 		}
 
+		// All sharding work is async and runs as system.buddy, so the daemon
+		// cannot enforce the user's permissions later: gate here, before any
+		// state is touched or anything is enqueued. The probe runs on the
+		// user-delegated client, so the daemon itself evaluates the rules.
+		if (!Permissions::hasSchemaAccess($this->manticoreClient, $this->payload->table)) {
+			return static::getErrorTask(
+				"Permission denied for user '{$this->payload->user}': "
+				. "requires schema permission on table '{$this->payload->table}'"
+			);
+		}
+		$systemClient = $this->manticoreClient->getSystemClient();
+
 		// Try to validate that we do not create the same table we have
 		$q = "SHOW CREATE TABLE {$this->payload->table} OPTION force=1";
-		$resp = $this->manticoreClient->sendRequest($q);
+		$resp = $systemClient->sendRequest($q);
 		/** @var array{0:array{data?:array{0:array{value:string}}}} $result */
 		$result = $resp->getResult();
 		if (isset($result[0]['data'][0])) {
@@ -106,7 +119,7 @@ final class CreateHandler extends BaseHandlerWithClient {
 		// Observability ends up broken (FAIL_017), so we surface the
 		// limitation up front.
 		if (!$this->payload->cluster) {
-			$clusterName = $this->getJoinedClusterName();
+			$clusterName = $this->getJoinedClusterName($systemClient);
 			if ($clusterName !== '') {
 				return static::getErrorTask(
 					'Local sharded tables cannot be created on a node that is '
@@ -116,11 +129,21 @@ final class CreateHandler extends BaseHandlerWithClient {
 			}
 		}
 
+		return $this->validateClusterAndRf($systemClient);
+	}
+
+	/**
+	 * Validate that the requested cluster exists and has enough nodes
+	 * for the requested replication factor
+	 * @param SystemClient $systemClient
+	 * @return ?Task
+	 */
+	protected function validateClusterAndRf(SystemClient $systemClient): ?Task {
 		$nodeCount = 1;
 		// Check that cluster exists
 		if ($this->payload->cluster) {
 			/** @var array{0:array{data?:array{0:array{Value:string}}}} $result */
-			$result = $this->manticoreClient
+			$result = $systemClient
 				->sendRequest("SHOW STATUS LIKE 'cluster_{$this->payload->cluster}_nodes_view'")
 				->getResult();
 			if (!isset($result[0]['data'][0])) {
@@ -154,11 +177,12 @@ final class CreateHandler extends BaseHandlerWithClient {
 	 * clusters with md5-hash names, which we filter out here — only the
 	 * cluster that contains system.sharding_table is reported.
 	 *
+	 * @param SystemClient $client
 	 * @return string
 	 */
-	protected function getJoinedClusterName(): string {
+	protected function getJoinedClusterName(SystemClient $client): string {
 		/** @var array{0?:array{data?:array<array{Counter:string,Value:string}>}} $res */
-		$res = $this->manticoreClient
+		$res = $client
 			->sendRequest("SHOW STATUS LIKE 'cluster_%_indexes'")
 			->getResult();
 		foreach ($res[0]['data'] ?? [] as $row) {
@@ -191,7 +215,7 @@ final class CreateHandler extends BaseHandlerWithClient {
 	 * @return Closure
 	 */
 	protected static function getShardingFn(): Closure {
-		return static function (Payload $payload, Client $client): TaskResult {
+		return static function (Payload $payload, SystemClient $client): TaskResult {
 			$ts = time();
 			$value = [];
 			$timeout = $payload->getShardingTimeout();

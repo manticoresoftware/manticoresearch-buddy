@@ -38,9 +38,10 @@ class GetAliasesHandler extends BaseEntityHandler {
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
+			$systemClient = self::getSystemClient($manticoreClient);
 			$query = "SHOW TABLES LIKE '" . parent::ALIAS_TABLE . "'";
 			/** @var array{0?:array{data?:array<mixed>}} $queryResult */
-			$queryResult = $manticoreClient->sendRequest($query)->getResult();
+			$queryResult = $systemClient->sendRequest($query)->getResult();
 			if (!isset($queryResult[0])) {
 				return TaskResult::raw([]);
 			}
@@ -61,9 +62,10 @@ class GetAliasesHandler extends BaseEntityHandler {
 	 * @return array<string,mixed>
 	 */
 	public static function get(string $indexAlias, HTTPClient $manticoreClient): array {
+		$systemClient = self::getSystemClient($manticoreClient);
 		$query = 'SELECT index FROM ' . parent::ALIAS_TABLE . " WHERE alias='{$indexAlias}'";
 		/** @var array{0:array{data?:array<array{index:string}>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 		if (!isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
 			return [];
 		}

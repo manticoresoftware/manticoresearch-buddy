@@ -10,39 +10,45 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
+use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 
 class ConversationManager {
 	use SqlEscapingTrait;
 
-	public const string CONVERSATIONS_TABLE = 'chat_conversations';
 	private const int CONVERSATION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 	private const int TIMESTAMP_PRECISION = 1000000;
+	private readonly string $tableName;
 
 	/**
-	 * @param Client $client
+	 * @throws ManticoreSearchClientError
+	 * @throws QueryParseError
 	 */
-	public function __construct(private readonly Client $client) {
+	public function __construct(
+		private readonly Client $client,
+		string $modelName
+	) {
+		$this->tableName = ResourceTable::name(ResourceTable::RESOURCE_CHAT_HISTORY, $modelName);
+		$this->initializeTable();
 	}
 
 	/**
 	 * Initialize conversations table if it doesn't exist
 	 *
-	 * @param Client $client
-	 *
 	 * @return void
 	 * @throws ManticoreSearchClientError
 	 */
-	public function initializeTable(Client $client): void {
+	private function initializeTable(): void {
 		// Create enhanced conversations table with search context columns
 		$sql
 			= /** @lang Manticore */
-			'CREATE TABLE IF NOT EXISTS ' . self::CONVERSATIONS_TABLE . ' (
+			'CREATE TABLE IF NOT EXISTS ' . $this->tableName . ' (
 			conversation_uuid string,
-			model_uuid string,
+			`model_name` string,
 			created_at bigint,
 			role string,
 			message text,
@@ -54,7 +60,7 @@ class ConversationManager {
 			ttl bigint
 		)';
 
-		$response = $client->sendRequest($sql);
+		$response = $this->client->sendRequest($sql);
 		if ($response->hasError()) {
 			throw ManticoreSearchClientError::create('Failed to create conversations table: ' . $response->getError());
 		}
@@ -62,7 +68,7 @@ class ConversationManager {
 
 	/**
 	 * @param string $conversationUuid
-	 * @param string $modelUuid
+	 * @param string $modelName
 	 * @param ConversationMessage $message
 	 * @param int $tokensUsed
 	 *
@@ -71,7 +77,7 @@ class ConversationManager {
 	 */
 	public function saveMessage(
 		string $conversationUuid,
-		string $modelUuid,
+		string $modelName,
 		ConversationMessage $message,
 		int $tokensUsed = 0
 	): void {
@@ -80,12 +86,12 @@ class ConversationManager {
 
 		$sql = sprintf(
 		/** @lang manticore */
-			'INSERT INTO %s (conversation_uuid, model_uuid, created_at, role, message, tokens_used, '
+			'INSERT INTO %s (conversation_uuid, `model_name`, created_at, role, message, tokens_used, '
 			. 'intent, search_query, exclude_query, excluded_ids, ttl) '
 			. 'VALUES (%s, %s, %d, %s, %s, %d, %s, %s, %s, %s, %d)',
-			self::CONVERSATIONS_TABLE,
+			$this->tableName,
 			$this->quote($conversationUuid),
-			$this->quote($modelUuid),
+			$this->quote($modelName),
 			$currentTime,
 			$this->quote($message->role),
 			$this->quote($message->message),
@@ -121,7 +127,7 @@ class ConversationManager {
 			. 'WHERE conversation_uuid = %s '
 			. 'ORDER BY created_at ASC, id ASC '
 			. 'LIMIT %d',
-			self::CONVERSATIONS_TABLE,
+			$this->tableName,
 			$this->quote($conversationUuid),
 			$limit
 		);

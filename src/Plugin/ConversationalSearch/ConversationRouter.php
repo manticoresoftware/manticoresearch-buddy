@@ -87,11 +87,11 @@ final class ConversationRouter {
 			. '- For ' . ConversationRoute::ANSWER_FROM_HISTORY . ' and ' . ConversationRoute::REJECT
 			. ", standalone_question and exclude_query must be empty strings.\n"
 			. "Do not answer the user. Only call the function.\n\n"
-			. "    <Conversation history>\n"
+			. "<Conversation history>\n"
 			. $this->formatConversationHistory($historyPayload)
-			. "\n"
-			. "    <Question>\n"
-			. "  $userQuery";
+			. "</Conversation history>\n"
+			. "<Question>\n"
+			. "  $userQuery<Question>";
 	}
 
 	/**
