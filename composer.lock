@@ -62,16 +62,16 @@
         },
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.384.6",
+            "version": "3.384.8",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "073ff664a003798a673aaa2494a0bb1b904cfeba"
+                "reference": "eab63461524f6b7e309d03441b09f0f5532f2672"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/073ff664a003798a673aaa2494a0bb1b904cfeba",
-                "reference": "073ff664a003798a673aaa2494a0bb1b904cfeba",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/eab63461524f6b7e309d03441b09f0f5532f2672",
+                "reference": "eab63461524f6b7e309d03441b09f0f5532f2672",
                 "shasum": ""
             },
             "require": {
@@ -153,9 +153,9 @@
             "support": {
                 "forum": "https://github.com/aws/aws-sdk-php/discussions",
                 "issues": "https://github.com/aws/aws-sdk-php/issues",
-                "source": "https://github.com/aws/aws-sdk-php/tree/3.384.6"
+                "source": "https://github.com/aws/aws-sdk-php/tree/3.384.8"
             },
-            "time": "2026-06-09T19:00:05+00:00"
+            "time": "2026-06-11T18:06:10+00:00"
         },
         {
             "name": "composer/ca-bundle",
@@ -1190,12 +1190,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "3c449ce1839d01e7b82531ba6b472ca43e91e723"
+                "reference": "a025084f3468143bc55bdbe3ad38ca29f8e43fb1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/3c449ce1839d01e7b82531ba6b472ca43e91e723",
-                "reference": "3c449ce1839d01e7b82531ba6b472ca43e91e723",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/a025084f3468143bc55bdbe3ad38ca29f8e43fb1",
+                "reference": "a025084f3468143bc55bdbe3ad38ca29f8e43fb1",
                 "shasum": ""
             },
             "require": {
@@ -1234,7 +1234,7 @@
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
                 "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
             },
-            "time": "2026-05-27T05:22:56+00:00"
+            "time": "2026-06-12T10:12:43+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -1536,16 +1536,16 @@
         },
         {
             "name": "mtdowling/jmespath.php",
-            "version": "2.8.0",
+            "version": "2.9.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/jmespath/jmespath.php.git",
-                "reference": "a2a865e05d5f420b50cc2f85bb78d565db12a6bc"
+                "reference": "9c208ba27ae7d90853c288b3795d6702eb251d34"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/jmespath/jmespath.php/zipball/a2a865e05d5f420b50cc2f85bb78d565db12a6bc",
-                "reference": "a2a865e05d5f420b50cc2f85bb78d565db12a6bc",
+                "url": "https://api.github.com/repos/jmespath/jmespath.php/zipball/9c208ba27ae7d90853c288b3795d6702eb251d34",
+                "reference": "9c208ba27ae7d90853c288b3795d6702eb251d34",
                 "shasum": ""
             },
             "require": {
@@ -1554,7 +1554,7 @@
             },
             "require-dev": {
                 "composer/xdebug-handler": "^3.0.3",
-                "phpunit/phpunit": "^8.5.33"
+                "phpunit/phpunit": "^8.5.52"
             },
             "bin": [
                 "bin/jp.php"
@@ -1562,7 +1562,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "2.8-dev"
+                    "dev-master": "2.9-dev"
                 }
             },
             "autoload": {
@@ -1596,9 +1596,9 @@
             ],
             "support": {
                 "issues": "https://github.com/jmespath/jmespath.php/issues",
-                "source": "https://github.com/jmespath/jmespath.php/tree/2.8.0"
+                "source": "https://github.com/jmespath/jmespath.php/tree/2.9.1"
             },
-            "time": "2024-09-04T18:46:31+00:00"
+            "time": "2026-06-11T10:43:56+00:00"
         },
         {
             "name": "php-ds/php-ds",
@@ -2087,16 +2087,16 @@
         },
         {
             "name": "seld/jsonlint",
-            "version": "1.11.0",
+            "version": "1.12.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Seldaek/jsonlint.git",
-                "reference": "1748aaf847fc731cfad7725aec413ee46f0cc3a2"
+                "reference": "d95c42df9c4a713ca1d4a45b37f0416dee1ea73a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Seldaek/jsonlint/zipball/1748aaf847fc731cfad7725aec413ee46f0cc3a2",
-                "reference": "1748aaf847fc731cfad7725aec413ee46f0cc3a2",
+                "url": "https://api.github.com/repos/Seldaek/jsonlint/zipball/d95c42df9c4a713ca1d4a45b37f0416dee1ea73a",
+                "reference": "d95c42df9c4a713ca1d4a45b37f0416dee1ea73a",
                 "shasum": ""
             },
             "require": {
@@ -2135,7 +2135,7 @@
             ],
             "support": {
                 "issues": "https://github.com/Seldaek/jsonlint/issues",
-                "source": "https://github.com/Seldaek/jsonlint/tree/1.11.0"
+                "source": "https://github.com/Seldaek/jsonlint/tree/1.12.0"
             },
             "funding": [
                 {
@@ -2147,7 +2147,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-07-11T14:55:45+00:00"
+            "time": "2026-06-11T13:43:55+00:00"
         },
         {
             "name": "seld/phar-utils",
@@ -6096,10 +6096,10 @@
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.1.0"
     },
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
