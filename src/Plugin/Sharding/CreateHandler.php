@@ -89,13 +89,13 @@ final class CreateHandler extends BaseHandlerWithClient {
 		// cannot enforce the user's permissions later: gate here, before any
 		// state is touched or anything is enqueued. The probe runs on the
 		// user-delegated client, so the daemon itself evaluates the rules.
-		$systemClient = $this->manticoreClient->getSystemClient();
 		if (!Permissions::hasSchemaAccess($this->manticoreClient, $this->payload->table)) {
 			return static::getErrorTask(
 				"Permission denied for user '{$this->payload->user}': "
 				. "requires schema permission on table '{$this->payload->table}'"
 			);
 		}
+		$systemClient = $this->manticoreClient->getSystemClient();
 
 		// Try to validate that we do not create the same table we have
 		$q = "SHOW CREATE TABLE {$this->payload->table} OPTION force=1";
