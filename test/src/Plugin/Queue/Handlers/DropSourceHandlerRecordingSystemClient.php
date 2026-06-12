@@ -11,11 +11,10 @@
 
 namespace Manticoresearch\BuddyTest\Plugin\Queue\Handlers;
 
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 
-final class DropSourceHandlerRecordingClient extends Client {
+final class DropSourceHandlerRecordingSystemClient extends SystemClient {
 	public function __construct(private DropSourceHandlerClientRecords $records) {
 		parent::__construct();
 	}
@@ -29,13 +28,5 @@ final class DropSourceHandlerRecordingClient extends Client {
 		unset($path, $disableAgentHeader, $requestMethod);
 
 		return $this->records->record($request, $this->delegatedUser);
-	}
-
-	public function getSystemClient(): SystemClient {
-		return $this->systemClient ??= new DropSourceHandlerRecordingSystemClient($this->records);
-	}
-
-	public function getDelegatedUser(): ?string {
-		return $this->delegatedUser;
 	}
 }
