@@ -12,6 +12,8 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Sharding;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Permissions;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
@@ -36,14 +38,24 @@ class ShowMasterHandler extends BaseHandlerWithClient {
 	 * @throws RuntimeException
 	 */
 	public function run(): Task {
-		$taskFn = static function (Client $client): TaskResult {
+		$taskFn = static function (Client $userClient, SystemClient $client): TaskResult {
+			$emptyResult = TaskResult::withData([])
+				->column('node', Column::String)
+				->column('status', Column::String);
+
+			// The master is sharding topology info: report it only when the
+			// requesting user can access at least one sharded table (SHOW
+			// TABLES is permission-filtered by the daemon)
+			$visibleTables = Permissions::getAccessibleTables($userClient);
+			if (!in_array('shard', $visibleTables, true)) {
+				return $emptyResult;
+			}
+
 			$state = new State($client);
 
 			// Sharding not initialized yet
 			if (!$state->isActive()) {
-				return TaskResult::withData([])
-					->column('node', Column::String)
-					->column('status', Column::String);
+				return $emptyResult;
 			}
 
 			/** @var string $master */
@@ -62,6 +74,11 @@ class ShowMasterHandler extends BaseHandlerWithClient {
 				->column('status', Column::String);
 		};
 
-		return Task::create($taskFn, [$this->manticoreClient])->run();
+		// Sharding meta lives in system.* tables that users cannot access:
+		// the user client is only used for the daemon-filtered visibility probe
+		return Task::create(
+			$taskFn,
+			[$this->manticoreClient, $this->manticoreClient->getSystemClient()]
+		)->run();
 	}
 }

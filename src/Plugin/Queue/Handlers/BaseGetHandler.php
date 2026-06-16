@@ -43,7 +43,7 @@ abstract class BaseGetHandler extends BaseHandlerWithClient {
 		$name = $this->getName($this->payload);
 		$type = $this->getType();
 		$fields = $this->getFields();
-		$tableName = $this->getTableName();
+		$tableName = $this->getTableName($name);
 
 		/**
 		 * @param string $name
@@ -69,7 +69,7 @@ abstract class BaseGetHandler extends BaseHandlerWithClient {
 			$fields[] = 'original_query';
 			$stringFields = implode(',', $fields);
 			$sql = /** @lang manticore */
-				"SELECT $stringFields FROM $tableName WHERE match('@name \"$name\"') LIMIT 1";
+				"SELECT $stringFields FROM $tableName LIMIT 1";
 			$rawResult = $manticoreClient->sendRequest($sql);
 			if ($rawResult->hasError()) {
 				throw ManticoreSearchClientError::create((string)$rawResult->getError());
@@ -140,7 +140,7 @@ abstract class BaseGetHandler extends BaseHandlerWithClient {
 	/**
 	 * @return string
 	 */
-	abstract protected function getTableName(): string;
+	abstract protected function getTableName(string $name): string;
 
 	/**
 	 * @return string
@@ -152,6 +152,5 @@ abstract class BaseGetHandler extends BaseHandlerWithClient {
 	 * @return string
 	 */
 	abstract protected static function formatResult(string $query): string;
-
 
 }

@@ -275,7 +275,7 @@ class ConversationalTest extends TestCase {
 	public function testDropChatModelQuotedNameContainingIfExistsStillErrorsWhenMissing(): void {
 		$this->assertQueryResultContainsError(
 			"DROP CHAT MODEL 'my IF EXISTS model'",
-			"chat model 'my IF EXISTS model' not found"
+			"Invalid plugin resource name 'my IF EXISTS model'"
 		);
 	}
 

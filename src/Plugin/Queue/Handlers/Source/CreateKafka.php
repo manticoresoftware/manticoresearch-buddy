@@ -11,7 +11,8 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\CreateViewHandler;
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\ViewRecordCreator;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
@@ -78,60 +79,10 @@ final class CreateKafka extends BaseCreateSourceHandler {
 	use SqlEscapingTrait;
 
 	/**
-	 * @param Payload<array{
-	 *         CREATE: array{
-	 *             expr_type: string,
-	 *             not-exists: bool,
-	 *             base_expr: string,
-	 *             sub_tree: array{
-	 *                 expr_type: string,
-	 *                 base_expr: string
-	 *             }[]
-	 *         },
-	 *         SOURCE: array{
-	 *             base_expr: string,
-	 *             name: string,
-	 *             no_quotes?: array{
-	 *                 delim: bool,
-	 *                 parts: string[]
-	 *             },
-	 *             create-def: array{
-	 *                 expr_type: string,
-	 *                 base_expr: string,
-	 *                 sub_tree: array{
-	 *                     expr_type: string,
-	 *                     base_expr: string,
-	 *                     sub_tree: array{
-	 *                         expr_type: string,
-	 *                         base_expr: string,
-	 *                         sub_tree: array{
-	 *                             expr_type: string,
-	 *                             base_expr: string
-	 *                         }[]
-	 *                     }[]
-	 *                 }[]
-	 *             },
-	 *             options: array{
-	 *                 expr_type: string,
-	 *                 base_expr: string,
-	 *                 delim: string,
-	 *                 sub_tree: array{
-	 *                     expr_type: string,
-	 *                     base_expr: string,
-	 *                     delim: string,
-	 *                     sub_tree: array{
-	 *                         expr_type: string,
-	 *                         base_expr: string
-	 *                     }[]
-	 *                 }[]
-	 *             }[]
-	 *         }
-	 *     }> $payload
 	 * @throws ManticoreSearchClientError|\PHPSQLParser\exceptions\UnsupportedFeatureException
 	 */
 	public static function handle(Payload $payload, Client $manticoreClient): TaskResult {
-
-
+		$systemClient = $manticoreClient->getSystemClient();
 		$options = self::parseOptions($payload);
 
 		if (!empty($options->partitionList) && $options->numConsumers > 1) {
@@ -141,15 +92,11 @@ final class CreateKafka extends BaseCreateSourceHandler {
 			);
 		}
 
-		$sql = /** @lang ManticoreSearch */
-			'SELECT * FROM ' . Payload::SOURCE_TABLE_NAME .
-			" WHERE match('@name \"" . $options->name . "\"')";
-
-
-		$record = $manticoreClient->sendRequest($sql)->getResult();
-		if (is_array($record[0]) && $record[0]['total']) {
+		$sourceTable = ResourceTable::name(ResourceTable::RESOURCE_SOURCE, $options->name);
+		if ($manticoreClient->hasTable($sourceTable)) {
 			throw ManticoreSearchClientError::create("Source $options->name already exist");
 		}
+		self::checkAndCreateSource($manticoreClient, $options->name);
 
 		for ($i = 0; $i < $options->numConsumers; $i++) {
 			$attrs = json_encode(
@@ -167,7 +114,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 			$query = /** @lang ManticoreSearch */
 				"CREATE TABLE {$bufferTablePrefix}{$options->name}_{$i} $options->schema";
 
-			$request = $manticoreClient->sendRequest($query);
+			$request = $systemClient->sendRequest($query);
 			if ($request->hasError()) {
 				throw ManticoreSearchClientError::create((string)$request->getError());
 			}
@@ -176,7 +123,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 			$customMapping = self::escapeSqlString($options->customMapping);
 
 			$query = /** @lang ManticoreSearch */
-				'INSERT INTO ' . Payload::SOURCE_TABLE_NAME .
+				'INSERT INTO ' . $sourceTable .
 				' (id, type, name, full_name, buffer_table, attrs, custom_mapping, original_query) VALUES ' .
 				"(0, '" . self::SOURCE_TYPE_KAFKA . "', '$options->name','{$options->name}_$i'," .
 				"'{$bufferTablePrefix}{$options->name}_$i', '$attrs', '$customMapping', '$escapedPayload')";
@@ -187,25 +134,40 @@ final class CreateKafka extends BaseCreateSourceHandler {
 			}
 		}
 
-		self::handleOrphanViews($options->name, $options->numConsumers, $manticoreClient);
+		self::handleOrphanViews($options->name, $options->numConsumers, $systemClient);
+		unset($systemClient);
 
 		return TaskResult::none();
 	}
 
 	/**
+	 * Orphan views are suspended materialized-view rows left after dropping the
+	 * source table and its buffer tables. When the source is recreated, these rows
+	 * must be reconciled with the new consumer count.
+	 *
 	 * @throws ManticoreSearchClientError|\PHPSQLParser\exceptions\UnsupportedFeatureException
 	 */
-	public static function handleOrphanViews(string $sourceName, int $maxIndex, Client $client): void {
-		$viewsTable = Payload::VIEWS_TABLE_NAME;
-		if (!$client->hasTable($viewsTable)) {
-			return;
+	private static function handleOrphanViews(string $sourceName, int $maxIndex, Client $systemClient): void {
+		$viewsTables = ResourceTable::list($systemClient, ResourceTable::TABLE_PREFIX_MATERIALIZED_VIEW);
+		foreach ($viewsTables as $viewsTable) {
+			self::handleOrphanViewsTable($viewsTable, $sourceName, $maxIndex, $systemClient);
 		}
+	}
 
+	/**
+	 * @throws ManticoreSearchClientError|\PHPSQLParser\exceptions\UnsupportedFeatureException
+	 */
+	private static function handleOrphanViewsTable(
+		string $viewsTable,
+		string $sourceName,
+		int $maxIndex,
+		Client $systemClient
+	): void {
 		$sql = /** @lang Manticore */
 			"SELECT * FROM $viewsTable " .
 			"WHERE MATCH('@source_name \"" . $sourceName . "_*\"') AND suspended=1";
 
-		$request = $client->sendRequest($sql);
+		$request = $systemClient->sendRequest($sql);
 		if ($request->hasError()) {
 			throw ManticoreSearchClientError::create((string)$request->getError());
 		}
@@ -219,35 +181,67 @@ final class CreateKafka extends BaseCreateSourceHandler {
 		$views = $result[0]['data'];
 		$viewsCount = sizeof($views);
 
-
 		if ($viewsCount > 0 && $viewsCount < $maxIndex) {
-			$originalQuery = (string)$views[0]['original_query'];
-			$viewName = (string)$views[0]['name'];
+			self::restoreOrphanViewRecords($views, $sourceName, $maxIndex, $viewsCount, $systemClient);
+			return;
+		}
 
-			$parser = new PHPSQLParser($originalQuery);
-			$destinationTableName = $parser->parsed['VIEW']['to']['no_quotes']['parts'][0];
-			unset($parser->parsed['CREATE'], $parser->parsed['VIEW']);
+		self::deleteOrphanViews($viewsTable, $views, $sourceName, $maxIndex, $systemClient);
+	}
 
-			CreateViewHandler::createViewRecords(
-				$client, $viewName, $parser->parsed,
-				$sourceName, $originalQuery, $destinationTableName,
-				$maxIndex, $viewsCount, 1
-			);
-		} else {
-			$ids = self::getOrphanIds($views, $sourceName, $maxIndex);
+	/**
+	 * @param array<int, array<string>> $views
+	 * @throws \PHPSQLParser\exceptions\UnsupportedFeatureException
+	 */
+	private static function restoreOrphanViewRecords(
+		array $views,
+		string $sourceName,
+		int $maxIndex,
+		int $viewsCount,
+		Client $systemClient
+	): void {
+		$originalQuery = (string)$views[0]['original_query'];
+		$viewName = (string)$views[0]['name'];
 
-			if ($ids === []) {
-				return;
-			}
+		$parser = new PHPSQLParser($originalQuery);
+		$destinationTableName = $parser->parsed['VIEW']['to']['no_quotes']['parts'][0];
+		unset($parser->parsed['CREATE'], $parser->parsed['VIEW']);
 
-			$ids = implode(',', $ids);
-			Buddy::debug("Remove orphan views records ids ($ids)");
-			$sql = /** @lang manticore */
-				"DELETE FROM $viewsTable WHERE id in ($ids)";
-			$rawResult = $client->sendRequest($sql);
-			if ($rawResult->hasError()) {
-				throw ManticoreSearchClientError::create((string)$rawResult->getError());
-			}
+		(new ViewRecordCreator($systemClient))->create(
+			$viewName,
+			$parser->parsed,
+			$sourceName,
+			$originalQuery,
+			$destinationTableName,
+			$maxIndex,
+			$viewsCount,
+			1
+		);
+	}
+
+	/**
+	 * @param array<int, array<string>> $views
+	 * @throws ManticoreSearchClientError
+	 */
+	private static function deleteOrphanViews(
+		string $viewsTable,
+		array $views,
+		string $sourceName,
+		int $maxIndex,
+		Client $systemClient
+	): void {
+		$ids = self::getOrphanIds($views, $sourceName, $maxIndex);
+		if ($ids === []) {
+			return;
+		}
+
+		$ids = implode(',', $ids);
+		Buddy::debug("Remove orphan views records ids ($ids)");
+		$sql = /** @lang manticore */
+			"DELETE FROM $viewsTable WHERE id in ($ids)";
+		$rawResult = $systemClient->sendRequest($sql);
+		if ($rawResult->hasError()) {
+			throw ManticoreSearchClientError::create((string)$rawResult->getError());
 		}
 	}
 
@@ -260,10 +254,8 @@ final class CreateKafka extends BaseCreateSourceHandler {
 	public static function getOrphanIds(array $views, string $sourceName, int $maxIndex): array {
 		$ids = [];
 		foreach ($views as $orphanView) {
-			$viewSourceName = explode('_', $orphanView['source_name']);
-			// remove index from array, leave only name
-			$index = array_pop($viewSourceName);
-			$viewSourceName = implode('_', $viewSourceName);
+			$index = self::getSourceIndex($orphanView['source_name']);
+			$viewSourceName = self::getSourceNameFromFullName($orphanView['source_name']);
 			if ($viewSourceName !== $sourceName || $index < $maxIndex) {
 				continue;
 			}
@@ -272,6 +264,19 @@ final class CreateKafka extends BaseCreateSourceHandler {
 		}
 
 		return $ids;
+	}
+
+	private static function getSourceNameFromFullName(string $sourceFullName): string {
+		return (string)preg_replace('/_\d+$/', '', $sourceFullName);
+	}
+
+	private static function getSourceIndex(string $sourceFullName): int {
+		preg_match('/_(\d+)$/', $sourceFullName, $matches);
+		if (!isset($matches[1])) {
+			throw ManticoreSearchClientError::create("Invalid source name $sourceFullName");
+		}
+
+		return (int)$matches[1];
 	}
 
 	/**

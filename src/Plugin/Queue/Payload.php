@@ -29,8 +29,6 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 final class Payload extends BasePayload
 {
 
-	const SOURCE_TABLE_NAME = 'system.sources';
-	const VIEWS_TABLE_NAME = 'system.views';
 	const BUFFER_TABLE_PREFIX = 'system.buffer_';
 
 	const TYPE_SOURCE = 'source';

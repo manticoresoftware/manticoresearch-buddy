@@ -12,17 +12,19 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers;
 
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
+use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 
 /**
  * @template T of array
  */
-abstract class BaseViewHandler extends BaseHandlerWithClient {
+abstract class BaseListHandler extends BaseHandlerWithClient {
 
 	/**
 	 * Initialize the executor
@@ -40,35 +42,27 @@ abstract class BaseViewHandler extends BaseHandlerWithClient {
 	 */
 	public function run(): Task {
 
-		$tableName = $this->getTableName();
+		$tablePrefix = $this->getTablePrefix();
 		/**
-		 * @param string $tableName
+		 * @param string $tablePrefix
 		 * @param Client $manticoreClient
 		 * @return TaskResult
 		 * @throws ManticoreSearchClientError
 		 */
-		$taskFn = static function (string $tableName, Client $manticoreClient): TaskResult {
-
-
-			if (!$manticoreClient->hasTable($tableName)) {
-				return TaskResult::none();
+		$taskFn = static function (string $tablePrefix, Client $manticoreClient): TaskResult {
+			$rows = [];
+			foreach (ResourceTable::list($manticoreClient, $tablePrefix) as $tableName) {
+				$rows[] = ['name' => substr($tableName, strlen($tablePrefix))];
 			}
 
-			$sql = /** @lang manticore */
-				"SELECT name FROM $tableName GROUP BY name";
-			$resp = $manticoreClient->sendRequest($sql);
-			if ($resp->hasError()) {
-				throw ManticoreSearchClientError::create((string)$resp->getError());
-			}
-
-			return TaskResult::fromResponse($resp);
+			return TaskResult::withData($rows)->column('name', Column::String);
 		};
 
 		return Task::create(
 			$taskFn,
-			[$tableName, $this->manticoreClient]
+			[$tablePrefix, $this->manticoreClient]
 		)->run();
 	}
 
-	abstract protected function getTableName(): string;
+	abstract protected function getTablePrefix(): string;
 }

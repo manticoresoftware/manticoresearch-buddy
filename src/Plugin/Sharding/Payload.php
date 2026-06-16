@@ -30,6 +30,8 @@ final class Payload extends BasePayload {
 	public bool $quiet;
 	/** @var array<string,int|string> */
 	public array $options;
+	/** Requesting user from the daemon auth context, empty when auth is disabled */
+	public string $user = '';
 
 	/**
 	 * Get processors to run
@@ -58,7 +60,7 @@ final class Payload extends BasePayload {
 	 * @return static
 	 */
 	public static function fromRequest(Request $request): static {
-		return match ($request->command) {
+		$self = match ($request->command) {
 			'create', 'alter' => static::fromCreate($request),
 			'drop' => static::fromDrop($request),
 			'show' => match (true) {
@@ -69,6 +71,8 @@ final class Payload extends BasePayload {
 			'desc', 'describe' => static::fromDesc($request),
 			default => throw new QueryParseError('Failed to parse query'),
 		};
+		$self->user = $request->user ?? '';
+		return $self;
 	}
 
 	/**

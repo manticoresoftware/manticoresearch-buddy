@@ -38,23 +38,69 @@ class ConversationManagerTest extends TestCase {
 	 * @throws ManticoreSearchClientError
 	 */
 	public function testInitializeTableCreatesTable(): void {
-		$conversationManager = $this->createConversationManager();
-
-		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
 		$mockResponse = $this->createSuccessfulResponse();
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
-			->with($this->stringContains(/** @lang manticore */ 'CREATE TABLE IF NOT EXISTS chat_conversations'))
+			->with(
+				$this->stringContains(
+				/** @lang manticore */
+					'CREATE TABLE IF NOT EXISTS system.chat_history_test_model'
+				)
+			)
 			->willReturn($mockResponse);
 
-		$conversationManager->initializeTable($mockClient);
+		new ConversationManager($mockClient, 'test_model');
 	}
 
-	private function createConversationManager(?HTTPClient $client = null): ConversationManager {
-		return new ConversationManager($client ?? $this->createMock(HTTPClient::class));
+	/**
+	 * @throws ManticoreSearchClientError
+	 */
+	public function testInitializeModelHistoryTableCreatesModelSpecificTable(): void {
+		$mockClient = $this->createMock(HTTPClient::class);
+		$mockResponse = $this->createSuccessfulResponse();
+		$expectedSql = /** @lang manticore */ 'CREATE TABLE IF NOT EXISTS system.chat_history_test_model';
+
+		$mockClient->expects($this->once())
+			->method('sendRequest')
+			->with($this->stringContains($expectedSql))
+			->willReturn($mockResponse);
+
+		new ConversationManager($mockClient, 'test_model');
+	}
+
+	private function createConversationManagerWithRequestExpectation(
+		HTTPClient&MockObject $client,
+		callable $assertSql,
+		Response $response
+	): ConversationManager {
+		$initResponse = $this->createSuccessfulResponse();
+		$requestNumber = 0;
+
+		$client->expects($this->exactly(2))
+			->method('sendRequest')
+			->willReturnCallback(
+				function (string $sql) use (&$requestNumber, $assertSql, $initResponse, $response): Response {
+					++$requestNumber;
+					if ($requestNumber === 1) {
+						$this->assertStringContainsString(
+							/** @lang manticore */
+							'CREATE TABLE IF NOT EXISTS system.chat_history_test_model',
+							$sql
+						);
+
+						return $initResponse;
+					}
+
+					$this->assertTrue($assertSql($sql));
+
+					return $response;
+				}
+			);
+
+		return new ConversationManager($client, 'test_model');
 	}
 
 	private function createSuccessfulResponse(): Response {
@@ -68,19 +114,21 @@ class ConversationManagerTest extends TestCase {
 	 * @throws ManticoreSearchClientError
 	 */
 	public function testInitializeTableAlreadyExists(): void {
-		$conversationManager = $this->createConversationManager();
-
-		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
 		$mockResponse = $this->createSuccessfulResponse();
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
-			->with($this->stringContains(/** @lang manticore */ 'CREATE TABLE IF NOT EXISTS chat_conversations'))
+			->with(
+				$this->stringContains(
+				/** @lang manticore */
+					'CREATE TABLE IF NOT EXISTS system.chat_history_test_model'
+				)
+			)
 			->willReturn($mockResponse);
 
-		$conversationManager->initializeTable($mockClient);
+		new ConversationManager($mockClient, 'test_model');
 	}
 
 	/**
@@ -91,24 +139,19 @@ class ConversationManagerTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		$conversationManager = $this->createConversationManager($mockClient);
-
 		$mockResponse = $this->createSuccessfulResponse();
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->with(
-				$this->callback(
-					function ($sql) {
-						return str_contains($sql, /** @lang manticore */ 'INSERT INTO chat_conversations')
-							&& str_contains($sql, 'conversation_uuid')
-							&& str_contains($sql, 'model_uuid')
-							&& str_contains($sql, 'role')
-							&& str_contains($sql, 'message');
-					}
-				)
-			)
-			->willReturn($mockResponse);
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			function (string $sql): bool {
+				return str_contains($sql, /** @lang manticore */ 'INSERT INTO system.chat_history_test_model')
+					&& str_contains($sql, 'conversation_uuid')
+					&& str_contains($sql, 'model_name')
+					&& str_contains($sql, 'role')
+					&& str_contains($sql, 'message');
+			},
+			$mockResponse
+		);
 
 		$conversationManager->saveMessage(
 			'conv-123',
@@ -124,21 +167,17 @@ class ConversationManagerTest extends TestCase {
 	 */
 	public function testSaveMessageStoresExcludedIdsAsJsonArrayEvenWhenEmpty(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
-		$conversationManager = $this->createConversationManager($mockClient);
 
 		$mockResponse = $this->createSuccessfulResponse();
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->with(
-				$this->callback(
-					static function (string $sql): bool {
-						return str_contains($sql, 'excluded_ids, ttl')
-							&& str_contains($sql, "'[]'");
-					}
-				)
-			)
-			->willReturn($mockResponse);
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			static function (string $sql): bool {
+				return str_contains($sql, 'excluded_ids, ttl')
+					&& str_contains($sql, "'[]'");
+			},
+			$mockResponse
+		);
 
 		$conversationManager->saveMessage(
 			'conv-123',
@@ -154,8 +193,6 @@ class ConversationManagerTest extends TestCase {
 	public function testGetConversationHistoryOrdered(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		$conversationManager = new ConversationManager($mockClient);
 
 		// Mock response with conversation data
 		$mockResponse = $this->createMock(Response::class);
@@ -175,15 +212,18 @@ class ConversationManagerTest extends TestCase {
 			)
 		);
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->with(
-				$this->stringContains(
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			function (string $sql): bool {
+				return str_contains(
+					$sql,
 					/** @lang manticore */
-					'SELECT role, message, intent, search_query, exclude_query, excluded_ids FROM chat_conversations'
-				)
-			)
-			->willReturn($mockResponse);
+					'SELECT role, message, intent, search_query, exclude_query, excluded_ids '
+					. 'FROM system.chat_history_test_model'
+				);
+			},
+			$mockResponse
+		);
 
 		$result = $conversationManager->getConversationMessages('conv-123')->format();
 
@@ -198,12 +238,13 @@ class ConversationManagerTest extends TestCase {
 	public function testGetConversationHistoryEmpty(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-		$conversationManager = $this->createConversationManager($mockClient);
 		$mockResponse = $this->createEmptyDataResponse();
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->willReturn($mockResponse);
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			static fn(): bool => true,
+			$mockResponse
+		);
 
 		$result = $conversationManager->getConversationMessages('conv-123')->format();
 
@@ -256,8 +297,6 @@ class ConversationManagerTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		$conversationManager = new ConversationManager($mockClient);
-
 		// Mock response with limited data
 		$mockResponse = $this->createMock(Response::class);
 		$mockResponse->method('hasError')->willReturn(false);
@@ -275,15 +314,18 @@ class ConversationManagerTest extends TestCase {
 			)
 		);
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->with(
-				$this->stringContains(
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			function (string $sql): bool {
+				return str_contains(
+					$sql,
 					/** @lang manticore */
-					'SELECT role, message, intent, search_query, exclude_query, excluded_ids FROM chat_conversations'
-				)
-			)
-			->willReturn($mockResponse);
+					'SELECT role, message, intent, search_query, exclude_query, excluded_ids '
+					. 'FROM system.chat_history_test_model'
+				);
+			},
+			$mockResponse
+		);
 
 		$result = $conversationManager->getConversationMessages('conv-123', 5)->format();
 
@@ -299,8 +341,6 @@ class ConversationManagerTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		$conversationManager = $this->createConversationManager($mockClient);
-
 		$mockResponse = $this->createSearchContextResponse(
 			[
 				'search_query' => 'movies about space',
@@ -309,19 +349,16 @@ class ConversationManagerTest extends TestCase {
 			]
 		);
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->with(
-				$this->callback(
-					function ($sql) {
-						return str_contains(
-							$sql,
-							'SELECT role, message, intent, search_query, exclude_query, excluded_ids'
-						);
-					}
-				)
-			)
-			->willReturn($mockResponse);
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			function (string $sql): bool {
+				return str_contains(
+					$sql,
+					'SELECT role, message, intent, search_query, exclude_query, excluded_ids'
+				);
+			},
+			$mockResponse
+		);
 
 		$result = $conversationManager->getConversationMessages('conv-123')->latestSearchContext();
 
@@ -367,13 +404,13 @@ class ConversationManagerTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		$conversationManager = $this->createConversationManager($mockClient);
-
 		$mockResponse = $this->createEmptyDataResponse();
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->willReturn($mockResponse);
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			static fn(): bool => true,
+			$mockResponse
+		);
 
 		$result = $conversationManager->getConversationMessages('conv-123')->latestSearchContext();
 
@@ -386,7 +423,6 @@ class ConversationManagerTest extends TestCase {
 	 */
 	public function testGetLatestSearchContextTreatsWhitespaceExcludedIdsAsEmpty(): void {
 		$mockClient = $this->createMock(HTTPClient::class);
-		$conversationManager = $this->createConversationManager($mockClient);
 
 		$mockResponse = $this->createSearchContextResponse(
 			[
@@ -396,9 +432,11 @@ class ConversationManagerTest extends TestCase {
 			]
 		);
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->willReturn($mockResponse);
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			static fn(): bool => true,
+			$mockResponse
+		);
 
 		$result = $conversationManager->getConversationMessages('conv-123')->latestSearchContext();
 
@@ -413,8 +451,6 @@ class ConversationManagerTest extends TestCase {
 	public function testGetConversationHistoryForQueryGenerationKeepsFollowUps(): void {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		$conversationManager = new ConversationManager($mockClient);
 
 		// Mock response with complete conversation data, including FOLLOW_UP records.
 		$mockResponse = $this->createMock(Response::class);
@@ -454,16 +490,13 @@ class ConversationManagerTest extends TestCase {
 			)
 		);
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->with(
-				$this->callback(
-					function ($sql) {
-						return !str_contains($sql, 'intent !=');
-					}
-				)
-			)
-			->willReturn($mockResponse);
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			function (string $sql): bool {
+				return !str_contains($sql, 'intent !=');
+			},
+			$mockResponse
+		);
 
 		$result = $conversationManager->getConversationMessages('conv-123')->format();
 
@@ -483,24 +516,19 @@ class ConversationManagerTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		$conversationManager = $this->createConversationManager($mockClient);
-
 		$mockResponse = $this->createSuccessfulResponse();
 
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->with(
-				$this->callback(
-					function ($sql) {
-						return str_contains($sql, /** @lang manticore */ 'INSERT INTO chat_conversations')
-							&& str_contains($sql, 'intent')
-							&& str_contains($sql, 'search_query')
-							&& str_contains($sql, 'exclude_query')
-							&& str_contains($sql, 'excluded_ids');
-					}
-				)
-			)
-			->willReturn($mockResponse);
+		$conversationManager = $this->createConversationManagerWithRequestExpectation(
+			$mockClient,
+			function (string $sql): bool {
+				return str_contains($sql, /** @lang manticore */ 'INSERT INTO system.chat_history_test_model')
+					&& str_contains($sql, 'intent')
+					&& str_contains($sql, 'search_query')
+					&& str_contains($sql, 'exclude_query')
+					&& str_contains($sql, 'excluded_ids');
+			},
+			$mockResponse
+		);
 
 		$conversationManager->saveMessage(
 			'conv-123',

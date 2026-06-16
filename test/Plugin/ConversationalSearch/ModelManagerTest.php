@@ -10,13 +10,13 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ModelManager;
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Struct;
 use PHPUnit\Framework\TestCase;
-use Random\RandomException;
 
 class ModelManagerTest extends TestCase {
 	/**
@@ -35,27 +35,7 @@ class ModelManagerTest extends TestCase {
 
 	/**
 	 * @throws ManticoreSearchClientError
-	 */
-	public function testInitializeTablesCreatesModelsTable(): void {
-		$modelManager = new ModelManager();
-
-		// Mock HTTP client
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		$createResponse = $this->createMock(Response::class);
-		$createResponse->method('hasError')->willReturn(false);
-
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->willReturn($createResponse);
-
-		$modelManager->initializeTables($mockClient);
-	}
-
-	/**
-	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
-	 * @throws RandomException
 	 */
 	public function testCreateModelSuccessful(): void {
 		$modelManager = new ModelManager();
@@ -63,19 +43,27 @@ class ModelManagerTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock responses for modelExists check and insert
-		$modelExistsResponse = $this->createMock(Response::class);
-		$modelExistsResponse->method('hasError')->willReturn(false);
-		$modelExistsResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => [['count' => 0]]]])
-		);
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('system.chat_model_test_model')
+			->willReturn(false);
+
+		$createModelTableResponse = $this->createMock(Response::class);
+		$createModelTableResponse->method('hasError')->willReturn(false);
 
 		$insertResponse = $this->createMock(Response::class);
 		$insertResponse->method('hasError')->willReturn(false);
 
-		$mockClient->expects($this->exactly(2))
+		$createHistoryResponse = $this->createMock(Response::class);
+		$createHistoryResponse->method('hasError')->willReturn(false);
+
+		$mockClient->expects($this->exactly(3))
 			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($modelExistsResponse, $insertResponse);
+			->willReturnOnConsecutiveCalls(
+				$createModelTableResponse,
+				$insertResponse,
+				$createHistoryResponse
+			);
 
 		$config = [
 			'name' => 'test_model',
@@ -93,7 +81,6 @@ class ModelManagerTest extends TestCase {
 
 	/**
 	 * @throws ManticoreSearchResponseError
-	 * @throws RandomException
 	 */
 	public function testCreateModelDuplicateName(): void {
 		$modelManager = new ModelManager();
@@ -101,16 +88,10 @@ class ModelManagerTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock response showing model already exists
-		$modelExistsResponse = $this->createMock(Response::class);
-		$modelExistsResponse->method('hasError')->willReturn(false);
-		$modelExistsResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => [['count' => 1]]]])
-		);
-
 		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->willReturn($modelExistsResponse);
+			->method('hasTable')
+			->with('system.chat_model_existing_model')
+			->willReturn(true);
 
 		$config = [
 			'name' => 'existing_model',
@@ -126,7 +107,7 @@ class ModelManagerTest extends TestCase {
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetModelByUuidOrNameFoundByName(): void {
+	public function testGetModelFound(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
@@ -141,7 +122,6 @@ class ModelManagerTest extends TestCase {
 					[
 						'data' => [
 							[
-								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
 								'description' => 'Test chat Model',
 								'model' => 'openai:gpt-4',
@@ -163,18 +143,16 @@ class ModelManagerTest extends TestCase {
 
 		$mockClient->expects($this->once())
 			->method('sendRequest')
-			->with($this->stringContains('WHERE (name = \'test_model\' OR uuid = \'test_model\')'))
 			->willReturn($mockResponse);
 
-		/** @var array{id:string, uuid:string, name:string,model:string,
+		/** @var array{id:string, name:string,model:string,
 		 * description:string,
 		 * settings:array{api_key:string, base_url:string, retrieval_limit:int, max_document_length:int},
 		 * created_at:string,updated_at:string} $result
 		 */
-		$result = $modelManager->getModelByUuidOrName($mockClient, 'test_model');
+		$result = $modelManager->getModel($mockClient, 'test_model');
 
 		$this->assertIsArray($result);
-		$this->assertEquals('test-uuid-123', $result['uuid']);
 		$this->assertEquals('test_model', $result['name']);
 		$this->assertEquals('Test chat Model', $result['description']);
 		$this->assertEquals('openai:gpt-4', $result['model']);
@@ -187,70 +165,40 @@ class ModelManagerTest extends TestCase {
 	}
 
 	/**
-	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetModelByUuidOrNameFoundByUuid(): void {
+	public function testGetModelNotFound(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock response with model data
 		$mockResponse = $this->createMock(Response::class);
 		$mockResponse->method('hasError')->willReturn(false);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-					[
-						'data' => [
-							[
-								'uuid' => 'test-uuid-123',
-								'name' => 'test_model',
-								'settings' => '{}',
-							],
-						],
-					],
-				]
-			)
-		);
-
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->with($this->stringContains('WHERE (name = \'test-uuid-123\' OR uuid = \'test-uuid-123\')'))
-			->willReturn($mockResponse);
-
-		$result = $modelManager->getModelByUuidOrName($mockClient, 'test-uuid-123');
-
-		$this->assertIsArray($result);
-		$this->assertEquals('test-uuid-123', $result['uuid']);
-	}
-
-	/**
-	 * @throws ManticoreSearchResponseError
-	 */
-	public function testGetModelByUuidOrNameNotFound(): void {
-		$modelManager = new ModelManager();
-
-		// Mock HTTP client
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		$mockResponse = $this->createEmptyModelLookupResponse();
-
+		$mockResponse->method('getResult')->willReturn(Struct::fromData([['data' => []]]));
 		$mockClient->expects($this->once())
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
 		$this->expectException(ManticoreSearchClientError::class);
-		$modelManager->getModelByUuidOrName($mockClient, 'nonexistent');
+		$modelManager->getModel($mockClient, 'nonexistent');
 	}
 
-	private function createEmptyModelLookupResponse(): Response {
+	/**
+	 * @param list<string> $modelNames
+	 */
+	private function createModelTableListResponse(array $modelNames): Response {
+		$rows = [];
+		foreach ($modelNames as $modelName) {
+			$rows[] = [
+				'Table' => ResourceTable::TABLE_PREFIX_CHAT_MODEL . $modelName,
+				'Type' => 'rt',
+			];
+		}
+
 		$mockResponse = $this->createMock(Response::class);
 		$mockResponse->method('hasError')->willReturn(false);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => []]])
-		);
+		$mockResponse->method('getResult')->willReturn(Struct::fromData([['data' => $rows]]));
 
 		return $mockResponse;
 	}
@@ -259,78 +207,69 @@ class ModelManagerTest extends TestCase {
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testDeleteModelByUuidOrNameSuccessful(): void {
+	public function testDeleteModelSuccessful(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock getModelByUuidOrName response
-		$getModelResponse = $this->createMock(Response::class);
-		$getModelResponse->method('hasError')->willReturn(false);
-		$getModelResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-					[
-						'data' => [
-							[
-								'uuid' => 'test-uuid-123',
-								'name' => 'test_model',
-								'settings' => '{}',
-							],
-						],
-					],
-				]
-			)
-		);
 
 		// Mock delete response
 		$deleteResponse = $this->createMock(Response::class);
 		$deleteResponse->method('hasError')->willReturn(false);
 
+		$dropHistoryResponse = $this->createMock(Response::class);
+		$dropHistoryResponse->method('hasError')->willReturn(false);
+
+		$mockClient->expects($this->once())
+			->method('hasTable')
+			->with('system.chat_model_test_model')
+			->willReturn(true);
 		$mockClient->expects($this->exactly(2))
 			->method('sendRequest')
-			->willReturnOnConsecutiveCalls($getModelResponse, $deleteResponse);
+			->willReturnOnConsecutiveCalls(
+				$deleteResponse,
+				$dropHistoryResponse
+			);
 
-		$modelManager->deleteModelByUuidOrName($mockClient, 'test_model');
+		$modelManager->deleteModel($mockClient, 'test_model');
 	}
 
 	/**
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testDeleteModelByUuidOrNameModelNotFound(): void {
+	public function testDeleteModelModelNotFound(): void {
 		$modelManager = new ModelManager();
 
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		$getModelResponse = $this->createEmptyModelLookupResponse();
-
 		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->willReturn($getModelResponse);
+			->method('hasTable')
+			->with('system.chat_model_nonexistent')
+			->willReturn(false);
+		$mockClient->expects($this->never())->method('sendRequest');
 
 		$this->expectException(ManticoreSearchClientError::class);
 
-		$modelManager->deleteModelByUuidOrName($mockClient, 'nonexistent');
+		$modelManager->deleteModel($mockClient, 'nonexistent');
 	}
 
 	/**
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testDeleteModelByUuidOrNameIfExistsDoesNotThrowWhenModelMissing(): void {
+	public function testDeleteModelIfExistsDoesNotThrowWhenModelMissing(): void {
 		$modelManager = new ModelManager();
 
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		$getModelResponse = $this->createEmptyModelLookupResponse();
-
 		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->willReturn($getModelResponse);
+			->method('hasTable')
+			->with('system.chat_model_nonexistent')
+			->willReturn(false);
+		$mockClient->expects($this->never())->method('sendRequest');
 
-		$modelManager->deleteModelByUuidOrName($mockClient, 'nonexistent', true);
+		$modelManager->deleteModel($mockClient, 'nonexistent', true);
 		$this->addToAssertionCount(1);
 	}
 
@@ -344,29 +283,23 @@ class ModelManagerTest extends TestCase {
 		// Mock HTTP client
 		$mockClient = $this->createMock(HTTPClient::class);
 
-		// Mock response with multiple models
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-		$mockResponse->method('getResult')->willReturn(
+		$tableListResponse = $this->createModelTableListResponse(['model1', 'model2']);
+
+		$model1Response = $this->createMock(Response::class);
+		$model1Response->method('hasError')->willReturn(false);
+		$model1Response->method('getResult')->willReturn(
 			Struct::fromData(
 				[
 					[
 						'data' => [
 							[
 								'id' => 1,
-								'uuid' => 'uuid-1',
 								'name' => 'model1',
 								'description' => 'Model One',
 								'model' => 'openai:gpt-4',
+								'settings' => '{}',
 								'created_at' => 1234567890,
-							],
-							[
-								'id' => 2,
-								'uuid' => 'uuid-2',
-								'name' => 'model2',
-								'description' => 'Model Two',
-								'model' => 'openai:gpt-3.5-turbo',
-								'created_at' => 1234567891,
+								'updated_at' => 1234567890,
 							],
 						],
 					],
@@ -374,19 +307,84 @@ class ModelManagerTest extends TestCase {
 			)
 		);
 
-		$mockClient->expects($this->once())
+		$model2Response = $this->createMock(Response::class);
+		$model2Response->method('hasError')->willReturn(false);
+		$model2Response->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+					[
+						'data' => [
+							[
+								'id' => 2,
+								'name' => 'model2',
+								'description' => 'Model Two',
+								'model' => 'openai:gpt-3.5-turbo',
+								'settings' => '{}',
+								'created_at' => 1234567891,
+								'updated_at' => 1234567891,
+							],
+						],
+					],
+				]
+			)
+		);
+
+		$mockClient->expects($this->exactly(3))
 			->method('sendRequest')
-			->with($this->stringContains('SELECT id, uuid, name, description, model, created_at'))
-			->willReturn($mockResponse);
+			->willReturnOnConsecutiveCalls($tableListResponse, $model1Response, $model2Response);
 
 		$result = $modelManager->getAllModels($mockClient);
 
 		$this->assertIsArray($result);
 		$this->assertCount(2, $result);
-		$this->assertEquals('uuid-1', $result[0]['uuid']);
-		$this->assertEquals('model1', $result[0]['name']);
-		$this->assertEquals('uuid-2', $result[1]['uuid']);
-		$this->assertEquals('model2', $result[1]['name']);
+		$this->assertEquals('model2', $result[0]['name']);
+		$this->assertEquals('model1', $result[1]['name']);
+	}
+
+	/**
+	 * @throws ManticoreSearchClientError
+	 * @throws ManticoreSearchResponseError
+	 */
+	public function testGetAllModelsSkipsInaccessibleModelTables(): void {
+		$modelManager = new ModelManager();
+		$mockClient = $this->createMock(HTTPClient::class);
+
+		$tableListResponse = $this->createModelTableListResponse(['allowed', 'denied']);
+
+		$allowedResponse = $this->createMock(Response::class);
+		$allowedResponse->method('hasError')->willReturn(false);
+		$allowedResponse->method('getResult')->willReturn(
+			Struct::fromData(
+				[
+					[
+						'data' => [
+							[
+								'id' => 1,
+								'name' => 'allowed',
+								'description' => 'Allowed',
+								'model' => 'openai:gpt-4',
+								'settings' => '{}',
+								'created_at' => 1234567890,
+								'updated_at' => 1234567890,
+							],
+						],
+					],
+				]
+			)
+		);
+
+		$deniedResponse = $this->createMock(Response::class);
+		$deniedResponse->method('hasError')->willReturn(true);
+		$deniedResponse->method('getError')->willReturn("Permission denied for user 'reader'");
+
+		$mockClient->expects($this->exactly(3))
+			->method('sendRequest')
+			->willReturnOnConsecutiveCalls($tableListResponse, $allowedResponse, $deniedResponse);
+
+		$result = $modelManager->getAllModels($mockClient);
+
+		$this->assertCount(1, $result);
+		$this->assertSame('allowed', $result[0]['name']);
 	}
 
 	/**
@@ -528,40 +526,10 @@ class ModelManagerTest extends TestCase {
 	}
 
 	/**
-	 * @throws ReflectionException
-	 */
-	public function testModelExistsCaseSensitivity(): void {
-		$modelManager = new ModelManager();
-
-		// Mock HTTP client
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock response showing model exists
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData([['data' => [['count' => 1]]]])
-		);
-
-		$mockClient->expects($this->once())
-			->method('sendRequest')
-			->with($this->stringContains('WHERE name = \'TestModel\''))
-			->willReturn($mockResponse);
-
-		// Use reflection to access private method
-		$reflection = new ReflectionClass($modelManager);
-		$method = $reflection->getMethod('modelExists');
-
-		$result = $method->invoke($modelManager, $mockClient, 'TestModel');
-
-		$this->assertTrue($result);
-	}
-
-	/**
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetModelByUuidOrNameWithNullSettingsFailsFast(): void {
+	public function testGetModelWithNullSettingsFailsFast(): void {
 		$modelManager = new ModelManager();
 		$this->expectException(ManticoreSearchClientError::class);
 
@@ -577,7 +545,6 @@ class ModelManagerTest extends TestCase {
 					[
 						'data' => [
 							[
-								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
 								'model' => 'openai:gpt-4',
 								'settings' => null,
@@ -593,14 +560,14 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$modelManager->getModelByUuidOrName($mockClient, 'test_model');
+		$modelManager->getModel($mockClient, 'test_model');
 	}
 
 	/**
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetModelByUuidOrNameWithEmptyStringSettingsFailsFast(): void {
+	public function testGetModelWithEmptyStringSettingsFailsFast(): void {
 		$modelManager = new ModelManager();
 		$this->expectException(ManticoreSearchClientError::class);
 
@@ -616,7 +583,6 @@ class ModelManagerTest extends TestCase {
 					[
 						'data' => [
 							[
-								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
 								'model' => 'openai:gpt-4',
 								'settings' => '',
@@ -632,13 +598,13 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$modelManager->getModelByUuidOrName($mockClient, 'test_model');
+		$modelManager->getModel($mockClient, 'test_model');
 	}
 
 	/**
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetModelByUuidOrNameWithInvalidJsonSettings(): void {
+	public function testGetModelWithInvalidJsonSettings(): void {
 		$modelManager = new ModelManager();
 
 		$this->expectException(ManticoreSearchClientError::class);
@@ -655,7 +621,6 @@ class ModelManagerTest extends TestCase {
 					[
 						'data' => [
 							[
-								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
 								'model' => 'openai:gpt-4',
 								'settings' => '{invalid json',
@@ -671,14 +636,14 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$modelManager->getModelByUuidOrName($mockClient, 'test_model');
+		$modelManager->getModel($mockClient, 'test_model');
 	}
 
 	/**
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testGetModelByUuidOrNameWithStringNullSettingsFailsFast(): void {
+	public function testGetModelWithStringNullSettingsFailsFast(): void {
 		$modelManager = new ModelManager();
 		$this->expectException(ManticoreSearchClientError::class);
 
@@ -694,7 +659,6 @@ class ModelManagerTest extends TestCase {
 					[
 						'data' => [
 							[
-								'uuid' => 'test-uuid-123',
 								'name' => 'test_model',
 								'model' => 'openai:gpt-4',
 								'settings' => 'NULL',
@@ -710,6 +674,6 @@ class ModelManagerTest extends TestCase {
 			->method('sendRequest')
 			->willReturn($mockResponse);
 
-		$modelManager->getModelByUuidOrName($mockClient, 'test_model');
+		$modelManager->getModel($mockClient, 'test_model');
 	}
 }

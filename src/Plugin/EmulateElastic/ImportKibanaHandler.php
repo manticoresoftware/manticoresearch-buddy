@@ -41,9 +41,10 @@ class ImportKibanaHandler extends BaseEntityHandler {
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
+			$systemClient = self::getSystemClient($manticoreClient);
 			$query = 'CREATE TABLE IF NOT EXISTS ' . parent::ENTITY_TABLE
 				. ' (_id string, _index string, _index_alias string, _type string, _source json)';
-			$queryResult = $manticoreClient->sendRequest($query)->getResult();
+			$queryResult = $systemClient->sendRequest($query)->getResult();
 			if (isset($queryResult['error'])) {
 				throw new \Exception('Unknown error on entity table creation');
 			}
@@ -145,9 +146,10 @@ class ImportKibanaHandler extends BaseEntityHandler {
 	 * @return string
 	 */
 	protected static function getImportedPattern(string $patternId, HTTPClient $manticoreClient): string {
+		$systemClient = self::getSystemClient($manticoreClient);
 		$query = 'SELECT _source FROM ' . parent::ENTITY_TABLE . " WHERE _id='{$patternId}'";
 		/** @var array{error?:string,0:array{data?:array<array{_source:string}>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error']) || !isset($queryResult[0]['data'])) {
 			throw new \Exception('Unknown error on Kibana index pattern retrieval');
 		}
@@ -171,9 +173,10 @@ class ImportKibanaHandler extends BaseEntityHandler {
 		$pattern = simdjson_decode($patternSource, true);
 		$indexName = isset($pattern['index-pattern'])
 			? $pattern['index-pattern']['title'] : $pattern['attributes']['title'];
+		$systemClient = self::getSystemClient($manticoreClient);
 		$query = 'SELECT _id, _source FROM ' . parent::ENTITY_TABLE . " WHERE _type='{$indexType}'";
 		/** @var array{error?:string,0:array{data?:array<array{_source:string,_id:string}>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error']) || !isset($queryResult[0]['data'])) {
 			throw new \Exception('Unknown error on Kibana entity retrieval');
 		}
@@ -207,9 +210,10 @@ class ImportKibanaHandler extends BaseEntityHandler {
 		$importedId = explode(':', $importedId)[1];
 		$actualId = explode(':', $actualId)[1];
 
+		$systemClient = self::getSystemClient($manticoreClient);
 		$query = 'SELECT _id, _source FROM ' . parent::ENTITY_TABLE	. " WHERE _type='visualization'";
 		/** @var array{error?:string,0:array{data?:array<array{_source:string,_id:string}>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error']) || !isset($queryResult[0]['data'])) {
 			throw new \Exception('Unknown error on Kibana imorted entity retrieval');
 		}
@@ -223,7 +227,7 @@ class ImportKibanaHandler extends BaseEntityHandler {
 			$entitySource = str_replace('\\"', '\\\\"', (string)json_encode($entitySource));
 			$query = 'UPDATE ' . parent::ENTITY_TABLE
 				. " SET _source='{$entitySource}' WHERE _id='{$entityInfo['_id']}'";
-			$queryResult = $manticoreClient->sendRequest($query)->getResult();
+			$queryResult = $systemClient->sendRequest($query)->getResult();
 			if (isset($queryResult['error'])) {
 				throw new \Exception('Unknown error on Kibana imported entity update');
 			}

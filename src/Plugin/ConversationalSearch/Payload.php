@@ -127,7 +127,7 @@ final class Payload extends BasePayload {
 			$this->action = self::ACTION_SHOW_MODELS;
 		} elseif (preg_match('/^DESCRIBE\s+CHAT\s+MODEL\s+[\'"]?([^\'"]+)[\'"]?\s*\z/i', $sql, $matches)) {
 			$this->action = self::ACTION_DESCRIBE_MODEL;
-			$this->params = ['model_name_or_uuid' => $matches[1]];
+			$this->params = ['model_name' => $matches[1]];
 		} elseif (preg_match('/^DROP\s+CHAT\s+MODEL\s+/i', $sql)) {
 			$this->action = self::ACTION_DROP_MODEL;
 			$this->params = $this->parseDropModelParams($sql);
@@ -307,12 +307,12 @@ final class Payload extends BasePayload {
 	}
 
 	/**
-	 * @return array{model_name_or_uuid: string, if_exists?: '1'}
+	 * @return array{model_name: string, if_exists?: '1'}
 	 * @throws QueryParseError
 	 */
 	private function parseDropModelParams(string $sql): array {
 		if (!preg_match(
-			'/^DROP\s+CHAT\s+MODEL\s+(?:(IF\s+EXISTS)\s+)?(?:\'([^\']+)\'|"([^"]+)"|([A-Za-z0-9_-]+))\s*\z/i',
+			'/^DROP\s+CHAT\s+MODEL\s+(?:(IF\s+EXISTS)\s+)?(\'[^\']+\'|"[^"]+"|[A-Za-z0-9_-]+)\s*\z/i',
 			$sql,
 			$matches
 		)
@@ -320,18 +320,7 @@ final class Payload extends BasePayload {
 			throw QueryParseError::create('Invalid DROP CHAT MODEL syntax');
 		}
 
-		$modelNameOrUuid = $matches[2] ?? '';
-		if ($modelNameOrUuid === '') {
-			$modelNameOrUuid = $matches[3] ?? '';
-		}
-		if ($modelNameOrUuid === '') {
-			$modelNameOrUuid = $matches[4] ?? '';
-		}
-		if ($modelNameOrUuid === '') {
-			throw QueryParseError::create('DROP CHAT MODEL requires model name or uuid');
-		}
-
-		$params = ['model_name_or_uuid' => $modelNameOrUuid];
+		$params = ['model_name' => $this->unquoteString($matches[2])];
 		if (!empty($matches[1])) {
 			$params['if_exists'] = '1';
 		}
@@ -359,7 +348,7 @@ final class Payload extends BasePayload {
 		$parsed = [
 			'query' => $this->unquoteString($parts[0] ?? ''),
 			'table' => $this->unquoteString($parts[1] ?? ''),
-			'model_uuid' => $this->unquoteString($parts[2] ?? ''),
+			'model_name' => $this->unquoteString($parts[2] ?? ''),
 		];
 
 		switch ($partCount) {

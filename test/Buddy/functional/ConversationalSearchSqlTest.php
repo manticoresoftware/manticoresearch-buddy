@@ -15,7 +15,24 @@ use PHPUnit\Framework\TestCase;
 class ConversationalSearchSqlTest extends TestCase {
 	use TestFunctionalTrait;
 
+	/** @var list<string> */
+	private array $createdChatModels = [];
 
+	/** @var list<string> */
+	private array $createdTables = [];
+
+	protected function tearDown(): void {
+		foreach ($this->createdChatModels as $modelName) {
+			static::runSqlQuery("DROP CHAT MODEL IF EXISTS '{$modelName}'");
+		}
+
+		foreach ($this->createdTables as $tableName) {
+			static::runSqlQuery("DROP TABLE IF EXISTS {$tableName}");
+		}
+
+		$this->createdChatModels = [];
+		$this->createdTables = [];
+	}
 
 	/**
 	 * Test complete chat flow including table creation and conversation
@@ -25,6 +42,8 @@ class ConversationalSearchSqlTest extends TestCase {
 		$uniqueId = uniqid();
 		$tableName = "test_docs_{$uniqueId}";
 		$modelName = "test_sql_model_{$uniqueId}";
+		$this->createdTables[] = $tableName;
+		$this->createdChatModels[] = $modelName;
 
 		// Create a test documents table for chat
 		$result = static::runSqlQuery("CREATE TABLE {$tableName} (title text, content text, id int)");
@@ -50,13 +69,15 @@ class ConversationalSearchSqlTest extends TestCase {
 				retrieval_limit = 5
 			)"
 		);
-		$this->assertNotEmpty($result); // CREATE CHAT MODEL returns UUID table
-		$this->assertStringContainsString('uuid', implode(' ', $result)); // Should contain UUID header
+		$this->assertNotEmpty($result);
+		$this->assertStringContainsString('name', implode(' ', $result));
+
+		$historyTable = "system.chat_history_{$modelName}";
 
 		// Verify conversations table was created
-		$result = static::runSqlQuery('SHOW TABLES LIKE chat_conversations');
+		$result = static::runSqlQuery("DESCRIBE {$historyTable}");
 		$this->assertNotEmpty($result);
-		$this->assertStringContainsString('chat_conversations', implode(' ', $result));
+		$this->assertStringContainsString('conversation_uuid', implode(' ', $result));
 
 		// Test conversation call (this should insert into conversations table)
 		// Note: This might fail due to missing API keys, but we can check SQL structure
@@ -88,6 +109,7 @@ class ConversationalSearchSqlTest extends TestCase {
 		// Use unique names to avoid conflicts
 		$uniqueId = uniqid();
 		$modelName = "structure_test_model_{$uniqueId}";
+		$this->createdChatModels[] = $modelName;
 
 		// Create chat model to ensure conversations table exists
 		$result = static::runSqlQuery(
@@ -96,14 +118,16 @@ class ConversationalSearchSqlTest extends TestCase {
 				retrieval_limit = 3
 			)"
 		);
-		$this->assertNotEmpty($result); // CREATE CHAT MODEL returns UUID table
-		$this->assertStringContainsString('uuid', implode(' ', $result)); // Should contain UUID header
+		$this->assertNotEmpty($result);
+		$this->assertStringContainsString('name', implode(' ', $result));
+
+		$historyTable = "system.chat_history_{$modelName}";
 
 		// Check table structure
-		$result = static::runSqlQuery('DESCRIBE chat_conversations');
+		$result = static::runSqlQuery("DESCRIBE {$historyTable}");
 		$this->assertNotEmpty($result);
 		$expectedColumns = [
-			'conversation_uuid', 'model_uuid', 'created_at', 'role', 'message',
+			'conversation_uuid', 'model_name', 'created_at', 'role', 'message',
 			'tokens_used', 'intent', 'search_query', 'exclude_query', 'excluded_ids', 'ttl',
 		];
 		foreach ($expectedColumns as $column) {
@@ -112,7 +136,7 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Test direct INSERT into conversations table
 		$result = static::runSqlQuery(
-			'INSERT INTO chat_conversations (conversation_uuid, model_uuid, created_at, role, message, '
+			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
 				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 				. "('test-conv-1', 'test-model-1', " . time() . ", 'user', 'Test message', 50, "
 				. "'NEW', '', '[]', " . (time() + 86400) . ')'
@@ -121,7 +145,7 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Verify the data was inserted correctly
 		$result = static::runSqlQuery(
-			"SELECT role, message FROM chat_conversations WHERE conversation_uuid = 'test-conv-1'"
+			"SELECT role, message FROM {$historyTable} WHERE conversation_uuid = 'test-conv-1'"
 		);
 		$this->assertNotEmpty($result);
 		$this->assertStringContainsString('user', implode(' ', $result));
@@ -136,6 +160,8 @@ class ConversationalSearchSqlTest extends TestCase {
 		$uniqueId = uniqid();
 		$modelName = "security_test_model_{$uniqueId}";
 		$tableName = "test_docs_{$uniqueId}";
+		$this->createdTables[] = $tableName;
+		$this->createdChatModels[] = $modelName;
 
 		// Create test table first
 		static::runSqlQuery("CREATE TABLE {$tableName} (title text, content text, id int)");
@@ -147,14 +173,16 @@ class ConversationalSearchSqlTest extends TestCase {
 				retrieval_limit = 3
 			)"
 		);
-		$this->assertNotEmpty($result); // CREATE CHAT MODEL returns UUID table
-		$this->assertStringContainsString('uuid', implode(' ', $result)); // Should contain UUID header
+		$this->assertNotEmpty($result);
+		$this->assertStringContainsString('name', implode(' ', $result));
+
+		$historyTable = "system.chat_history_{$modelName}";
 
 		// Test with potentially dangerous input
 		$dangerousInputs = [
-			"Robert'); DROP TABLE chat_conversations; --",
+			"Robert'); DROP TABLE {$historyTable}; --",
 			"' OR '1'='1",
-			"'; INSERT INTO chat_conversations VALUES ('hack', 'hack', 0, 'hacker', 'pwned', 0, "
+			"'; INSERT INTO {$historyTable} VALUES ('hack', 'hack', 0, 'hacker', 'pwned', 0, "
 				. "'' , '', '', '[]', 0); --",
 			'CONCAT(char(39), char(32), char(79), char(82), char(32), char(39), char(49), '
 				. 'char(39), char(61), char(39), char(49), char(39))',
@@ -168,7 +196,7 @@ class ConversationalSearchSqlTest extends TestCase {
 			);
 
 			// Check if any SQL injection succeeded (table should still exist)
-			$tableCheck = $this->runSqlQuery('SHOW TABLES LIKE chat_conversations');
+			$tableCheck = $this->runSqlQuery('SHOW TABLES');
 			$this->assertNotEmpty(
 				$tableCheck,
 				'Conversations table should still exist after potential SQL injection attempt'
@@ -183,6 +211,7 @@ class ConversationalSearchSqlTest extends TestCase {
 		// Use unique names to avoid conflicts
 		$uniqueId = uniqid();
 		$modelName = "history_test_model_{$uniqueId}";
+		$this->createdChatModels[] = $modelName;
 
 		// Create chat model
 		$result = static::runSqlQuery(
@@ -191,8 +220,10 @@ class ConversationalSearchSqlTest extends TestCase {
 				retrieval_limit = 3
 			)"
 		);
-		$this->assertNotEmpty($result); // CREATE CHAT MODEL returns UUID table
-		$this->assertStringContainsString('uuid', implode(' ', $result)); // Should contain UUID header
+		$this->assertNotEmpty($result);
+		$this->assertStringContainsString('name', implode(' ', $result));
+
+		$historyTable = "system.chat_history_{$modelName}";
 
 		// Insert test conversation data directly
 		$currentTime = time();
@@ -200,7 +231,7 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Insert multiple messages
 		$result = static::runSqlQuery(
-			'INSERT INTO chat_conversations (conversation_uuid, model_uuid, created_at, role, message, '
+			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
 				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 				. "('$conversationId', '{$modelName}', $currentTime, 'user', 'First question', "
 				. "30, 'NEW', '', '[]', " . ($currentTime + 86400) . ')'
@@ -208,7 +239,7 @@ class ConversationalSearchSqlTest extends TestCase {
 		$this->assertEmpty($result); // INSERT via SQL returns empty result
 
 		$result = static::runSqlQuery(
-			'INSERT INTO chat_conversations (conversation_uuid, model_uuid, created_at, role, message, '
+			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
 				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 				. "('$conversationId', '{$modelName}', " . ($currentTime + 60) . ", 'assistant', "
 				. "'First answer', 50, 'ANSWER', '', '[]', " . ($currentTime + 86400) . ')'
@@ -216,7 +247,7 @@ class ConversationalSearchSqlTest extends TestCase {
 		$this->assertEmpty($result); // INSERT via SQL returns empty result
 
 		$result = static::runSqlQuery(
-			'INSERT INTO chat_conversations (conversation_uuid, model_uuid, created_at, role, message, '
+			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
 				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 				. "('$conversationId', '{$modelName}', " . ($currentTime + 120) . ", 'user', "
 				. "'Second question', 25, 'FOLLOW_UP', '', '[]', " . ($currentTime + 86400) . ')'
@@ -225,7 +256,7 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Test complete history retrieval
 		$historyResult = $this->runSqlQuery(
-			'SELECT role, message FROM chat_conversations WHERE conversation_uuid = '
+			"SELECT role, message FROM {$historyTable} WHERE conversation_uuid = "
 			. "'$conversationId' ORDER BY created_at ASC"
 		);
 		$this->assertNotEmpty($historyResult);
@@ -235,7 +266,7 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Test query-generation history keeps FOLLOW_UP messages
 		$queryHistoryResult = $this->runSqlQuery(
-			'SELECT role, message FROM chat_conversations WHERE conversation_uuid = '
+			"SELECT role, message FROM {$historyTable} WHERE conversation_uuid = "
 			. "'$conversationId' ORDER BY created_at ASC"
 		);
 		$this->assertNotEmpty($queryHistoryResult);
@@ -245,7 +276,7 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Test search context retrieval (only select attributes, not stored fields)
 		$contextResult = $this->runSqlQuery(
-			'SELECT exclude_query, excluded_ids FROM chat_conversations WHERE '
+			"SELECT exclude_query, excluded_ids FROM {$historyTable} WHERE "
 				. "conversation_uuid = '$conversationId' AND role = 'user' "
 				. "AND intent != 'FOLLOW_UP' ORDER BY created_at DESC LIMIT 1"
 		);
@@ -256,11 +287,20 @@ class ConversationalSearchSqlTest extends TestCase {
 	 * Test error handling for malformed SQL
 	 */
 	public function testErrorHandlingForMalformedSql(): void {
-		// Test various malformed SQL scenarios that should be caught
+		$uniqueId = uniqid();
+		$modelName = "error_test_model_{$uniqueId}";
+		$this->createdChatModels[] = $modelName;
+		static::runSqlQuery(
+			"CREATE CHAT MODEL '{$modelName}' (
+				model = 'openai:gpt-4',
+				retrieval_limit = 3
+			)"
+		);
+		$historyTable = "system.chat_history_{$modelName}";
 
 		// Test INSERT with wrong column count
 		$this->assertQueryResultContainsError(
-			'INSERT INTO chat_conversations (conversation_uuid, model_uuid, created_at, role, message, '
+			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
 				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) '
 				. "VALUES ('test', 'test', 0)", // Missing 6 values
 			'P01: wrong number of values here near \')\''
@@ -268,7 +308,7 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Test INSERT with wrong data types (Manticore might be more permissive than expected)
 		$result = static::runSqlQuery(
-			'INSERT INTO chat_conversations (conversation_uuid, model_uuid, created_at, role, message, '
+			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
 				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 				. "('test', 'test', 'not_a_number', 'user', 'test', 'not_a_number', 'test', "
 				. "'test', 'test', 'not_a_number')"
@@ -279,8 +319,8 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Test SELECT with invalid column names
 		$this->assertQueryResultContainsError(
-			'SELECT invalid_column FROM chat_conversations',
-			'table chat_conversations: parse error: unknown column: invalid_column'
+			"SELECT invalid_column FROM {$historyTable}",
+			"table {$historyTable}: parse error: unknown column: invalid_column"
 		);
 	}
 
@@ -291,6 +331,7 @@ class ConversationalSearchSqlTest extends TestCase {
 		// Use unique names to avoid conflicts
 		$uniqueId = uniqid();
 		$modelName = "concurrent_test_model_{$uniqueId}";
+		$this->createdChatModels[] = $modelName;
 
 		// Create chat model
 		$result = static::runSqlQuery(
@@ -299,8 +340,10 @@ class ConversationalSearchSqlTest extends TestCase {
 				retrieval_limit = 3
 			)"
 		);
-		$this->assertNotEmpty($result); // CREATE CHAT MODEL returns UUID table
-		$this->assertStringContainsString('uuid', implode(' ', $result)); // Should contain UUID header
+		$this->assertNotEmpty($result);
+		$this->assertStringContainsString('name', implode(' ', $result));
+
+		$historyTable = "system.chat_history_{$modelName}";
 
 		// Insert conversations for different users concurrently
 		$currentTime = time();
@@ -312,7 +355,7 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		foreach ($conversations as [$convId, $user, $message]) {
 			$result = static::runSqlQuery(
-				'INSERT INTO chat_conversations (conversation_uuid, model_uuid, created_at, role, message, '
+				"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
 					. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
 					. "('$convId', '{$modelName}', $currentTime, '$user', '$message', 30, "
 					. "'NEW', '', '[]', " . ($currentTime + 86400) . ')'
@@ -323,7 +366,7 @@ class ConversationalSearchSqlTest extends TestCase {
 		// Verify each conversation can be retrieved independently
 		foreach ($conversations as [$convId, $user, $message]) {
 			$result = $this->runSqlQuery(
-				"SELECT role, message FROM chat_conversations WHERE conversation_uuid = '$convId'"
+				"SELECT role, message FROM {$historyTable} WHERE conversation_uuid = '$convId'"
 			);
 			$this->assertNotEmpty($result);
 			$this->assertStringContainsString($user, implode(' ', $result));
@@ -332,10 +375,10 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Verify no cross-contamination
 		$conv1Result = $this->runSqlQuery(
-			"SELECT COUNT(*) as count FROM chat_conversations WHERE conversation_uuid = 'conv1'"
+			"SELECT COUNT(*) as count FROM {$historyTable} WHERE conversation_uuid = 'conv1'"
 		);
 		$conv2Result = $this->runSqlQuery(
-			"SELECT COUNT(*) as count FROM chat_conversations WHERE conversation_uuid = 'conv2'"
+			"SELECT COUNT(*) as count FROM {$historyTable} WHERE conversation_uuid = 'conv2'"
 		);
 		$this->assertStringContainsString('1', implode(' ', $conv1Result));
 		$this->assertStringContainsString('1', implode(' ', $conv2Result));

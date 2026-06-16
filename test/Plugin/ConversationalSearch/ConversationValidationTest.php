@@ -751,11 +751,8 @@ class ConversationValidationTest extends TestCase {
 	 * @param MockObject&HTTPClient $mockClient
 	 */
 	private function configureClientWithInitialization(HTTPClient $mockClient): void {
-		$mockClient->expects($this->exactly(2))
-			->method('sendRequest')
-			->willReturnOnConsecutiveCalls(
-				$this->createResponse(),
-				$this->createResponse()
-			);
+		$mockClient->method('hasTable')->willReturn(false);
+		$mockClient->method('sendRequest')
+			->willReturn($this->createResponse());
 	}
 }

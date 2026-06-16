@@ -9,29 +9,23 @@
   program; if you did not, you can find it at http://www.gnu.org/
 */
 
-namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
+namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 
-use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseViewHandler;
-use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
+use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\BaseListHandler;
 
 /**
- * @extends BaseViewHandler<array{
+* @extends BaseListHandler<array{
  *       SHOW: array{
  *           0: array{
  *               expr_type: string,
- *               base_expr: string
- *           },
- *           1: array{
- *               expr_type: string,
- *               base_expr: string
+ *               base_expr?: string
  *           }
  *       }
  *   }>
  */
-final class ViewViewsHandler extends BaseViewHandler {
-
-
-	protected function getTableName(): string {
-		return Payload::VIEWS_TABLE_NAME;
+final class ListSourceHandler extends BaseListHandler {
+	protected function getTablePrefix(): string {
+		return ResourceTable::TABLE_PREFIX_SOURCE;
 	}
 }

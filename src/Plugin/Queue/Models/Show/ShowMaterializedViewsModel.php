@@ -20,6 +20,6 @@ use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 class ShowMaterializedViewsModel extends Model {
 
 	public function getHandlerClass(): string {
-		return 'Handlers\\View\\ViewViewsHandler';
+		return 'Handlers\\View\\ListViewsHandler';
 	}
 }

@@ -20,8 +20,6 @@ trait EntityAliasTrait {
 	use QueryMapLoaderTrait;
 	use KibanaVersionTrait;
 
-	protected static string $defaulAliasTable = '_aliases';
-
 	/**
 	 *
 	 * @param string $index
@@ -36,21 +34,22 @@ trait EntityAliasTrait {
 		HTTPClient $manticoreClient,
 		?string $aliasTable = null
 	): void {
+		$systemClient = self::getSystemClient($manticoreClient);
 		if (!isset($aliasTable)) {
-			$aliasTable = self::$defaulAliasTable;
+			$aliasTable = parent::ALIAS_TABLE;
 		}
 		$query = "CREATE TABLE IF NOT EXISTS $aliasTable (index text, alias text) min_infix_len='2'";
-		$manticoreClient->sendRequest($query);
+		$systemClient->sendRequest($query);
 		$query = "SELECT id FROM $aliasTable WHERE MATCH('@index {$index}')";
 		/** @var array{0:array{data:array<array{id:int}>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 		$isExistingIndex = (bool)$queryResult[0]['data'];
 		$id = $isExistingIndex ? $queryResult[0]['data'][0]['id'] : null;
 		$query = $isExistingIndex
 			? "REPLACE INTO {$aliasTable} VALUES($id, '{$index}', '{$alias}')"
 			: "INSERT INTO $aliasTable (index, alias) VALUES('{$index}', '{$alias}')";
 		/** @var array{error?:string,0:array{data?:array<mixed>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 
 		if (isset($queryResult['error'])) {
 			throw new \Exception('Unknown error on template creation');
@@ -68,16 +67,17 @@ trait EntityAliasTrait {
 	 * @return array<mixed>
 	 */
 	protected static function getAliasData(HTTPClient $manticoreClient, string $query): array {
-		$showQuery = "SHOW TABLES LIKE '" . self::$defaulAliasTable . "'";
+		$systemClient = self::getSystemClient($manticoreClient);
+		$showQuery = "SHOW TABLES LIKE '" . parent::ALIAS_TABLE . "'";
 		/** @var array{0?:array{data?:array<mixed>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($showQuery)->getResult();
+		$queryResult = $systemClient->sendRequest($showQuery)->getResult();
 		if (!isset($queryResult[0])) {
 			return [];
 		}
 
-		$query = 'SELECT index, alias FROM ' . self::$defaulAliasTable . " WHERE MATCH('{$query}')";
+		$query = 'SELECT index, alias FROM ' . parent::ALIAS_TABLE . " WHERE MATCH('{$query}')";
 		/** @var array{0:array{data?:array<array{index:string,alias:string}>}} $queryResult */
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 		if (!isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
 			return [];
 		}
@@ -94,9 +94,10 @@ trait EntityAliasTrait {
 	 * @throws RuntimeException
 	 */
 	protected static function refreshAliasedEntities(string $index, string $alias, HTTPClient $manticoreClient): void {
+		$systemClient = self::getSystemClient($manticoreClient);
 		$query = 'CREATE TABLE IF NOT EXISTS ' . parent::ENTITY_TABLE
 		. ' (_id string, _index string, _index_alias string, _type string, _source json)';
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error'])) {
 			throw new \Exception('Unknown error on entity table creation');
 		}
@@ -117,7 +118,7 @@ trait EntityAliasTrait {
 		AddEntityHandler::add($source, $entityId, 'settings', $index, $alias, $manticoreClient);
 
 		$query = 'UPDATE ' . parent::ENTITY_TABLE . " SET _index='{$index}' WHERE _index=''";
-		$queryResult = $manticoreClient->sendRequest($query)->getResult();
+		$queryResult = $systemClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error'])) {
 			throw new \Exception('Unknown error on entity alias update');
 		}

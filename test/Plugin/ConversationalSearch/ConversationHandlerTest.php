@@ -16,11 +16,13 @@ use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationRequest;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationRoute;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Handler as ChatHandler;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\LlmProvider;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ModelManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Payload as ChatPayload;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\SearchContext;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\SearchEngine;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\SearchServices;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\VectorFieldInfo;
+use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
@@ -100,9 +102,16 @@ class ConversationHandlerTest extends TestCase {
 		$handler = new ChatHandler($payload);
 
 		$mockClient = $this->createMock(HTTPClient::class);
-		$modelExistsResponse = $this->createResponse([['data' => [['count' => 0]]]]);
+		$mockClient->method('hasTable')->with('system.chat_model_test_model')->willReturn(false);
 		$insertResponse = $this->createResponse([['total' => 1, 'error' => '', 'warning' => '']]);
-		$this->configureClientWithInitialization($mockClient, [$modelExistsResponse, $insertResponse]);
+		$this->configureClientWithInitialization(
+			$mockClient,
+			[
+				$this->createResponse(),
+				$insertResponse,
+				$this->createResponse(),
+			]
+		);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
@@ -115,11 +124,10 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = (array)$result->getStruct();
 		$this->assertIsArray($struct);
-		/** @var array<int, array{data: array<int, array{uuid: string}>}> $struct */
+		/** @var array<int, array{data: array<int, array{name: string}>}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
-		$this->assertArrayHasKey('uuid', $struct[0]['data'][0]);
-		$this->assertNotEmpty($struct[0]['data'][0]['uuid']);
+		$this->assertSame('test_model', $struct[0]['data'][0]['name']);
 	}
 
 	public function testShowModelsSuccess(): void {
@@ -139,15 +147,22 @@ class ConversationHandlerTest extends TestCase {
 		$handler = new ChatHandler($payload);
 
 		$mockClient = $this->createMock(HTTPClient::class);
-		$selectResponse = $this->createResponse(
+		$tableListResponse = $this->createResponse(
 			[['data' => [[
-				'uuid' => 'test-uuid',
-				'name' => 'test_model',
-				'model' => 'openai:gpt-4',
-				'created_at' => 1234567890,
+				'Table' => ResourceTable::TABLE_PREFIX_CHAT_MODEL . 'test_model',
+				'Type' => 'rt',
 			]]]]
 		);
-		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
+		$selectResponse = $this->createResponse(
+			[['data' => [[
+				'name' => 'test_model',
+				'model' => 'openai:gpt-4',
+				'settings' => '{}',
+				'created_at' => 1234567890,
+				'updated_at' => 1234567890,
+			]]]]
+		);
+		$this->configureClientWithInitialization($mockClient, [$tableListResponse, $selectResponse]);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
@@ -159,13 +174,12 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertIsArray($struct);
 		/** @var array<int, array{
 		 *   columns: array<int, array<string, array{type: string}>>,
-		 *   data: array<int, array{uuid: string, name: string}>
+		 *   data: array<int, array{name: string}>
 		 * }> $struct
 		 */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertCount(1, $struct[0]['data']);
-		$this->assertEquals('test-uuid', $struct[0]['data'][0]['uuid']);
 		$this->assertEquals('test_model', $struct[0]['data'][0]['name']);
 		$this->assertEquals([['created_at' => ['type' => 'long long']]], array_slice($struct[0]['columns'], -1));
 	}
@@ -186,28 +200,29 @@ class ConversationHandlerTest extends TestCase {
 			)
 		);
 
-		$handler = new ChatHandler($payload);
-
 		$mockClient = $this->createMock(HTTPClient::class);
+		$mockClient->method('hasTable')->with('system.chat_model_test_model')->willReturn(true);
 		$selectResponse = $this->createResponse(
 			[[
 				'total' => 1,
 				'error' => '',
 				'warning' => '',
 				'data' => [[
-					'uuid' => 'test-uuid',
+					'id' => '1',
 					'name' => 'test_model',
+					'description' => '',
+					'model' => 'openai:gpt-4',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000,"api_key":"sk-test"}',
 					'created_at' => '2023-01-01 00:00:00',
+					'updated_at' => '2023-01-01 00:00:00',
 				]],
 			]]
 		);
 		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
-		$handler->setManticoreClient($mockClient);
 
-		$task = $handler->run();
-		$this->assertTrue($task->isSucceed());
-		$result = $task->getResult();
+		$method = new ReflectionMethod(ChatHandler::class, 'describeModel');
+		$method->setAccessible(true);
+		$result = $method->invoke(null, $payload, new ModelManager(), $mockClient);
 
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = (array)$result->getStruct();
@@ -217,8 +232,14 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertGreaterThan(0, sizeof($struct[0]['data']));
 		// Should have multiple property-value pairs for the model description
-		$this->assertEquals('uuid', $struct[0]['data'][0]['property']);
-		$this->assertEquals('test-uuid', $struct[0]['data'][0]['value']);
+		$nameRows = array_values(
+			array_filter(
+				$struct[0]['data'],
+				static fn(array $row): bool => $row['property'] === 'name'
+			)
+		);
+		$this->assertCount(1, $nameRows);
+		$this->assertSame('test_model', $nameRows[0]['value']);
 		$apiKeyRows = array_values(
 			array_filter(
 				$struct[0]['data'],
@@ -245,25 +266,14 @@ class ConversationHandlerTest extends TestCase {
 				]
 			)
 		);
-
 		$handler = new ChatHandler($payload);
-
 		$mockClient = $this->createMock(HTTPClient::class);
-		$getModelResponse = $this->createResponse(
-			[[
-				'total' => 1,
-				'error' => '',
-				'warning' => '',
-				'data' => [[
-					'uuid' => 'test-uuid',
-					'name' => 'test_model',
-					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
-					'created_at' => '2023-01-01 00:00:00',
-				]],
-			]]
-		);
+		$mockClient->method('hasTable')->with('system.chat_model_test_model')->willReturn(true);
 		$deleteModelResponse = $this->createResponse([['total' => 0, 'error' => '', 'warning' => '']]);
-		$this->configureClientWithInitialization($mockClient, [$getModelResponse, $deleteModelResponse]);
+		$this->configureClientWithInitialization(
+			$mockClient,
+			[$deleteModelResponse, $this->createResponse()]
+		);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
@@ -472,9 +482,16 @@ class ConversationHandlerTest extends TestCase {
 		$handler = new ChatHandler($payload);
 
 		$mockClient = $this->createMock(HTTPClient::class);
-		$modelExistsResponse = $this->createResponse([['data' => [['count' => 0]]]]);
+		$mockClient->method('hasTable')->with('system.chat_model_encrypted_test_model')->willReturn(false);
 		$insertResponse = $this->createResponse([['total' => 1, 'error' => '', 'warning' => '']]);
-		$this->configureClientWithInitialization($mockClient, [$modelExistsResponse, $insertResponse]);
+		$this->configureClientWithInitialization(
+			$mockClient,
+			[
+				$this->createResponse(),
+				$insertResponse,
+				$this->createResponse(),
+			]
+		);
 		$handler->setManticoreClient($mockClient);
 
 		$task = $handler->run();
@@ -487,12 +504,11 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = (array)$result->getStruct();
 		$this->assertIsArray($struct);
-		/** @var array<int, array{data: array<int, array{uuid: string}>}> $struct */
+		/** @var array<int, array{data: array<int, array{name: string}>}> $struct */
 		$this->assertCount(1, $struct);
 		$this->assertArrayHasKey('data', $struct[0]);
 		$this->assertCount(1, $struct[0]['data']);
-		$this->assertArrayHasKey('uuid', $struct[0]['data'][0]);
-		$this->assertIsString($struct[0]['data'][0]['uuid']);
+		$this->assertSame('encrypted_test_model', $struct[0]['data'][0]['name']);
 	}
 
 	public function testDescribeModelWithApiKeyMasking(): void {
@@ -512,28 +528,29 @@ class ConversationHandlerTest extends TestCase {
 			)
 		);
 
-		$handler = new ChatHandler($payload);
-
 		$mockClient = $this->createMock(HTTPClient::class);
+		$mockClient->method('hasTable')->with('system.chat_model_encrypted_test_model')->willReturn(true);
 		$selectResponse = $this->createResponse(
 			[[
 				'total' => 1,
 				'error' => '',
 				'warning' => '',
 				'data' => [[
-					'uuid' => 'encrypted-uuid-123',
+					'id' => '1',
 					'name' => 'encrypted_test_model',
+					'description' => '',
+					'model' => 'openai:gpt-4',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
 					'created_at' => '2023-01-01 00:00:00',
+					'updated_at' => '2023-01-01 00:00:00',
 				]],
 			]]
 		);
 		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
-		$handler->setManticoreClient($mockClient);
 
-		$task = $handler->run();
-		$this->assertTrue($task->isSucceed());
-		$result = $task->getResult();
+		$method = new ReflectionMethod(ChatHandler::class, 'describeModel');
+		$method->setAccessible(true);
+		$result = $method->invoke(null, $payload, new ModelManager(), $mockClient);
 
 		$this->assertInstanceOf(TaskResult::class, $result);
 		$struct = (array)$result->getStruct();
@@ -575,9 +592,16 @@ class ConversationHandlerTest extends TestCase {
 			// Mock the manticore client
 			$mockClient = $this->createMock(HTTPClient::class);
 
-			$modelExistsResponse = $this->createResponse([['data' => [['count' => 0]]]]);
-			$insertResponse = $this->createResponse([['total' => 1, 'error' => '', 'warning' => '']]);
-			$this->configureClientWithInitialization($mockClient, [$modelExistsResponse, $insertResponse]);
+				$mockClient->method('hasTable')->with('system.chat_model_keyfile_test_model')->willReturn(false);
+				$insertResponse = $this->createResponse([['total' => 1, 'error' => '', 'warning' => '']]);
+				$this->configureClientWithInitialization(
+					$mockClient,
+					[
+						$this->createResponse(),
+						$insertResponse,
+						$this->createResponse(),
+					]
+				);
 			$handler->setManticoreClient($mockClient);
 
 			try {
@@ -605,7 +629,7 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testHandleConversationNewQuestionGeneratesNewContext(): void {
-		$query = "CALL CHAT('Show me action movies', 'movies', 'model-uuid', 'conv-uuid')";
+		$query = "CALL CHAT('Show me action movies', 'movies', 'test_model', 'conv-uuid')";
 
 		$payload = ChatPayload::fromRequest(
 			Request::fromArray(
@@ -640,11 +664,11 @@ class ConversationHandlerTest extends TestCase {
 		$mockClient = $this->createMock(HTTPClient::class);
 
 		$initResponses = $this->createInitializationResponses();
+		$historyInitResponse = $this->createResponse();
 
 		$modelResponse = $this->createResponse(
 			[[
 				'data' => [[
-					'uuid' => 'model-uuid',
 					'name' => 'test_model',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
 					'created_at' => '2023-01-01 00:00:00',
@@ -692,18 +716,24 @@ class ConversationHandlerTest extends TestCase {
 
 			$callCounter = 0;
 			$responses = [
-				...$initResponses, // initializeTables
-				$modelResponse, // getModelByUuidOrName
-				$historyResponse, // getConversationMessages
-				$schemaResponse, // inspectVectorFieldInfo for main search
+					...$initResponses, // initializeTables
+					$modelResponse, // getModel
+					$historyInitResponse, // initialize model history table
+					$historyResponse, // getConversationMessages
+					$schemaResponse, // inspectVectorFieldInfo for main search
 				$searchResponse, // performSearchWithExcludedIds
 				$saveUserContextResponse, // saveMessage user with context
 				$saveAssistantResponse, // saveMessage assistant
 			];
 
 			$mockClient->method('hasTable')
-			->with('movies')
-			->willReturn(true);
+				->willReturnCallback(
+					static fn(string $table): bool => in_array(
+						$table,
+						['movies', 'system.chat_model_test_model'],
+						true
+					)
+				);
 
 			$mockClient->method('sendRequest')
 			->willReturnCallback(
@@ -750,7 +780,7 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testFollowUpWithoutContextFallsBackToNewIntent(): void {
-		$query = "CALL CHAT('What about comedies?', 'movies', 'model-uuid', 'conv-uuid')";
+		$query = "CALL CHAT('What about comedies?', 'movies', 'test_model', 'conv-uuid')";
 
 		$payload = ChatPayload::fromRequest(
 			Request::fromArray(
@@ -788,10 +818,10 @@ class ConversationHandlerTest extends TestCase {
 		$mockClient = $this->createMock(HTTPClient::class);
 
 		$initResponses = $this->createInitializationResponses();
+		$historyInitResponse = $this->createResponse();
 		$modelResponse = $this->createResponse(
 			[[
 				'data' => [[
-					'uuid' => 'model-uuid',
 					'name' => 'test_model',
 					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
 					'created_at' => '2023-01-01 00:00:00',
@@ -813,10 +843,11 @@ class ConversationHandlerTest extends TestCase {
 
 		$queries = [];
 		$responses = [
-			...$initResponses,
-			$modelResponse,
-			$historyResponse,
-			$schemaResponse,
+				...$initResponses,
+				$modelResponse,
+				$historyInitResponse,
+				$historyResponse,
+				$schemaResponse,
 			$searchResponse,
 			$saveUserResponse,
 			$saveAssistantResponse,
@@ -824,8 +855,9 @@ class ConversationHandlerTest extends TestCase {
 		$callCounter = 0;
 
 		$mockClient->method('hasTable')
-			->with('movies')
-			->willReturn(true);
+			->willReturnCallback(
+				static fn(string $table): bool => in_array($table, ['movies', 'system.chat_model_test_model'], true)
+			);
 
 		$mockClient->method('sendRequest')
 			->willReturnCallback(
@@ -841,7 +873,7 @@ class ConversationHandlerTest extends TestCase {
 		$task = $handler->run();
 
 		$this->assertTrue($task->isSucceed());
-		$userInsert = $queries[6];
+		$userInsert = $queries[5];
 		$this->assertStringContainsString("'" . ConversationRoute::SEARCH . "'", $userInsert);
 		$this->assertStringContainsString(
 			"'What comedy movies are relevant to the current conversation?'",
@@ -866,8 +898,7 @@ class ConversationHandlerTest extends TestCase {
 		$route = new ConversationRoute(ConversationRoute::ANSWER_FROM_HISTORY, '', '', 'History contains answer.');
 		$model = [
 			'id' => '1',
-			'uuid' => 'model-uuid',
-			'name' => 'test_model',
+						'name' => 'test_model',
 			'model' => 'openai:gpt-4',
 			'settings' => ['retrieval_limit' => 5],
 			'created_at' => '',
@@ -875,7 +906,7 @@ class ConversationHandlerTest extends TestCase {
 		];
 		$vectorFieldInfo = new VectorFieldInfo('embedding', 'content', ['embedding']);
 		$context = new SearchContext(
-			new ConversationRequest('Which one was the crime drama?', 'docs', 'model-uuid', 'conv-uuid'),
+			new ConversationRequest('Which one was the crime drama?', 'docs', 'test_model', 'conv-uuid'),
 			$history,
 			$model,
 			$route,
@@ -922,7 +953,7 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testConversationRejectsInvalidTableIdentifierBeforeHasTable(): void {
-		$query = "CALL CHAT('Show me action movies', 'movies WHERE 1=1', 'model-uuid', 'conv-uuid')";
+		$query = "CALL CHAT('Show me action movies', 'movies WHERE 1=1', 'test_model', 'conv-uuid')";
 
 		$payload = ChatPayload::fromRequest(
 			Request::fromArray(
@@ -1039,10 +1070,7 @@ class ConversationHandlerTest extends TestCase {
 	 * @return array<int, Response>
 	 */
 	private function createInitializationResponses(): array {
-		return [
-			$this->createResponse(),
-			$this->createResponse(),
-		];
+		return [];
 	}
 
 	/**

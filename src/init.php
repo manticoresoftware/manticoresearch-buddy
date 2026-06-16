@@ -94,6 +94,7 @@ $plugins = [
 	'manticoresoftware/buddy-plugin-flush',
 	'manticoresoftware/buddy-plugin-metrics',
 	'manticoresoftware/buddy-plugin-conversational-search',
+	'manticoresoftware/buddy-plugin-plugins-auth-permissions',
 ];
 // Filtering out the plugins that we don't need
 if (!empty($opts['enable-plugin'])) {
@@ -112,5 +113,11 @@ if (!empty($opts['enable-plugin'])) {
 Pluggable::setContainer($container);
 Pluggable::setCorePlugins($plugins);
 MetricThread::setContainer($container);
+
+// Warm the system client on the prototype: request clones copy the memoized
+// reference, so the whole process shares one SystemClient and its pool
+/** @var HTTPClient $manticoreClient */
+$manticoreClient = $container->get('manticoreClient');
+$manticoreClient->getSystemClient();
 
 return $container;
