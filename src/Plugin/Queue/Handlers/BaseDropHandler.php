@@ -13,6 +13,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers;
 
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
+use Manticoresearch\Buddy\Base\Plugin\Queue\QueuePermissionChecker;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
@@ -39,6 +40,7 @@ abstract class BaseDropHandler extends BaseHandlerWithClient {
 
 		$name = $this->getName($this->payload);
 		$tableName = $this->getTableName($name);
+		QueuePermissionChecker::requireSchema($this->manticoreClient, $tableName);
 
 		/**
 		 * @param string $tableName

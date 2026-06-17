@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\Source;
 use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View\ViewRecordCreator;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
+use Manticoresearch\Buddy\Base\Plugin\Queue\QueuePermissionChecker;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\QueryValidationError;
@@ -93,6 +94,7 @@ final class CreateKafka extends BaseCreateSourceHandler {
 		}
 
 		$sourceTable = ResourceTable::name(ResourceTable::RESOURCE_SOURCE, $options->name);
+		QueuePermissionChecker::requireSchema($manticoreClient, $sourceTable);
 		if ($manticoreClient->hasTable($sourceTable)) {
 			throw ManticoreSearchClientError::create("Source $options->name already exist");
 		}

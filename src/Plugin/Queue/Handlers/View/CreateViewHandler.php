@@ -13,6 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 
 use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
+use Manticoresearch\Buddy\Base\Plugin\Queue\QueuePermissionChecker;
 use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
@@ -117,6 +118,8 @@ final class CreateViewHandler extends BaseHandlerWithClient {
 			$sourceName = strtolower($tableName);
 			$viewName = strtolower($parsedPayload['VIEW']['no_quotes']['parts'][0]);
 			$destinationTableName = strtolower($parsedPayload['VIEW']['to']['no_quotes']['parts'][0]);
+			$viewTable = ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $viewName);
+			QueuePermissionChecker::requireSchema($this->manticoreClient, $viewTable);
 
 			if (isset($parsedPayload['LIMIT'])) {
 				throw GenericError::create("Can't use query with limit");

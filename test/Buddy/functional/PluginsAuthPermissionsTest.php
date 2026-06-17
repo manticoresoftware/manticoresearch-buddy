@@ -100,6 +100,34 @@ JSON;
 		$this->assertExtraResourceAccess($case);
 	}
 
+	public function testQueueCommandsRequireMutationPermissions(): void {
+		$suffix = bin2hex(random_bytes(4));
+		$source = 'queue_auth_source_' . $suffix;
+		$view = 'queue_auth_view_' . $suffix;
+		$destination = 'queue_auth_dest_' . $suffix;
+
+		$this->runRootSql("DROP USER '" . self::USERNAME . "'");
+		$this->cleanupQueueObjects($source, $view, $destination);
+		$this->createQueueObjects($source, $view, $destination);
+		$this->createUser();
+
+		$this->assertMysqlOk($this->runRootSql("GRANT READ ON source/$source TO '" . self::USERNAME . "'"));
+		$this->assertMysqlOk($this->runRootSql("GRANT READ ON mva/$view TO '" . self::USERNAME . "'"));
+
+		$this->assertMysqlOk($this->runUserSql("SHOW SOURCE $source"));
+		$this->assertMysqlOk($this->runUserSql("SHOW MATERIALIZED VIEW $view"));
+		$this->assertMysqlPermissionDenied(
+			$this->runUserSql("ALTER MATERIALIZED VIEW $view suspended=1")
+		);
+		$this->assertQueueViewSuspended($view, '0');
+		$this->assertMysqlPermissionDenied($this->runUserSql("DROP SOURCE $source"));
+		$this->assertMysqlOk($this->runRootSql("SHOW SOURCE $source"));
+		$this->assertMysqlPermissionDenied($this->runUserSql("DROP MATERIALIZED VIEW $view"));
+		$this->assertMysqlOk($this->runRootSql("SHOW MATERIALIZED VIEW $view"));
+
+		$this->cleanupQueueObjects($source, $view, $destination);
+	}
+
 	/**
 	 * @return array<string,array{case:array{
 	 *   resource:string,
@@ -228,6 +256,34 @@ JSON;
 				"'CREATE MATERIALIZED VIEW $name TO destination AS SELECT * FROM source',0,'$marker')"
 			)
 		);
+	}
+
+	private function createQueueObjects(string $source, string $view, string $destination): void {
+		$this->assertMysqlOk(
+			$this->runRootSql(
+				"CREATE SOURCE $source (id bigint, body text) " .
+				"type='kafka' broker_list='127.0.0.1:9092' topic_list='queue-auth' " .
+				"consumer_group='queue-auth' num_consumers='1' batch='50'"
+			)
+		);
+		$this->assertMysqlOk($this->runRootSql("CREATE TABLE $destination (id bigint, body text)"));
+		$this->assertMysqlOk(
+			$this->runRootSql(
+				"CREATE MATERIALIZED VIEW $view TO $destination AS SELECT id, body FROM $source"
+			)
+		);
+	}
+
+	private function cleanupQueueObjects(string $source, string $view, string $destination): void {
+		$this->runRootSql("DROP MATERIALIZED VIEW $view");
+		$this->runRootSql("DROP SOURCE $source");
+		$this->runRootSql("DROP TABLE IF EXISTS $destination");
+	}
+
+	private function assertQueueViewSuspended(string $view, string $expected): void {
+		$result = $this->runRootSql("SHOW MATERIALIZED VIEW $view");
+		$this->assertMysqlOk($result);
+		$this->assertStringContainsString($expected, $result['output']);
 	}
 
 	private function dropTable(string $tableName): void {
