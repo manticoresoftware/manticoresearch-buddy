@@ -88,8 +88,7 @@ jobs:
           # We need to write current version HERE before we pack
           echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
           # Now build it
-          ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
-          ./bin/package-phar-payload "build/share/modules/${{ env.APP_NAME }}" "build/${{ env.APP_NAME }}" "build/${{ env.APP_NAME }}.sh" "build/${{ env.APP_NAME }}.ps1"
+          ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}" --phar --compat-src-main
 
       - uses: manticoresoftware/upload_artifact_with_retries@main
         with:
@@ -124,8 +123,7 @@ jobs:
           git clone https://github.com/manticoresoftware/phar_builder.git
           # We need to write current version HERE before we pack
           echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
-          ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}"
-          ./bin/package-phar-payload "build/share/modules/${{ env.APP_NAME }}" "build/${{ env.APP_NAME }}" "build/${{ env.APP_NAME }}.sh" "build/${{ env.APP_NAME }}.ps1"
+          ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}" --phar --compat-src-main
       - name: Prepare packages structure
         run: |
           mkdir -p .debpkg/usr/share/manticore/modules/${{ env.APP_NAME }}/bin
