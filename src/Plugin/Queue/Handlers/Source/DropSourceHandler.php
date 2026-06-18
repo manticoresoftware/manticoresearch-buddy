@@ -68,22 +68,25 @@ final class DropSourceHandler extends BaseDropHandler {
 			throw ManticoreSearchClientError::create((string)$result->getError());
 		}
 
-		$removed = 0;
+		$sourceRows = [];
 		$result = $result->getResult();
 		if (is_array($result[0])) {
-			foreach ($result[0]['data'] as $sourceRow) {
-				$this->payload::$processor
-					->execute('stopWorkerById', [$sourceRow['full_name']]);
-
-				self::suspendSourceViews($sourceRow['full_name'], $manticoreClient);
-				self::dropBufferTable($sourceRow, $manticoreClient);
-				$removed++;
-			}
+			$sourceRows = $result[0]['data'];
 		}
 
 		$dropResponse = $manticoreClient->sendRequest("DROP TABLE IF EXISTS $tableName");
 		if ($dropResponse->hasError()) {
 			throw ManticoreSearchClientError::create((string)$dropResponse->getError());
+		}
+
+		$removed = 0;
+		foreach ($sourceRows as $sourceRow) {
+			$this->payload::$processor
+				->execute('stopWorkerById', [$sourceRow['full_name']]);
+
+			self::suspendSourceViews($sourceRow['full_name'], $manticoreClient);
+			self::dropBufferTable($sourceRow, $manticoreClient);
+			$removed++;
 		}
 
 		return $removed;

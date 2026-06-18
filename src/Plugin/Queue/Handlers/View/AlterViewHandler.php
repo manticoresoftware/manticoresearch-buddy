@@ -14,7 +14,6 @@ namespace Manticoresearch\Buddy\Base\Plugin\Queue\Handlers\View;
 use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Models\Model;
 use Manticoresearch\Buddy\Base\Plugin\Queue\Payload;
-use Manticoresearch\Buddy\Base\Plugin\Queue\QueuePermissionChecker;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
@@ -76,7 +75,6 @@ final class AlterViewHandler extends BaseHandlerWithClient {
 			$parsedPayload = $this->payload->model->getPayload();
 			$name = strtolower($parsedPayload['VIEW']['no_quotes']['parts'][0] ?? '');
 			$viewsTable = ResourceTable::name(ResourceTable::RESOURCE_MATERIALIZED_VIEW, $name);
-			QueuePermissionChecker::requireViewWrite($this->manticoreClient, $viewsTable);
 
 				$sql = /** @lang manticore */
 					"SELECT * FROM $viewsTable";

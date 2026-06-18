@@ -79,6 +79,11 @@ class QueryProcessor {
 				/** @var HTTPClient $value */
 				$value = clone $value;
 				$value->setDelegatedUser($request->user ?? null);
+				$userLog = $request->user !== '' ? $request->user : '<empty>';
+				Buddy::debug(
+					"[$request->id] injected manticoreClient for user {$userLog}: "
+					. $value::class . '#' . spl_object_id($value)
+				);
 			}
 			$handler->{'set' . ucfirst($prop)}($value);
 		}
