@@ -85,6 +85,7 @@ jobs:
       - name: Prepare release directory
         run: |
           git clone https://github.com/manticoresoftware/phar_builder.git
+          cd phar_builder
           git checkout phar-payload
           # We need to write current version HERE before we pack
           echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
