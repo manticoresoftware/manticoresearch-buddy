@@ -84,10 +84,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Prepare release directory
         run: |
-          git clone https://github.com/manticoresoftware/phar_builder.git
-          cd phar_builder
-          git checkout phar-payload
-          cd ..
+          git clone --branch phar-payload https://github.com/manticoresoftware/phar_builder.git
           # We need to write current version HERE before we pack
           echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
           # Now build it
@@ -123,7 +120,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build binary
         run: |
-          git clone https://github.com/manticoresoftware/phar_builder.git
+          git clone --branch phar-payload https://github.com/manticoresoftware/phar_builder.git
           # We need to write current version HERE before we pack
           echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
           ./phar_builder/bin/build --name="Manticore Buddy" --package="${{ env.APP_NAME }}" --phar --compat-src-main
