@@ -87,6 +87,7 @@ jobs:
           git clone https://github.com/manticoresoftware/phar_builder.git
           cd phar_builder
           git checkout phar-payload
+          cd ..
           # We need to write current version HERE before we pack
           echo "${{ needs.vars.outputs.version_full }}" > APP_VERSION
           # Now build it
