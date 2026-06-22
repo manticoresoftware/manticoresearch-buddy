@@ -48,26 +48,30 @@ class ContentFieldsTest extends TestCase {
 		$method->setAccessible(true);
 
 		// Test single field (backward compatibility)
-		$context = $method->invoke(null, $searchResults, 'content', 1000);
+		$context = $this->buildContext($searchResults, 'content', 1000);
 		$this->assertIsString($context);
-		$this->assertStringContainsString('This is the main content.', $context);
-		$this->assertStringContainsString('Complex SQL queries explained.', $context);
+		$sources = $this->decodeSources($context);
+		$this->assertSame('This is the main content.', $sources[0]['content']);
+		$this->assertSame('Complex SQL queries explained.', $sources[1]['content']);
+		$this->assertArrayNotHasKey('vector_field', $sources[0]);
 
 		// Test multiple fields with comma separator
-		$context = $method->invoke(null, $searchResults, 'title,content', 1000);
-		$expected = "Database Basics, This is the main content.\nAdvanced Queries, Complex SQL queries explained.";
-		$this->assertEquals($expected, $context);
+		$context = $this->buildContext($searchResults, 'title,content', 1000);
+		$sources = $this->decodeSources($context);
+		$this->assertSame('Database Basics', $sources[0]['title']);
+		$this->assertSame('This is the main content.', $sources[0]['content']);
 
 		// Test three fields
-		$context = $method->invoke(null, $searchResults, 'title,summary,content', 1000);
-		$expected = "Database Basics, A quick overview of databases., This is the main content.\n" .
-			'Advanced Queries, Learn advanced database techniques., Complex SQL queries explained.';
-		$this->assertEquals($expected, $context);
+		$context = $this->buildContext($searchResults, 'title,summary,content', 1000);
+		$sources = $this->decodeSources($context);
+		$this->assertSame('A quick overview of databases.', $sources[0]['summary']);
+		$this->assertSame('Learn advanced database techniques.', $sources[1]['summary']);
 
 		// Test missing field (should skip gracefully)
-		$context = $method->invoke(null, $searchResults, 'title,nonexistent,content', 1000);
-		$expected = "Database Basics, This is the main content.\nAdvanced Queries, Complex SQL queries explained.";
-		$this->assertEquals($expected, $context);
+		$context = $this->buildContext($searchResults, 'title,nonexistent,content', 1000);
+		$sources = $this->decodeSources($context);
+		$this->assertSame('Database Basics', $sources[0]['title']);
+		$this->assertSame('This is the main content.', $sources[0]['content']);
 	}
 
 	public function testBuildContextWithEmptyFields(): void {
@@ -84,9 +88,11 @@ class ContentFieldsTest extends TestCase {
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, 'title,content,summary', 1000);
-		$expected = 'Test, Summary text';  // Empty content should be excluded
-		$this->assertEquals($expected, $context);
+		$context = $this->buildContext($searchResults, 'title,content,summary', 1000);
+		$sources = $this->decodeSources($context);
+		$this->assertSame('Test', $sources[0]['title']);
+		$this->assertSame('Summary text', $sources[0]['summary']);
+		$this->assertArrayNotHasKey('content', $sources[0]);
 	}
 
 	public function testBuildContextWithWhitespaceFields(): void {
@@ -103,9 +109,11 @@ class ContentFieldsTest extends TestCase {
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, 'title,content,summary', 1000);
-		$expected = 'Test Title, Valid summary';  // Whitespace-only content should be excluded
-		$this->assertEquals($expected, $context);
+		$context = $this->buildContext($searchResults, 'title,content,summary', 1000);
+		$sources = $this->decodeSources($context);
+		$this->assertSame('Test Title', $sources[0]['title']);
+		$this->assertSame('Valid summary', $sources[0]['summary']);
+		$this->assertArrayNotHasKey('content', $sources[0]);
 	}
 
 	public function testBuildContextWithEmptyResults(): void {
@@ -114,7 +122,7 @@ class ContentFieldsTest extends TestCase {
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, 'title,content', 1000);
+		$context = $this->buildContext($searchResults, 'title,content', 1000);
 		$this->assertEquals('', $context);
 	}
 
@@ -131,9 +139,10 @@ class ContentFieldsTest extends TestCase {
 		$method->setAccessible(true);
 
 		// Test explicit single field
-		$context = $method->invoke(null, $searchResults, 'content', 1000);
-		$expected = 'Single content field';
-		$this->assertEquals($expected, $context);
+		$context = $this->buildContext($searchResults, 'content', 1000);
+		$sources = $this->decodeSources($context);
+		$this->assertSame(1, $sources[0]['id']);
+		$this->assertSame('Single content field', $sources[0]['content']);
 	}
 
 	public function testBuildContextWithTruncation(): void {
@@ -149,10 +158,46 @@ class ContentFieldsTest extends TestCase {
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, 'title,content', 50);
+		$context = $this->buildContext($searchResults, 'title,content', 80);
 		$this->assertIsString($context);
-		$this->assertStringEndsWith('...', $context);
-		$this->assertLessThanOrEqual(53, strlen($context));
+		$sources = $this->decodeSources($context);
+		$this->assertIsString($sources[0]['content']);
+		$this->assertStringEndsWith('...', $sources[0]['content']);
+		$this->assertLessThanOrEqual(80, strlen((string)json_encode($sources[0], JSON_THROW_ON_ERROR)));
+	}
+
+	public function testBuildContextReturnsValidJsonAndCropsLongestSourceFields(): void {
+		$searchResults = [
+			[
+				'id' => 7713940850845155334,
+				'content' => str_repeat('Breaking Bad crime drama. ', 20),
+				'title' => 'Breaking Bad',
+				'knn_dist' => 0.69800115,
+			],
+			[
+				'id' => 7713940850845155336,
+				'content' => str_repeat('Stranger Things television series. ', 20),
+				'title' => 'Stranger Things',
+				'knn_dist' => 0.77477241,
+			],
+		];
+
+		$reflection = new ReflectionClass(Handler::class);
+		$method = $reflection->getMethod('buildContext');
+		$method->setAccessible(true);
+
+		$context = $this->buildContext($searchResults, 'content', 120);
+
+		$this->assertIsString($context);
+		$sources = $this->decodeSources($context);
+		$this->assertCount(2, $sources);
+		$this->assertSame(7713940850845155334, $sources[0]['id']);
+		$this->assertSame('Breaking Bad', $sources[0]['title']);
+		$this->assertSame(0.69800115, $sources[0]['knn_dist']);
+		$this->assertIsString($sources[0]['content']);
+		$this->assertStringEndsWith('...', $sources[0]['content']);
+		$this->assertLessThanOrEqual(120, strlen((string)json_encode($sources[0], JSON_THROW_ON_ERROR)));
+		$this->assertLessThanOrEqual(120, strlen((string)json_encode($sources[1], JSON_THROW_ON_ERROR)));
 	}
 
 	public function testBuildContextWithoutTruncationWhenDisabled(): void {
@@ -168,9 +213,56 @@ class ContentFieldsTest extends TestCase {
 		$method = $reflection->getMethod('buildContext');
 		$method->setAccessible(true);
 
-		$context = $method->invoke(null, $searchResults, 'title,content', 0);
+		$context = $this->buildContext($searchResults, 'title,content', 0);
 		$this->assertIsString($context);
-		$this->assertStringNotContainsString('...', $context);
+		$sources = $this->decodeSources($context);
+		$this->assertIsString($sources[0]['content']);
+		$this->assertStringNotContainsString('...', $sources[0]['content']);
+	}
+
+	public function testBuildContextCropsLongerFieldsBeforeShorterFields(): void {
+		$searchResults = [
+			[
+				'id' => 1,
+				'a' => str_repeat('a', 2000),
+				'b' => str_repeat('b', 500),
+				'c' => str_repeat('c', 10),
+			],
+		];
+
+		$context = $this->buildContext($searchResults, 'a,b,c', 800);
+		$sources = $this->decodeSources($context);
+
+		$this->assertLessThanOrEqual(800, strlen((string)json_encode($sources[0], JSON_THROW_ON_ERROR)));
+		$this->assertIsString($sources[0]['a']);
+		$this->assertIsString($sources[0]['b']);
+		$this->assertIsString($sources[0]['c']);
+		$this->assertSame(str_repeat('c', 10), $sources[0]['c']);
+		$this->assertStringEndsWith('...', $sources[0]['a']);
+		$this->assertStringEndsWith('...', $sources[0]['b']);
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $searchResults
+	 */
+	private function buildContext(array $searchResults, string $contentFields, int $maxDocumentLength): string {
+		$reflection = new ReflectionClass(Handler::class);
+		$method = $reflection->getMethod('buildContext');
+		$method->setAccessible(true);
+		$context = $method->invoke(null, $searchResults, $contentFields, $maxDocumentLength);
+		$this->assertIsString($context);
+
+		return $context;
+	}
+
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function decodeSources(string $context): array {
+		/** @var array<int, array<string, mixed>> $sources */
+		$sources = simdjson_decode($context, true);
+
+		return $sources;
 	}
 
 	public function testGetLlmRequestOptionsUsesFixedResponseLimit(): void {

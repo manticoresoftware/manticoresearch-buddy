@@ -98,7 +98,7 @@ Model with prompt, transport options, and retrieval settings:
 ```sql
 CREATE CHAT MODEL support_assistant (
     model='openai:gpt-4o-mini',
-    api_key='sk-...',
+    api_key='your-provider-api-key',
     base_url='http://host.docker.internal:8787/v1',
     timeout=60,
     retrieval_limit=5,
@@ -114,9 +114,12 @@ Common options:
 | `description` | No | Stored description |
 | `api_key` | No | Provider API key passed to the `llm` extension |
 | `base_url` | No | Provider or proxy base URL |
-| `timeout` | No | LLM request timeout |
-| `retrieval_limit` | No | Number of documents requested from KNN, `1..50` |
-| `max_document_length` | No | Per-document context limit; `0` disables truncation |
+| `timeout` | No | LLM request timeout, `1..65536` |
+| `retrieval_limit` | No | Number of documents requested from KNN, `1..50`; default `5` |
+| `max_document_length` | No | Per-document context limit; `0` disables truncation, `100..65536` truncates; default `2000` |
+
+Model names in `CREATE CHAT MODEL` may contain letters, numbers, and
+underscores only.
 
 `model` is validated as `provider:model`, for example:
 
@@ -204,6 +207,9 @@ Arguments are positional only:
 The fifth argument is stored internally as `fields` for compatibility with the
 current parser, but it must be a single vector field name.
 
+The table argument must be a plain table identifier, optionally qualified as
+`database.table`. The vector field argument must be a plain field identifier.
+
 ## Search And Context Details
 
 KNN search uses this shape:
@@ -221,8 +227,8 @@ Behavior:
 - `retrieval_limit` controls the final `LIMIT`.
 - The default KNN threshold is currently `0.8`.
 - If the conversation route includes an exclusion query, Buddy first finds
-  matching IDs with a stricter KNN threshold and excludes those IDs from the
-  main search.
+  matching IDs with `knn(<vector_field>, 15, '<exclude query>')` and threshold
+  `0.75`, then excludes those IDs from the main search.
 - The final `sources` include normal result fields and `knn_dist`.
 - `FLOAT_VECTOR` columns are removed from `sources` to avoid returning large
   embedding payloads.
@@ -244,7 +250,8 @@ Behavior:
 | `conversation_uuid` | Existing or generated conversation id |
 | `user_query` | Original user query |
 | `search_query` | Standalone search query used for retrieval |
-| `response` | LLM answer |
+| `response` | LLM answer with inline references like `[ref:<id>]` removed |
+| `response_with_refs` | Full LLM answer including inline source references like `[ref:<id>]`, where `<id>` is the source row id |
 | `sources` | JSON string containing retrieved source rows |
 
 Example response shape:
@@ -255,6 +262,7 @@ Example response shape:
   "user_query": "What is vector search?",
   "search_query": "vector search, embeddings, similarity search",
   "response": "Vector search finds similar items by comparing embeddings...",
+  "response_with_refs": "Vector search finds similar items by comparing embeddings [ref:1]...",
   "sources": "[{\"id\":1,\"title\":\"Vector Search\",\"content\":\"...\",\"knn_dist\":0.12}]"
 }
 ```
@@ -286,6 +294,13 @@ Drop safely:
 ```sql
 DROP CHAT MODEL IF EXISTS assistant;
 ```
+
+`SHOW CHAT MODELS` returns `name`, `model`, and `created_at` columns.
+`DESCRIBE CHAT MODEL` returns `property` and `value` columns; stored API keys
+are shown as `HIDDEN`.
+
+Dropping a chat model also drops that model's conversation history table.
+Conversation history is stored per model and is written with a 30-day TTL.
 
 ## Complete Example
 

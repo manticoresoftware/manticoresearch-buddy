@@ -286,7 +286,8 @@ final class Handler extends BaseHandlerWithClient {
 			);
 		}
 
-		$responseText = $response['content'];
+		$responseWithRefs = $response['content'];
+		$responseText = self::stripReferences($responseWithRefs);
 		$tokensUsed = $response['metadata']['tokens_used'];
 
 		$turn = new ConversationTurn(
@@ -306,12 +307,14 @@ final class Handler extends BaseHandlerWithClient {
 				'user_query' => $request->query,
 				'search_query' => $queries['search_query'],
 				'response' => $responseText,
+				'response_with_refs' => $responseWithRefs,
 				'sources' => json_encode($searchResults),
 			]
 		)->column('conversation_uuid', Column::String)
 			->column('user_query', Column::String)
 			->column('search_query', Column::String)
 			->column('response', Column::String)
+			->column('response_with_refs', Column::String)
 			->column('sources', Column::String);
 	}
 
@@ -530,11 +533,22 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
+	 * @return string
+	 */
+	private static function stripReferences(string $responseWithRefs): string {
+		$response = preg_replace('/\s*\[ref:[^\]\s]+\]/', '', $responseWithRefs);
+		$response = preg_replace('/[ 	]+([.,;:!?])/', '$1', (string)$response);
+
+		return trim((string)$response);
+	}
+
+	/**
 	 * @param array<int, array<string, mixed>> $searchResults
 	 * @param string $contentFields
 	 * @param int $maxDocumentLength
 	 *
 	 * @return string
+	 * @throws JsonException
 	 */
 	private static function buildContext(
 		array $searchResults,
@@ -556,28 +570,105 @@ final class Handler extends BaseHandlerWithClient {
 			}
 		}
 
-		$truncatedDocs = array_map(
-			function ($doc) use ($fields, $maxDocumentLength) {
-				$contentParts = [];
-				foreach ($fields as $field) {
-					if (!isset($doc[$field]) || !is_string($doc[$field]) || empty(trim($doc[$field]))) {
-						continue;
-					}
-
-					$contentParts[] = $doc[$field];
-				}
-
-				// Use comma + space as separator between fields
-				$content = implode(', ', $contentParts);
-				if ($maxDocumentLength === 0 || strlen($content) <= $maxDocumentLength) {
-					return $content;
-				}
-
-				return substr($content, 0, $maxDocumentLength) . '...';
-			}, $searchResults
+		$croppedSources = array_map(
+			static fn(array $doc): array => self::cropSourceToMaxLength(
+				self::filterContextSource($doc),
+				$maxDocumentLength
+			),
+			$searchResults
 		);
 
-		return implode("\n", $truncatedDocs);
+		return (string)json_encode($croppedSources, JSON_THROW_ON_ERROR);
+	}
+
+	/**
+	 * @param array<string, mixed> $source
+	 *
+	 * @return array<string, scalar|null>
+	 */
+	private static function filterContextSource(array $source): array {
+		$filtered = [];
+		foreach ($source as $field => $value) {
+			if (!is_scalar($value) && $value !== null) {
+				continue;
+			}
+			if (is_string($value) && trim($value) === '') {
+				continue;
+			}
+
+			$filtered[$field] = $value;
+		}
+
+		return $filtered;
+	}
+
+	/**
+	 * @param array<string, scalar|null> $source
+	 *
+	 * @return array<string, scalar|null>
+	 */
+	private static function cropSourceToMaxLength(array $source, int $maxDocumentLength): array {
+		if ($maxDocumentLength === 0) {
+			return $source;
+		}
+
+		while (strlen((string)json_encode($source, JSON_THROW_ON_ERROR)) > $maxDocumentLength) {
+			$stringFields = self::getStringFieldLengths($source);
+			if ($stringFields === []) {
+				return $source;
+			}
+
+			$longestField = array_key_first($stringFields);
+			$currentValue = (string)$source[$longestField];
+			$currentLength = strlen($currentValue);
+			$overflow = strlen((string)json_encode($source, JSON_THROW_ON_ERROR)) - $maxDocumentLength;
+			$nextLength = self::getNextStringFieldLength($stringFields);
+			$reduction = min($overflow, max(1, $currentLength - $nextLength));
+
+			$source[$longestField] = self::cropStringToLength($currentValue, $currentLength - $reduction);
+		}
+
+		return $source;
+	}
+
+	/**
+	 * @param array<string, scalar|null> $source
+	 *
+	 * @return array<string, int>
+	 */
+	private static function getStringFieldLengths(array $source): array {
+		$stringFields = [];
+		foreach ($source as $field => $value) {
+			if (!is_string($value)) {
+				continue;
+			}
+
+			$length = strlen($value);
+			if ($length === 0) {
+				continue;
+			}
+
+			$stringFields[$field] = $length;
+		}
+		arsort($stringFields);
+
+		return $stringFields;
+	}
+
+	/**
+	 * @param array<string, int> $stringFields
+	 */
+	private static function getNextStringFieldLength(array $stringFields): int {
+		$lengths = array_values($stringFields);
+		return $lengths[1] ?? 0;
+	}
+
+	private static function cropStringToLength(string $value, int $targetLength): string {
+		if ($targetLength <= 3) {
+			return '';
+		}
+
+		return substr($value, 0, $targetLength - 3) . '...';
 	}
 
 	/**
@@ -659,22 +750,29 @@ final class Handler extends BaseHandlerWithClient {
 
 	/**
 	 * @param array<string, array{user?: string, assistant?: string}> $history
+	 *
+	 * @throws JsonException
 	 */
 	private static function buildPrompt(string $query, string $context, array $history): string {
-		return 'Respond conversationally. Response should be based ONLY on the provided history and context sections' .
-			"(IMPORTANT !!! You can't use your own knowledge to add anything that isn't mentioned there). " .
-			'Do not exceed the response token limit (' .
-			self::RESPONSE_MAX_TOKENS .
-			'), and end the answer cleanly before reaching it. ' .
-			'<main>' .
-			"<history>\n" .
-			"```json\n" .
-			(string)json_encode($history) .
-			"\n```\n" .
-			"</history>\n" .
-			"<context>$context</context>\n" .
-			"<query>$query</query>\n" .
-			'</main>';
+		$historyJson = (string)json_encode($history, JSON_THROW_ON_ERROR);
+
+		return "system:\n"
+			. "You are a context-only answer writer.\n\n"
+			. 'Answer using only the provided context. Do not use outside knowledge, memory, assumptions, '
+			. "or unsupported facts.\n"
+			. 'Keep the answer concise and under ' . self::RESPONSE_MAX_TOKENS . " tokens.\n"
+			. "Citation rule:\n\n"
+			. "First write the answer with no citations at all.\n"
+			. "After the answer is finished, append the reference context ID (context[].id) once.\n"
+			. "If id reference was used, it must be exactly: [ref:<id>]\n"
+			. "Never put a reference ID after individual sentences.\n"
+			. "Never repeat the same reference ID.\n\n"
+			. "If the context is insufficient, answer exactly:\n"
+			. "I don’t have enough information in the provided context to answer.\n\n"
+			. "user:\n"
+			. "Query: $query\n\n"
+			. "History:\n```json\n$historyJson\n```\n"
+			. "Context:\n```json\n$context\n```";
 	}
 
 	/**
