@@ -173,6 +173,23 @@ class ContentFieldsTest extends TestCase {
 		$this->assertLessThanOrEqual(120, strlen((string)json_encode($sources[1], JSON_THROW_ON_ERROR)));
 	}
 
+	public function testBuildContextStopsCroppingWhenJsonCannotFitBudget(): void {
+		$context = $this->buildContext(
+			[
+				[
+					'id' => 123456789,
+					'content' => 'Text that cannot fit next to id in a tiny JSON budget.',
+				],
+			],
+			'content',
+			1
+		);
+
+		$sources = $this->decodeSources($context);
+		$this->assertSame('123456789', $sources[0]['id']);
+		$this->assertSame('', $sources[0]['content']);
+	}
+
 	public function testBuildContextRemovesNonStringFieldsFromLlmContext(): void {
 		$searchResults = [
 			[

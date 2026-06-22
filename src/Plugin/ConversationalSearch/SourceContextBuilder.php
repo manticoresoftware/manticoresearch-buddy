@@ -42,9 +42,17 @@ final class SourceContextBuilder {
 	 * @return array<int, string>
 	 */
 	private function parseContentFields(string $contentFields): array {
-		$fields = array_map('trim', explode(',', $contentFields));
+		$fields = [];
+		foreach (explode(',', $contentFields) as $field) {
+			$field = trim($field);
+			if ($field === '') {
+				continue;
+			}
 
-		return array_values(array_filter($fields, static fn(string $field): bool => $field !== ''));
+			$fields[] = $field;
+		}
+
+		return $fields;
 	}
 
 	/**
@@ -99,20 +107,25 @@ final class SourceContextBuilder {
 			return $source;
 		}
 
-		// Keep reducing the longest string field until the JSON object fits the per-source budget.
-		while ($this->jsonLength($source) > $maxLength) {
-			$stringFields = $this->stringFieldLengths($source);
-			if ($stringFields === []) {
+		$currentLength = $this->jsonLength($source);
+		while ($currentLength > $maxLength) {
+			$fieldLength = $this->longestStringFieldLength($source);
+			if ($fieldLength === null) {
 				return $source;
 			}
 
-			$field = array_key_first($stringFields);
-			$source[$field] = $this->cropLongestField(
-				(string)$source[$field],
-				$stringFields[$field],
-				$this->nextFieldLength($stringFields),
-				$this->jsonLength($source) - $maxLength
+			$source[$fieldLength['field']] = $this->cropLongestField(
+				$source[$fieldLength['field']],
+				$fieldLength['length'],
+				$fieldLength['next_length'],
+				$currentLength - $maxLength
 			);
+			$nextLength = $this->jsonLength($source);
+			if ($nextLength >= $currentLength) {
+				return $source;
+			}
+
+			$currentLength = $nextLength;
 		}
 
 		return $source;
@@ -131,28 +144,37 @@ final class SourceContextBuilder {
 	/**
 	 * @param array<string, string> $source
 	 *
-	 * @return array<string, int>
+	 * @return array{field: string, length: int, next_length: int}|null
 	 */
-	private function stringFieldLengths(array $source): array {
-		$lengths = [];
+	private function longestStringFieldLength(array $source): ?array {
+		$longestField = '';
+		$longestLength = 0;
+		$nextLength = 0;
 		foreach ($source as $field => $value) {
 			if ($field === self::SOURCE_ID_FIELD || $value === '') {
 				continue;
 			}
 
-			$lengths[$field] = strlen($value);
+			$length = strlen($value);
+			if ($length > $longestLength) {
+				$nextLength = $longestLength;
+				$longestLength = $length;
+				$longestField = $field;
+				continue;
+			}
+
+			if ($length <= $nextLength) {
+				continue;
+			}
+
+			$nextLength = $length;
 		}
-		arsort($lengths);
 
-		return $lengths;
-	}
+		if ($longestField === '') {
+			return null;
+		}
 
-	/**
-	 * @param array<string, int> $stringFields
-	 */
-	private function nextFieldLength(array $stringFields): int {
-		$lengths = array_values($stringFields);
-		return $lengths[1] ?? 0;
+		return ['field' => $longestField, 'length' => $longestLength, 'next_length' => $nextLength];
 	}
 
 	/**
