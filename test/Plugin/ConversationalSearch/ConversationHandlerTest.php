@@ -645,20 +645,26 @@ class ConversationHandlerTest extends TestCase {
 			)
 		);
 
-			$handler = new ChatHandler(
-				$payload, $this->createMockLlmProvider(
-					[
-					[
-					'content' => 'Here are some action movies!',
-					'metadata' => ['tokens_used' => 120],
-					'success' => true,
-					], // generateResponse
-					],
-					[
-						$this->createToolRouteResponse(ConversationRoute::SEARCH, 'Show me action movies', ''),
-					]
-				)
-			);
+		$handler = new ChatHandler(
+			$payload, $this->createMockLlmProvider(
+				[
+				[
+				'content' => 'Here are some action movies [ref:1]! More details [ref:1].',
+				'metadata' => ['tokens_used' => 120],
+				'success' => true,
+				], // generateResponse
+				],
+				[
+					$this->createToolRouteResponse(ConversationRoute::SEARCH, 'Show me action movies', ''),
+				],
+				[
+					static fn(string $prompt): bool => str_contains(
+						$prompt,
+						'Context:' . "\n```json\n" . '[{"id":"1","content":"Action movie content..."}]' . "\n```"
+					),
+				]
+			)
+		);
 
 		// Mock the manticore client with all expected calls
 		$mockClient = $this->createMock(HTTPClient::class);
@@ -763,6 +769,8 @@ class ConversationHandlerTest extends TestCase {
 		 *   conversation_uuid: string,
 		 *   user_query: string,
 		 *   search_query: string,
+		 *   response: string,
+		 *   response_with_refs: string,
 		 *   sources: mixed
 		 * }>}
 		 *> $struct */
@@ -773,10 +781,37 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertArrayHasKey('user_query', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('search_query', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('response', $struct[0]['data'][0]);
+		$this->assertArrayHasKey('response_with_refs', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('sources', $struct[0]['data'][0]);
 		$this->assertEquals('conv-uuid', $struct[0]['data'][0]['conversation_uuid']);
 		$this->assertEquals('Show me action movies', $struct[0]['data'][0]['user_query']);
+		$this->assertSame('Here are some action movies! More details.', $struct[0]['data'][0]['response']);
+		$this->assertSame(
+			'Here are some action movies [ref:1]! More details [ref:1].',
+			$struct[0]['data'][0]['response_with_refs']
+		);
 		$this->assertStringContainsString('action movies', $struct[0]['data'][0]['search_query']);
+	}
+
+	public function testBuildPromptRequiresSingleAppendedReferenceFormat(): void {
+		$reflection = new ReflectionClass(ChatHandler::class);
+		$method = $reflection->getMethod('buildPrompt');
+		$method->setAccessible(true);
+
+		$prompt = $method->invoke(
+			null,
+			'What is vector search?',
+			'[{"id":1,"content":"Vector search compares embeddings."}]',
+			[]
+		);
+
+		$this->assertIsString($prompt);
+		$this->assertStringContainsString('First write the answer with no citations at all.', $prompt);
+		$this->assertStringContainsString('append the reference context ID (context[].id) once', $prompt);
+		$this->assertStringContainsString('If id reference was used, it must be exactly: [ref:<id>]', $prompt);
+		$this->assertStringContainsString('Never put a reference ID after individual sentences.', $prompt);
+		$this->assertStringContainsString('Never repeat the same reference ID.', $prompt);
+		$this->assertStringContainsString('[{"id":1,"content":"Vector search compares embeddings."}]', $prompt);
 	}
 
 	public function testFollowUpWithoutContextFallsBackToNewIntent(): void {
@@ -980,18 +1015,26 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertStringContainsString('Invalid table identifier', $task->getError()->getResponseError());
 	}
 
-		/**
-		 * Create a mock LLM provider with predefined responses
-		 *
-			 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
-			 * @param array<int, array<string, mixed>> $toolResponses Array of LLM tool response arrays
-			 * @return LlmProvider
-			 */
-	private function createMockLlmProvider(array $responses, array $toolResponses = []): LlmProvider {
+	/**
+	 * Create a mock LLM provider with predefined responses.
+	 *
+	 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
+	 * @param array<int, array<string, mixed>> $toolResponses Array of LLM tool response arrays
+	 * @param array<int, callable(string): bool> $promptAssertions
+	 * @return LlmProvider
+	 */
+	private function createMockLlmProvider(
+		array $responses,
+		array $toolResponses = [],
+		array $promptAssertions = []
+	): LlmProvider {
 		$mockProvider = $this->createMock(LlmProvider::class);
 		$callCount = 0;
-		$callback = function ($_prompt, $_options = []) use (&$responses, &$callCount) {
-			unset($_prompt, $_options);
+		$callback = function (string $prompt, $_options = []) use (&$responses, &$callCount, $promptAssertions) {
+			unset($_options);
+			if (isset($promptAssertions[$callCount])) {
+				TestCase::assertTrue($promptAssertions[$callCount]($prompt));
+			}
 			if ($callCount >= sizeof($responses)) {
 				throw new \Exception(
 					'Too many LLM calls: expected ' . sizeof($responses) . ', got ' . ($callCount + 1)
