@@ -645,20 +645,26 @@ class ConversationHandlerTest extends TestCase {
 			)
 		);
 
-			$handler = new ChatHandler(
-				$payload, $this->createMockLlmProvider(
-					[
-					[
-					'content' => 'Here are some action movies [ref:1]! More details [ref:1].',
-					'metadata' => ['tokens_used' => 120],
-					'success' => true,
-					], // generateResponse
-					],
-					[
-						$this->createToolRouteResponse(ConversationRoute::SEARCH, 'Show me action movies', ''),
-					]
-				)
-			);
+		$handler = new ChatHandler(
+			$payload, $this->createMockLlmProvider(
+				[
+				[
+				'content' => 'Here are some action movies [ref:1]! More details [ref:1].',
+				'metadata' => ['tokens_used' => 120],
+				'success' => true,
+				], // generateResponse
+				],
+				[
+					$this->createToolRouteResponse(ConversationRoute::SEARCH, 'Show me action movies', ''),
+				],
+				[
+					static fn(string $prompt): bool => str_contains(
+						$prompt,
+						'Context:' . "\n```json\n" . '[{"id":"1","content":"Action movie content..."}]' . "\n```"
+					),
+				]
+			)
+		);
 
 		// Mock the manticore client with all expected calls
 		$mockClient = $this->createMock(HTTPClient::class);
@@ -1009,18 +1015,26 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertStringContainsString('Invalid table identifier', $task->getError()->getResponseError());
 	}
 
-		/**
-		 * Create a mock LLM provider with predefined responses
-		 *
-			 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
-			 * @param array<int, array<string, mixed>> $toolResponses Array of LLM tool response arrays
-			 * @return LlmProvider
-			 */
-	private function createMockLlmProvider(array $responses, array $toolResponses = []): LlmProvider {
+	/**
+	 * Create a mock LLM provider with predefined responses.
+	 *
+	 * @param array<int, array<string, mixed>> $responses Array of LLM response arrays
+	 * @param array<int, array<string, mixed>> $toolResponses Array of LLM tool response arrays
+	 * @param array<int, callable(string): bool> $promptAssertions
+	 * @return LlmProvider
+	 */
+	private function createMockLlmProvider(
+		array $responses,
+		array $toolResponses = [],
+		array $promptAssertions = []
+	): LlmProvider {
 		$mockProvider = $this->createMock(LlmProvider::class);
 		$callCount = 0;
-		$callback = function ($_prompt, $_options = []) use (&$responses, &$callCount) {
-			unset($_prompt, $_options);
+		$callback = function (string $prompt, $_options = []) use (&$responses, &$callCount, $promptAssertions) {
+			unset($_options);
+			if (isset($promptAssertions[$callCount])) {
+				TestCase::assertTrue($promptAssertions[$callCount]($prompt));
+			}
 			if ($callCount >= sizeof($responses)) {
 				throw new \Exception(
 					'Too many LLM calls: expected ' . sizeof($responses) . ', got ' . ($callCount + 1)

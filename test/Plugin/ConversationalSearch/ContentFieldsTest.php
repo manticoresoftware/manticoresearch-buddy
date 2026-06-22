@@ -10,6 +10,7 @@
  */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Handler;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\SourceContextBuilder;
 use PHPUnit\Framework\TestCase;
 
 class ContentFieldsTest extends TestCase {
@@ -41,19 +42,15 @@ class ContentFieldsTest extends TestCase {
 				'vector_field' => [0.4, 0.5, 0.6],
 			],
 		];
-
-		// Test reflection to access private method
-		$reflection = new ReflectionClass(Handler::class);
-		$method = $reflection->getMethod('buildContext');
-		$method->setAccessible(true);
-
 		// Test single field (backward compatibility)
 		$context = $this->buildContext($searchResults, 'content', 1000);
 		$this->assertIsString($context);
 		$sources = $this->decodeSources($context);
+		$this->assertSame('1', $sources[0]['id']);
 		$this->assertSame('This is the main content.', $sources[0]['content']);
 		$this->assertSame('Complex SQL queries explained.', $sources[1]['content']);
 		$this->assertArrayNotHasKey('vector_field', $sources[0]);
+		$this->assertArrayNotHasKey('title', $sources[0]);
 
 		// Test multiple fields with comma separator
 		$context = $this->buildContext($searchResults, 'title,content', 1000);
@@ -84,10 +81,6 @@ class ContentFieldsTest extends TestCase {
 			],
 		];
 
-		$reflection = new ReflectionClass(Handler::class);
-		$method = $reflection->getMethod('buildContext');
-		$method->setAccessible(true);
-
 		$context = $this->buildContext($searchResults, 'title,content,summary', 1000);
 		$sources = $this->decodeSources($context);
 		$this->assertSame('Test', $sources[0]['title']);
@@ -105,10 +98,6 @@ class ContentFieldsTest extends TestCase {
 			],
 		];
 
-		$reflection = new ReflectionClass(Handler::class);
-		$method = $reflection->getMethod('buildContext');
-		$method->setAccessible(true);
-
 		$context = $this->buildContext($searchResults, 'title,content,summary', 1000);
 		$sources = $this->decodeSources($context);
 		$this->assertSame('Test Title', $sources[0]['title']);
@@ -118,10 +107,6 @@ class ContentFieldsTest extends TestCase {
 
 	public function testBuildContextWithEmptyResults(): void {
 		$searchResults = [];
-		$reflection = new ReflectionClass(Handler::class);
-		$method = $reflection->getMethod('buildContext');
-		$method->setAccessible(true);
-
 		$context = $this->buildContext($searchResults, 'title,content', 1000);
 		$this->assertEquals('', $context);
 	}
@@ -134,14 +119,10 @@ class ContentFieldsTest extends TestCase {
 			],
 		];
 
-		$reflection = new ReflectionClass(Handler::class);
-		$method = $reflection->getMethod('buildContext');
-		$method->setAccessible(true);
-
 		// Test explicit single field
 		$context = $this->buildContext($searchResults, 'content', 1000);
 		$sources = $this->decodeSources($context);
-		$this->assertSame(1, $sources[0]['id']);
+		$this->assertSame('1', $sources[0]['id']);
 		$this->assertSame('Single content field', $sources[0]['content']);
 	}
 
@@ -153,10 +134,6 @@ class ContentFieldsTest extends TestCase {
 				'content' => str_repeat('A very long content string. ', 120), // Exceeds the internal 2000-char limit
 			],
 		];
-
-		$reflection = new ReflectionClass(Handler::class);
-		$method = $reflection->getMethod('buildContext');
-		$method->setAccessible(true);
 
 		$context = $this->buildContext($searchResults, 'title,content', 80);
 		$this->assertIsString($context);
@@ -182,22 +159,39 @@ class ContentFieldsTest extends TestCase {
 			],
 		];
 
-		$reflection = new ReflectionClass(Handler::class);
-		$method = $reflection->getMethod('buildContext');
-		$method->setAccessible(true);
-
 		$context = $this->buildContext($searchResults, 'content', 120);
 
 		$this->assertIsString($context);
 		$sources = $this->decodeSources($context);
 		$this->assertCount(2, $sources);
-		$this->assertSame(7713940850845155334, $sources[0]['id']);
-		$this->assertSame('Breaking Bad', $sources[0]['title']);
-		$this->assertSame(0.69800115, $sources[0]['knn_dist']);
+		$this->assertSame('7713940850845155334', $sources[0]['id']);
+		$this->assertArrayNotHasKey('title', $sources[0]);
+		$this->assertArrayNotHasKey('knn_dist', $sources[0]);
 		$this->assertIsString($sources[0]['content']);
 		$this->assertStringEndsWith('...', $sources[0]['content']);
 		$this->assertLessThanOrEqual(120, strlen((string)json_encode($sources[0], JSON_THROW_ON_ERROR)));
 		$this->assertLessThanOrEqual(120, strlen((string)json_encode($sources[1], JSON_THROW_ON_ERROR)));
+	}
+
+	public function testBuildContextRemovesNonStringFieldsFromLlmContext(): void {
+		$searchResults = [
+			[
+				'id' => 42,
+				'content' => 'Visible source text',
+				'title' => 'Not part of requested vector source fields',
+				'year' => 2024,
+				'knn_dist' => 0.15,
+				'active' => true,
+				'payload' => ['nested' => 'value'],
+			],
+		];
+
+		$context = $this->buildContext($searchResults, 'content', 1000);
+		$sources = $this->decodeSources($context);
+
+		$this->assertSame(['id', 'content'], array_keys($sources[0]));
+		$this->assertSame('42', $sources[0]['id']);
+		$this->assertSame('Visible source text', $sources[0]['content']);
 	}
 
 	public function testBuildContextWithoutTruncationWhenDisabled(): void {
@@ -208,10 +202,6 @@ class ContentFieldsTest extends TestCase {
 				'content' => str_repeat('A very long content string. ', 120),
 			],
 		];
-
-		$reflection = new ReflectionClass(Handler::class);
-		$method = $reflection->getMethod('buildContext');
-		$method->setAccessible(true);
 
 		$context = $this->buildContext($searchResults, 'title,content', 0);
 		$this->assertIsString($context);
@@ -246,13 +236,7 @@ class ContentFieldsTest extends TestCase {
 	 * @param array<int, array<string, mixed>> $searchResults
 	 */
 	private function buildContext(array $searchResults, string $contentFields, int $maxDocumentLength): string {
-		$reflection = new ReflectionClass(Handler::class);
-		$method = $reflection->getMethod('buildContext');
-		$method->setAccessible(true);
-		$context = $method->invoke(null, $searchResults, $contentFields, $maxDocumentLength);
-		$this->assertIsString($context);
-
-		return $context;
+		return (new SourceContextBuilder())->build($searchResults, $contentFields, $maxDocumentLength);
 	}
 
 	/**
