@@ -5,13 +5,16 @@ Manticore Buddy. It searches an existing vectorized table, builds context from
 matched documents, and asks an LLM to answer using that context and the current
 conversation history.
 
-Supported commands:
+Supported SQL commands:
 
 - `CREATE CHAT MODEL`
 - `SHOW CHAT MODELS`
 - `DESCRIBE CHAT MODEL`
 - `DROP CHAT MODEL`
 - `CALL CHAT`
+
+Conversation calls are also available through the HTTP JSON `/search` endpoint.
+Chat model management remains SQL-only.
 
 ## How It Works
 
@@ -204,8 +207,53 @@ Arguments are positional only:
 | 4 | `conversation_uuid` | No | Existing conversation id, or empty string |
 | 5 | `fields` / vector field | No | `FLOAT_VECTOR` field used in `knn(...)` |
 
-The fifth argument is stored internally as `fields` for compatibility with the
-current parser, but it must be a single vector field name.
+The table argument must be a plain table identifier, optionally qualified as
+`database.table`. The vector field argument must be a plain field identifier.
+
+## HTTP JSON Syntax
+
+Conversational Search also supports named-field HTTP JSON requests through the
+standard `/search` endpoint.
+
+Start or continue a conversation:
+
+```bash
+curl -s -X POST http://localhost:9308/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "chat": {
+      "query": "How is vector search different from full-text search?",
+      "table": "docs",
+      "model_name": "assistant",
+      "conversation_uuid": "search-demo-1",
+      "vector_field": "embedding"
+    }
+  }'
+```
+
+Required fields:
+
+| Field | Description |
+|---|---|
+| `query` | User question |
+| `table` | Table to search |
+| `model_name` | chat model name |
+
+Optional fields:
+
+| Field | Description |
+|---|---|
+| `conversation_uuid` | Existing conversation id. If omitted or empty, Buddy creates a new one |
+| `vector_field` | `FLOAT_VECTOR` field used in `knn(...)` |
+
+`vector_field` is the HTTP JSON name for the fifth SQL `CALL CHAT` argument.
+The legacy JSON field name `fields` is accepted as an alias, but requests must
+not include both `vector_field` and `fields`.
+
+HTTP JSON conversation responses use the same logical columns as `CALL CHAT`:
+`conversation_uuid`, `user_query`, `search_query`, `response`,
+`response_with_refs`, and `sources`. `sources` is currently returned as a JSON
+string containing the retrieved source rows.
 
 The table argument must be a plain table identifier, optionally qualified as
 `database.table`. The vector field argument must be a plain field identifier.

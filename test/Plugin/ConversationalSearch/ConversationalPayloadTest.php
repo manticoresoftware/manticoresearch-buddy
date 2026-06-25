@@ -259,26 +259,102 @@ class ConversationalPayloadTest extends TestCase {
 		$this->assertEquals('550e8400-e29b-41d4-a716-446655440000', $payload->params['model_name']);
 	}
 
-	public function testHTTPNotSupported(): void {
+	/**
+	 * @throws QueryParseError
+	 */
+	public function testJsonConversationParsing(): void {
+		$request = $this->createJsonRequest(
+			'/search',
+			'{"chat":{"query":"What is vector search?","table":"docs","model_name":"assistant",'
+				. '"conversation_uuid":"search-demo-1","vector_field":"embedding"}}'
+		);
+
+		$this->assertTrue(ChatPayload::hasMatch($request));
+
+		$payload = ChatPayload::fromRequest($request);
+
+		$this->assertEquals('conversation', $payload->action);
+		$this->assertEquals('What is vector search?', $payload->params['query']);
+		$this->assertEquals('docs', $payload->params['table']);
+		$this->assertEquals('assistant', $payload->params['model_name']);
+		$this->assertEquals('search-demo-1', $payload->params['conversation_uuid']);
+		$this->assertEquals('embedding', $payload->params['fields']);
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
+	public function testJsonConversationParsingWithRequiredFieldsOnly(): void {
+		$payload = ChatPayload::fromRequest(
+			$this->createJsonRequest(
+				'/search',
+				'{"chat":{"query":"What is vector search?","table":"docs","model_name":"assistant"}}'
+			)
+		);
+
+		$this->assertEquals('conversation', $payload->action);
+		$this->assertEquals('What is vector search?', $payload->params['query']);
+		$this->assertEquals('docs', $payload->params['table']);
+		$this->assertEquals('assistant', $payload->params['model_name']);
+		$this->assertArrayNotHasKey('conversation_uuid', $payload->params);
+		$this->assertArrayNotHasKey('fields', $payload->params);
+	}
+
+	public function testJsonConversationRejectsFieldsAndVectorFieldTogether(): void {
 		$this->expectException(QueryParseError::class);
 
 		ChatPayload::fromRequest(
-			Request::fromArray(
-				[
-					'version' => Buddy::PROTOCOL_VERSION,
-					'error' => '',
-					'payload' => (string)json_encode(
-						[
-							'id' => 'test_model',
-							'name' => 'Test Model',
-							'model' => 'openai:gpt-4o',
-						]
-					),
-					'format' => RequestFormat::JSON,
-					'endpointBundle' => ManticoreEndpoint::Search,
-					'path' => '/chat/models',
-				]
+			$this->createJsonRequest(
+				'/search',
+				'{"chat":{"query":"What is vector search?","table":"docs","model_name":"assistant",'
+					. '"fields":"legacy_embedding","vector_field":"embedding"}}'
 			)
+		);
+	}
+
+	public function testJsonConversationRejectsMissingQuery(): void {
+		$this->expectException(QueryParseError::class);
+
+		ChatPayload::fromRequest(
+			$this->createJsonRequest('/search', '{"chat":{"table":"docs","model_name":"assistant"}}')
+		);
+	}
+
+	public function testJsonConversationRejectsUnknownField(): void {
+		$this->expectException(QueryParseError::class);
+
+		ChatPayload::fromRequest(
+			$this->createJsonRequest(
+				'/search',
+				'{"chat":{"query":"What is vector search?","table":"docs","model_name":"assistant",'
+					. '"unknown":"value"}}'
+			)
+		);
+	}
+
+	public function testJsonConversationRejectsNonStringField(): void {
+		$this->expectException(QueryParseError::class);
+
+		ChatPayload::fromRequest(
+			$this->createJsonRequest(
+				'/search',
+				'{"chat":{"query":"What is vector search?","table":"docs","model_name":"assistant",'
+					. '"conversation_uuid":123}}'
+			)
+		);
+	}
+
+	private function createJsonRequest(string $path, string $payload, string $httpMethod = 'POST'): Request {
+		return Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $payload,
+				'format' => RequestFormat::JSON,
+				'endpointBundle' => ManticoreEndpoint::Search,
+				'path' => $path,
+				'httpMethod' => $httpMethod,
+			]
 		);
 	}
 

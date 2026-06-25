@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
 
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 
@@ -24,6 +25,9 @@ final class Payload extends BasePayload {
 	public const string ACTION_DESCRIBE_MODEL = 'describe_model';
 	public const string ACTION_DROP_MODEL = 'drop_model';
 	public const string ACTION_CONVERSATION = 'conversation';
+	private const array CONVERSATION_JSON_FIELDS = [
+		'query', 'table', 'model_name', 'conversation_uuid', 'vector_field', 'fields',
+	];
 
 	/** @var string */
 	public string $action;
@@ -42,12 +46,32 @@ final class Payload extends BasePayload {
 	 * @return bool
 	 */
 	public static function hasMatch(Request $request): bool {
+		if (self::matchesJson($request)) {
+			return true;
+		}
+
 		// Check SQL patterns first
 		if (self::matchesSQL($request)) {
 			return true;
 		}
 
 		return false;
+	}
+
+	/**
+	 * Check if HTTP JSON /search request contains chat payload
+	 *
+	 * @param Request $request
+	 *
+	 * @return bool
+	 */
+	private static function matchesJson(Request $request): bool {
+		if ($request->endpointBundle !== ManticoreEndpoint::Search) {
+			return false;
+		}
+
+		$payload = simdjson_decode($request->payload, true);
+		return is_array($payload) && isset($payload['chat']) && is_array($payload['chat']);
 	}
 
 	/**
@@ -94,13 +118,123 @@ final class Payload extends BasePayload {
 	 * @throws QueryParseError
 	 */
 	public static function fromRequest(Request $request): static {
-		$payload = new static();
-		$payload->query = $request->payload;
+		return match ($request->endpointBundle) {
+			ManticoreEndpoint::Search => static::fromJsonRequest($request),
+			default => static::fromSqlRequest($request),
+		};
+	}
 
-		// Parse SQL request only (HTTP API not supported)
-		$payload->parseSQLRequest($request);
+	/**
+	 * @param Request $request
+	 *
+	 * @return static
+	 * @throws QueryParseError
+	 */
+	protected static function fromJsonRequest(Request $request): static {
+		$self = new static();
+		$self->query = $request->payload;
+		$payload = $self->decodeJsonBody($request);
+		if (!isset($payload['chat']) || !is_array($payload['chat'])) {
+			throw QueryParseError::create('HTTP JSON body must contain chat object');
+		}
+
+		$self->parseJsonConversation($payload['chat']);
+		return $self;
+	}
+
+	/**
+	 * @param Request $request
+	 *
+	 * @return static
+	 * @throws QueryParseError
+	 */
+	protected static function fromSqlRequest(Request $request): static {
+		$self = new static();
+		$self->query = $request->payload;
+		$self->parseSQLRequest($request);
+		return $self;
+	}
+
+	/**
+	 * @param Request $request
+	 *
+	 * @return array<string, mixed>
+	 * @throws QueryParseError
+	 */
+	private function decodeJsonBody(Request $request): array {
+		if (trim($request->payload) === '') {
+			throw QueryParseError::create('HTTP JSON body is required');
+		}
+
+		$payload = simdjson_decode($request->payload, true);
+		if (!is_array($payload)) {
+			throw QueryParseError::create('HTTP JSON body must be an object');
+		}
 
 		return $payload;
+	}
+
+	/**
+	 * @param array<string, mixed> $payload
+	 *
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private function parseJsonConversation(array $payload): void {
+		$this->action = self::ACTION_CONVERSATION;
+		$hasVectorField = false;
+		$hasFields = false;
+
+		foreach ($payload as $field => $value) {
+			$this->parseJsonConversationField($field, $value, $hasVectorField, $hasFields);
+		}
+
+		if ($hasVectorField && $hasFields) {
+			throw QueryParseError::create('Use either vector_field or fields, not both');
+		}
+
+		$this->validateRequiredJsonConversationParams();
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
+	private function parseJsonConversationField(
+		string $field,
+		mixed $value,
+		bool &$hasVectorField,
+		bool &$hasFields
+	): void {
+		if (!in_array($field, self::CONVERSATION_JSON_FIELDS, true)) {
+			throw QueryParseError::create("Unknown chat JSON field: $field");
+		}
+
+		if (!is_string($value)) {
+			throw QueryParseError::create("$field must be a string");
+		}
+
+		if ($field === 'vector_field') {
+			$hasVectorField = true;
+			$this->params['fields'] = $value;
+			return;
+		}
+
+		if ($field === 'fields') {
+			$hasFields = true;
+		}
+
+		$this->params[$field] = $value;
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
+	private function validateRequiredJsonConversationParams(): void {
+		foreach (['query', 'table', 'model_name'] as $field) {
+			if (!isset($this->params[$field]) || trim($this->params[$field]) === '') {
+				throw QueryParseError::create("$field must be a non-empty string");
+			}
+		}
 	}
 
 
