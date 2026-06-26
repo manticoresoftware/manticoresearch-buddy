@@ -9,13 +9,16 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
+use Manticoresearch\Buddy\Base\Plugin\Metrics\Handler;
 use Manticoresearch\Buddy\Base\Plugin\Metrics\Payload;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
+use Manticoresearch\BuddyTest\Plugin\Metrics\RecordingMetricsClient;
 use PHPUnit\Framework\TestCase;
+use Swoole\Event;
 
 /**
  * Unit test for Metrics plugin content type verification
@@ -112,6 +115,37 @@ final class MetricsContentTypeTest extends TestCase {
 	 *
 	 * @return void
 	 */
+	public function testMetricsHandlerUsesCloseOnResponseClientForInternalScrapeQueries(): void {
+		RecordingMetricsClient::reset();
+
+		$payload = new Payload();
+		$handler = new Handler($payload);
+		$client = new RecordingMetricsClient('original');
+		$handler->setManticoreClient($client);
+
+		$failure = null;
+		go(
+			static function () use ($handler, &$failure): void {
+				try {
+					$task = $handler->run();
+					$task->wait(true);
+				} catch (Throwable $e) {
+					$failure = $e;
+				}
+			}
+		);
+		Event::wait();
+
+		if ($failure instanceof Throwable) {
+			throw $failure;
+		}
+
+		$this->assertSame(0, $client->sendRequestCount, 'The shared async client must not handle metrics scrape SQL');
+		$this->assertInstanceOf(RecordingMetricsClient::class, RecordingMetricsClient::$lastClone);
+		$this->assertTrue(RecordingMetricsClient::$lastClone->forceSyncWasEnabled);
+		$this->assertGreaterThan(0, RecordingMetricsClient::$lastClone->sendRequestCount);
+	}
+
 	public function testMetricsEndpointEnumValue(): void {
 		$this->assertEquals('metrics', Endpoint::Metrics->value);
 	}

@@ -52,7 +52,9 @@ final class Handler extends BaseHandlerWithClient
 			$definitions = $decoded;
 			$store = new MetricStore($definitions);
 			$context = new MetricsScrapeContext();
-			$settings = $client->getSettings();
+			$metricsClient = clone $client;
+			$metricsClient->setForceSync(true);
+			$settings = $metricsClient->getSettings();
 			$context->settings = [
 				'searchd.data_dir' => (string)($settings->searchdDataDir ?? ''),
 				'searchd.binlog_path' => (string)($settings->searchdBinlogPath ?? ''),
@@ -71,7 +73,7 @@ final class Handler extends BaseHandlerWithClient
 
 			foreach ($collectors as $collector) {
 				try {
-					$collector->collect($client, $store, $context);
+					$collector->collect($metricsClient, $store, $context);
 				} catch (ManticoreSearchClientError | ManticoreSearchResponseError $e) {
 					Buddy::warning('Metrics: collector failed (' . $collector::class . '): ' . $e->getMessage());
 
