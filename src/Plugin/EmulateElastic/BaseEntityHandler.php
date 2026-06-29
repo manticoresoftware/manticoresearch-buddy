@@ -16,8 +16,6 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 
 abstract class BaseEntityHandler extends BaseHandlerWithClient {
 
-	use InternalBuddyClientTrait;
-
 	const ALIAS_TABLE = 'system.kibana_aliases';
 	const ENTITY_TABLE = 'system.kibana_entities';
 	const TEMPLATE_TABLE = 'system.kibana_templates';
@@ -56,7 +54,7 @@ abstract class BaseEntityHandler extends BaseHandlerWithClient {
 	 * @return string
 	 */
 	protected static function getEntityIndex(string $indexAlias, HTTPClient $manticoreClient): string {
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		$query = 'SELECT index FROM ' . self::ALIAS_TABLE . " WHERE alias='{$indexAlias}'";
 		/** @var array{0:array{data?:array<array{index:string}>}} $queryResult */
 		$queryResult = $systemClient->sendRequest($query)->getResult();
@@ -77,7 +75,7 @@ abstract class BaseEntityHandler extends BaseHandlerWithClient {
 	 * @throws \Exception
 	 */
 	protected static function executeQuery(string $query, HTTPClient $manticoreClient, string $queryType): void {
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		/** @var array{error?:string,0:array{data?:array<mixed>}} $queryResult */
 		$queryResult = $systemClient->sendRequest($query)->getResult();
 		if (isset($queryResult['error'])) {

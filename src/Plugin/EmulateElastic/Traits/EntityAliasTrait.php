@@ -34,7 +34,7 @@ trait EntityAliasTrait {
 		HTTPClient $manticoreClient,
 		?string $aliasTable = null
 	): void {
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		if (!isset($aliasTable)) {
 			$aliasTable = parent::ALIAS_TABLE;
 		}
@@ -67,7 +67,7 @@ trait EntityAliasTrait {
 	 * @return array<mixed>
 	 */
 	protected static function getAliasData(HTTPClient $manticoreClient, string $query): array {
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		$showQuery = "SHOW TABLES LIKE '" . parent::ALIAS_TABLE . "'";
 		/** @var array{0?:array{data?:array<mixed>}} $queryResult */
 		$queryResult = $systemClient->sendRequest($showQuery)->getResult();
@@ -94,7 +94,7 @@ trait EntityAliasTrait {
 	 * @throws RuntimeException
 	 */
 	protected static function refreshAliasedEntities(string $index, string $alias, HTTPClient $manticoreClient): void {
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		$query = 'CREATE TABLE IF NOT EXISTS ' . parent::ENTITY_TABLE
 		. ' (_id string, _index string, _index_alias string, _type string, _source json)';
 		$queryResult = $systemClient->sendRequest($query)->getResult();

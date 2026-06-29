@@ -41,7 +41,7 @@ class ImportKibanaHandler extends BaseEntityHandler {
 	 */
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
-			$systemClient = self::getSystemClient($manticoreClient);
+			$systemClient = $manticoreClient->getSystemClient();
 			$query = 'CREATE TABLE IF NOT EXISTS ' . parent::ENTITY_TABLE
 				. ' (_id string, _index string, _index_alias string, _type string, _source json)';
 			$queryResult = $systemClient->sendRequest($query)->getResult();
@@ -146,7 +146,7 @@ class ImportKibanaHandler extends BaseEntityHandler {
 	 * @return string
 	 */
 	protected static function getImportedPattern(string $patternId, HTTPClient $manticoreClient): string {
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		$query = 'SELECT _source FROM ' . parent::ENTITY_TABLE . " WHERE _id='{$patternId}'";
 		/** @var array{error?:string,0:array{data?:array<array{_source:string}>}} $queryResult */
 		$queryResult = $systemClient->sendRequest($query)->getResult();
@@ -173,7 +173,7 @@ class ImportKibanaHandler extends BaseEntityHandler {
 		$pattern = simdjson_decode($patternSource, true);
 		$indexName = isset($pattern['index-pattern'])
 			? $pattern['index-pattern']['title'] : $pattern['attributes']['title'];
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		$query = 'SELECT _id, _source FROM ' . parent::ENTITY_TABLE . " WHERE _type='{$indexType}'";
 		/** @var array{error?:string,0:array{data?:array<array{_source:string,_id:string}>}} $queryResult */
 		$queryResult = $systemClient->sendRequest($query)->getResult();
@@ -210,7 +210,7 @@ class ImportKibanaHandler extends BaseEntityHandler {
 		$importedId = explode(':', $importedId)[1];
 		$actualId = explode(':', $actualId)[1];
 
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		$query = 'SELECT _id, _source FROM ' . parent::ENTITY_TABLE	. " WHERE _type='visualization'";
 		/** @var array{error?:string,0:array{data?:array<array{_source:string,_id:string}>}} $queryResult */
 		$queryResult = $systemClient->sendRequest($query)->getResult();
