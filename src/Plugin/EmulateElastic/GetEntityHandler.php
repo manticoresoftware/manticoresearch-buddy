@@ -66,7 +66,7 @@ class GetEntityHandler extends BaseEntityHandler {
 	 * }
 	 */
 	public static function get(string $entityId, string $entityIndex, HTTPClient $manticoreClient): array {
-		$systemClient = self::getSystemClient($manticoreClient);
+		$systemClient = $manticoreClient->getSystemClient();
 		$query = 'SELECT _source FROM `' . self::ENTITY_TABLE . "` WHERE _id='{$entityId}'";
 		if ($entityIndex) {
 			$query  .= " AND _index='{$entityIndex}'";

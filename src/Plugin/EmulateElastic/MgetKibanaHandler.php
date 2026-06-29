@@ -41,7 +41,7 @@ class MgetKibanaHandler extends BaseEntityHandler {
 			/** @var array{docs:array<array{_id:string,_index:string}>} $payloadBody */
 			$payloadBody = simdjson_decode($payload->body, true);
 			$entityInfo = $payloadBody['docs'];
-			$systemClient = self::getSystemClient($manticoreClient);
+			$systemClient = $manticoreClient->getSystemClient();
 			$getEntitiesCond = self::buildEntitiesCond($entityInfo);
 			$query = 'SELECT _id, _index, _source FROM `' . self::ENTITY_TABLE . "` WHERE {$getEntitiesCond}";
 			/** @var array{

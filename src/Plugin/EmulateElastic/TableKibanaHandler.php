@@ -71,7 +71,7 @@ class TableKibanaHandler extends BaseEntityHandler {
 					'timed_out' => false,
 					'took' => 0,
 				];
-				$systemClient = self::getSystemClient($manticoreClient);
+				$systemClient = $manticoreClient->getSystemClient();
 				$query = 'SELECT * FROM ' . parent::ENTITY_TABLE;
 				$searchConds = [];
 				self::extractSearchConds($payloadBody, $searchConds);

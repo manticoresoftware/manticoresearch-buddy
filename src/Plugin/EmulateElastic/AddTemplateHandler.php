@@ -22,8 +22,6 @@ use RuntimeException;
  */
 class AddTemplateHandler extends BaseHandlerWithClient {
 
-	use InternalBuddyClientTrait;
-
 	/**
 	 *  Initialize the executor
 	 *
@@ -49,7 +47,7 @@ class AddTemplateHandler extends BaseHandlerWithClient {
 			$patterns = json_encode($request['index_patterns']);
 			unset($request['index_patterns']);
 			$content = json_encode($request);
-			$systemClient = self::getSystemClient($manticoreClient);
+			$systemClient = $manticoreClient->getSystemClient();
 			$templateTable = BaseEntityHandler::TEMPLATE_TABLE;
 
 			// We may need to do a wildcard search by template name so we index it

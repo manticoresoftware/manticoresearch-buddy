@@ -30,7 +30,7 @@ class UpdateEntityHandler extends BaseEntityHandler {
 	public function run(): Task {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			[$entityId, $entityIndex, $entityIndexAlias] = self::getEntityInfo($payload->path, $manticoreClient);
-			$systemClient = self::getSystemClient($manticoreClient);
+			$systemClient = $manticoreClient->getSystemClient();
 			$query = 'SELECT _source FROM `' . parent::ENTITY_TABLE
 			. "` WHERE _id='{$entityId}' AND _index='{$entityIndex}'";
 			/** @var array{error?:string,0:array{data?:array<array{_source:string}>}} $queryResult */
