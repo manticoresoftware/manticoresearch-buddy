@@ -853,23 +853,37 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertStringContainsString('action movies', $struct[0]['data'][0]['search_query']);
 	}
 
-	public function testBuildPromptDoesNotForceReferenceFormat(): void {
+	public function testBuildPromptUsesHistoryContextOnlyPrompt(): void {
 		$reflection = new ReflectionClass(ChatHandler::class);
 		$method = $reflection->getMethod('buildPrompt');
 		$method->setAccessible(true);
+		$history = [['role' => 'user', 'content' => 'Earlier question']];
 
 		$prompt = $method->invoke(
 			null,
 			'What is vector search?',
 			'[{"id":1,"content":"Vector search compares embeddings."}]',
-			[]
+			$history
 		);
 
 		$this->assertIsString($prompt);
+		$this->assertStringStartsWith('Respond conversationally.', $prompt);
+		$this->assertStringContainsString(
+			'Response should be based ONLY on the provided history and context sections',
+			$prompt
+		);
+		$this->assertStringContainsString("You can't use your own knowledge", $prompt);
+		$this->assertStringContainsString('Do not exceed the response token limit (4096)', $prompt);
+		$this->assertStringContainsString('<main><history>', $prompt);
+		$this->assertStringContainsString(
+			'<context>[{"id":1,"content":"Vector search compares embeddings."}]</context>',
+			$prompt
+		);
+		$this->assertStringContainsString('<query>What is vector search?</query>', $prompt);
+		$this->assertStringEndsWith('</main>', $prompt);
 		$this->assertStringNotContainsString('Citation rule:', $prompt);
 		$this->assertStringNotContainsString('append the reference context ID (context[].id) once', $prompt);
 		$this->assertStringNotContainsString('[ref:<id>]', $prompt);
-		$this->assertStringContainsString('[{"id":1,"content":"Vector search compares embeddings."}]', $prompt);
 	}
 
 	public function testBuildPromptUsesCustomPromptWhenConfigured(): void {
@@ -886,9 +900,18 @@ class ConversationHandlerTest extends TestCase {
 		);
 
 		$this->assertIsString($prompt);
+		$this->assertStringStartsWith(
+			'You are a support assistant. Mention the matching source title.',
+			$prompt
+		);
 		$this->assertStringContainsString('You are a support assistant. Mention the matching source title.', $prompt);
-		$this->assertStringContainsString('Query: What is vector search?', $prompt);
-		$this->assertStringContainsString('[{"id":1,"content":"Vector search compares embeddings."}]', $prompt);
+		$this->assertStringNotContainsString('Respond conversationally.', $prompt);
+		$this->assertStringNotContainsString('history/context-only rule', $prompt);
+		$this->assertStringContainsString('<query>What is vector search?</query>', $prompt);
+		$this->assertStringContainsString(
+			'<context>[{"id":1,"content":"Vector search compares embeddings."}]</context>',
+			$prompt
+		);
 		$this->assertStringNotContainsString('You are a context-only answer writer.', $prompt);
 	}
 
@@ -924,7 +947,7 @@ class ConversationHandlerTest extends TestCase {
 						$prompt,
 						'You are a support assistant. Mention the matching source title.'
 					)
-						&& str_contains($prompt, 'Query: What is vector search?')
+						&& str_contains($prompt, '<query>What is vector search?</query>')
 						&& str_contains($prompt, '[{"id":1,"content":"Vector search compares embeddings."}]')
 				),
 				$this->isType('array')

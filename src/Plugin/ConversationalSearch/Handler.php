@@ -640,21 +640,24 @@ final class Handler extends BaseHandlerWithClient {
 		string $customPrompt = ''
 	): string {
 		$historyJson = (string)json_encode($history, JSON_THROW_ON_ERROR);
-		$systemPrompt = trim($customPrompt) !== ''
+		$prompt = trim($customPrompt) !== ''
 			? trim($customPrompt)
-			: "You are a context-only answer writer.\n\n"
-				. 'Answer using only the provided context. Do not use outside knowledge, memory, assumptions, '
-				. "or unsupported facts.\n"
-				. 'Keep the answer concise and under ' . self::RESPONSE_MAX_TOKENS . " tokens.\n"
-				. "If the context is insufficient, answer exactly:\n"
-				. 'I don’t have enough information in the provided context to answer.';
+			: 'Respond conversationally. Response should be based ONLY on the provided history and context sections' .
+				"(IMPORTANT !!! You can't use your own knowledge to add anything that isn't mentioned there). " .
+				'Do not exceed the response token limit (' .
+				self::RESPONSE_MAX_TOKENS .
+				'), and end the answer cleanly before reaching it.';
 
-		return "system:\n"
-			. $systemPrompt . "\n\n"
-			. "user:\n"
-			. "Query: $query\n\n"
-			. "History:\n```json\n$historyJson\n```\n"
-			. "Context:\n```json\n$context\n```";
+		return $prompt . ' ' .
+			'<main>' .
+			"<history>\n" .
+			"```json\n" .
+			$historyJson .
+			"\n```\n" .
+			"</history>\n" .
+			"<context>$context</context>\n" .
+			"<query>$query</query>\n" .
+			'</main>';
 	}
 
 	/**
