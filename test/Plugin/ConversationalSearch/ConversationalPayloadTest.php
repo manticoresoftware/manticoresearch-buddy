@@ -166,6 +166,27 @@ class ConversationalPayloadTest extends TestCase {
 	/**
 	 * @throws QueryParseError
 	 */
+	public function testSQLCreateModelParsingWithCustomPrompt(): void {
+		$query = "CREATE CHAT MODEL assistant (
+			model='openai:gpt-4o-mini',
+			custom_prompt='Answer like a technical support agent. Use source ids.'
+		);";
+
+		$payload = $this->parseSqlPayload($query);
+
+		$this->assertCreateModelPayload(
+			$payload,
+			[
+				'identifier' => 'assistant',
+				'model' => 'openai:gpt-4o-mini',
+				'custom_prompt' => 'Answer like a technical support agent. Use source ids.',
+			]
+		);
+	}
+
+	/**
+	 * @throws QueryParseError
+	 */
 	public function testSQLShowModelsParsing(): void {
 		$query = 'SHOW CHAT MODELS';
 

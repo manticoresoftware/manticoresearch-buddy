@@ -459,6 +459,68 @@ class ConversationHandlerTest extends TestCase {
 		);
 	}
 
+	public function testCreateModelRejectsEmptyCustomPrompt(): void {
+		$query = "CREATE CHAT MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			custom_prompt = '   '
+		)";
+
+		$payload = ChatPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new ChatHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString('custom_prompt must be a non-empty string', $error->getResponseError());
+	}
+
+	public function testCreateModelRejectsTooLongCustomPrompt(): void {
+		$query = "CREATE CHAT MODEL 'test_model' (
+			model = 'openai:gpt-4',
+			custom_prompt = '" . str_repeat('a', 32769) . "'
+		)";
+
+		$payload = ChatPayload::fromRequest(
+			Request::fromArray(
+				[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => '',
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => '',
+				]
+			)
+		);
+
+		$handler = new ChatHandler($payload);
+		$mockClient = $this->createMock(HTTPClient::class);
+		$this->configureClientWithInitialization($mockClient);
+		$handler->setManticoreClient($mockClient);
+
+		$task = $handler->run();
+		$this->assertFalse($task->isSucceed());
+		$error = $task->getError();
+		$this->assertInstanceOf(QueryParseError::class, $error);
+		$this->assertStringContainsString('custom_prompt must be at most 32768 bytes', $error->getResponseError());
+	}
+
 	public function testCreateModelWithEncryptionIntegration(): void {
 		$query = "CREATE CHAT MODEL 'encrypted_test_model' (
 			model = 'openai:gpt-4',
@@ -770,7 +832,6 @@ class ConversationHandlerTest extends TestCase {
 		 *   user_query: string,
 		 *   search_query: string,
 		 *   response: string,
-		 *   response_with_refs: string,
 		 *   sources: mixed
 		 * }>}
 		 *> $struct */
@@ -781,19 +842,18 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertArrayHasKey('user_query', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('search_query', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('response', $struct[0]['data'][0]);
-		$this->assertArrayHasKey('response_with_refs', $struct[0]['data'][0]);
+		$this->assertArrayNotHasKey('response_with_refs', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('sources', $struct[0]['data'][0]);
 		$this->assertEquals('conv-uuid', $struct[0]['data'][0]['conversation_uuid']);
 		$this->assertEquals('Show me action movies', $struct[0]['data'][0]['user_query']);
-		$this->assertSame('Here are some action movies! More details.', $struct[0]['data'][0]['response']);
 		$this->assertSame(
 			'Here are some action movies [ref:1]! More details [ref:1].',
-			$struct[0]['data'][0]['response_with_refs']
+			$struct[0]['data'][0]['response']
 		);
 		$this->assertStringContainsString('action movies', $struct[0]['data'][0]['search_query']);
 	}
 
-	public function testBuildPromptRequiresSingleAppendedReferenceFormat(): void {
+	public function testBuildPromptDoesNotForceReferenceFormat(): void {
 		$reflection = new ReflectionClass(ChatHandler::class);
 		$method = $reflection->getMethod('buildPrompt');
 		$method->setAccessible(true);
@@ -806,12 +866,86 @@ class ConversationHandlerTest extends TestCase {
 		);
 
 		$this->assertIsString($prompt);
-		$this->assertStringContainsString('First write the answer with no citations at all.', $prompt);
-		$this->assertStringContainsString('append the reference context ID (context[].id) once', $prompt);
-		$this->assertStringContainsString('If id reference was used, it must be exactly: [ref:<id>]', $prompt);
-		$this->assertStringContainsString('Never put a reference ID after individual sentences.', $prompt);
-		$this->assertStringContainsString('Never repeat the same reference ID.', $prompt);
+		$this->assertStringNotContainsString('Citation rule:', $prompt);
+		$this->assertStringNotContainsString('append the reference context ID (context[].id) once', $prompt);
+		$this->assertStringNotContainsString('[ref:<id>]', $prompt);
 		$this->assertStringContainsString('[{"id":1,"content":"Vector search compares embeddings."}]', $prompt);
+	}
+
+	public function testBuildPromptUsesCustomPromptWhenConfigured(): void {
+		$reflection = new ReflectionClass(ChatHandler::class);
+		$method = $reflection->getMethod('buildPrompt');
+		$method->setAccessible(true);
+
+		$prompt = $method->invoke(
+			null,
+			'What is vector search?',
+			'[{"id":1,"content":"Vector search compares embeddings."}]',
+			[],
+			'You are a support assistant. Mention the matching source title.'
+		);
+
+		$this->assertIsString($prompt);
+		$this->assertStringContainsString('You are a support assistant. Mention the matching source title.', $prompt);
+		$this->assertStringContainsString('Query: What is vector search?', $prompt);
+		$this->assertStringContainsString('[{"id":1,"content":"Vector search compares embeddings."}]', $prompt);
+		$this->assertStringNotContainsString('You are a context-only answer writer.', $prompt);
+	}
+
+	public function testGenerateResponseUsesModelCustomPrompt(): void {
+		$model = [
+			'id' => '1',
+			'name' => 'assistant',
+			'model' => 'openai:gpt-4o-mini',
+			'settings' => [
+				'custom_prompt' => 'You are a support assistant. Mention the matching source title.',
+			],
+			'created_at' => '',
+			'updated_at' => '',
+		];
+		$response = [
+			'success' => true,
+			'content' => 'Vector search compares embeddings.',
+			'metadata' => [
+				'tokens_used' => 10,
+				'input_tokens' => 8,
+				'output_tokens' => 2,
+				'response_time_ms' => 1,
+				'finish_reason' => 'stop',
+			],
+		];
+		$provider = $this->createMock(LlmProvider::class);
+		$provider->expects($this->once())->method('configure')->with($model);
+		$provider->expects($this->once())
+			->method('generateResponse')
+			->with(
+				$this->callback(
+					static fn(string $prompt): bool => str_contains(
+						$prompt,
+						'You are a support assistant. Mention the matching source title.'
+					)
+						&& str_contains($prompt, 'Query: What is vector search?')
+						&& str_contains($prompt, '[{"id":1,"content":"Vector search compares embeddings."}]')
+				),
+				$this->isType('array')
+			)
+			->willReturn($response);
+
+		$reflection = new ReflectionClass(ChatHandler::class);
+		$method = $reflection->getMethod('generateResponse');
+		$method->setAccessible(true);
+		$result = $method->invoke(
+			null,
+			$model,
+			'What is vector search?',
+			'[{"id":1,"content":"Vector search compares embeddings."}]',
+			new ConversationHistory([]),
+			$provider
+		);
+
+		$this->assertIsArray($result);
+		/** @var array{content: string} $result */
+		$this->assertSame('Vector search compares embeddings.', $result['content']);
 	}
 
 	public function testFollowUpWithoutContextFallsBackToNewIntent(): void {

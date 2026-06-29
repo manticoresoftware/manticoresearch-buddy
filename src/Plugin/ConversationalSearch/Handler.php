@@ -102,7 +102,7 @@ final class Handler extends BaseHandlerWithClient {
 	): TaskResult {
 		/** @var array{identifier: string, model: string, description?: string,
 		 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-		 *   max_document_length?: string|int} $config
+		 *   max_document_length?: string|int, custom_prompt?: string} $config
 		 */
 		$config = $payload->params;
 		$createConfig = (new ModelConfigValidator())->validate($config);
@@ -286,8 +286,7 @@ final class Handler extends BaseHandlerWithClient {
 			);
 		}
 
-		$responseWithRefs = $response['content'];
-		$responseText = self::stripReferences($responseWithRefs);
+		$responseText = $response['content'];
 		$tokensUsed = $response['metadata']['tokens_used'];
 
 		$turn = new ConversationTurn(
@@ -307,14 +306,12 @@ final class Handler extends BaseHandlerWithClient {
 				'user_query' => $request->query,
 				'search_query' => $queries['search_query'],
 				'response' => $responseText,
-				'response_with_refs' => $responseWithRefs,
 				'sources' => json_encode($searchResults),
 			]
 		)->column('conversation_uuid', Column::String)
 			->column('user_query', Column::String)
 			->column('search_query', Column::String)
 			->column('response', Column::String)
-			->column('response_with_refs', Column::String)
 			->column('sources', Column::String);
 	}
 
@@ -533,16 +530,6 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * @return string
-	 */
-	private static function stripReferences(string $responseWithRefs): string {
-		$response = preg_replace('/\s*\[ref:[^\]\s]+\]/', '', $responseWithRefs);
-		$response = preg_replace('/[ 	]+([.,;:!?])/', '$1', (string)$response);
-
-		return trim((string)$response);
-	}
-
-	/**
 	 * @param array<int, array<string, mixed>> $searchResults
 	 * @param string $contentFields
 	 * @param int $maxDocumentLength
@@ -616,7 +603,13 @@ final class Handler extends BaseHandlerWithClient {
 	): array {
 		$provider->configure($model);
 
-		$prompt = self::buildPrompt($query, $context, $history->payload());
+		$customPrompt = $model['settings']['custom_prompt'] ?? null;
+		$prompt = self::buildPrompt(
+			$query,
+			$context,
+			$history->payload(),
+			is_string($customPrompt) ? $customPrompt : ''
+		);
 		$settings = self::getLlmRequestOptions();
 
 		return $provider->generateResponse($prompt, $settings);
@@ -640,22 +633,24 @@ final class Handler extends BaseHandlerWithClient {
 	 *
 	 * @throws JsonException
 	 */
-	private static function buildPrompt(string $query, string $context, array $history): string {
+	private static function buildPrompt(
+		string $query,
+		string $context,
+		array $history,
+		string $customPrompt = ''
+	): string {
 		$historyJson = (string)json_encode($history, JSON_THROW_ON_ERROR);
+		$systemPrompt = trim($customPrompt) !== ''
+			? trim($customPrompt)
+			: "You are a context-only answer writer.\n\n"
+				. 'Answer using only the provided context. Do not use outside knowledge, memory, assumptions, '
+				. "or unsupported facts.\n"
+				. 'Keep the answer concise and under ' . self::RESPONSE_MAX_TOKENS . " tokens.\n"
+				. "If the context is insufficient, answer exactly:\n"
+				. 'I don’t have enough information in the provided context to answer.';
 
 		return "system:\n"
-			. "You are a context-only answer writer.\n\n"
-			. 'Answer using only the provided context. Do not use outside knowledge, memory, assumptions, '
-			. "or unsupported facts.\n"
-			. 'Keep the answer concise and under ' . self::RESPONSE_MAX_TOKENS . " tokens.\n"
-			. "Citation rule:\n\n"
-			. "First write the answer with no citations at all.\n"
-			. "After the answer is finished, append the reference context ID (context[].id) once.\n"
-			. "If id reference was used, it must be exactly: [ref:<id>]\n"
-			. "Never put a reference ID after individual sentences.\n"
-			. "Never repeat the same reference ID.\n\n"
-			. "If the context is insufficient, answer exactly:\n"
-			. "I don’t have enough information in the provided context to answer.\n\n"
+			. $systemPrompt . "\n\n"
 			. "user:\n"
 			. "Query: $query\n\n"
 			. "History:\n```json\n$historyJson\n```\n"
