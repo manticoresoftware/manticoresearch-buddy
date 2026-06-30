@@ -722,7 +722,7 @@ class ConversationHandlerTest extends TestCase {
 				[
 					static fn(string $prompt): bool => str_contains(
 						$prompt,
-						'Context:' . "\n```json\n" . '[{"id":"1","content":"Action movie content..."}]' . "\n```"
+						'<context>[{"id":"1","content":"Action movie content..."}]</context>'
 					),
 				]
 			)
