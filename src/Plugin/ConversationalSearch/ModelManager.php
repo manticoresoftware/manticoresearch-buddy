@@ -32,7 +32,7 @@ class ModelManager {
 	 * @param HTTPClient $client
 	 * @param array{name: string, model: string, description?: string, api_key?: string,
 	 *   base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
+	 *   max_document_length?: string|int, custom_prompt?: string} $config
 	 *
 	 * @return string Model name
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError|QueryParseError

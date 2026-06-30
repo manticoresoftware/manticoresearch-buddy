@@ -14,6 +14,8 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 
 final class ModelConfigValidator {
+	private const int MAX_CUSTOM_PROMPT_BYTES = 32768;
+
 	/**
 	 * Supported flat fields for CREATE CHAT MODEL.
 	 *
@@ -27,16 +29,17 @@ final class ModelConfigValidator {
 		'timeout',
 		'retrieval_limit',
 		'max_document_length',
+		'custom_prompt',
 	];
 
 	/**
 	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
+	 *   max_document_length?: string|int, custom_prompt?: string} $config
 	 *
 	 * @return array{name: string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int}
+	 *   max_document_length?: string|int, custom_prompt?: string}
 	 * @throws QueryParseError
 	 */
 	public function validate(array $config): array {
@@ -46,6 +49,7 @@ final class ModelConfigValidator {
 		$this->validateTimeout($config);
 		$this->validateRetrievalLimit($config);
 		$this->validateMaxDocumentLength($config);
+		$this->validateCustomPrompt($config);
 
 		$createConfig = ['name' => $config['identifier']];
 		foreach (self::MODEL_FIELDS as $field) {
@@ -58,7 +62,7 @@ final class ModelConfigValidator {
 
 		/** @var array{name: string, model: string, description?: string,
 		 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-		 *   max_document_length?: string|int} $createConfig
+		 *   max_document_length?: string|int, custom_prompt?: string} $createConfig
 		 */
 		return $createConfig;
 	}
@@ -85,7 +89,7 @@ final class ModelConfigValidator {
 	/**
 	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
+	 *   max_document_length?: string|int, custom_prompt?: string} $config
 	 *
 	 * @return void
 	 * @throws QueryParseError
@@ -99,7 +103,7 @@ final class ModelConfigValidator {
 	/**
 	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
+	 *   max_document_length?: string|int, custom_prompt?: string} $config
 	 *
 	 * @return void
 	 * @throws QueryParseError
@@ -115,7 +119,7 @@ final class ModelConfigValidator {
 	/**
 	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
+	 *   max_document_length?: string|int, custom_prompt?: string} $config
 	 *
 	 * @return void
 	 * @throws QueryParseError
@@ -142,7 +146,7 @@ final class ModelConfigValidator {
 	/**
 	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
+	 *   max_document_length?: string|int, custom_prompt?: string} $config
 	 *
 	 * @return void
 	 * @throws QueryParseError
@@ -169,7 +173,7 @@ final class ModelConfigValidator {
 	/**
 	 * @param array{identifier:string, model: string, description?: string,
 	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
-	 *   max_document_length?: string|int} $config
+	 *   max_document_length?: string|int, custom_prompt?: string} $config
 	 *
 	 * @return void
 	 * @throws QueryParseError
@@ -195,6 +199,31 @@ final class ModelConfigValidator {
 		) {
 			throw QueryParseError::create(
 				'max_document_length must be 0 or an integer between 100 and 65536'
+			);
+		}
+	}
+
+	/**
+	 * @param array{identifier:string, model: string, description?: string,
+	 *   api_key?: string, base_url?: string, timeout?: string|int, retrieval_limit?: string|int,
+	 *   max_document_length?: string|int, custom_prompt?: string} $config
+	 *
+	 * @return void
+	 * @throws QueryParseError
+	 */
+	private function validateCustomPrompt(array $config): void {
+		if (!isset($config['custom_prompt'])) {
+			return;
+		}
+
+		$customPrompt = $config['custom_prompt'];
+		if (trim($customPrompt) === '') {
+			throw QueryParseError::create('custom_prompt must be a non-empty string');
+		}
+
+		if (strlen($customPrompt) > self::MAX_CUSTOM_PROMPT_BYTES) {
+			throw QueryParseError::create(
+				'custom_prompt must be at most ' . self::MAX_CUSTOM_PROMPT_BYTES . ' bytes'
 			);
 		}
 	}

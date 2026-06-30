@@ -101,6 +101,7 @@ Model with prompt, transport options, and retrieval settings:
 ```sql
 CREATE CHAT MODEL support_assistant (
     model='openai:gpt-4o-mini',
+    custom_prompt='You are a support assistant. Answer using the retrieved context and mention source ids.',
     api_key='your-provider-api-key',
     base_url='http://host.docker.internal:8787/v1',
     timeout=60,
@@ -115,6 +116,7 @@ Common options:
 |---|---:|---|
 | `model` | Yes | LLM model id in `provider:model` format |
 | `description` | No | Stored description |
+| `custom_prompt` | No | Prompt instructions used to build the answer from the retrieved context and conversation history; if set, it must be non-empty and at most 32768 bytes |
 | `api_key` | No | Provider API key passed to the `llm` extension |
 | `base_url` | No | Provider or proxy base URL |
 | `timeout` | No | LLM request timeout, `1..65536` |
@@ -123,6 +125,12 @@ Common options:
 
 Model names in `CREATE CHAT MODEL` may contain letters, numbers, and
 underscores only.
+
+`custom_prompt` is optional. If it is omitted, Buddy uses its default answer
+prompt. If it is set, it must contain non-whitespace text and must not exceed
+32768 bytes. To make the LLM return source citations, include that instruction
+in `custom_prompt`, for example: `Cite sources as [ref:<id>] using source row
+ids from the context.`
 
 `model` is validated as `provider:model`, for example:
 
@@ -251,9 +259,8 @@ The legacy JSON field name `fields` is accepted as an alias, but requests must
 not include both `vector_field` and `fields`.
 
 HTTP JSON conversation responses use the same logical columns as `CALL CHAT`:
-`conversation_uuid`, `user_query`, `search_query`, `response`,
-`response_with_refs`, and `sources`. `sources` is currently returned as a JSON
-string containing the retrieved source rows.
+`conversation_uuid`, `user_query`, `search_query`, `response`, and `sources`.
+`sources` is currently returned as a JSON string containing the retrieved source rows.
 
 The table argument must be a plain table identifier, optionally qualified as
 `database.table`. The vector field argument must be a plain field identifier.
@@ -298,8 +305,7 @@ Behavior:
 | `conversation_uuid` | Existing or generated conversation id |
 | `user_query` | Original user query |
 | `search_query` | Standalone search query used for retrieval |
-| `response` | LLM answer with inline references like `[ref:<id>]` removed |
-| `response_with_refs` | Full LLM answer including inline source references like `[ref:<id>]`, where `<id>` is the source row id |
+| `response` | LLM answer as generated |
 | `sources` | JSON string containing retrieved source rows |
 
 Example response shape:
@@ -310,12 +316,13 @@ Example response shape:
   "user_query": "What is vector search?",
   "search_query": "vector search, embeddings, similarity search",
   "response": "Vector search finds similar items by comparing embeddings...",
-  "response_with_refs": "Vector search finds similar items by comparing embeddings [ref:1]...",
   "sources": "[{\"id\":1,\"title\":\"Vector Search\",\"content\":\"...\",\"knn_dist\":0.12}]"
 }
 ```
 
-Vector fields are intentionally absent from `sources`.
+Vector fields are intentionally absent from `sources`. If you want source citations,
+add citation instructions to `custom_prompt`; source row IDs are available in the
+context and `sources` payload.
 
 ## Model Management
 
