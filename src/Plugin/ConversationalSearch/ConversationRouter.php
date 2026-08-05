@@ -19,6 +19,7 @@ use Throwable;
 final class ConversationRouter {
 
 	private const string TOOL_NAME = 'route_conversation';
+	private const int MAX_ROUTING_ATTEMPTS = 3;
 
 	/**
 	 * @param array<string, mixed> $modelConfig
@@ -31,20 +32,10 @@ final class ConversationRouter {
 		array $modelConfig
 	): ConversationRoute {
 		$llmProvider->configure($modelConfig);
-		$response = $llmProvider->generateToolCall(
+		$response = $this->generateRouteToolCall(
+			$llmProvider,
 			$this->buildPrompt($userQuery, $conversationHistory->payload()),
-			$this->toolDefinition(),
-			[
-				'temperature' => Handler::RESPONSE_TEMPERATURE,
-				'max_tokens' => 256,
-			]
 		);
-
-		if (!$response['success']) {
-			throw ManticoreSearchClientError::create(
-				LlmProvider::formatFailureMessage('Conversation routing failed', $response)
-			);
-		}
 
 		$route = $this->parseRoute($response['tool_calls']);
 		Buddy::debugv("\nChat: [DEBUG CONVERSATION ROUTE]");
@@ -54,6 +45,41 @@ final class ConversationRouter {
 		Buddy::debugv("Chat: └─ Reason: $route->reason");
 
 		return $route;
+	}
+
+	/**
+	 * @return array{success:true, content:string, tool_calls:array<int, mixed>, metadata:array<string, mixed>}
+	 * @throws ManticoreSearchClientError
+	 */
+	private function generateRouteToolCall(LlmProvider $llmProvider, string $prompt): array {
+		$toolDefinition = $this->toolDefinition();
+		$options = [
+			'temperature' => Handler::RESPONSE_TEMPERATURE,
+			'max_tokens' => 256,
+		];
+		$response = [];
+
+		for ($attempt = 1; $attempt <= self::MAX_ROUTING_ATTEMPTS; $attempt++) {
+			$response = $llmProvider->generateToolCall($prompt, $toolDefinition, $options);
+			if ($response['success']) {
+				return $response;
+			}
+
+			if ($attempt === self::MAX_ROUTING_ATTEMPTS) {
+				continue;
+			}
+
+			Buddy::debugv(
+				'Chat: ├─ Conversation routing tool call failed, retrying attempt '
+				. ($attempt + 1)
+				. ' of '
+				. self::MAX_ROUTING_ATTEMPTS
+			);
+		}
+
+		throw ManticoreSearchClientError::create(
+			LlmProvider::formatFailureMessage('Conversation routing failed', $response)
+		);
 	}
 
 	/**

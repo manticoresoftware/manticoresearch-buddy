@@ -148,6 +148,40 @@ final class ConversationRouterTest extends TestCase {
 		$router->route('cast?', $this->history(), $provider, ['model' => 'openai:gpt-4']);
 	}
 
+	public function testRetriesTransientToolCallFailure(): void {
+		$router = new ConversationRouter();
+
+		/** @var MockObject&LlmProvider $provider */
+		$provider = $this->createMock(LlmProvider::class);
+		$provider->expects($this->exactly(2))
+			->method('generateToolCall')
+			->willReturnOnConsecutiveCalls(
+				[
+					'success' => false,
+					'error' => 'LLM tool call failed',
+					'content' => '',
+					'provider' => 'llm',
+					'details' => 'missing field id at line 77 column 56',
+				],
+				$this->toolResponse(
+					ConversationRoute::SEARCH,
+					'What are denim jackets with buttons instead of zippers?',
+					'',
+					'The user asks for new searchable product criteria.'
+				)
+			);
+
+		$route = $router->route(
+			'Hello, I am looking for denim jackets that have buttons instead of a zipper . X a sipper',
+			new ConversationHistory([]),
+			$provider,
+			['model' => 'openai:gpt-4']
+		);
+
+		$this->assertEquals(ConversationRoute::SEARCH, $route->route);
+		$this->assertEquals('What are denim jackets with buttons instead of zippers?', $route->standaloneQuestion);
+	}
+
 	public function testThrowsWhenToolCallHasInvalidShape(): void {
 		$router = new ConversationRouter();
 
