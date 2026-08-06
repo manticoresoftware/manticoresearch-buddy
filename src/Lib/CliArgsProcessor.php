@@ -16,7 +16,6 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 
 final class CliArgsProcessor {
-
 	private const LONG_OPTS  = [
 		'threads:', 'telemetry-period:', 'disable-telemetry',
 		'version', 'help', 'listen:', 'bind:',
@@ -49,7 +48,7 @@ final class CliArgsProcessor {
 				. " can be used multiple times\n"
 			. '--enable-plugin        Disables all plugins and enables only the specified ones;'
 				. " can be used multiple times\n"
-			. "--listen               HTTP endpoint to accept Manticore requests\n"
+			. "--listen               Manticore HTTP endpoint, including unix:/socket/path\n"
 			. "--version              display the current version of Buddy\n"
 			. "--help                 display this help message\n"
 			. "--telemetry-period=[N] set period for telemetry when we do snapshots\n"
