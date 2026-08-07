@@ -51,6 +51,14 @@ class CliArgsProcessorTest extends TestCase {
 		$this->assertEquals($listen, ConfigManager::get('LISTEN'));
 	}
 
+	public function testUnixSocketListenArgProcessOk(): void {
+		$listen = 'unix:/tmp/manticore_data/searchd.sock';
+
+		CliArgsProcessor::run(['listen' => $listen]);
+
+		$this->assertSame($listen, ConfigManager::get('LISTEN'));
+	}
+
 	public function testVersionArgProcessOk(): void {
 		CliArgsProcessor::run();
 
