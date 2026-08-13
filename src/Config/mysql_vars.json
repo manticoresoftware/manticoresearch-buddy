@@ -485,6 +485,7 @@
     "pseudo_slave_mode": 0,
     "pseudo_thread_id": 14,
     "query_alloc_block_size": 8192,
+    "query_cache_size": 0,
     "query_prealloc_size": 8192,
     "rand_seed1": 0,
     "rand_seed2": 0,

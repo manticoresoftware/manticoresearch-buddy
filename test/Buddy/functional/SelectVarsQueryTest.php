@@ -34,4 +34,36 @@ class SelectVarsQueryTest extends TestCase {
 		);
 	}
 
+	public function testMySqlConnectorJInitializationQuery(): void {
+		$this->assertQueryResult(
+			'SELECT @@session.auto_increment_increment AS auto_increment_increment, '
+			. '@@character_set_client AS character_set_client, '
+			. '@@character_set_connection AS character_set_connection, '
+			. '@@character_set_results AS character_set_results, '
+			. '@@character_set_server AS character_set_server, '
+			. '@@collation_server AS collation_server, '
+			. '@@collation_connection AS collation_connection, '
+			. '@@init_connect AS init_connect, '
+			. '@@interactive_timeout AS interactive_timeout, '
+			. '@@license AS license, '
+			. '@@lower_case_table_names AS lower_case_table_names, '
+			. '@@max_allowed_packet AS max_allowed_packet, '
+			. '@@net_write_timeout AS net_write_timeout, '
+			. '@@performance_schema AS performance_schema, '
+			. '@@sql_mode AS sql_mode, '
+			. '@@system_time_zone AS system_time_zone, '
+			. '@@time_zone AS time_zone, '
+			. '@@transaction_isolation AS transaction_isolation, '
+			. '@@wait_timeout AS wait_timeout, '
+			. '@@query_cache_size AS query_cache_size',
+			[
+				'auto_increment_increment',
+				'character_set_results',
+				'wait_timeout',
+				'query_cache_size',
+				'0',
+			]
+		);
+	}
+
 }
