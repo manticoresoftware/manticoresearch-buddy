@@ -58,7 +58,7 @@ final class Handler extends BaseHandler {
 		'AUTO_INCREMENT' => '',
 	];
 
-	/** @var array<string,string> */
+	/** @var array<string,float|int|string> */
 	protected static array $unsupportedMySQLVars;
 
   /** @var Client $manticoreClient */
@@ -908,7 +908,7 @@ final class Handler extends BaseHandler {
 
 	/**
 	 * Get unsupported system variable names
-	 * @return array<string,string>
+	 * @return array<string,float|int|string>
 	 */
 	protected static function getUnsupportedMySQLVars(): array {
 		if (isset(static::$unsupportedMySQLVars)) {
@@ -919,8 +919,8 @@ final class Handler extends BaseHandler {
 		if ($mySqlVarsContent === false) {
 			throw new Exception("Unable to read MySQLVars config file at '$mySqlVarsFilePath'");
 		}
-		/** @var array<string,string> $mySqlVars */
-		$mySqlVars = json_decode($mySqlVarsContent, true);
+		/** @var array<string,float|int|string> $mySqlVars */
+		$mySqlVars = simdjson_decode($mySqlVarsContent, true);
 		if (!is_array($mySqlVars)) {
 			throw new Exception("Invalid MySQLVars config file at '$mySqlVarsFilePath'");
 		}
