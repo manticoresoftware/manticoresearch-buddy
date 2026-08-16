@@ -183,10 +183,9 @@ The request from Manticore Search to Buddy is made in JSON format no matter how 
 | Key | Description |
 |-|-|
 | `type` | Either `unknown json request` when the original request is made via JSON over HTTP or `unknown sql request` for SQL over HTTP/mysql. |
-| `error` | An object containg information about error(error message, etc.) to be returned to the user, if any. |
+| `error` | An object containing information about error (error message, etc.) to be returned to the user, if any. |
 | `message` | An object containing details such as `path_query` (specific to JSON over HTTP requests), `http_method`  (`HEAD`, `GET`, etc) and `body` which holds the main content of the request. For JSON over HTTP, `path_query` can include specific endpoints like `_doc`, `_create`, etc., while for SQL over HTTP/mysql, it remains empty (`""`). `http_method` is set to `""` for SQL over HTTP/mysql |
 | `version` | The maximum protocol version supported by the sender. |
-| `meta` | A JSON object containing additional information about the response or null. |
 
 Example of the request:
 
@@ -214,11 +213,11 @@ The response JSON structure:
 |-|-|
 | `type` | Set to `json response` if the request type was `unknown json request` and `sql response` for `unknown sql request`. |
 | `message` | A JSON object potentially containing an `error` message for displaying and/or logging. This is what Manticore Search will forward to the end-user. |
-| `log` | Optional object describing a log entity to be handled by Manticore Search (for example, flushed into `auth.log`). |
+| `log` | Optional array of log entity objects to be handled by Manticore Search (for example, flushed into `auth.log`). Each entity contains `type` (string), `severity` (string), and `message` (string). Only present when the error implements `HasDaemonLogEntity`. |
 | `error_code` | An integer representing the HTTP error code which will be a part of the HTTP response to the user making a JSON over HTTP request. For SQL over HTTP/mysql communications, this field is ignored. |
 | `version` | Indicates the current protocol version being used. Current version is 3. |
 | `content_type` | Optional string that defines the Content-Type header value for the reply to the client. |
-| `meta` | A JSON object containing additional information about the response or null. |
+| `meta` | A JSON object containing query statistics from `SHOW META` (see below), or `null` when no meta is available. The daemon uses these fields for query logging and to populate `SHOW META` output. |
 
 
 Example of HTTP Response:
@@ -236,7 +235,7 @@ Example of HTTP Response:
 }
 ```
 
-Example of HTTP Response:
+Example of HTTP Response with meta:
 
 ```json
 {
@@ -247,11 +246,38 @@ Example of HTTP Response:
   },
   "error_code": 0,
   "meta": {
-    ...
+    "total": 5,
+    "total_found": 5,
+    "total_relation": "eq",
+    "time": "0.001",
+    "keyword[1]": "the",
+    "docs[1]": "5",
+    "hits[1]": "10"
   },
   "version": 3
 }
 ```
+
+##### The `meta` field
+
+The `meta` object in the response carries query statistics that mirror the output of `SHOW META` in Manticore Search. The daemon relies on these fields for two purposes:
+
+- **Query logging** — when `query_log_format = sphinxql` is enabled, the daemon writes meta values (such as `total_found` and `time`) into the query log for each processed query.
+- **`SHOW META` output** — when a client runs `SHOW META` after a query, the daemon returns the meta fields from the last Buddy response.
+
+Common fields include:
+
+| Field | Description |
+|-|-|
+| `total` | Number of matches returned in the current result set. |
+| `total_found` | Total number of matches found by the daemon (may exceed `total` when `LIMIT` is used). |
+| `total_relation` | Relation between `total` and `total_found`: `eq` when they are equal, `gte` when `total_found` may be higher. |
+| `time` | Query execution time in seconds. |
+| `keyword[N]` | The N-th keyword from the full-text query. |
+| `docs[N]` | Number of documents matching the N-th keyword. |
+| `hits[N]` | Number of hits (occurrences) of the N-th keyword. |
+
+The `meta` field is always present in the response — it is `null` when no query statistics are available (for example, in error responses or non-query handlers).
 
 Example of MySQL Response:
 
