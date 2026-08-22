@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Backup;
 
 use Manticoresearch\Backup\Lib\FileStorage;
+use Manticoresearch\Backup\Lib\ManticoreAuth;
 use Manticoresearch\Backup\Lib\ManticoreBackup;
 use Manticoresearch\Backup\Lib\ManticoreClient;
 use Manticoresearch\Backup\Lib\ManticoreConfig;
@@ -19,6 +20,7 @@ use Manticoresearch\Buddy\Core\Plugin\BaseHandler;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
+use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 
 /**
  * This is the class to handle BACKUP ... SQL command
@@ -42,13 +44,15 @@ class Handler extends BaseHandler {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$isAsync = $this->payload->options['async'] ?? false;
+		$auth = $this->createAuth();
 		$task = Task::create(
 			static function (string $args): TaskResult {
 				/** @var Payload $payload */
+				/** @var ?ManticoreAuth $auth */
 				/** @phpstan-ignore-next-line */
-				[$payload] = unserialize($args);
+				[$payload, $auth] = unserialize($args);
 				$config = new ManticoreConfig($payload->configPath);
-				$client = new ManticoreClient([$config]);
+				$client = new ManticoreClient([$config], $auth);
 				$storage = new FileStorage(
 					$payload->path,
 					$payload->options['compress'] ?? false
@@ -61,7 +65,7 @@ class Handler extends BaseHandler {
 					]
 				)->column('Path', Column::String);
 			},
-			[serialize([$this->payload])]
+			[serialize([$this->payload, $auth])]
 		);
 		if ($isAsync) {
 			$task->defer();
@@ -74,5 +78,18 @@ class Handler extends BaseHandler {
 	 */
 	public function getProps(): array {
 		return [];
+	}
+
+	protected function createAuth(): ?ManticoreAuth {
+		$token = ConfigManager::get('BUDDY_AUTH_TOKEN');
+		if ($token === '') {
+			return null;
+		}
+
+		return new ManticoreAuth(
+			token: $token,
+			delegatedUser: $this->payload->user,
+			userAgent: 'Manticore Buddy/backup'
+		);
 	}
 }
