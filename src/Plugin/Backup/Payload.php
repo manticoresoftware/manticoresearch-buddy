@@ -34,6 +34,9 @@ final class Payload extends BasePayload {
 	/** @var bool */
 	public bool $isQuotedPath = false;
 
+	/** Requesting user from the daemon auth context, empty when auth is disabled */
+	public string $user = '';
+
   /**
    * @param string $path
    * @param string[] $tables
@@ -112,6 +115,7 @@ final class Payload extends BasePayload {
 		);
 
 		$self->isQuotedPath = $isQuotedPath;
+		$self->user = $request->user ?? '';
 		$queryTokens = static::extractTokens($query);
 		$buildTokens = $self->tokenize();
 		if (array_diff($queryTokens, $buildTokens)) {
