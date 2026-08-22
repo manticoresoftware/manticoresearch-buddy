@@ -156,6 +156,24 @@ class BackupPayloadTest extends TestCase {
 	}
 
 
+	public function testSQLQueryParsingPreservesAuthenticatedUser(): void {
+		$payload = BackupPayload::fromRequest(
+			Request::fromArray(
+				[
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => 'BACKUP TABLE a TO /tmp',
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => '',
+					'user' => 'admin',
+				]
+			)
+		);
+
+		$this->assertSame('admin', $payload->user);
+	}
+
 	public function testSQLQueryParsingSucceedOnRightSyntax(): void {
 		$testingSet = [
 			'backup to /tmp',
