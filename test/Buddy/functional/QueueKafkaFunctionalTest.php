@@ -38,6 +38,41 @@ final class QueueKafkaFunctionalTest extends TestCase {
 		$this->cleanupObjects();
 	}
 
+	public function testKafkaWorkerCopiesBigintAndNumericLookingString(): void {
+		$this->cleanupObjects();
+		$this->createSource($this->group, 1);
+		static::runSqlQuery(
+			'CREATE TABLE ' . $this->destination . ' (id bigint, name text, short_name text)'
+		);
+
+		$buffer = 'system.buffer_' . $this->source . '_0';
+		static::runSqlQuery(
+			"REPLACE INTO $buffer (id, term, abbrev) VALUES " .
+			"(5047479470261279290, 'synthetic first record', '704918273645001234567890')," .
+			"(5047479470261279291, 'synthetic second record', '704918273645001234567891')"
+		);
+
+		$this->runViewWorker();
+
+		$result = static::runHttpQuery('SELECT id, name, short_name FROM ' . $this->destination);
+		$this->assertIsArray($result[0]);
+		$this->assertSame('', $result[0]['error']);
+
+		$rows = [];
+		$separator = chr(9);
+		foreach ($result[0]['data'] as $row) {
+			$rows[] = implode($separator, [$row['id'], $row['name'], $row['short_name']]);
+		}
+		sort($rows);
+		$this->assertSame(
+			[
+				implode($separator, ['5047479470261279290', 'synthetic first record', '704918273645001234567890']),
+				implode($separator, ['5047479470261279291', 'synthetic second record', '704918273645001234567891']),
+			],
+			$rows
+		);
+	}
+
 	public function testKafkaQueueFullLifecycleWithSourceRecreation(): void {
 		$this->cleanupObjects();
 
