@@ -44,6 +44,7 @@ try {
 
 $opts = CliArgsProcessor::run();
 $authToken = getenv('BUDDY_TOKEN') ?: null;
+ConfigManager::set('BUDDY_AUTH_TOKEN', $authToken ?? '');
 // Reset token
 putenv('BUDDY_TOKEN=');
 
