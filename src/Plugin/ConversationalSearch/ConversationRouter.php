@@ -20,6 +20,7 @@ final class ConversationRouter {
 
 	private const string TOOL_NAME = 'route_conversation';
 	private const int MAX_ROUTING_ATTEMPTS = 3;
+	private const int ROUTING_MAX_TOKENS = 1024;
 
 	/**
 	 * @param array<string, mixed> $modelConfig
@@ -55,7 +56,7 @@ final class ConversationRouter {
 		$toolDefinition = $this->toolDefinition();
 		$options = [
 			'temperature' => Handler::RESPONSE_TEMPERATURE,
-			'max_tokens' => 256,
+			'max_tokens' => self::ROUTING_MAX_TOKENS,
 		];
 		$response = [];
 
@@ -117,7 +118,7 @@ final class ConversationRouter {
 			. $this->formatConversationHistory($historyPayload)
 			. "</Conversation history>\n"
 			. "<Question>\n"
-			. "  $userQuery<Question>";
+			. "  $userQuery</Question>";
 	}
 
 	/**

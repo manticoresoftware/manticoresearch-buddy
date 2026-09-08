@@ -147,6 +147,38 @@ class BaseProviderTest extends TestCase {
 		);
 	}
 
+	public function testPersistedTransportOptionsRemainClientOptionsWhenGenerationOverridesAreApplied(): void {
+		$settingsJson = '{"api_key":"model-key","base_url":"http:\/\/model.example\/v1\/responses","timeout":"12"}';
+		$this->provider->configure(
+			[
+				'settings' => $settingsJson,
+			]
+		);
+
+		$reflection = new ReflectionClass($this->provider);
+		$getSettings = $reflection->getMethod('getSettings');
+		$getSettings->setAccessible(true);
+		$extractClientOptions = $reflection->getMethod('extractClientOptions');
+		$extractClientOptions->setAccessible(true);
+
+		$settings = (array)$getSettings->invoke(
+			$this->provider,
+			[
+				'temperature' => 0.2,
+				'max_tokens' => 256,
+			]
+		);
+
+		$this->assertSame(
+			[
+				'api_key' => 'model-key',
+				'base_url' => 'http://model.example/v1/responses',
+				'timeout' => 12,
+			],
+			(array)$extractClientOptions->invoke($this->provider, $settings)
+		);
+	}
+
 	public function testConvertToFloatValidNumeric(): void {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);

@@ -102,8 +102,8 @@ Model with prompt, transport options, and retrieval settings:
 CREATE CHAT MODEL support_assistant (
     model='openai:gpt-4o-mini',
     custom_prompt='You are a support assistant. Answer using the retrieved context and mention source ids.',
-    api_key='your-provider-api-key',
-    base_url='http://host.docker.internal:8787/v1',
+    api_key='your-azure-entra-token',
+    base_url='https://YOUR-RESOURCE-NAME.openai.azure.com/openai/v1/responses',
     timeout=60,
     retrieval_limit=5,
     max_document_length=3000
@@ -153,6 +153,34 @@ environment:
 If `api_key` is not set in `CREATE CHAT MODEL`, the `llm` extension can use the
 matching provider environment variable. Pass `api_key` only when you want the
 model configuration to override the environment.
+
+## Local OpenAI-Compatible Models
+
+LM Studio can run local models with Conversational Search. For a
+local model identifier that is not in the `openai:*` catalog, use the
+`openrouter:*` transport with LM Studio's Chat Completions endpoint. When Buddy
+runs in Docker, use `host.docker.internal` to reach the server on the host.
+
+```sql
+CREATE CHAT MODEL local_assistant (
+    model='openrouter:google_gemma-4-e4b-it',
+    api_key='lm-studio',
+    base_url='http://host.docker.internal:1234/v1/chat/completions',
+    timeout=60,
+    retrieval_limit=5
+);
+```
+
+`api_key` is a non-secret placeholder accepted by LM Studio; do not use a real
+provider key for a local server. The `llm` extension validates the model portion
+of `openai:*` against its supported OpenAI model names, so
+`openai:google_gemma-4-e4b-it` is rejected even when LM Studio has that model
+loaded. The `openrouter:*` transport accepts the local identifier and can target
+an OpenAI-compatible Chat Completions server through `base_url`.
+
+Conversational Search requires the local model to reliably return an OpenAI
+function call for Buddy's routing schema. Test the model with `CALL CHAT`; basic
+text completion or a simple tool-call test alone is not sufficient.
 
 ## Ask Questions
 
