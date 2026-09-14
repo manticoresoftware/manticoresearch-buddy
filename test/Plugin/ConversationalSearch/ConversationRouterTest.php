@@ -36,6 +36,7 @@ final class ConversationRouterTest extends TestCase {
 					static fn (string $prompt): bool => str_contains($prompt, '<Conversation history>')
 						&& str_contains($prompt, '{"user":"tv shows?"}')
 						&& str_contains($prompt, '<Question>')
+						&& str_contains($prompt, '</Question>')
 						&& str_contains($prompt, 'what is the cast in GoT?')
 				),
 				$this->callback(
@@ -46,6 +47,12 @@ final class ConversationRouterTest extends TestCase {
 							ConversationRoute::REJECT,
 						]
 						&& in_array('exclude_query', $tool['parameters']['required'], true)
+				),
+				$this->equalTo(
+					[
+						'temperature' => 0.1,
+						'max_tokens' => 1024,
+					]
 				)
 			)
 			->willReturn(
