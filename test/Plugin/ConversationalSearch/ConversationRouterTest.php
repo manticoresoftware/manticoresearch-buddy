@@ -189,6 +189,110 @@ final class ConversationRouterTest extends TestCase {
 		$this->assertEquals('What are denim jackets with buttons instead of zippers?', $route->standaloneQuestion);
 	}
 
+	/**
+	 * @dataProvider invalidRouteProvider
+	 */
+	public function testRetriesInvalidRoute(string $route, string $question, string $excludeQuery): void {
+		$provider = $this->createMock(LlmProvider::class);
+		$provider->expects($this->exactly(2))
+			->method('generateToolCall')
+			->willReturnOnConsecutiveCalls(
+				$this->toolResponse($route, $question, $excludeQuery, 'Invalid routing response.'),
+				$this->toolResponse(ConversationRoute::SEARCH, 'What is clustering?', '', 'New question.')
+			);
+
+		$result = (new ConversationRouter())->route(
+			'What is clustering?', $this->history(), $provider, ['model' => 'openai:gpt-4']
+		);
+
+		$this->assertSame(ConversationRoute::SEARCH, $result->route);
+		$this->assertSame('What is clustering?', $result->standaloneQuestion);
+	}
+
+	/**
+	 * @return array<string, array{string, string, string}>
+	 */
+	public static function invalidRouteProvider(): array {
+		return [
+			'history with question' => [ConversationRoute::ANSWER_FROM_HISTORY, 'What is clustering?', ''],
+			'reject with question' => [ConversationRoute::REJECT, 'What is clustering?', ''],
+			'history with exclusion' => [ConversationRoute::ANSWER_FROM_HISTORY, '', 'clustering'],
+			'reject with exclusion' => [ConversationRoute::REJECT, '', 'clustering'],
+			'empty search question' => [ConversationRoute::SEARCH, '', ''],
+			'unknown route' => ['UNKNOWN', '', ''],
+		];
+	}
+
+	public function testRecoversFromMalformedToolCallsToHistoryRoute(): void {
+		$valid = $this->toolResponse(ConversationRoute::ANSWER_FROM_HISTORY, '', '', 'Answer is in history.');
+		$empty = $valid;
+		$empty['tool_calls'] = [];
+		$toolCall = $this->createMock(ToolCall::class);
+		$toolCall->method('getArguments')->willReturn('{');
+		$malformed = $valid;
+		$malformed['tool_calls'] = [$toolCall];
+
+		$provider = $this->createMock(LlmProvider::class);
+		$provider->expects($this->exactly(3))
+			->method('generateToolCall')
+			->willReturnOnConsecutiveCalls($empty, $malformed, $valid);
+
+		$result = (new ConversationRouter())->route(
+			'Which one is fantasy?', $this->history(), $provider, ['model' => 'openai:gpt-4']
+		);
+
+		$this->assertSame(ConversationRoute::ANSWER_FROM_HISTORY, $result->route);
+		$this->assertSame('', $result->standaloneQuestion);
+		$this->assertSame('', $result->excludeQuery);
+	}
+
+	public function testThrowsLastValidationErrorAfterThreeAttempts(): void {
+		$provider = $this->createMock(LlmProvider::class);
+		$provider->expects($this->exactly(3))
+			->method('generateToolCall')
+			->willReturnOnConsecutiveCalls(
+				$this->toolResponse(ConversationRoute::SEARCH, '', '', 'Missing question.'),
+				$this->toolResponse(ConversationRoute::REJECT, '', 'clustering', 'Unexpected exclusion.'),
+				$this->toolResponse(ConversationRoute::ANSWER_FROM_HISTORY, 'What is clustering?', '', 'Invalid.')
+			);
+
+		try {
+			(new ConversationRouter())->route(
+				'What is clustering?', $this->history(), $provider, ['model' => 'openai:gpt-4']
+			);
+			$this->fail('Expected routing to fail after three attempts.');
+		} catch (ManticoreSearchClientError $error) {
+			$this->assertSame(
+				'Conversation routing returned unexpected search question',
+				$error->getResponseError()
+			);
+		}
+	}
+
+	public function testProviderAndValidationFailuresShareRetryBudget(): void {
+		$provider = $this->createMock(LlmProvider::class);
+		$provider->expects($this->exactly(3))
+			->method('generateToolCall')
+			->willReturnOnConsecutiveCalls(
+				['success' => false, 'error' => 'LLM tool call failed', 'content' => '', 'provider' => 'llm'],
+				$this->toolResponse(ConversationRoute::SEARCH, '', '', 'Missing question.'),
+				['success' => false, 'error' => 'LLM tool call failed', 'content' => '',
+					'provider' => 'llm', 'details' => 'Provider unavailable']
+			);
+
+		try {
+			(new ConversationRouter())->route(
+				'What is clustering?', $this->history(), $provider, ['model' => 'openai:gpt-4']
+			);
+			$this->fail('Expected routing to fail after three attempts.');
+		} catch (ManticoreSearchClientError $error) {
+			$this->assertSame(
+				'Conversation routing failed: LLM tool call failed: Provider unavailable',
+				$error->getResponseError()
+			);
+		}
+	}
+
 	public function testThrowsWhenToolCallHasInvalidShape(): void {
 		$router = new ConversationRouter();
 
