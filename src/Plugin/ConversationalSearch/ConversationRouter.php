@@ -33,12 +33,11 @@ final class ConversationRouter {
 		array $modelConfig
 	): ConversationRoute {
 		$llmProvider->configure($modelConfig);
-		$response = $this->generateRouteToolCall(
+		$route = $this->generateRoute(
 			$llmProvider,
 			$this->buildPrompt($userQuery, $conversationHistory->payload()),
 		);
 
-		$route = $this->parseRoute($response['tool_calls']);
 		Buddy::debugv("\nChat: [DEBUG CONVERSATION ROUTE]");
 		Buddy::debugv("Chat: ├─ Route: $route->route");
 		Buddy::debugv("Chat: ├─ Standalone question: '$route->standaloneQuestion'");
@@ -49,25 +48,31 @@ final class ConversationRouter {
 	}
 
 	/**
-	 * @return array{success:true, content:string, tool_calls:array<int, mixed>, metadata:array<string, mixed>}
 	 * @throws ManticoreSearchClientError
 	 */
-	private function generateRouteToolCall(LlmProvider $llmProvider, string $prompt): array {
+	private function generateRoute(LlmProvider $llmProvider, string $prompt): ConversationRoute {
 		$toolDefinition = $this->toolDefinition();
 		$options = [
 			'temperature' => Handler::RESPONSE_TEMPERATURE,
 			'max_tokens' => self::ROUTING_MAX_TOKENS,
 		];
-		$response = [];
 
-		for ($attempt = 1; $attempt <= self::MAX_ROUTING_ATTEMPTS; $attempt++) {
+		for ($attempt = 1;; $attempt++) {
 			$response = $llmProvider->generateToolCall($prompt, $toolDefinition, $options);
 			if ($response['success']) {
-				return $response;
+				try {
+					return $this->parseRoute($response['tool_calls']);
+				} catch (ManticoreSearchClientError $error) {
+					// A successful provider request can still contain an invalid route.
+				}
+			} else {
+				$error = ManticoreSearchClientError::create(
+					LlmProvider::formatFailureMessage('Conversation routing failed', $response)
+				);
 			}
 
 			if ($attempt === self::MAX_ROUTING_ATTEMPTS) {
-				continue;
+				throw $error;
 			}
 
 			Buddy::debugv(
@@ -77,10 +82,6 @@ final class ConversationRouter {
 				. self::MAX_ROUTING_ATTEMPTS
 			);
 		}
-
-		throw ManticoreSearchClientError::create(
-			LlmProvider::formatFailureMessage('Conversation routing failed', $response)
-		);
 	}
 
 	/**
