@@ -20,6 +20,12 @@ use Manticoresearch\Buddy\Core\Plugin\BasePayload;
  * This is simple do nothing request that handle empty queries
  * which can be as a result of only comments in it that we strip
  * @phpstan-extends BasePayload<array>
+ * @phpstan-type ParsedQuery array{
+ *   FROM?: array<int, array{table?: string}>,
+ *   WHERE?: array<int, array{expr_type: string, base_expr: string,
+ *     sub_tree: array<int, array{expr_type: string, base_expr: string, sub_tree?: mixed}>}>,
+ *   LIMIT?: array{rowcount?: string, offset?: string}
+ * }
  */
 final class Payload extends BasePayload
 {
@@ -38,6 +44,8 @@ final class Payload extends BasePayload
 	public array $condition = [];
 
 	public Endpoint $endpointBundle;
+	/** @var ParsedQuery|null $parsedQuery */
+	public ?array $parsedQuery = null;
 	public ?int $size = null;
 	public int $offset = 0;
 	public ?int $maxMatches = null;
@@ -105,7 +113,11 @@ final class Payload extends BasePayload
 	 * @return void
 	 */
 	private static function parseSqlRequest(self $payload): void {
+		/** @var ParsedQuery|null $parsedPayload */
 		$parsedPayload = static::$sqlQueryParser::getParsedPayload();
+		// The parser keeps one parsed payload per process, so a concurrent request
+		// replaces it while the handler awaits the vector fetch: keep our own copy.
+		$payload->parsedQuery = $parsedPayload;
 		$payload->table = $parsedPayload['FROM'][0]['table'] ?? null;
 
 		if (!isset($parsedPayload['WHERE'])) {
