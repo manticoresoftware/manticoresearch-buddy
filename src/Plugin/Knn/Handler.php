@@ -219,12 +219,12 @@ final class Handler extends BaseHandlerWithClient {
 	 */
 	private static function substituteParsedQuery(Payload $payload, string $queryVector): void {
 
-		$parsedQuery = $payload::$sqlQueryParser::getParsedPayload();
+		$parsedQuery = $payload->parsedQuery;
 		if ($parsedQuery === null) {
 			return;
 		}
 
-		foreach ($parsedQuery['WHERE'] as $k => $condition) {
+		foreach ($parsedQuery['WHERE'] ?? [] as $k => $condition) {
 			if ($condition['base_expr'] !== 'knn') {
 				continue;
 			}
