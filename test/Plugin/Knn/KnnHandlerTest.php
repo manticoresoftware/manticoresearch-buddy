@@ -68,6 +68,45 @@ final class KnnHandlerTest extends TestCase {
 		Event::wait();
 	}
 
+	public function testSqlDocIdQueryIgnoresQueryParsedByConcurrentRequest(): void {
+		$request = self::createSqlKnnRequest('SELECT id, knn_dist() AS distance FROM t WHERE knn(v, 25, 1) limit 2');
+		$concurrentRequest = self::createSqlKnnRequest('SELECT id FROM other WHERE knn(w, 5, 7)');
+
+		$this->assertTrue(Payload::hasMatch($request));
+		$payload = Payload::fromRequest($request);
+
+		$mockClient = $this->createMock(Client::class);
+		$mockClient->expects($this->exactly(2))
+			->method('sendRequest')
+			->willReturnCallback(
+				function (string $query) use ($concurrentRequest): Response {
+					if ($query === 'SELECT * FROM t WHERE id = 1') {
+						// Another request is parsed while this one awaits the vector fetch
+						$this->assertTrue(Payload::hasMatch($concurrentRequest));
+						return self::createDocResponse();
+					}
+
+					$this->assertStringContainsString('FROM t', $query);
+					$this->assertStringContainsString('knn(v,25,(1,0))', $query);
+
+					return self::createSqlKnnResponse();
+				}
+			);
+
+		$handler = new Handler($payload);
+		$handler->setManticoreClient($mockClient);
+
+		go(
+			function () use ($handler): void {
+				$task = $handler->run();
+				$task->wait(true);
+
+				$this->assertTrue($task->isSucceed());
+			}
+		);
+		Event::wait();
+	}
+
 	public function testHttpDocIdQueryWithSizeFetchesOneExtraHitBeforeRemovingSelf(): void {
 		$request = Request::fromArray(
 			[
@@ -354,6 +393,19 @@ final class KnnHandlerTest extends TestCase {
 			}
 		);
 		Event::wait();
+	}
+
+	private static function createSqlKnnRequest(string $query): Request {
+		return Request::fromArray(
+			[
+				'version' => Buddy::PROTOCOL_VERSION,
+				'error' => "P01: syntax error, unexpected integer, expecting '(' near '1'",
+				'payload' => $query,
+				'format' => RequestFormat::SQL,
+				'endpointBundle' => ManticoreEndpoint::Sql,
+				'path' => 'sql?mode=raw',
+			]
+		);
 	}
 
 	private static function createDocResponse(): Response {
