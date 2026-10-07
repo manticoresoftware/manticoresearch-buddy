@@ -57,4 +57,27 @@ class FuzzyPayloadTest extends TestCase {
 	public function testParseTableNames(string $query, array $expected): void {
 		$this->assertSame($expected, Payload::parseTableNames($query));
 	}
+
+	public function testSqlFuzzyQueryWithEscapedApostrophe(): void {
+		$payload = new Payload();
+		$payload->payload = "SELECT * FROM catalog WHERE MATCH('peter\\'s') OPTION fuzzy=1";
+		$payload->fuzzy = true;
+		$payload->quorum = 0;
+		$payload->queries = [];
+
+		$processedQuery = '';
+		$result = $payload->getQueriesSQLRequest(
+			static function (string $query) use (&$processedQuery): array {
+				$processedQuery = $query;
+				return [[$query]];
+			}
+		);
+
+		$this->assertSame("peter's", $processedQuery);
+		$this->assertSame(
+			"SELECT * FROM catalog WHERE MATCH('(peter\\'s^50)')",
+			trim($result)
+		);
+	}
+
 }
