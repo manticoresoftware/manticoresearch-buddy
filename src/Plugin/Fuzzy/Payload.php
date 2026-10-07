@@ -267,6 +267,7 @@ final class Payload extends BasePayload {
 		$payload = $this->payload;
 		preg_match(static::MATCH_REG_PATTERN, $payload, $matches);
 		$searchValue = $matches[1] ?? '';
+		$searchValue = str_replace("\\'", "'", $searchValue);
 		$searchTableName = $matches[2] ?? '';
 		$template = (string)preg_replace(
 			[
@@ -553,6 +554,6 @@ final class Payload extends BasePayload {
 
 		// We need double escape here cuz we replace this match inside
 		// SQL query so every escape symbol is escaped twice
-		return addcslashes(addcslashes($word, static::ESCAPE_CHARS), '\\');
+		return addcslashes(addcslashes($word, static::ESCAPE_CHARS), "\\'");
 	}
 }
