@@ -235,6 +235,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 				$normalizedScoreMap[$normalizedKey] = $value;
 			}
 			$scoreMap = $normalizedScoreMap;
+		} else {
+			$words = $this->getPhraseWords($phrase);
 		}
 
 		// If no words found, we just add the original phrase
@@ -270,6 +272,30 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$combinations = Arrays::boostListValues($combinations, [$phrase]);
 		/** @var array<string> $combinations */
 		return $combinations;
+	}
+
+	/**
+	 * Split the phrase into words the way the table tokenizes it and keep them as typed,
+	 * so that without fuzzy matching only the last word gets expanded
+	 * @param string $phrase
+	 * @return array<Variation>
+	 * @throws RuntimeException
+	 * @throws ManticoreSearchClientError
+	 */
+	private function getPhraseWords(string $phrase): array {
+		$query = addcslashes($phrase, '*%?\'');
+		$q = "CALL KEYWORDS('{$query}', '{$this->payload->table}')";
+		/** @var array{0:array{data?:array<array{tokenized:string}>}} $result */
+		$result = $this->manticoreClient->sendRequest($q)->getResult();
+		$tokens = array_column($result[0]['data'] ?? [], 'tokenized');
+		$lastIndex = array_key_last($tokens);
+		$words = [];
+		foreach ($tokens as $i => $token) {
+			// The last word follows the same preserve rule as a single-word phrase
+			$keepToken = $i !== $lastIndex || $this->payload->preserve;
+			$words[] = ['original' => $token, 'keywords' => $keepToken ? [$token] : []];
+		}
+		return $words;
 	}
 
 	/**
