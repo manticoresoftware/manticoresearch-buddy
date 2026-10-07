@@ -21,7 +21,8 @@ final class AutocompleteTest extends TestCase {
 	public function setUp(): void {
 		static::runSqlQuery('CREATE TABLE ' . self::TABLE . "(name text) min_infix_len='2'");
 		static::runSqlQuery(
-			'INSERT INTO ' . self::TABLE . " (id, name) VALUES (1, 'linen shirt'), (2, 'linen shorts'), (3, 'red dress')"
+			'INSERT INTO ' . self::TABLE . ' (id, name) VALUES '
+			. "(1, 'linen shirt'), (2, 'linen shorts'), (3, 'red dress')"
 		);
 	}
 
