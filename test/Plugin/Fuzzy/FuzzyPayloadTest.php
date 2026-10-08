@@ -57,4 +57,105 @@ class FuzzyPayloadTest extends TestCase {
 	public function testParseTableNames(string $query, array $expected): void {
 		$this->assertSame($expected, Payload::parseTableNames($query));
 	}
+
+	public function testSqlFuzzyQueryWithEscapedApostrophe(): void {
+		$payload = new Payload();
+		$payload->payload = "SELECT * FROM catalog WHERE MATCH('peter\\'s') OPTION fuzzy=1";
+		$payload->fuzzy = true;
+		$payload->quorum = 0;
+		$payload->queries = [];
+
+		$processedQuery = '';
+		$result = $payload->getQueriesSQLRequest(
+			static function (string $query) use (&$processedQuery): array {
+				$processedQuery = $query;
+				return [[$query]];
+			}
+		);
+
+		$this->assertSame("peter's", $processedQuery);
+		$this->assertSame(
+			"SELECT * FROM catalog WHERE MATCH('(peter\\'s^50)')",
+			trim($result)
+		);
+	}
+
+	public function testSqlFuzzyQueryWithEscapedApostropheAndQuorum(): void {
+		$payload = new Payload();
+		$payload->payload = "SELECT * FROM catalog WHERE MATCH('peter\\'s') OPTION fuzzy=1, quorum=0.5";
+		$payload->fuzzy = true;
+		$payload->quorum = 0.5;
+		$payload->queries = [];
+
+		$result = $payload->getQueriesSQLRequest(
+			static fn(string $query): array => [[$query]]
+		);
+
+		$this->assertSame(
+			"SELECT * FROM catalog WHERE MATCH('(peter\\'s^50) | \"peter\\'s\"/0.5')",
+			trim($result)
+		);
+	}
+
+	public function testSqlFuzzyQueryWithEscapedApostropheFallback(): void {
+		$payload = new Payload();
+		$payload->payload = "SELECT * FROM catalog WHERE MATCH('peter\\'s') OPTION fuzzy=1";
+		$payload->fuzzy = true;
+		$payload->quorum = 0;
+		$payload->queries = [];
+
+		$result = $payload->getQueriesSQLRequest(
+			static fn(): array => []
+		);
+
+		$this->assertSame(
+			"SELECT * FROM catalog WHERE MATCH('peter\\'s')",
+			trim($result)
+		);
+	}
+
+	public function testSqlNonFuzzyQueryPreservesEscapedApostrophe(): void {
+		$payload = new Payload();
+		$payload->payload = "SELECT * FROM catalog WHERE MATCH('peter\\'s') OPTION fuzzy=0";
+		$payload->fuzzy = false;
+		$payload->quorum = 0;
+		$payload->queries = [];
+
+		$called = false;
+		$result = $payload->getQueriesSQLRequest(
+			static function (string $query) use (&$called): array {
+				$called = true;
+				return [[$query]];
+			}
+		);
+
+		$this->assertFalse($called);
+		$this->assertSame(
+			"SELECT * FROM catalog WHERE MATCH('peter\\'s')",
+			trim($result)
+		);
+	}
+
+	public function testSqlFuzzyQueryWithEscapedBackslashAndQuorum(): void {
+		$payload = new Payload();
+		$payload->payload = "SELECT * FROM catalog WHERE MATCH('a\\\\b c') OPTION fuzzy=1, quorum=0.5";
+		$payload->fuzzy = true;
+		$payload->quorum = 0.5;
+		$payload->queries = [];
+
+		$processedQuery = '';
+		$result = $payload->getQueriesSQLRequest(
+			static function (string $query) use (&$processedQuery): array {
+				$processedQuery = $query;
+				return [[$query]];
+			}
+		);
+
+		$this->assertSame("a\\b c", $processedQuery);
+		$this->assertSame(
+			"SELECT * FROM catalog WHERE MATCH('(a\\\\b c^50) | \"a\\\\b c\"/0.5')",
+			trim($result)
+		);
+	}
+
 }

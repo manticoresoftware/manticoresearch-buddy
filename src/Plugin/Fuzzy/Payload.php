@@ -12,6 +12,7 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Fuzzy;
 
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
+use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
@@ -24,6 +25,7 @@ use RuntimeException;
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
+	use SqlEscapingTrait;
 	const MAX_BOOST = 50;
 	const DECREASE_FACTOR = 1.44;
 	const ESCAPE_CHARS = '()[]<!|*/-~^$@';
@@ -296,8 +298,9 @@ final class Payload extends BasePayload {
 			$template = substr($template, 0, -6);
 		}
 
-		// If not fuzzy enabled, we do not need to run function and simply assign search value
+		// If not fuzzy enabled, preserve the original SQL-escaped search value as-is
 		if ($this->fuzzy) {
+			$searchValue = static::unescapeSqlString($searchValue);
 			$match = $this->getQueryStringMatch($fn, $searchValue);
 		} else {
 			$match = $searchValue;
@@ -355,12 +358,12 @@ final class Payload extends BasePayload {
 		}
 		// Edge case when nothing to match, use original phrase as fallback
 		if (!$variations) {
-			$match = $searchValue;
+			$match = static::escapeSqlString($searchValue);
 		}
 
 		// Append original query with quorum if quorum > 0
 		if ($this->quorum > 0) {
-			$match .= ' | "' . $searchValue . '"/' . $this->quorum;
+			$match .= ' | "' . static::escapeSqlString($searchValue) . '"/' . $this->quorum;
 		}
 
 		return $match;
@@ -553,6 +556,6 @@ final class Payload extends BasePayload {
 
 		// We need double escape here cuz we replace this match inside
 		// SQL query so every escape symbol is escaped twice
-		return addcslashes(addcslashes($word, static::ESCAPE_CHARS), '\\');
+		return static::escapeSqlString(addcslashes($word, static::ESCAPE_CHARS));
 	}
 }
