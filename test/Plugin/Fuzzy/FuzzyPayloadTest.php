@@ -105,7 +105,7 @@ class FuzzyPayloadTest extends TestCase {
 		$payload->queries = [];
 
 		$result = $payload->getQueriesSQLRequest(
-			static fn(string $query): array => []
+			static fn(): array => []
 		);
 
 		$this->assertSame(
