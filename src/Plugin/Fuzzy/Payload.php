@@ -267,7 +267,6 @@ final class Payload extends BasePayload {
 		$payload = $this->payload;
 		preg_match(static::MATCH_REG_PATTERN, $payload, $matches);
 		$searchValue = $matches[1] ?? '';
-		$searchValue = str_replace("\\'", "'", $searchValue);
 		$searchTableName = $matches[2] ?? '';
 		$template = (string)preg_replace(
 			[
@@ -297,8 +296,9 @@ final class Payload extends BasePayload {
 			$template = substr($template, 0, -6);
 		}
 
-		// If not fuzzy enabled, we do not need to run function and simply assign search value
+		// If not fuzzy enabled, preserve the original SQL-escaped search value as-is
 		if ($this->fuzzy) {
+			$searchValue = str_replace("\\'", "'", $searchValue);
 			$match = $this->getQueryStringMatch($fn, $searchValue);
 		} else {
 			$match = $searchValue;
@@ -356,12 +356,12 @@ final class Payload extends BasePayload {
 		}
 		// Edge case when nothing to match, use original phrase as fallback
 		if (!$variations) {
-			$match = $searchValue;
+			$match = static::escapeSqlString($searchValue);
 		}
 
 		// Append original query with quorum if quorum > 0
 		if ($this->quorum > 0) {
-			$match .= ' | "' . $searchValue . '"/' . $this->quorum;
+			$match .= ' | "' . static::escapeSqlString($searchValue) . '"/' . $this->quorum;
 		}
 
 		return $match;
@@ -543,6 +543,15 @@ final class Payload extends BasePayload {
 	}
 
 	/**
+	 * Escape a value that will be inserted into a single-quoted SQL string.
+	 * @param string $value
+	 * @return string
+	 */
+	protected static function escapeSqlString(string $value): string {
+		return addcslashes($value, "\\'");
+	}
+
+	/**
 	 * Properly escape special symbols that are used in operators to protect from it
 	 * @param string $word
 	 * @return string
@@ -554,6 +563,6 @@ final class Payload extends BasePayload {
 
 		// We need double escape here cuz we replace this match inside
 		// SQL query so every escape symbol is escaped twice
-		return addcslashes(addcslashes($word, static::ESCAPE_CHARS), "\\'");
+		return static::escapeSqlString(addcslashes($word, static::ESCAPE_CHARS));
 	}
 }
