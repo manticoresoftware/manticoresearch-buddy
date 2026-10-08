@@ -14,6 +14,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Fuzzy;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint;
 use Manticoresearch\Buddy\Core\Network\Request;
+use Manticoresearch\Buddy\Core\Lib\SqlEscapingTrait;
 use Manticoresearch\Buddy\Core\Plugin\BasePayload;
 use Manticoresearch\Buddy\Core\Tool\Arrays;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -24,6 +25,7 @@ use RuntimeException;
  * @phpstan-extends BasePayload<array>
  */
 final class Payload extends BasePayload {
+	use SqlEscapingTrait;
 	const MAX_BOOST = 50;
 	const DECREASE_FACTOR = 1.44;
 	const ESCAPE_CHARS = '()[]<!|*/-~^$@';
@@ -298,7 +300,7 @@ final class Payload extends BasePayload {
 
 		// If not fuzzy enabled, preserve the original SQL-escaped search value as-is
 		if ($this->fuzzy) {
-			$searchValue = str_replace("\\'", "'", $searchValue);
+			$searchValue = static::unescapeSqlString($searchValue);
 			$match = $this->getQueryStringMatch($fn, $searchValue);
 		} else {
 			$match = $searchValue;
@@ -540,15 +542,6 @@ final class Payload extends BasePayload {
 			);
 		}
 		return $layouts;
-	}
-
-	/**
-	 * Escape a value that will be inserted into a single-quoted SQL string.
-	 * @param string $value
-	 * @return string
-	 */
-	protected static function escapeSqlString(string $value): string {
-		return addcslashes($value, "\\'");
 	}
 
 	/**

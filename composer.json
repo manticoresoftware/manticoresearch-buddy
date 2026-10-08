@@ -33,7 +33,7 @@
         "composer/composer": "^2.9.6",
 		"manticoresoftware/telemetry": "^0.1.19",
 		"symfony/dependency-injection": "^6.1",
-		"manticoresoftware/buddy-core": "dev-main",
+		"manticoresoftware/buddy-core": "dev-fix/quotes-escaping",
 		"php-ds/php-ds": "^1.4",
 		"manticoresoftware/manticoresearch-backup": "^1.10.4",
 		"symfony/expression-language": "^6.4"

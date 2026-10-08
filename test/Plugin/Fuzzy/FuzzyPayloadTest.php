@@ -136,4 +136,26 @@ class FuzzyPayloadTest extends TestCase {
 		);
 	}
 
+	public function testSqlFuzzyQueryWithEscapedBackslashAndQuorum(): void {
+		$payload = new Payload();
+		$payload->payload = "SELECT * FROM catalog WHERE MATCH('a\\\\b c') OPTION fuzzy=1, quorum=0.5";
+		$payload->fuzzy = true;
+		$payload->quorum = 0.5;
+		$payload->queries = [];
+
+		$processedQuery = '';
+		$result = $payload->getQueriesSQLRequest(
+			static function (string $query) use (&$processedQuery): array {
+				$processedQuery = $query;
+				return [[$query]];
+			}
+		);
+
+		$this->assertSame("a\\b c", $processedQuery);
+		$this->assertSame(
+			"SELECT * FROM catalog WHERE MATCH('(a\\\\b c^50) | \"a\\\\b c\"/0.5')",
+			trim($result)
+		);
+	}
+
 }

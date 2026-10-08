@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7b49f3eb7d98a5e7a4bd32b7240834a9",
+    "content-hash": "3c358624bd0c59fccf3513acb86b9948",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -1171,16 +1171,16 @@
         },
         {
             "name": "manticoresoftware/buddy-core",
-            "version": "dev-main",
+            "version": "dev-fix/quotes-escaping",
             "source": {
                 "type": "git",
                 "url": "https://github.com/manticoresoftware/buddy-core.git",
-                "reference": "f136541dc4c6a87959146bd89ec212c931f90d46"
+                "reference": "c50ee90f0c3da1e28988c3e29f8b039dbccc9eec"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/f136541dc4c6a87959146bd89ec212c931f90d46",
-                "reference": "f136541dc4c6a87959146bd89ec212c931f90d46",
+                "url": "https://api.github.com/repos/manticoresoftware/buddy-core/zipball/c50ee90f0c3da1e28988c3e29f8b039dbccc9eec",
+                "reference": "c50ee90f0c3da1e28988c3e29f8b039dbccc9eec",
                 "shasum": ""
             },
             "require": {
@@ -1196,7 +1196,6 @@
                 "slevomat/coding-standard": "^8.5",
                 "squizlabs/php_codesniffer": "^3.7"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -1217,9 +1216,9 @@
             "description": "The Buddy Core to develop your own plugin for Manticore Search",
             "support": {
                 "issues": "https://github.com/manticoresoftware/buddy-core/issues",
-                "source": "https://github.com/manticoresoftware/buddy-core/tree/main"
+                "source": "https://github.com/manticoresoftware/buddy-core/tree/fix/quotes-escaping"
             },
-            "time": "2026-08-28T11:06:31+00:00"
+            "time": "2026-10-08T11:54:26+00:00"
         },
         {
             "name": "manticoresoftware/manticoresearch-backup",
@@ -6100,10 +6099,10 @@
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.1.0"
     },
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
