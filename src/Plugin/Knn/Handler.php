@@ -23,6 +23,9 @@ use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskResult;
 use RuntimeException;
 
+/**
+ * @phpstan-import-type ParsedQuery from Payload
+ */
 final class Handler extends BaseHandlerWithClient {
 	/**
 	 * Initialize the executor
@@ -175,11 +178,14 @@ final class Handler extends BaseHandlerWithClient {
 	 * @throws QueryParseError|ManticoreSearchClientError|GenericError
 	 */
 	private static function knnSqlQuery(Client $manticoreClient, Payload $payload, string $queryVector): Response {
+		if ($payload->parsedQuery === null) {
+			throw new QueryParseError('Failed to parse query');
+		}
 
-		self::substituteParsedQuery($payload, $queryVector);
-
+		$parsedQuery = self::substituteParsedQuery($payload->parsedQuery, $queryVector);
+		$sql = $payload::$sqlQueryParser::getCompletedPayloadFrom($parsedQuery);
 		$resp = $manticoreClient
-				->sendRequest($payload::$sqlQueryParser::getCompletedPayload(), $payload->endpointBundle->value);
+				->sendRequest($sql, $payload->endpointBundle->value);
 
 		if ($resp->hasError()) {
 			ManticoreSearchResponseError::throw((string)$resp->getError());
@@ -207,24 +213,18 @@ final class Handler extends BaseHandlerWithClient {
 	}
 
 	/**
-	 * This method updates SQL parsed payload.
+	 * This method substitutes the query vector into the SQL parsed payload.
 	 * For example this method allows to modify queries from
 	 * SELECT * FROM tbl WHERE knn(query_vector, 5, 1)
 	 * To
 	 * SELECT * FROM tbl WHERE knn(query_vector, 5, (-0.9999,-0.9999,-0.9999,-0.9999))
 	 *
-	 * @param Payload $payload
+	 * @param ParsedQuery $parsedQuery
 	 * @param string $queryVector
-	 * @return void
+	 * @return ParsedQuery
 	 */
-	private static function substituteParsedQuery(Payload $payload, string $queryVector): void {
-
-		$parsedQuery = $payload::$sqlQueryParser::getParsedPayload();
-		if ($parsedQuery === null) {
-			return;
-		}
-
-		foreach ($parsedQuery['WHERE'] as $k => $condition) {
+	private static function substituteParsedQuery(array $parsedQuery, string $queryVector): array {
+		foreach ($parsedQuery['WHERE'] ?? [] as $k => $condition) {
 			if ($condition['base_expr'] !== 'knn') {
 				continue;
 			}
@@ -239,6 +239,7 @@ final class Handler extends BaseHandlerWithClient {
 		if (isset($parsedQuery['LIMIT']['rowcount']) && (int)($parsedQuery['LIMIT']['offset'] ?? 0) === 0) {
 			$parsedQuery['LIMIT']['rowcount'] = (string)((int)$parsedQuery['LIMIT']['rowcount'] + 1);
 		}
-		$payload::$sqlQueryParser::setParsedPayload($parsedQuery);
+
+		return $parsedQuery;
 	}
 }
