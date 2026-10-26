@@ -15,6 +15,15 @@ include_once __DIR__ . DIRECTORY_SEPARATOR
 	. 'src' . DIRECTORY_SEPARATOR
 	. 'init.php';
 
+// PHP 8.5 deprecates Swoole's implicit Event::wait() at request shutdown.
+// Keep Buddy's strict error handler throughout the tests, but restore PHP's
+// default handler before extension shutdown so that notice is not fatal.
+if (PHP_VERSION_ID >= 80500 && extension_loaded('swoole')) {
+	register_shutdown_function(static function (): void {
+		set_error_handler(null);
+	});
+}
+
 use Manticoresearch\Buddy\Base\Lib\MetricThread;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
