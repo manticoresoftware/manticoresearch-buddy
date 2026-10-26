@@ -22,7 +22,6 @@ final class DropSourceHandlerTest extends TestCase {
 
 		$reflection = new ReflectionClass(DropSourceHandler::class);
 		$method = $reflection->getMethod('suspendSourceViews');
-		$method->setAccessible(true);
 		$method->invoke(null, 'orders_0', $client);
 
 		$this->assertSame(

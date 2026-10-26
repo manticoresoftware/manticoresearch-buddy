@@ -90,7 +90,6 @@ final class FailedNodeRebalanceMetadataCommitTest extends TestCase {
 		);
 
 		$method = new ReflectionMethod(Table::class, 'handleFailedNodesRebalance');
-		$method->setAccessible(true);
 		/** @var array<string,int> $tailIds */
 		$tailIds = $method->invoke(
 			$table,

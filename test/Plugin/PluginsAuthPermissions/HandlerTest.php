@@ -88,7 +88,6 @@ final class HandlerTest extends TestCase {
 		$payload = Payload::fromRequest($this->createRequest('GRANT SELECT ON chat_model/gpt TO user'));
 		$refClass = new ReflectionClass(Handler::class);
 		$method = $refClass->getMethod('morphChatHistoryQuery');
-		$method->setAccessible(true);
 
 		$this->assertSame(
 			"GRANT SELECT ON 'system.chat_history_gpt' TO user",
@@ -178,7 +177,6 @@ final class HandlerTest extends TestCase {
 	private function getPermissionQueries(Payload $payload): array {
 		$refClass = new ReflectionClass(Handler::class);
 		$method = $refClass->getMethod('permissionQueries');
-		$method->setAccessible(true);
 
 		/** @var array<int, string> */
 		return $method->invoke(null, $payload);

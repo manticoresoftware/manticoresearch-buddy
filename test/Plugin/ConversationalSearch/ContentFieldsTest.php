@@ -269,7 +269,6 @@ class ContentFieldsTest extends TestCase {
 	public function testGetLlmRequestOptionsUsesFixedResponseLimit(): void {
 		$reflection = new ReflectionClass(Handler::class);
 		$method = $reflection->getMethod('getLlmRequestOptions');
-		$method->setAccessible(true);
 
 		/** @var array<string, int|float> $options */
 		$options = $method->invoke(null);
