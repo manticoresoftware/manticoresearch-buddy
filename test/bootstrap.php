@@ -21,6 +21,12 @@ use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Tool\ConfigManager;
 use Psr\Container\ContainerInterface;
 
+// PHP 8.5 deprecates Swoole's implicit Event::wait() during shutdown.
+// Leave strict errors enabled during tests; restore defaults before shutdown.
+if (PHP_VERSION_ID >= 80500 && extension_loaded('swoole')) {
+	register_shutdown_function(static fn () => set_error_handler(null));
+}
+
 // Autoloader for test doubles
 spl_autoload_register(
 	function (string $className): void {

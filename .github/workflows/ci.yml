@@ -84,11 +84,14 @@ jobs:
         run: |
           set -e
           ln -snf "$GITHUB_WORKSPACE" /workdir
-          # the entrypoint is rewritten so we need to launch searchd manually
-          searchd
           cd /workdir
           composer install --prefer-dist
+          # Use the checked-out Buddy, not the older copy bundled in Test Kit.
+          rm -rf /usr/share/manticore/modules/manticore-buddy
+          ln -s /workdir /usr/share/manticore/modules/manticore-buddy
           git clone https://github.com/manticoresoftware/phar_builder.git
+          # The entrypoint is rewritten, so launch searchd manually.
+          searchd
           bin/test
 
   test_kit:

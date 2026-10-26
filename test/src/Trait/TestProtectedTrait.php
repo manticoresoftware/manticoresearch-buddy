@@ -24,7 +24,6 @@ trait TestProtectedTrait {
 	public static function invokeMethod(mixed $classInstance, string $methodName, array $args = []): mixed {
 		$class = new \ReflectionClass($classInstance);
 		$method = $class->getMethod($methodName);
-		$method->setAccessible(true);
 		$ref = gettype($classInstance) === 'string' ? null : $classInstance;
 		return $method->invokeArgs($ref, $args);
 	}

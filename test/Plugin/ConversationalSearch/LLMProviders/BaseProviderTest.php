@@ -33,7 +33,6 @@ class BaseProviderTest extends TestCase {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('getSettings');
-		$method->setAccessible(true);
 
 		$overrides = ['temperature' => 0.8, 'frequency_penalty' => 0.1];
 		$result = (array)$method->invoke($this->provider, $overrides);
@@ -55,7 +54,6 @@ class BaseProviderTest extends TestCase {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('getSettings');
-		$method->setAccessible(true);
 
 		$result = (array)$method->invoke($this->provider, []);
 
@@ -75,7 +73,6 @@ class BaseProviderTest extends TestCase {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('convertSettingsTypes');
-		$method->setAccessible(true);
 
 		$result = (array)$method->invoke($this->provider, $settings);
 
@@ -103,7 +100,6 @@ class BaseProviderTest extends TestCase {
 
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('extractClientOptions');
-		$method->setAccessible(true);
 
 		$result = (array)$method->invoke($this->provider, $settings);
 
@@ -130,9 +126,7 @@ class BaseProviderTest extends TestCase {
 
 		$reflection = new ReflectionClass($this->provider);
 		$getSettings = $reflection->getMethod('getSettings');
-		$getSettings->setAccessible(true);
 		$extractClientOptions = $reflection->getMethod('extractClientOptions');
-		$extractClientOptions->setAccessible(true);
 
 		$settings = (array)$getSettings->invoke($this->provider, []);
 		$result = (array)$extractClientOptions->invoke($this->provider, $settings);
@@ -157,9 +151,7 @@ class BaseProviderTest extends TestCase {
 
 		$reflection = new ReflectionClass($this->provider);
 		$getSettings = $reflection->getMethod('getSettings');
-		$getSettings->setAccessible(true);
 		$extractClientOptions = $reflection->getMethod('extractClientOptions');
-		$extractClientOptions->setAccessible(true);
 
 		$settings = (array)$getSettings->invoke(
 			$this->provider,
@@ -183,7 +175,6 @@ class BaseProviderTest extends TestCase {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('convertToFloat');
-		$method->setAccessible(true);
 
 		$this->assertEquals(3.14, $method->invoke($this->provider, '3.14'));
 		$this->assertEquals(42.0, $method->invoke($this->provider, '42'));
@@ -195,7 +186,6 @@ class BaseProviderTest extends TestCase {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('convertToInt');
-		$method->setAccessible(true);
 
 		$this->assertEquals(42, $method->invoke($this->provider, '42'));
 		$this->assertEquals(3, $method->invoke($this->provider, '3.14')); // Truncated
@@ -214,7 +204,6 @@ class BaseProviderTest extends TestCase {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('formatError');
-		$method->setAccessible(true);
 
 		$exception = new Exception('Test exception');
 		$result = $method->invoke($this->provider, 'Test message', $exception);
@@ -249,7 +238,6 @@ class BaseProviderTest extends TestCase {
 		// Use reflection to access protected method
 		$reflection = new ReflectionClass($this->provider);
 		$method = $reflection->getMethod('formatSuccess');
-		$method->setAccessible(true);
 
 		$this->provider->configure(['model' => 'test-model']);
 		$result = $method->invoke($this->provider, 'Test content', ['tokens' => 100]);

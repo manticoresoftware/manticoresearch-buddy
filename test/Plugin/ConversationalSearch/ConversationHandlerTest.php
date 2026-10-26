@@ -221,7 +221,6 @@ class ConversationHandlerTest extends TestCase {
 		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
 
 		$method = new ReflectionMethod(ChatHandler::class, 'describeModel');
-		$method->setAccessible(true);
 		$result = $method->invoke(null, $payload, new ModelManager(), $mockClient);
 
 		$this->assertInstanceOf(TaskResult::class, $result);
@@ -611,7 +610,6 @@ class ConversationHandlerTest extends TestCase {
 		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
 
 		$method = new ReflectionMethod(ChatHandler::class, 'describeModel');
-		$method->setAccessible(true);
 		$result = $method->invoke(null, $payload, new ModelManager(), $mockClient);
 
 		$this->assertInstanceOf(TaskResult::class, $result);
@@ -856,7 +854,6 @@ class ConversationHandlerTest extends TestCase {
 	public function testBuildPromptUsesHistoryContextOnlyPrompt(): void {
 		$reflection = new ReflectionClass(ChatHandler::class);
 		$method = $reflection->getMethod('buildPrompt');
-		$method->setAccessible(true);
 		$history = [['role' => 'user', 'content' => 'Earlier question']];
 
 		$prompt = $method->invoke(
@@ -889,7 +886,6 @@ class ConversationHandlerTest extends TestCase {
 	public function testBuildPromptUsesCustomPromptWhenConfigured(): void {
 		$reflection = new ReflectionClass(ChatHandler::class);
 		$method = $reflection->getMethod('buildPrompt');
-		$method->setAccessible(true);
 
 		$prompt = $method->invoke(
 			null,
@@ -956,7 +952,6 @@ class ConversationHandlerTest extends TestCase {
 
 		$reflection = new ReflectionClass(ChatHandler::class);
 		$method = $reflection->getMethod('generateResponse');
-		$method->setAccessible(true);
 		$result = $method->invoke(
 			null,
 			$model,
@@ -1120,7 +1115,6 @@ class ConversationHandlerTest extends TestCase {
 
 		$reflection = new ReflectionClass(ChatHandler::class);
 		$method = $reflection->getMethod('performSearch');
-		$method->setAccessible(true);
 		$result = $method->invoke(
 			null,
 			$context,
