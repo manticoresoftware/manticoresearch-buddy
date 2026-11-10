@@ -107,7 +107,6 @@ trait ReplaceSelectTestTrait {
 	private function injectMockClient(Handler $handler, Client $mockClient): void {
 		$reflection = new ReflectionClass($handler);
 		$property = $reflection->getProperty('manticoreClient');
-		$property->setAccessible(true);
 		$property->setValue($handler, $mockClient);
 	}
 

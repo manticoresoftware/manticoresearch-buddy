@@ -192,7 +192,6 @@ class ConversationalSearchTest extends TestCase {
 		$this->configureClientWithInitialization($mockClient, [$selectResponse]);
 
 		$method = new ReflectionMethod(ChatHandler::class, 'describeModel');
-		$method->setAccessible(true);
 		$result = $method->invoke(null, $payload, new ModelManager(), $mockClient);
 
 		$this->assertInstanceOf(TaskResult::class, $result);

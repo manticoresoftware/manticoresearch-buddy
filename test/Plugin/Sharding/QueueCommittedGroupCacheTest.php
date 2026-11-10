@@ -33,7 +33,6 @@ final class QueueCommittedGroupCacheTest extends TestCase {
 		$cluster = new Cluster($client, 'i', '127.0.0.1:63312');
 		$queue = new Queue($cluster, $client);
 		$method = new ReflectionMethod(Queue::class, 'isGroupCommitted');
-		$method->setAccessible(true);
 
 		$this->assertFalse($method->invoke($queue, $group));
 		$this->assertTrue($method->invoke($queue, $group));

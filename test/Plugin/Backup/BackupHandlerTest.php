@@ -53,7 +53,6 @@ final class BackupHandlerTest extends TestCase {
 
 	private function createAuth(BackupHandler $handler): ?ManticoreAuth {
 		$method = new ReflectionMethod(BackupHandler::class, 'createAuth');
-		$method->setAccessible(true);
 		/** @var ?ManticoreAuth */
 		return $method->invoke($handler);
 	}
