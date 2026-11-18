@@ -48,8 +48,8 @@ class InitKibanaHandler extends BaseEntityHandler {
 		$taskFn = static function (Payload $payload, HTTPClient $manticoreClient): TaskResult {
 			$alias = $payload->path;
 			$systemClient = $manticoreClient->getSystemClient();
-			$entityQuery = 'SELECT _id, _index, _source FROM `'
-				. self::ENTITY_TABLE . "` WHERE _index_alias='{$alias}' AND _type='settings'";
+			$entityQuery = 'SELECT _id, _index, _source FROM '
+				. self::ENTITY_TABLE . " WHERE _index_alias='{$alias}' AND _type='settings'";
 			/** @var array{error?:string,0:array{data?:array<array{_index:string,_source:string}>}} $queryResult */
 			$queryResult = $systemClient->sendRequest($entityQuery)->getResult();
 			if (isset($queryResult['error']) || !isset($queryResult[0]['data']) || !$queryResult[0]['data']) {

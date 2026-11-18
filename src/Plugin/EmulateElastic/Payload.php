@@ -61,6 +61,9 @@ final class Payload extends BasePayload {
 	/** @var string $body */
 	public string $body = '';
 
+	/** Whether the request uses create-only semantics. */
+	public bool $createOnly = false;
+
 	/** @var string $path */
 	public string $path;
 
@@ -82,6 +85,7 @@ final class Payload extends BasePayload {
 		$pathParts = explode('/', ltrim($request->path, '/'));
 		$self->path = $request->path;
 		self::detectRequestTarget($pathParts, $self);
+		$self->createOnly = static::$requestTarget === '_create';
 		switch (static::$requestTarget) {
 			case '_doc':
 				static::$requestTarget .= '_' . strtolower($request->httpMethod);

@@ -41,8 +41,8 @@ class FindEntityHandler extends BaseEntityHandler {
 			[$entityId, $entityIndex] = self::getEntityInfo($payload->path, $manticoreClient);
 
 			$systemClient = $manticoreClient->getSystemClient();
-			$query = 'SELECT _source FROM `' . self::ENTITY_TABLE
-				. "` WHERE _id='{$entityId}' AND _index='{$entityIndex}'";
+			$query = 'SELECT _source FROM ' . self::ENTITY_TABLE
+				. " WHERE _id='{$entityId}' AND _index='{$entityIndex}'";
 			/** @var array{error?:string,0:array{data?:array<array{_source:string}>}} $queryResult */
 			$queryResult = $systemClient->sendRequest($query)->getResult();
 			if (isset($queryResult['error']) || !isset($queryResult[0]['data']) || !$queryResult[0]['data']) {
