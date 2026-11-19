@@ -64,6 +64,14 @@ final class Node {
 			throw new RuntimeException('Node ID detection failed');
 		}
 
+		// The daemon announces itself to the cluster as node_address plus the API port,
+		// so the node id has to use the same host or queued tasks never match this node.
+		// An empty node_address counts as not set, the daemon reads the config the same way
+		$nodeAddress = $settings->searchdNodeAddress;
+		if ($nodeAddress) {
+			$port = substr($nodeId, strrpos($nodeId, ':') + 1);
+			return "$nodeAddress:$port";
+		}
 		return $nodeId;
 	}
 
