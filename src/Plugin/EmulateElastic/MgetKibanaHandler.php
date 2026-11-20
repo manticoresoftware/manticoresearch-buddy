@@ -43,7 +43,7 @@ class MgetKibanaHandler extends BaseEntityHandler {
 			$entityInfo = $payloadBody['docs'];
 			$systemClient = $manticoreClient->getSystemClient();
 			$getEntitiesCond = self::buildEntitiesCond($entityInfo);
-			$query = 'SELECT _id, _index, _source FROM `' . self::ENTITY_TABLE . "` WHERE {$getEntitiesCond}";
+			$query = 'SELECT _id, _index, _source FROM ' . self::ENTITY_TABLE . " WHERE {$getEntitiesCond}";
 			/** @var array{
 			 * error?:string,
 			 * 0:array{data?:array<array{_source:string,_id:string,_index:string}>}

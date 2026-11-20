@@ -18,6 +18,42 @@ use PHPUnit\Framework\TestCase;
 
 class EmulateElasticPayloadTest extends TestCase {
 
+	public function testCreateEndpointPreservesCreateOnlySemantics(): void {
+		$request = NetRequest::fromArray(
+			[
+				'error' => '/.kibana/_create/config%3A3.4.0 - unsupported endpoint',
+				'payload' => '{"config":{"buildNum":8743}}',
+				'version' => Buddy::PROTOCOL_VERSION,
+				'format' => RequestFormat::JSON,
+				'endpointBundle' => ManticoreEndpoint::Elastic,
+				'path' => '/.kibana/_create/config%3A3.4.0',
+				'httpMethod' => 'PUT',
+			]
+		);
+
+		$payload = Payload::fromRequest($request);
+
+		$this->assertTrue($payload->createOnly);
+	}
+
+	public function testDocEndpointUsesUpsertSemantics(): void {
+		$request = NetRequest::fromArray(
+			[
+				'error' => '/.kibana/_doc/config%3A3.4.0 - unsupported endpoint',
+				'payload' => '{"config":{"buildNum":8743}}',
+				'version' => Buddy::PROTOCOL_VERSION,
+				'format' => RequestFormat::JSON,
+				'endpointBundle' => ManticoreEndpoint::Elastic,
+				'path' => '/.kibana/_doc/config%3A3.4.0',
+				'httpMethod' => 'PUT',
+			]
+		);
+
+		$payload = Payload::fromRequest($request);
+
+		$this->assertFalse($payload->createOnly);
+	}
+
 	public function testGetTableNameFromElasticQueryOk():void {
 		$request = NetRequest::fromArray(
 			[
