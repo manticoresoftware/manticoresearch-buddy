@@ -216,7 +216,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 				$phrase,
 				$this->payload->table,
 				$this->payload->forceBigrams,
-				$distance
+				$distance,
+				preserve: $this->payload->preserve
 			);
 
 			// Normalize bigram separators in keywords from fuzzy variations
@@ -250,7 +251,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		$lastIndex = array_key_last($words);
 		$lastWords = $words[$lastIndex]['keywords'];
 		if (!$lastWords) {
-			$lastWords = [$words[$lastIndex]['original']];
+			// Non-fuzzy getPhraseWords leaves the last token empty so we can expand it here.
+			// Fuzzy + preserve=0 means "drop unmatched" — do not expand those back in.
+			$lastWords = ($distance === 0 || $this->payload->preserve)
+				? [$words[$lastIndex]['original']]
+				: [];
 		}
 
 		foreach ($lastWords as $lastWord) {
@@ -355,6 +360,11 @@ final class Handler extends BaseHandlerWithFlagCache {
 		array $scoreMap,
 		int $maxCount
 	): \Ds\Map {
+		// preserve=0 can yield empty keyword slots for unmatched tokens; skip them
+		if ($positionWords === []) {
+			return $combinations;
+		}
+
 		$newCombinations = new \Ds\Map();
 		foreach ($combinations as $combination => $score) {
 			foreach ($positionWords as $word) {

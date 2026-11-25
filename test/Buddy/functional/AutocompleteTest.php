@@ -45,4 +45,29 @@ final class AutocompleteTest extends TestCase {
 			['query: linen']
 		);
 	}
+
+	public function testAutocompletePreserveKeepsOriginalTypoAlongsideCorrection(): void {
+		static::runSqlQuery('INSERT INTO ' . self::TABLE . " (id, name) VALUES (4, 'hello world')");
+		$this->assertQueryResult(
+			"CALL AUTOCOMPLETE('hello wrld', '" . self::TABLE . "', 1 AS preserve, 0 AS prepend, 1 AS append)",
+			['query: hello wrld', 'query: hello world']
+		);
+	}
+
+	public function testAutocompleteWithoutPreserveDropsUnmatchedTokens(): void {
+		static::runSqlQuery('INSERT INTO ' . self::TABLE . " (id, name) VALUES (4, 'hello world')");
+		$this->assertQueryResult(
+			"CALL AUTOCOMPLETE('hello q wor', '" . self::TABLE . "', 0 AS preserve, 0 AS prepend, 1 AS append)",
+			['query: hello world'],
+			['query: hello q world']
+		);
+	}
+
+	public function testAutocompletePreserveKeepsUnmatchedTokens(): void {
+		static::runSqlQuery('INSERT INTO ' . self::TABLE . " (id, name) VALUES (4, 'hello world')");
+		$this->assertQueryResult(
+			"CALL AUTOCOMPLETE('hello q wor', '" . self::TABLE . "', 1 AS preserve, 0 AS prepend, 1 AS append)",
+			['query: hello q world']
+		);
+	}
 }
