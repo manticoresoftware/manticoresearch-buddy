@@ -44,7 +44,7 @@ final class ConversationSimplificationTest extends TestCase {
 			}
 		);
 		$manager = new ConversationManager($client, 'assistant');
-		$manager->saveMessage('conv', 'assistant', 'user', 'Find a movie');
+		$manager->saveTurn('conv', 'assistant', 'Find a movie', 'Try this one.', 'movies');
 		$history = $manager->getConversationMessages('conv');
 		$this->assertSame("user: Find a movie\nassistant: Try this one.\n", $history->format());
 		$this->assertSame(3, sizeof($queries));

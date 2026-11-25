@@ -41,7 +41,7 @@ final class HybridHistoryTest extends TestCase {
 			$queries
 		);
 		$manager = new ConversationManager($client, 'assistant');
-		$manager->saveMessage('conv', 'assistant', 'user', 'Which are black?');
+		$manager->saveTurn('conv', 'assistant', 'Which are black?', 'These pants are black.', 'docs');
 		$history = $manager->getConversationMessages('conv');
 
 		$this->assertCount(3, $queries);

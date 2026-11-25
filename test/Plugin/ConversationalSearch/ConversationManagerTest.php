@@ -45,7 +45,7 @@ class ConversationManagerTest extends TestCase {
 		new ConversationManager($client, 'test_model');
 	}
 
-	public function testSaveUserMessagePersistsSelectedModelName(): void {
+	public function testSaveTurnPersistsSelectedModelName(): void {
 		$client = $this->createMock(HTTPClient::class);
 		$manager = $this->managerWithRequest(
 			$client,
@@ -56,16 +56,17 @@ class ConversationManagerTest extends TestCase {
 					$sql
 				);
 				$this->assertMatchesRegularExpression(
-					"/VALUES \\('conv-123', 'different-model', [0-9]+, 'user', 'Hello, how are you\\?', [0-9]+\\)$/",
+					"/VALUES \\('conv-123', 'different-model', [0-9]+, 'user', 'Hello, how are you\\?', [0-9]+\\), "
+					. "\\('conv-123', 'different-model', [0-9]+, 'assistant', 'I am well.', [0-9]+\\)$/",
 					$sql
 				);
 			},
 			$this->successfulResponse()
 		);
-		$manager->saveMessage('conv-123', 'different-model', 'user', 'Hello, how are you?');
+		$manager->saveTurn('conv-123', 'different-model', 'Hello, how are you?', 'I am well.', 'docs');
 	}
 
-	public function testSaveAssistantMessagePersistsRoleAndMessage(): void {
+	public function testSaveTurnPersistsAssistantRoleAndMessage(): void {
 		$client = $this->createMock(HTTPClient::class);
 		$manager = $this->managerWithRequest(
 			$client,
@@ -75,7 +76,7 @@ class ConversationManagerTest extends TestCase {
 			},
 			$this->successfulResponse()
 		);
-		$manager->saveMessage('conv-123', 'test_model', 'assistant', 'Here is the answer.');
+		$manager->saveTurn('conv-123', 'test_model', 'What is the answer?', 'Here is the answer.', 'docs');
 	}
 
 	public function testSaveTurnPersistsMessagesAndExclusionsInOneInsert(): void {

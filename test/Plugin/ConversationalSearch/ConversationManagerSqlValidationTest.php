@@ -15,7 +15,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class ConversationManagerSqlValidationTest extends TestCase {
-	public function testSaveMessageIncludesModelName(): void {
+	public function testSaveTurnIncludesModelName(): void {
 		$client = $this->createMock(HTTPClient::class);
 		$manager = $this->managerWithRequest(
 			$client,
@@ -23,16 +23,17 @@ class ConversationManagerSqlValidationTest extends TestCase {
 				$this->assertMatchesRegularExpression(
 					'/^INSERT INTO system\\.chat_history_test_model '
 					. '\\(conversation_uuid, `model_name`, created_at, role, message, ttl\\) '
-					. "VALUES \\('conv-123', 'test_model', [0-9]+, 'user', 'Hello, how are you\\?', [0-9]+\\)$/",
+					. "VALUES \\('conv-123', 'test_model', [0-9]+, 'user', 'Hello, how are you\\?', [0-9]+\\), "
+					. "\\('conv-123', 'test_model', [0-9]+, 'assistant', 'I am well.', [0-9]+\\)$/",
 					$sql
 				);
 			},
 			$this->successfulResponse()
 		);
-		$manager->saveMessage('conv-123', 'test_model', 'user', 'Hello, how are you?');
+		$manager->saveTurn('conv-123', 'test_model', 'Hello, how are you?', 'I am well.', 'docs');
 	}
 
-	public function testSaveMessageEscapesSpecialCharacters(): void {
+	public function testSaveTurnEscapesSpecialCharacters(): void {
 		$client = $this->createMock(HTTPClient::class);
 		$manager = $this->managerWithRequest(
 			$client,
@@ -49,11 +50,12 @@ class ConversationManagerSqlValidationTest extends TestCase {
 			},
 			$this->successfulResponse()
 		);
-		$manager->saveMessage(
+		$manager->saveTurn(
 			'conv-123',
 			'test_model',
-			'user',
-			"O'Reilly's book has a line\nbreak and quote\"test"
+			"O'Reilly's book has a line\nbreak and quote\"test",
+			"O'Reilly's answer has a line\nbreak and quote\"test",
+			'docs'
 		);
 	}
 

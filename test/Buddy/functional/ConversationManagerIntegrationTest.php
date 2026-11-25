@@ -50,20 +50,13 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testCompleteConversationFlowWithRealDatabase(): void {
-		// Save a user message
-		$this->saveUser(
+		$this->conversationManager->saveTurn(
 			'test-conversation-1',
-			'What is machine learning?'
-		);
-
-		// Small delay to ensure different timestamps
-		sleep(1);
-
-		// Save an assistant response
-		$this->saveAssistant(
-			'test-conversation-1',
+			'test_model',
+			'What is machine learning?',
 			'Machine learning is a subset of artificial intelligence that focuses '
-			. 'on algorithms that can learn from data.'
+			. 'on algorithms that can learn from data.',
+			'docs'
 		);
 
 		// Retrieve conversation history
@@ -89,25 +82,21 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 */
 	public function testMultipleConversationExchanges(): void {
 		// First exchange
-		$this->saveUser(
+		$this->conversationManager->saveTurn(
 			'test-conversation-2',
-			'Show me movies about space'
-		);
-
-		$this->saveAssistant(
-			'test-conversation-2',
-			'Here are some great space movies: 2001: A Space Odyssey, Interstellar, Gravity...'
+			'test_model',
+			'Show me movies about space',
+			'Here are some great space movies: 2001: A Space Odyssey, Interstellar, Gravity...',
+			'docs'
 		);
 
 		// Second exchange
-		$this->saveUser(
+		$this->conversationManager->saveTurn(
 			'test-conversation-2',
-			'What about documentaries?'
-		);
-
-		$this->saveAssistant(
-			'test-conversation-2',
-			'Here are some space documentaries: Cosmos, The Farthest, Apollo 13...'
+			'test_model',
+			'What about documentaries?',
+			'Here are some space documentaries: Cosmos, The Farthest, Apollo 13...',
+			'docs'
 		);
 
 		// Test complete history
@@ -127,26 +116,29 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 */
 	public function testFollowUpQuestionsRemainInHistory(): void {
 		// Regular search question
-		$this->saveUser('test-conversation-3', 'What are the best sci-fi movies?');
-
-		$this->saveAssistant(
+		$this->conversationManager->saveTurn(
 			'test-conversation-3',
-			'Here are some highly-rated sci-fi movies: Blade Runner 2049, Arrival, The Matrix...'
+			'test_model',
+			'What are the best sci-fi movies?',
+			'Here are some highly-rated sci-fi movies: Blade Runner 2049, Arrival, The Matrix...',
+			'docs'
 		);
 
 		// Follow-up question should remain in query generation history.
-		$this->saveUser('test-conversation-3', 'Tell me more about Blade Runner 2049');
-
-		$this->saveAssistant(
+		$this->conversationManager->saveTurn(
 			'test-conversation-3',
-			'Blade Runner 2049 is a 2017 science fiction film directed by Denis Villeneuve...'
+			'test_model',
+			'Tell me more about Blade Runner 2049',
+			'Blade Runner 2049 is a 2017 science fiction film directed by Denis Villeneuve...',
+			'docs'
 		);
 
-		$this->saveUser('test-conversation-3', 'Who directed it?');
-
-		$this->saveAssistant(
+		$this->conversationManager->saveTurn(
 			'test-conversation-3',
-			'Denis Villeneuve directed Blade Runner 2049.'
+			'test_model',
+			'Who directed it?',
+			'Denis Villeneuve directed Blade Runner 2049.',
+			'docs'
 		);
 
 		// Test that complete history includes everything
@@ -199,7 +191,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$specialMessage = "This message contains: quotes 'single' and \"double\", " .
 			"newlines\nand\ttabs, backslashes\\, and unicode: ñáéíóú 🚀";
 
-		$this->saveUser('test-conversation-4', $specialMessage);
+		$this->conversationManager->saveTurn('test-conversation-4', 'test_model', $specialMessage, 'Noted.', 'docs');
 
 		// Retrieve and verify the message is preserved correctly
 		$history = $this->getConversationHistory('test-conversation-4');
@@ -218,10 +210,12 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testConversationStoresOnlyMessages(): void {
-		$this->saveUser('test-conversation-5', 'Show me results excluding some items');
+		$this->conversationManager->saveTurn(
+			'test-conversation-5', 'test_model', 'Show me results excluding some items', 'Here are results.', 'docs'
+		);
 
 		$this->assertSame(
-			"user: Show me results excluding some items\n",
+			"user: Show me results excluding some items\nassistant: Here are results.\n",
 			$this->getConversationHistory('test-conversation-5')
 		);
 	}
@@ -229,7 +223,9 @@ class ConversationManagerIntegrationTest extends TestCase {
 	/** @throws ManticoreSearchClientError|ManticoreSearchResponseError|JsonException */
 	public function testExcludedIdsPersistAcrossTurnsAndRemainScopedToTheTargetTable(): void {
 		$conversation = 'exclusion-integration';
-		$this->saveUser($conversation, 'Recommend TV shows');
+		$this->conversationManager->saveTurn(
+			$conversation, 'test_model', 'Recommend TV shows', 'Here are recommendations.', 'shows'
+		);
 		$this->conversationManager->saveTurn(
 			$conversation, 'test_model', 'Shows please', 'Here are shows', 'shows', ['12', '9007199254740993']
 		);
@@ -257,21 +253,21 @@ class ConversationManagerIntegrationTest extends TestCase {
 				->excludedIds()
 		);
 		$this->assertSame(
-			"user: Recommend TV shows\nuser: Shows please\nassistant: Here are shows\n"
+			"user: Recommend TV shows\nassistant: Here are recommendations.\n"
+			. "user: Shows please\nassistant: Here are shows\n"
 			. "user: Films please\nassistant: Here are films\n"
 			. "user: More shows\nassistant: Here are more shows\n",
 			$this->getConversationHistory($conversation)
 		);
-		$this->saveUser($conversation, 'Thanks');
-		$this->saveUser($conversation, 'New topic');
+		$this->conversationManager->saveTurn($conversation, 'test_model', 'Thanks', 'You are welcome.', 'shows');
 		$this->assertSame(
 			[], $this->conversationManager->getConversationMessages($conversation, 2, 'shows')->excludedIds()
 		);
 	}
 
 	public function testMessagesRecordTheirOwnModelName(): void {
-		$this->conversationManager->saveMessage('mixed-models', 'first-model', 'user', 'Hello');
-		$this->conversationManager->saveMessage('mixed-models', 'second-model', 'assistant', 'Hi');
+		$this->conversationManager->saveTurn('mixed-models', 'first-model', 'Hello', 'Hi', 'docs');
+		$this->conversationManager->saveTurn('mixed-models', 'second-model', 'Thanks', 'You are welcome.', 'docs');
 		$response = $this->client->sendRequest(
 			"SELECT role, `model_name` FROM system.chat_history_test_model WHERE conversation_uuid = 'mixed-models' "
 			. 'ORDER BY created_at ASC, id ASC'
@@ -280,8 +276,10 @@ class ConversationManagerIntegrationTest extends TestCase {
 		/** @var array<int, array{data: list<array{role:string, model_name:string}>}> $result */
 		$result = $response->getResult();
 		$rows = $result[0]['data'];
-		$this->assertSame('first-model', $rows[0]['model_name']);
-		$this->assertSame('second-model', $rows[1]['model_name']);
+		$this->assertSame(['user', 'assistant', 'user', 'assistant'], array_column($rows, 'role'));
+		$this->assertSame(
+			['first-model', 'first-model', 'second-model', 'second-model'], array_column($rows, 'model_name')
+		);
 	}
 
 	/**
@@ -293,7 +291,9 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 */
 	public function testTableCreationWithRealDatabase(): void {
 		// Verify table exists by trying to insert into it
-		$this->saveUser('test-conversation-6', 'Test message for table creation');
+		$this->conversationManager->saveTurn(
+			'test-conversation-6', 'test_model', 'Test message for table creation', 'Stored.', 'docs'
+		);
 
 		// Verify we can retrieve the message
 		$history = $this->getConversationHistory('test-conversation-6');
@@ -316,25 +316,4 @@ class ConversationManagerIntegrationTest extends TestCase {
 		return $this->conversationManager->getConversationMessages($conversationUuid)->format();
 	}
 
-	/** @throws ManticoreSearchClientError */
-	private function saveUser(string $conversationUuid, string $message): void {
-		$this->conversationManager->saveMessage(
-			$conversationUuid,
-			'test_model',
-			'user',
-			$message
-		);
-	}
-
-	/**
-	 * @throws ManticoreSearchClientError
-	 */
-	private function saveAssistant(string $conversationUuid, string $message): void {
-		$this->conversationManager->saveMessage(
-			$conversationUuid,
-			'test_model',
-			'assistant',
-			$message
-		);
-	}
 }

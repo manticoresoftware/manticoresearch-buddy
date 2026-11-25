@@ -16,6 +16,7 @@ use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Handler as ChatHandle
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\LlmProvider;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ModelManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Payload as ChatPayload;
+use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ResponsePromptBuilder;
 use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
@@ -867,12 +868,9 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testBuildPromptUsesHistoryContextOnlyPrompt(): void {
-		$reflection = new ReflectionClass(ChatHandler::class);
-		$method = $reflection->getMethod('buildPrompt');
-		$history = [['role' => 'user', 'content' => 'Earlier question']];
+		$history = ['turn' => ['user' => 'Earlier question']];
 
-		$prompt = $method->invoke(
-			null,
+		$prompt = (new ResponsePromptBuilder(4096))->build(
 			'What is vector search?',
 			'[{"id":1,"content":"Vector search compares embeddings."}]',
 			$history
@@ -899,10 +897,9 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testFollowUpPromptUsesCurrentRetrievedContextAndHistory(): void {
-		$method = new ReflectionMethod(ChatHandler::class, 'buildPrompt');
-		$prompt = $method->invoke(
-			null, 'Which show was a crime drama?', '[{"id":7,"content":"Breaking Bad"}]',
-			[['user' => 'I like Game of Thrones', 'assistant' => 'That is a fantasy series.']],
+		$prompt = (new ResponsePromptBuilder(4096))->build(
+			'Which show was a crime drama?', '[{"id":7,"content":"Breaking Bad"}]',
+			['turn' => ['user' => 'I like Game of Thrones', 'assistant' => 'That is a fantasy series.']],
 			''
 		);
 		$this->assertIsString($prompt);
@@ -912,11 +909,7 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testBuildPromptUsesCustomPromptWhenConfigured(): void {
-		$reflection = new ReflectionClass(ChatHandler::class);
-		$method = $reflection->getMethod('buildPrompt');
-
-		$prompt = $method->invoke(
-			null,
+		$prompt = (new ResponsePromptBuilder(4096))->build(
 			'What is vector search?',
 			'[{"id":1,"content":"Vector search compares embeddings."}]',
 			[],

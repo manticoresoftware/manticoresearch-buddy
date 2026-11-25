@@ -490,21 +490,13 @@ final class Handler extends BaseHandlerWithClient {
 		$provider->configure($model);
 
 		$customPrompt = $model['settings']['custom_prompt'] ?? null;
-		if ($smallTalk) {
-			$prompt = (is_string($customPrompt) && trim($customPrompt) !== '' ? trim($customPrompt) . "\n" : '')
-				. 'Respond briefly and naturally in the same language to the conversational message '
-				. 'unrelated to indexed data. '
-				. 'Do not answer factual questions, recommend documents, or invent search results. '
-				. "<history>\n" . json_encode($history->payload(), JSON_THROW_ON_ERROR) . "\n</history>\n"
-				. "<message>$query</message>";
-		} else {
-			$prompt = self::buildPrompt(
-				$query,
-				$context,
-				$history->payload(),
-				is_string($customPrompt) ? $customPrompt : ''
-			);
-		}
+		$prompt = (new ResponsePromptBuilder(self::RESPONSE_MAX_TOKENS))->build(
+			$query,
+			$context,
+			$history->payload(),
+			is_string($customPrompt) ? $customPrompt : '',
+			$smallTalk
+		);
 		$settings = self::getLlmRequestOptions();
 		if ($smallTalk) {
 			$settings['max_tokens'] = 128;
@@ -524,38 +516,6 @@ final class Handler extends BaseHandlerWithClient {
 			'frequency_penalty' => self::RESPONSE_FREQUENCY_PENALTY,
 			'presence_penalty' => self::RESPONSE_PRESENCE_PENALTY,
 		];
-	}
-
-	/**
-	 * @param array<string, array{user?: string, assistant?: string}> $history
-	 *
-	 * @throws JsonException
-	 */
-	private static function buildPrompt(
-		string $query,
-		string $context,
-		array $history,
-		string $customPrompt = ''
-	): string {
-		$historyJson = (string)json_encode($history, JSON_THROW_ON_ERROR);
-		$prompt = trim($customPrompt) !== ''
-			? trim($customPrompt)
-			: 'Respond conversationally. Response should be based ONLY on the provided history and context sections' .
-				"(IMPORTANT !!! You can't use your own knowledge to add anything that isn't mentioned there). " .
-				'Do not exceed the response token limit (' .
-				self::RESPONSE_MAX_TOKENS .
-				'), and end the answer cleanly before reaching it.';
-
-		return $prompt . ' ' .
-			'<main>' .
-			"<history>\n" .
-			"```json\n" .
-			$historyJson .
-			"\n```\n" .
-			"</history>\n" .
-			"<context>$context</context>\n" .
-			"<query>$query</query>\n" .
-			'</main>';
 	}
 
 }

@@ -319,7 +319,11 @@ class SearchEngine {
 
 		// MATCH parses its own operators after SQL unquotes the string. Escape both layers.
 		// The apostrophe is already escaped by escapeString() for the SQL layer.
-		$operators = [
+		$replacements = [
+			// Wildcards cannot be escaped reliably in MATCH; remove them.
+			'*' => '',
+			'?' => '',
+			'%' => '',
 			'\\' => '\\\\',
 			'!' => '\\!',
 			'"' => '\\"',
@@ -336,13 +340,11 @@ class SearchEngine {
 		];
 		$matchTerms = [];
 		foreach ($lexicalTerms as $term) {
-			// Wildcards cannot be escaped reliably in MATCH; keep only the literal term.
-			$term = trim(str_replace(['*', '?', '%'], '', $term));
+			$term = trim(strtr($term, $replacements));
 			if ($term === '') {
 				throw ManticoreSearchClientError::create('Hybrid search requires non-empty lexical terms');
 			}
-			$escapedTerm = strtr($term, $operators);
-			$matchTerms[] = str_contains($term, ' ') ? '"' . $escapedTerm . '"' : $escapedTerm;
+			$matchTerms[] = str_contains($term, ' ') ? '"' . $term . '"' : $term;
 		}
 		$anchor = array_shift($matchTerms);
 		$fullTextQuery = $anchor;

@@ -63,24 +63,6 @@ class ConversationManager {
 	}
 
 	/**
-	 * @param string $conversationUuid
-	 * @param string $modelName
-	 * @param string $role
-	 * @param string $message
-	 *
-	 * @return void
-	 * @throws ManticoreSearchClientError
-	 */
-	public function saveMessage(
-		string $conversationUuid,
-		string $modelName,
-		string $role,
-		string $message
-	): void {
-		$this->insertMessages($conversationUuid, $modelName, [['role' => $role, 'message' => $message]]);
-	}
-
-	/**
 	 * @param string $indexName Target search index, not the history table
 	 * @param list<string>|null $excludedIds
 	 * @throws JsonException|ManticoreSearchClientError
@@ -103,14 +85,6 @@ class ConversationManager {
 				'message' => json_encode($excludedIds, JSON_THROW_ON_ERROR),
 			];
 		}
-		$this->insertMessages($conversationUuid, $modelName, $messages);
-	}
-
-	/**
-	 * @param list<array{role:string, message:string}> $messages
-	 * @throws ManticoreSearchClientError
-	 */
-	private function insertMessages(string $conversationUuid, string $modelName, array $messages): void {
 		$currentTime = (int)(microtime(true) * self::TIMESTAMP_PRECISION);
 		$ttlTime = time() + self::CONVERSATION_TTL_SECONDS;
 		$values = [];
@@ -155,7 +129,6 @@ class ConversationManager {
 		int $limit = 100,
 		string $indexName = ''
 	): ConversationHistory {
-		$excludedRole = $indexName === '' ? null : 'excluded_ids:' . $indexName;
 		/** @lang Manticore */
 		$sql = sprintf(
 		/** @lang manticore */
@@ -180,7 +153,7 @@ class ConversationManager {
 		$messages = [];
 		$excludedIdsJson = null;
 		foreach ($data[0]['data'] as $row) {
-			if ($excludedRole !== null && $row['role'] === $excludedRole) {
+			if ($indexName !== '' && $row['role'] === 'excluded_ids:' . $indexName) {
 				if ($excludedIdsJson === null) {
 					$excludedIdsJson = (string)$row['message'];
 				}
