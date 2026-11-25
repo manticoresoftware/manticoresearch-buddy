@@ -127,8 +127,7 @@ class ConversationalSearchSqlTest extends TestCase {
 		$result = static::runSqlQuery("DESCRIBE {$historyTable}");
 		$this->assertNotEmpty($result);
 		$expectedColumns = [
-			'conversation_uuid', 'model_name', 'created_at', 'role', 'message',
-			'tokens_used', 'intent', 'search_query', 'exclude_query', 'excluded_ids', 'ttl',
+			'conversation_uuid', 'created_at', 'role', 'message', 'ttl',
 		];
 		foreach ($expectedColumns as $column) {
 			$this->assertStringContainsString($column, implode(' ', $result));
@@ -136,10 +135,8 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Test direct INSERT into conversations table
 		$result = static::runSqlQuery(
-			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
-				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
-				. "('test-conv-1', 'test-model-1', " . time() . ", 'user', 'Test message', 50, "
-				. "'NEW', '', '[]', " . (time() + 86400) . ')'
+			"INSERT INTO {$historyTable} (conversation_uuid, created_at, role, message, ttl) VALUES "
+				. "('test-conv-1', " . time() . ", 'user', 'Test message', " . (time() + 86400) . ')'
 		);
 		$this->assertEmpty($result); // INSERT via SQL returns empty result
 
@@ -231,26 +228,23 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Insert multiple messages
 		$result = static::runSqlQuery(
-			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
-				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
-				. "('$conversationId', '{$modelName}', $currentTime, 'user', 'First question', "
-				. "30, 'NEW', '', '[]', " . ($currentTime + 86400) . ')'
+			"INSERT INTO {$historyTable} (conversation_uuid, created_at, role, message, ttl) VALUES "
+				. "('$conversationId', $currentTime, 'user', 'First question', "
+				. ($currentTime + 86400) . ')'
 		);
 		$this->assertEmpty($result); // INSERT via SQL returns empty result
 
 		$result = static::runSqlQuery(
-			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
-				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
-				. "('$conversationId', '{$modelName}', " . ($currentTime + 60) . ", 'assistant', "
-				. "'First answer', 50, 'ANSWER', '', '[]', " . ($currentTime + 86400) . ')'
+			"INSERT INTO {$historyTable} (conversation_uuid, created_at, role, message, ttl) VALUES "
+				. "('$conversationId', " . ($currentTime + 60) . ", 'assistant', "
+				. "'First answer', " . ($currentTime + 86400) . ')'
 		);
 		$this->assertEmpty($result); // INSERT via SQL returns empty result
 
 		$result = static::runSqlQuery(
-			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
-				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
-				. "('$conversationId', '{$modelName}', " . ($currentTime + 120) . ", 'user', "
-				. "'Second question', 25, 'FOLLOW_UP', '', '[]', " . ($currentTime + 86400) . ')'
+			"INSERT INTO {$historyTable} (conversation_uuid, created_at, role, message, ttl) VALUES "
+				. "('$conversationId', " . ($currentTime + 120) . ", 'user', "
+				. "'Second question', " . ($currentTime + 86400) . ')'
 		);
 		$this->assertEmpty($result); // INSERT via SQL returns empty result
 
@@ -264,7 +258,7 @@ class ConversationalSearchSqlTest extends TestCase {
 		$this->assertStringContainsString('First answer', implode(' ', $historyResult));
 		$this->assertStringContainsString('Second question', implode(' ', $historyResult));
 
-		// Test query-generation history keeps FOLLOW_UP messages
+		// Test query-generation history keeps follow-up messages.
 		$queryHistoryResult = $this->runSqlQuery(
 			"SELECT role, message FROM {$historyTable} WHERE conversation_uuid = "
 			. "'$conversationId' ORDER BY created_at ASC"
@@ -274,13 +268,18 @@ class ConversationalSearchSqlTest extends TestCase {
 		$this->assertStringContainsString('First answer', implode(' ', $queryHistoryResult));
 		$this->assertStringContainsString('Second question', implode(' ', $queryHistoryResult));
 
-		// Test search context retrieval (only select attributes, not stored fields)
-		$contextResult = $this->runSqlQuery(
-			"SELECT exclude_query, excluded_ids FROM {$historyTable} WHERE "
-				. "conversation_uuid = '$conversationId' AND role = 'user' "
-				. "AND intent != 'FOLLOW_UP' ORDER BY created_at DESC LIMIT 1"
+		// Excluded IDs are stored as snapshots by table, not in user-message columns.
+		$exclusionResult = static::runSqlQuery(
+			"INSERT INTO {$historyTable} (conversation_uuid, created_at, role, message, ttl) VALUES "
+				. "('$conversationId', " . ($currentTime + 180) . ", 'excluded_ids:films', '[1,2]', "
+				. ($currentTime + 86400) . ')'
 		);
-		$this->assertNotEmpty($contextResult);
+		$this->assertEmpty($exclusionResult);
+		$storedExclusions = $this->runSqlQuery(
+			"SELECT message FROM {$historyTable} WHERE conversation_uuid = '$conversationId' "
+				. "AND role = 'excluded_ids:films' ORDER BY created_at DESC LIMIT 1"
+		);
+		$this->assertStringContainsString('[1,2]', implode(' ', $storedExclusions));
 	}
 
 	/**
@@ -300,18 +299,15 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		// Test INSERT with wrong column count
 		$this->assertQueryResultContainsError(
-			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
-				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) '
-				. "VALUES ('test', 'test', 0)", // Missing 6 values
+			"INSERT INTO {$historyTable} (conversation_uuid, created_at, role, message, ttl) "
+				. "VALUES ('test', 'test', 0)", // Missing 2 values
 			'P01: wrong number of values here near \')\''
 		);
 
 		// Test INSERT with wrong data types (Manticore might be more permissive than expected)
 		$result = static::runSqlQuery(
-			"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
-				. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
-				. "('test', 'test', 'not_a_number', 'user', 'test', 'not_a_number', 'test', "
-				. "'test', 'test', 'not_a_number')"
+			"INSERT INTO {$historyTable} (conversation_uuid, created_at, role, message, ttl) VALUES "
+				. "('test', 'not_a_number', 'user', 'test', 'not_a_number')"
 		);
 		// This might succeed or fail depending on Manticore's type conversion
 		// We just check that it doesn't crash the system
@@ -355,10 +351,9 @@ class ConversationalSearchSqlTest extends TestCase {
 
 		foreach ($conversations as [$convId, $user, $message]) {
 			$result = static::runSqlQuery(
-				"INSERT INTO {$historyTable} (conversation_uuid, `model_name`, created_at, role, message, "
-					. 'tokens_used, intent, exclude_query, excluded_ids, ttl) VALUES '
-					. "('$convId', '{$modelName}', $currentTime, '$user', '$message', 30, "
-					. "'NEW', '', '[]', " . ($currentTime + 86400) . ')'
+				"INSERT INTO {$historyTable} (conversation_uuid, created_at, role, message, ttl) VALUES "
+					. "('$convId', $currentTime, '$user', '$message', "
+					. ($currentTime + 86400) . ')'
 			);
 			$this->assertEmpty($result); // INSERT via SQL returns empty result
 		}

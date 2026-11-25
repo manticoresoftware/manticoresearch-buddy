@@ -13,15 +13,16 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
 
 final class ConversationRoute {
 
-	public const string ANSWER_FROM_HISTORY = 'ANSWER_FROM_HISTORY';
 	public const string SEARCH = 'SEARCH';
-	public const string REJECT = 'REJECT';
+	public const string CHAT = 'CHAT';
 
+	/** @param list<string> $lexicalTerms */
 	public function __construct(
 		public string $route,
 		public string $standaloneQuestion,
 		public string $excludeQuery,
-		public string $reason
+		public string $reason,
+		public array $lexicalTerms = []
 	) {
 	}
 }

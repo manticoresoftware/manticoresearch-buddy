@@ -26,7 +26,7 @@ final class Payload extends BasePayload {
 	public const string ACTION_DROP_MODEL = 'drop_model';
 	public const string ACTION_CONVERSATION = 'conversation';
 	private const array CONVERSATION_JSON_FIELDS = [
-		'query', 'table', 'model_name', 'conversation_uuid', 'vector_field', 'fields',
+		'query', 'table', 'model_name', 'conversation_uuid', 'vector_field', 'fields', 'search_strategy',
 	];
 
 	/** @var string */
@@ -212,6 +212,9 @@ final class Payload extends BasePayload {
 		if (!is_string($value)) {
 			throw QueryParseError::create("$field must be a string");
 		}
+		if ($field === 'search_strategy') {
+			$this->validateSearchStrategy($value);
+		}
 
 		if ($field === 'vector_field') {
 			$hasVectorField = true;
@@ -224,6 +227,12 @@ final class Payload extends BasePayload {
 		}
 
 		$this->params[$field] = $value;
+	}
+
+	private function validateSearchStrategy(string $strategy): void {
+		if (!in_array($strategy, [ConversationRequest::STRATEGY_KNN, ConversationRequest::STRATEGY_HYBRID], true)) {
+			throw QueryParseError::create('search_strategy must be knn or hybrid');
+		}
 	}
 
 	/**
@@ -473,7 +482,8 @@ final class Payload extends BasePayload {
 	private function parseConversationParams(string $params): array {
 		$parts = $this->parseCommaSeparatedParams($params);
 		$partCount = sizeof($parts);
-		$error = 'CHAT expects query, table, model, optional conversation_uuid, optional fields';
+		$error = 'CHAT expects query, table, model, optional conversation_uuid, optional fields, '
+			. 'optional search_strategy';
 
 		if ($partCount < 3) {
 			throw QueryParseError::create($error);
@@ -494,6 +504,12 @@ final class Payload extends BasePayload {
 			case 5:
 				$parsed['conversation_uuid'] = $this->unquoteString($parts[3]);
 				$parsed['fields'] = $this->unquoteString($parts[4]);
+				return $parsed;
+			case 6:
+				$parsed['conversation_uuid'] = $this->unquoteString($parts[3]);
+				$parsed['fields'] = $this->unquoteString($parts[4]);
+				$parsed['search_strategy'] = $this->unquoteString($parts[5]);
+				$this->validateSearchStrategy($parsed['search_strategy']);
 				return $parsed;
 			default:
 				throw QueryParseError::create($error);

@@ -10,6 +10,7 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
 
+use JsonException;
 use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
@@ -43,7 +44,7 @@ class ConversationManager {
 	 * @throws ManticoreSearchClientError
 	 */
 	private function initializeTable(): void {
-		// Create enhanced conversations table with search context columns
+		// Keep existing history tables intact; new tables store messages and their model names.
 		$sql
 			= /** @lang Manticore */
 			'CREATE TABLE IF NOT EXISTS ' . $this->tableName . ' (
@@ -52,11 +53,6 @@ class ConversationManager {
 			created_at bigint,
 			role string,
 			message text,
-			tokens_used int,
-			intent string,
-			search_query text,
-			exclude_query text,
-			excluded_ids text,
 			ttl bigint
 		)';
 
@@ -69,8 +65,8 @@ class ConversationManager {
 	/**
 	 * @param string $conversationUuid
 	 * @param string $modelName
-	 * @param ConversationMessage $message
-	 * @param int $tokensUsed
+	 * @param string $role
+	 * @param string $message
 	 *
 	 * @return void
 	 * @throws ManticoreSearchClientError
@@ -78,29 +74,63 @@ class ConversationManager {
 	public function saveMessage(
 		string $conversationUuid,
 		string $modelName,
-		ConversationMessage $message,
-		int $tokensUsed = 0
+		string $role,
+		string $message
 	): void {
+		$this->insertMessages($conversationUuid, $modelName, [['role' => $role, 'message' => $message]]);
+	}
+
+	/**
+	 * @param string $indexName Target search index, not the history table
+	 * @param list<string>|null $excludedIds
+	 * @throws JsonException|ManticoreSearchClientError
+	 */
+	public function saveTurn(
+		string $conversationUuid,
+		string $modelName,
+		string $userMessage,
+		string $assistantMessage,
+		string $indexName,
+		?array $excludedIds = null
+	): void {
+		$messages = [
+			['role' => 'user', 'message' => $userMessage],
+			['role' => 'assistant', 'message' => $assistantMessage],
+		];
+		if ($excludedIds !== null) {
+			$messages[] = [
+				'role' => 'excluded_ids:' . $indexName,
+				'message' => json_encode($excludedIds, JSON_THROW_ON_ERROR),
+			];
+		}
+		$this->insertMessages($conversationUuid, $modelName, $messages);
+	}
+
+	/**
+	 * @param list<array{role:string, message:string}> $messages
+	 * @throws ManticoreSearchClientError
+	 */
+	private function insertMessages(string $conversationUuid, string $modelName, array $messages): void {
 		$currentTime = (int)(microtime(true) * self::TIMESTAMP_PRECISION);
 		$ttlTime = time() + self::CONVERSATION_TTL_SECONDS;
-
+		$values = [];
+		foreach ($messages as $message) {
+			$values[] = sprintf(
+				'(%s, %s, %d, %s, %s, %d)',
+				$this->quote($conversationUuid),
+				$this->quote($modelName),
+				$currentTime,
+				$this->quote($message['role']),
+				$this->quote($message['message']),
+				$ttlTime
+			);
+		}
 		$sql = sprintf(
 		/** @lang manticore */
-			'INSERT INTO %s (conversation_uuid, `model_name`, created_at, role, message, tokens_used, '
-			. 'intent, search_query, exclude_query, excluded_ids, ttl) '
-			. 'VALUES (%s, %s, %d, %s, %s, %d, %s, %s, %s, %s, %d)',
+			'INSERT INTO %s (conversation_uuid, `model_name`, created_at, role, message, ttl) '
+			. 'VALUES %s',
 			$this->tableName,
-			$this->quote($conversationUuid),
-			$this->quote($modelName),
-			$currentTime,
-			$this->quote($message->role),
-			$this->quote($message->message),
-			$tokensUsed,
-			"'$message->intent'",
-			$message->searchQuery === '' ? "''" : $this->quote($message->searchQuery),
-			$message->excludeQuery === '' ? "''" : $this->quote($message->excludeQuery),
-			$this->quote($message->excludedIds),
-			$ttlTime
+			implode(', ', $values)
 		);
 
 		$result = $this->client->sendRequest($sql);
@@ -114,18 +144,24 @@ class ConversationManager {
 	/**
 	 * @param string $conversationUuid
 	 * @param int $limit
+	 * @param string $indexName Target search index, not the history table
 	 *
 	 * @return ConversationHistory
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function getConversationMessages(string $conversationUuid, int $limit = 100): ConversationHistory {
+	public function getConversationMessages(
+		string $conversationUuid,
+		int $limit = 100,
+		string $indexName = ''
+	): ConversationHistory {
+		$excludedRole = $indexName === '' ? null : 'excluded_ids:' . $indexName;
 		/** @lang Manticore */
 		$sql = sprintf(
 		/** @lang manticore */
-			'SELECT role, message, intent, search_query, exclude_query, excluded_ids FROM %s '
+			'SELECT role, message FROM %s '
 			. 'WHERE conversation_uuid = %s '
-			. 'ORDER BY created_at ASC, id ASC '
+			. 'ORDER BY created_at DESC, id DESC '
 			. 'LIMIT %d',
 			$this->tableName,
 			$this->quote($conversationUuid),
@@ -138,22 +174,25 @@ class ConversationManager {
 		}
 
 		$data = $result->getResult();
+		if (!is_array($data[0])) {
+			return new ConversationHistory([]);
+		}
 		$messages = [];
-		if (is_array($data[0])) {
-			$rows = $data[0]['data'];
-			foreach ($rows as $row) {
-				$messages[] = ConversationMessage::fromStored(
-					(string)$row['role'],
-					(string)$row['message'],
-					(string)$row['intent'],
-					(string)$row['search_query'],
-					(string)$row['exclude_query'],
-					(string)$row['excluded_ids']
-				);
+		$excludedIdsJson = null;
+		foreach ($data[0]['data'] as $row) {
+			if ($excludedRole !== null && $row['role'] === $excludedRole) {
+				if ($excludedIdsJson === null) {
+					$excludedIdsJson = (string)$row['message'];
+				}
+				continue;
 			}
+			if ($row['role'] !== 'user' && $row['role'] !== 'assistant') {
+				continue;
+			}
+			$messages[] = ['role' => (string)$row['role'], 'message' => (string)$row['message']];
 		}
 
-		return new ConversationHistory($messages);
+		return new ConversationHistory(array_reverse($messages), $excludedIdsJson);
 	}
 
 }

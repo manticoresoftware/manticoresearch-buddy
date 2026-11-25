@@ -197,6 +197,8 @@ class SearchEngine {
 	 * @param array{model: string, settings:array<string, mixed>} $modelConfig
 	 * @param float $threshold
 	 * @param VectorFieldInfo|null $vectorFieldInfo
+	 * @param string $strategy
+	 * @param list<string> $lexicalTerms
 	 *
 	 * @return array<int, array<string, mixed>>
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
@@ -207,19 +209,23 @@ class SearchEngine {
 		array $excludedIds,
 		array $modelConfig,
 		float $threshold,
-		?VectorFieldInfo $vectorFieldInfo = null
+		?VectorFieldInfo $vectorFieldInfo = null,
+		string $strategy = ConversationRequest::STRATEGY_KNN,
+		array $lexicalTerms = []
 	): array {
 		if ($vectorFieldInfo === null) {
 			$vectorFieldInfo = $this->inspectVectorFieldInfo($table);
 		}
 
-		return $this->runVectorSearch(
+		return $this->executeSearch(
 			$table,
 			$searchQuery,
 			$excludedIds,
 			$modelConfig,
 			$threshold,
-			$vectorFieldInfo
+			$vectorFieldInfo,
+			$strategy,
+			$lexicalTerms
 		);
 	}
 
@@ -230,18 +236,22 @@ class SearchEngine {
 	 * @param array{model: string, settings:array<string, mixed>} $modelConfig
 	 * @param float $threshold
 	 * @param VectorFieldInfo $vectorFieldInfo
+	 * @param string $strategy
+	 * @param list<string> $lexicalTerms
 	 *
 	 * @return array<int, array<string, mixed>>
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
-	private function runVectorSearch(
+	private function executeSearch(
 		string $table,
 		string $searchQuery,
 		array $excludedIds,
 		array $modelConfig,
 		float $threshold,
-		VectorFieldInfo $vectorFieldInfo
+		VectorFieldInfo $vectorFieldInfo,
+		string $strategy,
+		array $lexicalTerms
 	): array {
 		$retrievalLimit = $this->getRetrievalLimit($modelConfig);
 
@@ -252,17 +262,17 @@ class SearchEngine {
 			$excludeClause = 'id NOT IN (' . implode(',', $safeExcludeIds) . ')';
 			$knnK += sizeof($excludedIds) + 5;
 		}
-		$sql = $this->buildVectorSearchSql(
-			$table,
-			$vectorFieldInfo->name,
-			$searchQuery,
-			$knnK,
-			$threshold,
-			$retrievalLimit,
-			$excludeClause
-		);
+		$sql = match ($strategy) {
+			ConversationRequest::STRATEGY_HYBRID => $this->buildHybridSearchSql(
+				$table, $vectorFieldInfo->name, $searchQuery, $lexicalTerms, $knnK, $retrievalLimit, $excludeClause
+			),
+			ConversationRequest::STRATEGY_KNN => $this->buildVectorSearchSql(
+				$table, $vectorFieldInfo->name, $searchQuery, $knnK, $threshold, $retrievalLimit, $excludeClause
+			),
+			default => throw ManticoreSearchClientError::create("Unsupported search strategy: $strategy"),
+		};
 
-		Buddy::debugv("\nChat: [DEBUG KNN SEARCH]");
+		Buddy::debugv("\nChat: [DEBUG " . strtoupper($strategy) . ' SEARCH]');
 		Buddy::debugv("Chat: ├─ Search query: '$searchQuery'");
 		Buddy::debugv('Chat: ├─ Excluded IDs: [' . implode(', ', $excludedIds) . ']');
 		Buddy::debugv("Chat: ├─ retrieval_limit: $retrievalLimit");
@@ -354,4 +364,71 @@ class SearchEngine {
 		return "knn($vectorField, $knnK, '$searchEscaped')";
 	}
 
+	/** @param list<string> $lexicalTerms */
+	private function buildHybridSearchSql(
+		string $table,
+		string $vectorField,
+		string $searchQuery,
+		array $lexicalTerms,
+		int $knnK,
+		int $limit,
+		string $excludeClause
+	): string {
+		$searchQuery = trim($searchQuery);
+		if ($searchQuery === '') {
+			throw ManticoreSearchClientError::create('Search query must contain at least one term');
+		}
+		if ($lexicalTerms === []) {
+			throw ManticoreSearchClientError::create('Hybrid search requires lexical terms');
+		}
+
+		// MATCH parses its own operators after SQL unquotes the string. Escape both layers.
+		// The apostrophe is already escaped by escapeString() for the SQL layer.
+		$operators = [
+			'\\' => '\\\\',
+			'!' => '\\!',
+			'"' => '\\"',
+			'$' => '\\$',
+			'(' => '\\(',
+			')' => '\\)',
+			'-' => '\\-',
+			'/' => '\\/',
+			'<' => '\\<',
+			'@' => '\\@',
+			'^' => '\\^',
+			'|' => '\\|',
+			'~' => '\\~',
+		];
+		$matchTerms = [];
+		foreach ($lexicalTerms as $term) {
+			$term = trim($term);
+			if ($term === '') {
+				throw ManticoreSearchClientError::create('Hybrid search requires non-empty lexical terms');
+			}
+			$escapedTerm = strtr($term, $operators);
+			$matchTerms[] = str_contains($term, ' ') ? '"' . $escapedTerm . '"' : $escapedTerm;
+		}
+		$anchor = array_shift($matchTerms);
+		$fullTextQuery = $anchor;
+		if ($matchTerms !== []) {
+			$refinements = sizeof($matchTerms) > 1
+				? '(' . implode(' | ', $matchTerms) . ')' : $matchTerms[0];
+			$fullTextQuery .= ' MAYBE ' . $refinements;
+		}
+		$whereClauses = [
+			"MATCH('" . $this->escapeString($fullTextQuery) . "')",
+			$this->buildKnnWhereSql($vectorField, $knnK, $searchQuery),
+		];
+		if ($excludeClause !== '') {
+			$whereClauses[] = $excludeClause;
+		}
+
+		return sprintf(
+		/** @lang manticore */
+			"SELECT *, hybrid_score() AS hybrid_score FROM %s WHERE %s LIMIT %d OPTION fusion_method='rrf'",
+			$table,
+			implode(' AND ', $whereClauses),
+			$limit
+		);
+	}
 }

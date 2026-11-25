@@ -10,19 +10,14 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationHistory;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationManager;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationMessage;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationRequest;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationRoute;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Handler as ChatHandler;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\LlmProvider;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ModelManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Payload as ChatPayload;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\SearchContext;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\SearchEngine;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\SearchServices;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\VectorFieldInfo;
 use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
+use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\QueryParseError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
@@ -77,6 +72,21 @@ class ConversationHandlerTest extends TestCase {
 
 		$handler = new ChatHandler($payload);
 		$this->assertInstanceOf(ChatHandler::class, $handler);
+	}
+
+	public function testTableIdentifierRejectsTrailingNewlineBeforeLookup(): void {
+		$client = $this->createMock(HTTPClient::class);
+		$client->expects($this->never())->method('hasTable');
+		$this->expectException(ManticoreSearchClientError::class);
+		(new ReflectionMethod(ChatHandler::class, 'validateTable'))->invoke(null, $client, "movies\n");
+	}
+
+	public function testConversationResultFailsOnInvalidSourceEncoding(): void {
+		$request = new ConversationRequest('Find a document', 'docs', 'test_model', 'conv-uuid');
+		$this->expectException(JsonException::class);
+		(new ReflectionMethod(ChatHandler::class, 'conversationResult'))->invoke(
+			null, $request, 'Here it is', 'Find a document', [['title' => "\xB1"]]
+		);
 	}
 
 	public function testCreateModelSuccess(): void {
@@ -689,7 +699,7 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	public function testHandleConversationNewQuestionGeneratesNewContext(): void {
-		$query = "CALL CHAT('Show me action movies', 'movies', 'test_model', 'conv-uuid')";
+		$query = "CALL CHAT('Show me action movies, but not horror', 'movies', 'test_model', 'conv-uuid')";
 
 		$payload = ChatPayload::fromRequest(
 			Request::fromArray(
@@ -715,7 +725,7 @@ class ConversationHandlerTest extends TestCase {
 				], // generateResponse
 				],
 				[
-					$this->createToolRouteResponse(ConversationRoute::SEARCH, 'Show me action movies', ''),
+					$this->createToolQueryResponse('Show me action movies', 'horror'),
 				],
 				[
 					static fn(string $prompt): bool => str_contains(
@@ -751,7 +761,6 @@ class ConversationHandlerTest extends TestCase {
 			'data' => [],
 			]]
 		);
-
 		$schemaResponse = $this->createResponse(
 			[[
 			'data' => [
@@ -766,7 +775,8 @@ class ConversationHandlerTest extends TestCase {
 
 
 
-		// 8: performSearchWithExcludedIds (main KNN search)
+		$excludeResults = $this->createResponse([['data' => [['id' => 42, 'knn_dist' => 0.1]]]]);
+		// Main KNN search after excluding the new negative preference.
 		$searchResponse = $this->createResponse(
 			[[
 			'data' => [
@@ -775,10 +785,8 @@ class ConversationHandlerTest extends TestCase {
 			]]
 		);
 
-		// 9: saveMessage (user with context)
-		$saveUserContextResponse = $this->createResponse();
-
-		$saveAssistantResponse = $this->createResponse();
+		// Save the turn and updated exclusions together.
+		$saveTurnResponse = $this->createResponse();
 
 			$callCounter = 0;
 			$responses = [
@@ -787,9 +795,9 @@ class ConversationHandlerTest extends TestCase {
 					$historyInitResponse, // initialize model history table
 					$historyResponse, // getConversationMessages
 					$schemaResponse, // inspectVectorFieldInfo for main search
+				$excludeResults, // getExcludedIds
 				$searchResponse, // performSearchWithExcludedIds
-				$saveUserContextResponse, // saveMessage user with context
-				$saveAssistantResponse, // saveMessage assistant
+				$saveTurnResponse, // saveTurn
 			];
 
 			$mockClient->method('hasTable')
@@ -804,7 +812,14 @@ class ConversationHandlerTest extends TestCase {
 			$mockClient->method('sendRequest')
 			->willReturnCallback(
 				function ($sql) use (&$callCounter, $responses) {
-					unset($sql);
+					if (str_contains($sql, 'SELECT *, knn_dist()')) {
+						$this->assertStringContainsString('id NOT IN (42)', $sql);
+					}
+					if (str_starts_with($sql, 'INSERT INTO') && str_contains($sql, "'excluded_ids:movies'")) {
+						$this->assertStringContainsString("'user', 'Show me action movies, but not horror'", $sql);
+						$this->assertStringContainsString("'assistant', 'Here are some action movies", $sql);
+						$this->assertStringContainsString('[\\"42\\"]', $sql);
+					}
 					$callCounter++;
 					if ($callCounter > sizeof($responses)) {
 						throw new Exception("Unexpected database call #$callCounter");
@@ -843,7 +858,7 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey('response_with_refs', $struct[0]['data'][0]);
 		$this->assertArrayHasKey('sources', $struct[0]['data'][0]);
 		$this->assertEquals('conv-uuid', $struct[0]['data'][0]['conversation_uuid']);
-		$this->assertEquals('Show me action movies', $struct[0]['data'][0]['user_query']);
+		$this->assertEquals('Show me action movies, but not horror', $struct[0]['data'][0]['user_query']);
 		$this->assertSame(
 			'Here are some action movies [ref:1]! More details [ref:1].',
 			$struct[0]['data'][0]['response']
@@ -881,6 +896,19 @@ class ConversationHandlerTest extends TestCase {
 		$this->assertStringNotContainsString('Citation rule:', $prompt);
 		$this->assertStringNotContainsString('append the reference context ID (context[].id) once', $prompt);
 		$this->assertStringNotContainsString('[ref:<id>]', $prompt);
+	}
+
+	public function testFollowUpPromptUsesCurrentRetrievedContextAndHistory(): void {
+		$method = new ReflectionMethod(ChatHandler::class, 'buildPrompt');
+		$prompt = $method->invoke(
+			null, 'Which show was a crime drama?', '[{"id":7,"content":"Breaking Bad"}]',
+			[['user' => 'I like Game of Thrones', 'assistant' => 'That is a fantasy series.']],
+			''
+		);
+		$this->assertIsString($prompt);
+		$this->assertStringContainsString('I like Game of Thrones', $prompt);
+		$this->assertStringContainsString("You can't use your own knowledge", $prompt);
+		$this->assertStringContainsString('<context>[{"id":7,"content":"Breaking Bad"}]</context>', $prompt);
 	}
 
 	public function testBuildPromptUsesCustomPromptWhenConfigured(): void {
@@ -993,8 +1021,7 @@ class ConversationHandlerTest extends TestCase {
 					],
 				],
 				[
-					$this->createToolRouteResponse(
-						ConversationRoute::SEARCH,
+					$this->createToolQueryResponse(
 						'What comedy movies are relevant to the current conversation?',
 						''
 					),
@@ -1025,8 +1052,7 @@ class ConversationHandlerTest extends TestCase {
 		$searchResponse = $this->createResponse(
 			[[ 'data' => [['id' => 7, 'content' => 'Funny movie', 'knn_dist' => 0.1]] ]]
 		);
-		$saveUserResponse = $this->createResponse();
-		$saveAssistantResponse = $this->createResponse();
+		$saveTurnResponse = $this->createResponse();
 
 		$queries = [];
 		$responses = [
@@ -1036,8 +1062,7 @@ class ConversationHandlerTest extends TestCase {
 				$historyResponse,
 				$schemaResponse,
 			$searchResponse,
-			$saveUserResponse,
-			$saveAssistantResponse,
+			$saveTurnResponse,
 		];
 		$callCounter = 0;
 
@@ -1061,81 +1086,118 @@ class ConversationHandlerTest extends TestCase {
 
 		$this->assertTrue($task->isSucceed());
 		$userInsert = $queries[5];
-		$this->assertStringContainsString("'" . ConversationRoute::SEARCH . "'", $userInsert);
-		$this->assertStringContainsString(
-			"'What comedy movies are relevant to the current conversation?'",
-			$userInsert
-		);
+		$this->assertStringContainsString("'What about comedies?'", $userInsert);
+		$this->assertStringNotContainsString('What comedy movies are relevant', $userInsert);
+		$this->assertStringNotContainsString('search_query', $userInsert);
 	}
 
-	public function testAnswerFromHistoryReusesLatestSearchSources(): void {
-		$history = new ConversationHistory(
-			[
-				ConversationMessage::userWithExcludedIds(
-					'Recommend TV shows',
-					ConversationRoute::SEARCH,
-					'What are some good TV shows to watch?',
-					'Breaking Bad',
-					['5696241144904548358']
-				),
-				ConversationMessage::assistant('Breaking Bad is a crime drama.', ConversationRoute::SEARCH),
-				ConversationMessage::user('Which one was the crime drama?', ConversationRoute::ANSWER_FROM_HISTORY),
-			]
-		);
-		$route = new ConversationRoute(ConversationRoute::ANSWER_FROM_HISTORY, '', '', 'History contains answer.');
-		$model = [
-			'id' => '1',
-						'name' => 'test_model',
-			'model' => 'openai:gpt-4',
-			'settings' => ['retrieval_limit' => 5],
-			'created_at' => '',
-			'updated_at' => '',
-		];
-		$vectorFieldInfo = new VectorFieldInfo('embedding', 'content', ['embedding']);
-		$context = new SearchContext(
-			new ConversationRequest('Which one was the crime drama?', 'docs', 'test_model', 'conv-uuid'),
-			$history,
-			$model,
-			$route,
-			$vectorFieldInfo
-		);
-
-		$searchEngine = $this->createMock(SearchEngine::class);
-		$searchEngine->expects($this->once())
-			->method('search')
-			->with(
-				'docs',
-				'What are some good TV shows to watch?',
-				['5696241144904548358'],
-				$model,
-				0.8,
-				$vectorFieldInfo
-			)
-			->willReturn([['id' => 1, 'content' => 'Breaking Bad is a crime drama.']]);
-
-		$reflection = new ReflectionClass(ChatHandler::class);
-		$method = $reflection->getMethod('performSearch');
-		$result = $method->invoke(
-			null,
-			$context,
-			new SearchServices(
-				$this->createMock(ConversationManager::class),
-				$this->createMock(LlmProvider::class),
-				$searchEngine
-			)
-		);
-
-		$this->assertEquals(
-			[
-				[['id' => 1, 'content' => 'Breaking Bad is a crime drama.']],
+	/** @dataProvider searchStrategies */
+	public function testFollowUpSearchesCurrentQuestionAndReturnsSources(string $strategy): void {
+		$strategyArgument = $strategy === ConversationRequest::STRATEGY_HYBRID ? ", '', 'hybrid'" : '';
+		$query = "CALL CHAT('Which show was a crime drama?', 'movies', 'test_model', 'conv-uuid'"
+			. "$strategyArgument)";
+		$payload = ChatPayload::fromRequest(
+			Request::fromArray(
 				[
-					'search_query' => 'What are some good TV shows to watch?',
-					'exclude_query' => 'Breaking Bad',
-				],
-				['5696241144904548358'],
-			],
-			$result
+					'version' => Buddy::PROTOCOL_VERSION,
+					'error' => '',
+					'payload' => $query,
+					'format' => RequestFormat::SQL,
+					'endpointBundle' => ManticoreEndpoint::Sql,
+					'path' => '',
+				]
+			)
 		);
+		$currentQuestion = 'Which TV show was a crime drama?';
+		$provider = $this->createMockLlmProvider(
+			[['content' => 'Breaking Bad.', 'metadata' => ['tokens_used' => 20], 'success' => true]],
+			[$this->createToolQueryResponse(
+				$currentQuestion, '',
+				$strategy === ConversationRequest::STRATEGY_HYBRID ? ['Breaking Bad', 'crime drama'] : null
+			)],
+			[static fn(string $prompt): bool => str_contains($prompt, 'Breaking Bad is a crime drama.')
+				&& str_contains($prompt, '<query>Which show was a crime drama?</query>')
+				&& str_contains($prompt, '<context>') && str_contains($prompt, 'Breaking Bad source')]
+		);
+		$handler = new ChatHandler($payload, $provider);
+		$client = $this->createMock(HTTPClient::class);
+		$client->method('hasTable')->willReturnCallback(
+			static fn(string $table): bool => in_array($table, ['movies', 'system.chat_model_test_model'], true)
+		);
+		$responses = [
+			$this->createResponse(
+				[['data' => [[
+					'name' => 'test_model',
+					'settings' => '{"retrieval_limit":5,"max_document_length":2000}',
+					'created_at' => '2023-01-01 00:00:00',
+				]]]]
+			),
+			$this->createResponse(),
+			$this->createResponse(
+				[['data' => [[
+					'role' => 'excluded_ids:movies', 'message' => '["42"]',
+				], [
+					'role' => 'assistant', 'message' => 'Breaking Bad is a crime drama.',
+					'intent' => 'SEARCH', 'search_query' => '',
+					'exclude_query' => '', 'excluded_ids' => '', 'lexical_terms' => '',
+				], [
+					'role' => 'user', 'message' => 'Recommend TV shows', 'intent' => 'SEARCH',
+					'search_query' => 'What are some good TV shows?', 'exclude_query' => '', 'excluded_ids' => '',
+					'lexical_terms' => '["TV shows","Breaking Bad"]',
+				]]]]
+			),
+			$this->createResponse(
+				[['data' => [[
+					'Table' => 'movies',
+					'Create Table' => "CREATE TABLE movies (\ncontent text,\nembedding FLOAT_VECTOR from='content'\n)",
+				]]]]
+			),
+			$this->createResponse(
+				[['data' => [[
+					'id' => 7, 'content' => 'Breaking Bad source', 'knn_dist' => 0.1,
+				]]]]
+			),
+			$this->createResponse(),
+		];
+		$queries = [];
+		$client->expects($this->exactly(sizeof($responses)))->method('sendRequest')
+			->willReturnCallback(
+				function (string $sql) use (&$queries, $responses): Response {
+					$queries[] = $sql;
+					return $responses[sizeof($queries) - 1];
+				}
+			);
+		$handler->setManticoreClient($client);
+		$task = $handler->run();
+		$this->assertTrue($task->isSucceed(), $task->isSucceed() ? '' : $task->getError()->getResponseError());
+		$result = $task->getResult();
+		$this->assertInstanceOf(TaskResult::class, $result);
+		/** @var array<int, array{data: array<int, array{search_query:string, sources:string}>}> $rows */
+		$rows = (array)$result->getStruct();
+		$this->assertSame($currentQuestion, $rows[0]['data'][0]['search_query']);
+		$this->assertStringContainsString('Breaking Bad source', $rows[0]['data'][0]['sources']);
+		$this->assertStringContainsString(
+			"'Which show was a crime drama?'", $queries[sizeof($queries) - 1]
+		);
+		$this->assertStringNotContainsString('search_query', $queries[sizeof($queries) - 1]);
+		$this->assertStringContainsString("knn(embedding, 11, '$currentQuestion')", implode(' ', $queries));
+		$this->assertStringContainsString('id NOT IN (42)', $queries[4]);
+		$this->assertStringContainsString('knn(', implode(' ', $queries));
+		if ($strategy !== ConversationRequest::STRATEGY_HYBRID) {
+			return;
+		}
+		$this->assertStringContainsString('MATCH(', implode(' ', $queries));
+		$this->assertStringContainsString('Breaking Bad', $queries[4]);
+		$this->assertStringContainsString('crime drama', $queries[4]);
+		$this->assertStringContainsString('MAYBE', $queries[4]);
+	}
+
+	/** @return array<string, array{string}> */
+	public static function searchStrategies(): array {
+		return [
+			'knn' => [ConversationRequest::STRATEGY_KNN],
+			'hybrid' => [ConversationRequest::STRATEGY_HYBRID],
+		];
 	}
 
 	public function testConversationRejectsInvalidTableIdentifierBeforeHasTable(): void {
@@ -1215,19 +1277,28 @@ class ConversationHandlerTest extends TestCase {
 	}
 
 	/**
+	 * @param list<string>|null $lexicalTerms
 	 * @return array{success:true, content:string, tool_calls:array<int, mixed>, metadata:array<string, int|string>}
 	 */
-	private function createToolRouteResponse(string $route, string $standaloneQuestion, string $excludeQuery): array {
+	private function createToolQueryResponse(
+		string $standaloneQuestion,
+		string $excludeQuery,
+		?array $lexicalTerms = null
+	): array {
+		$arguments = [
+			'route' => ConversationRoute::SEARCH,
+			'standalone_question' => $standaloneQuestion,
+			'exclude_query' => $excludeQuery,
+			'reason' => 'Search indexed data',
+		];
+		if ($lexicalTerms !== null) {
+			$arguments['lexical_terms'] = $lexicalTerms;
+		}
 		$toolCall = $this->createMock(ToolCall::class);
 		$toolCall->method('getArguments')
 			->willReturn(
 				json_encode(
-					[
-						'route' => $route,
-						'standalone_question' => $standaloneQuestion,
-						'exclude_query' => $excludeQuery,
-						'reason' => 'test',
-					],
+					$arguments,
 					JSON_THROW_ON_ERROR
 				)
 			);

@@ -26,13 +26,15 @@ final class SearchContext {
 	 * } $model
 	 * @param ConversationRoute $route
 	 * @param VectorFieldInfo $vectorFieldInfo
+	 * @param list<string> $excludedIds
 	 */
 	public function __construct(
 		public ConversationRequest $request,
 		public ConversationHistory $history,
 		public array $model,
 		public ConversationRoute $route,
-		public VectorFieldInfo $vectorFieldInfo
+		public VectorFieldInfo $vectorFieldInfo,
+		public array $excludedIds
 	) {
 	}
 }
