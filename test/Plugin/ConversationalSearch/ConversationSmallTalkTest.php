@@ -47,7 +47,7 @@ final class ConversationSmallTalkTest extends TestCase {
 					&& str_contains($prompt, 'unrelated to indexed data')
 					&& !str_contains($prompt, '<context>')
 			),
-			$this->anything()
+			$this->callback(static fn(array $options): bool => $options['max_tokens'] === 128)
 		)->willReturn(
 			[
 			'success' => true, 'content' => 'Hello!',
@@ -103,6 +103,43 @@ final class ConversationSmallTalkTest extends TestCase {
 		$this->assertCount(3, $sql);
 	}
 
+	public function testSocialResponseUsesCustomPromptAndConversationHistory(): void {
+		$provider = $this->createMock(LlmProvider::class);
+		$toolCall = $this->createMock('ToolCall');
+		$toolCall->method('getArguments')->willReturn(
+			['route' => ConversationRoute::CHAT, 'standalone_question' => '', 'exclude_query' => '',
+				'reason' => 'Acknowledgement']
+		);
+		$provider->method('generateToolCall')->willReturn(
+			[
+				'success' => true, 'content' => '', 'tool_calls' => [$toolCall],
+				'metadata' => ['tokens_used' => 1, 'input_tokens' => 1, 'output_tokens' => 1,
+					'response_time_ms' => 1, 'finish_reason' => 'tool_calls'],
+			]
+		);
+		$provider->expects($this->once())->method('generateResponse')->with(
+			$this->callback(
+				static fn(string $prompt): bool => str_contains($prompt, 'Reply as a movie curator.')
+					&& str_contains($prompt, 'Recommend movies')
+					&& str_contains($prompt, 'Here are some movies.')
+					&& str_contains($prompt, '<message>Thanks for that recommendation</message>')
+					&& !str_contains($prompt, '<context>')
+			),
+			$this->anything()
+		)->willReturn(
+			[
+				'success' => true, 'content' => 'You are welcome!',
+				'metadata' => ['tokens_used' => 2, 'input_tokens' => 1, 'output_tokens' => 1,
+					'response_time_ms' => 1, 'finish_reason' => 'stop'],
+			]
+		);
+		$sql = [];
+		$task = $this->handler('Thanks for that recommendation', 'knn', $provider, $sql, 'Reply as a movie curator.')
+			->run();
+		$this->assertTrue($task->isSucceed(), $task->isSucceed() ? '' : $task->getError()->getResponseError());
+		$this->assertCount(4, $sql);
+	}
+
 	/** @return array<string, array{string, string}> */
 	public static function socialMessages(): array {
 		return [
@@ -114,7 +151,13 @@ final class ConversationSmallTalkTest extends TestCase {
 	}
 
 	/** @param list<string> $sql */
-	private function handler(string $message, string $strategy, LlmProvider $provider, array &$sql): Handler {
+	private function handler(
+		string $message,
+		string $strategy,
+		LlmProvider $provider,
+		array &$sql,
+		string $customPrompt = ''
+	): Handler {
 		$strategyArg = $strategy === 'hybrid' ? ", '', 'hybrid'" : '';
 		$query = "CALL CHAT('$message', 'movies', 'test_model', 'conv-uuid'{$strategyArg})";
 		$request = Request::fromArray(
@@ -126,13 +169,15 @@ final class ConversationSmallTalkTest extends TestCase {
 		$client = $this->createMock(Client::class);
 		$client->method('hasTable')->with('movies')->willReturn(true);
 		$client->method('sendRequest')->willReturnCallback(
-			function (string $query) use (&$sql): Response {
+			function (string $query) use (&$sql, $customPrompt): Response {
 				$sql[] = $query;
 				if (str_starts_with($query, 'SELECT * FROM system.chat_model_test_model')) {
 					return $this->response(
 						[['data' => [[
 						'id' => '1', 'name' => 'test_model', 'model' => 'openrouter:test',
-						'settings' => '{"max_document_length":2000}',
+						'settings' => (string)json_encode(
+							['max_document_length' => 2000, 'custom_prompt' => $customPrompt], JSON_THROW_ON_ERROR
+						),
 						'created_at' => '', 'updated_at' => '',
 						]]]]
 					);
@@ -144,6 +189,7 @@ final class ConversationSmallTalkTest extends TestCase {
 				if (str_starts_with($query, 'SELECT role, message FROM system.chat_history_test_model')) {
 					return $this->response(
 						[['data' => [
+						['role' => 'excluded_ids:movies', 'message' => 'Not valid JSON'],
 						['role' => 'assistant', 'message' => 'Here are some movies.'],
 						['role' => 'user', 'message' => 'Recommend movies'],
 						]]]

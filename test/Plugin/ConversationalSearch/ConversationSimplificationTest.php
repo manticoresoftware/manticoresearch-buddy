@@ -143,13 +143,12 @@ final class ConversationSimplificationTest extends TestCase {
 		)->willReturn($sources);
 		$context = new SearchContext(
 			new ConversationRequest('I like Breaking Bad.', 'shows', 'assistant', '', '', $strategy),
-			new ConversationHistory([]),
 			$model,
 			new ConversationRoute(ConversationRoute::SEARCH, $question, '', 'Search similar shows', $terms),
 			$vectorField, []
 		);
 		$this->assertSame(
-			[$sources, ['search_query' => $question, 'exclude_query' => ''], []],
+			[$sources, []],
 			(new ReflectionMethod(Handler::class, 'performSearch'))->invoke(null, $context, $engine)
 		);
 	}

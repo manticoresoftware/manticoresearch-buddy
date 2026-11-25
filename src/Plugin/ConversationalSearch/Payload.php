@@ -485,35 +485,27 @@ final class Payload extends BasePayload {
 		$error = 'CHAT expects query, table, model, optional conversation_uuid, optional fields, '
 			. 'optional search_strategy';
 
-		if ($partCount < 3) {
+		if ($partCount < 3 || $partCount > 6) {
 			throw QueryParseError::create($error);
 		}
 
 		$parsed = [
-			'query' => $this->unquoteString($parts[0] ?? ''),
-			'table' => $this->unquoteString($parts[1] ?? ''),
-			'model_name' => $this->unquoteString($parts[2] ?? ''),
+			'query' => $this->unquoteString($parts[0]),
+			'table' => $this->unquoteString($parts[1]),
+			'model_name' => $this->unquoteString($parts[2]),
 		];
 
-		switch ($partCount) {
-			case 3:
-				return $parsed;
-			case 4:
-				$parsed['conversation_uuid'] = $this->unquoteString($parts[3]);
-				return $parsed;
-			case 5:
-				$parsed['conversation_uuid'] = $this->unquoteString($parts[3]);
-				$parsed['fields'] = $this->unquoteString($parts[4]);
-				return $parsed;
-			case 6:
-				$parsed['conversation_uuid'] = $this->unquoteString($parts[3]);
-				$parsed['fields'] = $this->unquoteString($parts[4]);
-				$parsed['search_strategy'] = $this->unquoteString($parts[5]);
-				$this->validateSearchStrategy($parsed['search_strategy']);
-				return $parsed;
-			default:
-				throw QueryParseError::create($error);
+		if ($partCount >= 4) {
+			$parsed['conversation_uuid'] = $this->unquoteString($parts[3]);
 		}
+		if ($partCount >= 5) {
+			$parsed['fields'] = $this->unquoteString($parts[4]);
+		}
+		if ($partCount === 6) {
+			$parsed['search_strategy'] = $this->unquoteString($parts[5]);
+			$this->validateSearchStrategy($parsed['search_strategy']);
+		}
+		return $parsed;
 	}
 
 

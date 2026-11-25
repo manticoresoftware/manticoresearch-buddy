@@ -8,7 +8,6 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationHistory;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationManager;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationRequest;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationRoute;
@@ -107,17 +106,17 @@ final class ConversationExclusionsTest extends TestCase {
 		)->willReturn([['id' => 30, 'title' => 'Severance']]);
 		$context = new SearchContext(
 			new ConversationRequest('I do not like Stranger Things', 'shows', 'assistant', 'conv', '', $strategy),
-			new ConversationHistory([]), $model,
+			$model,
 			new ConversationRoute(
 				ConversationRoute::SEARCH, 'Recommend well-rated TV shows',
 				'Stranger Things', 'Search alternatives', $terms
 			),
 			$field, ['10']
 		);
-		/** @var array{array<int, array<string, mixed>>, array<string, string>, list<string>} $result */
+		/** @var array{array<int, array<string, mixed>>, list<string>} $result */
 		$result = (new ReflectionMethod(Handler::class, 'performSearch'))->invoke(null, $context, $engine);
 		$this->assertSame([['id' => 30, 'title' => 'Severance']], $result[0]);
-		$this->assertSame(['10', '20'], $result[2]);
+		$this->assertSame(['10', '20'], $result[1]);
 	}
 
 	/** @dataProvider searchStrategies */
@@ -134,17 +133,17 @@ final class ConversationExclusionsTest extends TestCase {
 		)->willReturn([['id' => 30, 'title' => 'Severance']]);
 		$context = new SearchContext(
 			new ConversationRequest('Recommend TV series', 'shows', 'assistant', 'conv', '', $strategy),
-			new ConversationHistory([]), $model,
+			$model,
 			new ConversationRoute(
 				ConversationRoute::SEARCH, 'Recommend TV series',
 				'', 'Search indexed data', $terms
 			),
 			$field, ['10', '20']
 		);
-		/** @var array{array<int, array<string, mixed>>, array<string, string>, list<string>} $result */
+		/** @var array{array<int, array<string, mixed>>, list<string>} $result */
 		$result = (new ReflectionMethod(Handler::class, 'performSearch'))->invoke(null, $context, $engine);
 		$this->assertSame([['id' => 30, 'title' => 'Severance']], $result[0]);
-		$this->assertSame(['10', '20'], $result[2]);
+		$this->assertSame(['10', '20'], $result[1]);
 	}
 
 	/** @return array<string, array{string}> */

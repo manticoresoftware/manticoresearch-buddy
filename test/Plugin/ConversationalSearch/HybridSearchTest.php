@@ -9,7 +9,6 @@
  program; if you did not, you can find it at http://www.gnu.org/
  */
 
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationHistory;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationRequest;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationRoute;
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\Handler;
@@ -193,6 +192,36 @@ final class HybridSearchTest extends TestCase {
 		);
 	}
 
+	public function testHybridSearchRemovesWildcardOperatorsFromLexicalTerms(): void {
+		$client = $this->createMock(Client::class);
+		$response = $this->createMock(Response::class);
+		$response->method('hasError')->willReturn(false);
+		$response->method('getResult')->willReturn(Struct::fromData([['data' => []]]));
+		$client->expects($this->once())->method('sendRequest')->with(
+			$this->callback(
+				static fn(string $sql): bool => str_contains($sql, "MATCH('frame MAYBE (frme | 50)')")
+					&& str_contains($sql, "knn(embedding, 3, 'frame* fr?me 50%')")
+			)
+		)->willReturn($response);
+		(new SearchEngine($client))->search(
+			'docs', 'frame* fr?me 50%', [],
+			['model' => 'openai:test', 'settings' => ['retrieval_limit' => 3]],
+			0.8, new VectorFieldInfo('embedding', 'title', ['embedding']), 'hybrid',
+			['frame*', 'fr?me', '50%']
+		);
+	}
+
+	public function testHybridSearchRejectsLexicalTermContainingOnlyWildcards(): void {
+		$client = $this->createMock(Client::class);
+		$client->expects($this->never())->method('sendRequest');
+		$this->expectException(ManticoreSearchClientError::class);
+		(new SearchEngine($client))->search(
+			'docs', 'wildcards', [],
+			['model' => 'openai:test', 'settings' => ['retrieval_limit' => 3]],
+			0.8, new VectorFieldInfo('embedding', 'title', ['embedding']), 'hybrid', ['*?%']
+		);
+	}
+
 	public function testHybridSearchRejectsMissingLexicalTerms(): void {
 		$client = $this->createMock(Client::class);
 		$client->expects($this->never())->method('sendRequest');
@@ -227,16 +256,16 @@ final class HybridSearchTest extends TestCase {
 		)->willReturn([['id' => 1, 'title' => '16x48 frame']]);
 		$context = new SearchContext(
 			new ConversationRequest('16x48 frame', 'docs', 'assistant', '', '', 'hybrid'),
-			new ConversationHistory([]), $model,
+			$model,
 			new ConversationRoute(
 				ConversationRoute::SEARCH, '16x48 frame', '',
 				'Search indexed data', ['Flex Pants', 'activewear']
 			),
 			$vectorField, []
 		);
-		/** @var array{0:array<int, array<string, mixed>>, 1:array<string, string>, 2:list<string>} $result */
+		/** @var array{array<int, array<string, mixed>>, list<string>} $result */
 		$result = (new ReflectionMethod(Handler::class, 'performSearch'))->invoke(null, $context, $engine);
-		$this->assertSame('16x48 frame', $result[1]['search_query']);
+		$this->assertSame([[['id' => 1, 'title' => '16x48 frame']], []], $result);
 	}
 
 	public function testHybridFollowUpSearchesCurrentQuestionUsingNewTerms(): void {
@@ -251,15 +280,9 @@ final class HybridSearchTest extends TestCase {
 			'docs', 'Which 16x48 frame has a metal border?', [], $model, 0.8, $vectorField,
 			'hybrid', ['frame', 'metal border']
 		)->willReturn($results);
-		$history = new ConversationHistory(
-			[
-				['role' => 'user', 'message' => 'Find a frame'],
-				['role' => 'assistant', 'message' => 'A frame.'],
-			]
-		);
 		$context = new SearchContext(
 			new ConversationRequest('Which one has a metal border?', 'docs', 'assistant', '', '', 'hybrid'),
-			$history, $model,
+			$model,
 			new ConversationRoute(
 				ConversationRoute::SEARCH, 'Which 16x48 frame has a metal border?',
 				'', 'Search current question', ['frame', 'metal border']
@@ -268,9 +291,7 @@ final class HybridSearchTest extends TestCase {
 		);
 		$result = (new ReflectionMethod(Handler::class, 'performSearch'))->invoke(null, $context, $engine);
 		$this->assertIsArray($result);
-		/** @var array{array<int, array<string, mixed>>, array{search_query:string, exclude_query:string}, list<string>} $result */
-		$this->assertSame($results, $result[0]);
-		$this->assertSame('Which 16x48 frame has a metal border?', $result[1]['search_query']);
+		$this->assertSame([$results, []], $result);
 	}
 
 	public function testHybridFollowUpUsesCurrentPlanTermsAfterKnnHistory(): void {
@@ -284,14 +305,9 @@ final class HybridSearchTest extends TestCase {
 			'docs', 'Which 16x48 frame is panoramic?', [], $model, 0.8, $vectorField,
 			'hybrid', ['frame', 'panoramic']
 		)->willReturn([['id' => 1, 'title' => '16x48 frame']]);
-		$history = new ConversationHistory(
-			[
-				['role' => 'user', 'message' => 'Find a frame'],
-			]
-		);
 		$context = new SearchContext(
 			new ConversationRequest('Which is panoramic?', 'docs', 'assistant', '', '', 'hybrid'),
-			$history, $model,
+			$model,
 			new ConversationRoute(
 				ConversationRoute::SEARCH, 'Which 16x48 frame is panoramic?',
 				'', 'Search current question', ['frame', 'panoramic']
@@ -300,8 +316,7 @@ final class HybridSearchTest extends TestCase {
 		);
 		$result = (new ReflectionMethod(Handler::class, 'performSearch'))->invoke(null, $context, $engine);
 		$this->assertIsArray($result);
-		/** @var array{array<int, array<string, mixed>>, array{search_query:string, exclude_query:string}, list<string>} $result */
-		$this->assertSame('Which 16x48 frame is panoramic?', $result[1]['search_query']);
+		$this->assertSame([[['id' => 1, 'title' => '16x48 frame']], []], $result);
 	}
 
 	private function sqlRequest(string $payload): Request {

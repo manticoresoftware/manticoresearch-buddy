@@ -252,44 +252,30 @@ final class Handler extends BaseHandlerWithClient {
 		$route = $conversationRouter->route(
 			$request->query, $conversationHistory, $provider, $model, $request->searchStrategy
 		);
-		if ($route->route === ConversationRoute::CHAT) {
-			$response = self::generateResponse(
-				$model, $request->query, '', $conversationHistory, $provider, true
-			);
-			if (!$response['success']) {
-				return TaskResult::withError(
-					LlmProvider::formatFailureMessage('LLM response generation failed', $response)
-				);
-			}
-			$conversationManager->saveTurn(
-				$conversationUuid, $model['name'], $request->query, $response['content'], $request->table
-			);
-			return self::conversationResult($request, $response['content'], '', []);
-		}
-		$previousExcludedIds = $conversationHistory->excludedIds();
-
-		/** @var array{max_document_length:int} $settings */
-		$settings = $model['settings'];
-		$vectorFieldInfo = $searchEngine->inspectVectorFieldInfo($request->table, $request->fields);
-		$searchContext = new SearchContext(
-			$request, $conversationHistory, $model, $route, $vectorFieldInfo, $previousExcludedIds
-		);
-		[$searchResults, $queries, $excludedIds] = self::performSearch($searchContext, $searchEngine);
-		self::logPreprocessingResults($request, $queries);
-		$maxDocumentLength = $settings['max_document_length'];
+		$smallTalk = $route->route === ConversationRoute::CHAT;
+		$searchResults = [];
+		$excludedIds = null;
 		$context = '';
-		if ($searchResults !== []) {
+		if (!$smallTalk) {
+			$previousExcludedIds = $conversationHistory->excludedIds();
+			$vectorFieldInfo = $searchEngine->inspectVectorFieldInfo($request->table, $request->fields);
+			$searchContext = new SearchContext($request, $model, $route, $vectorFieldInfo, $previousExcludedIds);
+			[$searchResults, $currentExcludedIds] = self::performSearch($searchContext, $searchEngine);
+			$excludedIds = $currentExcludedIds === $previousExcludedIds ? null : $currentExcludedIds;
+			self::logPreprocessingResults($request, $route);
+			$maxDocumentLength = $model['settings']['max_document_length'];
 			$context = (new SourceContextBuilder())->build(
 				$searchResults, $vectorFieldInfo->sourceFields, $maxDocumentLength
 			);
+			self::logContextBuilding($searchResults, $context, $maxDocumentLength);
 		}
-		self::logContextBuilding($searchResults, $context, $maxDocumentLength);
 		$response = self::generateResponse(
 			$model,
 			$request->query,
 			$context,
 			$conversationHistory,
-			$provider
+			$provider,
+			$smallTalk
 		);
 
 		if (!$response['success']) {
@@ -303,11 +289,11 @@ final class Handler extends BaseHandlerWithClient {
 
 		$conversationManager->saveTurn(
 			$conversationUuid, $model['name'], $request->query, $responseText, $request->table,
-			$excludedIds === $previousExcludedIds ? null : $excludedIds
+			$excludedIds
 		);
 		Buddy::debugv("Chat: ├─ Tokens used: $tokensUsed");
 
-		return self::conversationResult($request, $responseText, $queries['search_query'], $searchResults);
+		return self::conversationResult($request, $responseText, $route->standaloneQuestion, $searchResults);
 	}
 
 	/**
@@ -355,9 +341,9 @@ final class Handler extends BaseHandlerWithClient {
 	private static function parseCallChatParams(Payload $payload): ConversationRequest {
 		// Parse CALL CHAT parameters from payload
 		return new ConversationRequest(
-			$payload->params['query'] ?? '',
-			$payload->params['table'] ?? '',
-			$payload->params['model_name'] ?? '',
+			$payload->params['query'],
+			$payload->params['table'],
+			$payload->params['model_name'],
 			$payload->params['conversation_uuid'] ?? '',
 			$payload->params['fields'] ?? '',
 			$payload->params['search_strategy'] ?? ConversationRequest::STRATEGY_KNN
@@ -399,31 +385,21 @@ final class Handler extends BaseHandlerWithClient {
 	/**
 	 * @param SearchContext $context
 	 * @param SearchEngine $searchEngine
-	 * @return array{array<int, array<string, mixed>>, array{search_query:string, exclude_query:string}, list<string>}
+	 * @return array{array<int, array<string, mixed>>, list<string>}
 	 * @throws ManticoreSearchClientError|ManticoreSearchResponseError
 	 */
 	private static function performSearch(SearchContext $context, SearchEngine $searchEngine): array {
-		Buddy::debugv('Chat: ├─ Using structured conversation history for query generation');
-		$historyPayload = $context->history->payload();
-		Buddy::debugv('Chat: ├─ Query history turns: ' . sizeof($historyPayload));
-
-		$excludeQuery = $context->route->excludeQuery;
-		$queries = [
-			'search_query' => $context->route->standaloneQuestion,
-			'exclude_query' => $excludeQuery,
-		];
-
 		$excludedIds = $context->excludedIds;
-		if ($queries['exclude_query'] !== '') {
+		if ($context->route->excludeQuery !== '') {
 			$newIds = $searchEngine->getExcludedIds(
-				$context->request->table, $queries['exclude_query'], $context->vectorFieldInfo->name
+				$context->request->table, $context->route->excludeQuery, $context->vectorFieldInfo->name
 			);
 			$excludedIds = array_values(array_unique(array_merge($excludedIds, array_map('strval', $newIds))));
 		}
 
 		$searchResults = $searchEngine->search(
 			$context->request->table,
-			$queries['search_query'],
+			$context->route->standaloneQuestion,
 			$excludedIds,
 			$context->model,
 			0.8,
@@ -432,25 +408,25 @@ final class Handler extends BaseHandlerWithClient {
 			$context->route->lexicalTerms
 		);
 
-		return [$searchResults, $queries, $excludedIds];
+		return [$searchResults, $excludedIds];
 	}
 
 	/**
 	 * Log preprocessing results
 	 *
 	 * @param ConversationRequest $request
-	 * @param array{search_query:string, exclude_query:string} $queries
+	 * @param ConversationRoute $route
 	 *
 	 * @return void
 	 */
 	private static function logPreprocessingResults(
 		ConversationRequest $request,
-		array $queries
+		ConversationRoute $route
 	): void {
 		Buddy::debugv('Chat: [DEBUG PREPROCESSING]');
 		Buddy::debugv("Chat: ├─ User query: '$request->query'");
-		Buddy::debugv("Chat: ├─ Search query: '{$queries['search_query']}'");
-		Buddy::debugv("Chat: └─ Exclude query: '{$queries['exclude_query']}'");
+		Buddy::debugv("Chat: ├─ Search query: '$route->standaloneQuestion'");
+		Buddy::debugv("Chat: └─ Exclude query: '$route->excludeQuery'");
 	}
 
 
@@ -513,13 +489,15 @@ final class Handler extends BaseHandlerWithClient {
 	): array {
 		$provider->configure($model);
 
+		$customPrompt = $model['settings']['custom_prompt'] ?? null;
 		if ($smallTalk) {
-			$prompt = 'Respond briefly and naturally in the same language to the conversational message '
+			$prompt = (is_string($customPrompt) && trim($customPrompt) !== '' ? trim($customPrompt) . "\n" : '')
+				. 'Respond briefly and naturally in the same language to the conversational message '
 				. 'unrelated to indexed data. '
 				. 'Do not answer factual questions, recommend documents, or invent search results. '
+				. "<history>\n" . json_encode($history->payload(), JSON_THROW_ON_ERROR) . "\n</history>\n"
 				. "<message>$query</message>";
 		} else {
-			$customPrompt = $model['settings']['custom_prompt'] ?? null;
 			$prompt = self::buildPrompt(
 				$query,
 				$context,

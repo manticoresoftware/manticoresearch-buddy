@@ -29,8 +29,9 @@ At query time `CALL CHAT` does this:
    into a standalone question and extracts any newly excluded item or category.
    A greeting followed by an information request still searches; there is no
    rejection route.
-4. For a conversational message, generates a brief reply without inspecting
-   the vector field or retrieving documents, then saves both messages.
+4. For a conversational message, generates a brief reply using the configured
+   `custom_prompt` and bounded conversation history without inspecting the vector
+   field or retrieving documents, then saves both messages.
    `search_query` is empty and `sources` is `[]`. Previously excluded IDs remain
    unchanged.
 5. For a search request, loads previously excluded document IDs for this
@@ -344,6 +345,10 @@ WHERE MATCH('"<primary anchor>" MAYBE ("<refinement>" | "<another refinement>")'
 LIMIT <retrieval_limit> OPTION fusion_method='rrf'
 ```
 
+`*`, `?`, and `%` are removed from generated lexical terms before `MATCH`, since
+wildcard operators cannot reliably be escaped as literal terms. A term containing
+only those characters is rejected; the standalone KNN question is unchanged.
+
 Hybrid search does not apply the KNN distance threshold: doing so could remove
 documents found only by full-text matching. `sources` includes `hybrid_score`
 in hybrid mode. Lexical terms are generated for each new search using the
@@ -356,7 +361,7 @@ Behavior:
 - The default KNN-only threshold is currently `0.8`.
 - If the generated plan includes an exclusion query, Buddy finds
   matching IDs with `knn(<vector_field>, 15, '<exclude query>')` and threshold
-  `0.75`, then combines them with previously excluded IDs for this conversation
+  `0.70`, then combines them with previously excluded IDs for this conversation
   and table and filters them from the main search. This is a semantic nearest-
   neighbor lookup capped at 15 candidates per exclusion, not a literal full-text
   minus-word filter or an exhaustive scan of the table.

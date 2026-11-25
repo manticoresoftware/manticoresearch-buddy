@@ -15,7 +15,6 @@ final class SearchContext {
 
 	/**
 	 * @param ConversationRequest $request
-	 * @param ConversationHistory $history
 	 * @param array{
 	 *   id:string,
 	 *   name:string,
@@ -30,7 +29,6 @@ final class SearchContext {
 	 */
 	public function __construct(
 		public ConversationRequest $request,
-		public ConversationHistory $history,
 		public array $model,
 		public ConversationRoute $route,
 		public VectorFieldInfo $vectorFieldInfo,

@@ -86,9 +86,11 @@ final class ConversationRouter {
 					return $route;
 				} catch (ManticoreSearchClientError $error) {
 					// A successful provider request can still contain an invalid route.
-					[$retryPrompt, $toolDefinition, $searchOnlyRepair] = $this->prepareRetry(
-						$prompt, $error->getResponseError(), $hybrid, $attempt
-					);
+					$failure = $error->getResponseError();
+					$searchOnlyRepair = $hybrid && $attempt === self::MAX_ROUTING_ATTEMPTS - 1
+						&& in_array($failure, self::LEXICAL_FAILURES, true);
+					$retryPrompt = $this->retryPrompt($prompt, $failure, $hybrid, $searchOnlyRepair);
+					$toolDefinition = $this->toolDefinition($hybrid, $searchOnlyRepair);
 				}
 			} else {
 				$error = ManticoreSearchClientError::create(
@@ -109,21 +111,7 @@ final class ConversationRouter {
 		}
 	}
 
-	/**
-	 * @return array{string, array{name:string, description:string, parameters:array<string, mixed>}, bool}
-	 */
-	private function prepareRetry(string $prompt, string $failure, bool $hybrid, int $attempt): array {
-		$retryPrompt = $this->retryPrompt($prompt, $failure, $hybrid);
-		$searchOnly = $hybrid && $attempt === self::MAX_ROUTING_ATTEMPTS - 1
-			&& in_array($failure, self::LEXICAL_FAILURES, true);
-		if ($searchOnly) {
-			// The shared SEARCH/CHAT schema cannot require non-empty lexical terms for SEARCH alone.
-			$retryPrompt = "Repair the SEARCH route; provide non-empty lexical_terms.\n\n$retryPrompt";
-		}
-		return [$retryPrompt, $this->toolDefinition($hybrid, $searchOnly), $searchOnly];
-	}
-
-	private function retryPrompt(string $prompt, string $failure, bool $hybrid): string {
+	private function retryPrompt(string $prompt, string $failure, bool $hybrid, bool $searchOnly): string {
 		$correction = match ($failure) {
 			self::MISSING_LEXICAL_TERMS, self::INVALID_LEXICAL_TERMS,
 			self::INVALID_LEXICAL_TERM =>
@@ -143,7 +131,9 @@ final class ConversationRouter {
 						. 'with a distinctive anchor; for CHAT they must be empty.'
 					: 'SEARCH requires a non-empty standalone_question; CHAT requires empty search fields.'),
 		};
-		return "Previous tool call failed validation. $correction\n\n$prompt";
+		// The shared SEARCH/CHAT schema cannot require non-empty lexical terms for SEARCH alone.
+		$prefix = $searchOnly ? "Repair the SEARCH route; provide non-empty lexical_terms.\n\n" : '';
+		return $prefix . "Previous tool call failed validation. $correction\n\n$prompt";
 	}
 
 	/**
