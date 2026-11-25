@@ -12,13 +12,16 @@
 namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
 
 final class ConversationRequest {
+	public const string STRATEGY_KNN = 'knn';
+	public const string STRATEGY_HYBRID = 'hybrid';
 
 	public function __construct(
 		public string $query,
 		public string $table,
 		public string $modelName,
 		public string $conversationUuid = '',
-		public string $fields = ''
+		public string $fields = '',
+		public string $searchStrategy = self::STRATEGY_KNN
 	) {
 	}
 

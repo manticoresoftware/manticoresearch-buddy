@@ -12,22 +12,32 @@ namespace Manticoresearch\Buddy\Base\Plugin\ConversationalSearch;
 
 final readonly class ConversationHistory {
 	/**
-	 * @param array<int, ConversationMessage> $messages
+	 * @param list<array{role: string, message: string}> $messages
 	 */
-	public function __construct(private array $messages) {
+	public function __construct(private array $messages, private ?string $excludedIdsJson = null) {
 	}
 
 	/**
-	 * @return array<int, ConversationMessage>
+	 * @return list<array{role: string, message: string}>
 	 */
 	public function messages(): array {
 		return $this->messages;
 	}
 
+	/** @return list<string> */
+	public function excludedIds(): array {
+		if ($this->excludedIdsJson === null) {
+			return [];
+		}
+		/** @var list<string> $ids */
+		$ids = simdjson_decode($this->excludedIdsJson, true);
+		return $ids;
+	}
+
 	public function format(): string {
 		$history = '';
 		foreach ($this->messages as $message) {
-			$history .= $message->role . ': ' . $message->message . "\n";
+			$history .= $message['role'] . ': ' . $message['message'] . "\n";
 		}
 
 		return $history;
@@ -46,15 +56,15 @@ final readonly class ConversationHistory {
 		$turns = [];
 		$currentTimestamp = null;
 		foreach ($messages as $message) {
-			if ($message->role === 'user') {
+			if ($message['role'] === 'user') {
 				$currentTimestamp = $this->formatHistoryTimestamp(sizeof($turns));
 				$turns[$currentTimestamp] = [
-					'user' => $message->message,
+					'user' => $message['message'],
 				];
 				continue;
 			}
 
-			if ($message->role !== 'assistant') {
+			if ($message['role'] !== 'assistant') {
 				continue;
 			}
 
@@ -63,33 +73,10 @@ final readonly class ConversationHistory {
 				$turns[$currentTimestamp] = [];
 			}
 
-			$turns[$currentTimestamp]['assistant'] = $message->message;
+			$turns[$currentTimestamp]['assistant'] = $message['message'];
 		}
 
 		return $turns;
-	}
-
-	/**
-	 * @return array{search_query: string, exclude_query: string, excluded_ids: string}|null
-	 */
-	public function latestSearchContext(): ?array {
-		for ($i = sizeof($this->messages) - 1; $i >= 0; $i--) {
-			$message = $this->messages[$i];
-			if ($message->role !== 'user'
-				|| $message->intent === ConversationRoute::ANSWER_FROM_HISTORY
-				|| $message->searchQuery === ''
-			) {
-				continue;
-			}
-
-			return [
-				'search_query' => $message->searchQuery,
-				'exclude_query' => $message->excludeQuery,
-				'excluded_ids' => $message->excludedIds,
-			];
-		}
-
-		return null;
 	}
 
 	private function formatHistoryTimestamp(int $turnIndex): string {

@@ -2,15 +2,12 @@
 
 /*
   Copyright (c) 2024, Manticore Software LTD (https://manticoresearch.com)
-
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License version 3 or any later
   version. You should have received a copy of the GPL license along with this
   program; if you did not, you can find it at http://www.gnu.org/
 */
-
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationManager;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationMessage;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Network\Struct;
@@ -18,467 +15,172 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class ConversationManagerSqlValidationTest extends TestCase {
-
-	/**
-	 * Test that saveMessage generates valid SQL INSERT syntax
-	 */
-	public function testSaveMessageGeneratesValidInsertSql(): void {
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock successful response
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-
-		$conversationManager = $this->createConversationManagerWithRequestExpectation(
-			$mockClient,
-			function (string $sql): bool {
-				return $this->validateInsertSql($sql);
+	public function testSaveTurnIncludesModelName(): void {
+		$client = $this->createMock(HTTPClient::class);
+		$manager = $this->managerWithRequest(
+			$client,
+			function (string $sql): void {
+				$this->assertMatchesRegularExpression(
+					'/^INSERT INTO system\\.chat_history_test_model '
+					. '\\(conversation_uuid, `model_name`, created_at, role, message, ttl\\) '
+					. "VALUES \\('conv-123', 'test_model', [0-9]+, 'user', 'Hello, how are you\\?', [0-9]+\\), "
+					. "\\('conv-123', 'test_model', [0-9]+, 'assistant', 'I am well.', [0-9]+\\)$/",
+					$sql
+				);
 			},
-			$mockResponse
+			$this->successfulResponse()
 		);
+		$manager->saveTurn('conv-123', 'test_model', 'Hello, how are you?', 'I am well.', 'docs');
+	}
 
-		$conversationManager->saveMessage(
+	public function testSaveTurnEscapesSpecialCharacters(): void {
+		$client = $this->createMock(HTTPClient::class);
+		$manager = $this->managerWithRequest(
+			$client,
+			function (string $sql): void {
+				$this->assertStringStartsWith(
+					'INSERT INTO system.chat_history_test_model '
+					. '(conversation_uuid, `model_name`, created_at, role, message, ttl)',
+					$sql
+				);
+				$this->assertStringContainsString("O\\'Reilly", $sql);
+				$this->assertStringContainsString('line\\nbreak', $sql);
+				$this->assertStringContainsString('quote\\"test', $sql);
+				$this->assertStringNotContainsString('search_query', $sql);
+			},
+			$this->successfulResponse()
+		);
+		$manager->saveTurn(
 			'conv-123',
-			'model-456',
-			ConversationMessage::user('Hello, how are you?', 'NEW'),
-			150
+			'test_model',
+			"O'Reilly's book has a line\nbreak and quote\"test",
+			"O'Reilly's answer has a line\nbreak and quote\"test",
+			'docs'
 		);
 	}
 
-	private function createConversationManagerWithRequestExpectation(
+	public function testGetConversationMessagesSelectsOnlyRoleAndMessage(): void {
+		$client = $this->createMock(HTTPClient::class);
+		$rows = [
+			['role' => 'assistant', 'message' => 'Hi there!'],
+			['role' => 'excluded_ids:shows', 'message' => '["42"]'],
+			['role' => 'internal', 'message' => 'Not a conversation turn'],
+			['role' => 'user', 'message' => 'Hello'],
+		];
+		$response = $this->createMock(Response::class);
+		$response->method('hasError')->willReturn(false);
+		$response->method('getResult')->willReturn(Struct::fromData([['data' => $rows]]));
+		$manager = $this->managerWithRequest(
+			$client,
+			function (string $sql): void {
+				$this->assertSame(
+					"SELECT role, message FROM system.chat_history_test_model WHERE conversation_uuid = 'conv-123' "
+					. 'ORDER BY created_at DESC, id DESC LIMIT 100',
+					$sql
+				);
+			},
+			$response
+		);
+		$this->assertSame(
+			"user: Hello\nassistant: Hi there!\n",
+			$manager->getConversationMessages('conv-123')->format()
+		);
+	}
+
+	public function testGetConversationMessagesUsesRequestedLimitAndRetainsLegacyRows(): void {
+		$client = $this->createMock(HTTPClient::class);
+		$rows = [
+			['role' => 'assistant', 'message' => 'Here are movies.', 'tokens_used' => 42],
+			['role' => 'user', 'message' => 'Show me movies', 'intent' => 'NEW', 'model_name' => 'old-model'],
+		];
+		$response = $this->createMock(Response::class);
+		$response->method('hasError')->willReturn(false);
+		$response->method('getResult')->willReturn(Struct::fromData([['data' => $rows]]));
+		$manager = $this->managerWithRequest(
+			$client,
+			function (string $sql): void {
+				$this->assertStringStartsWith('SELECT role, message FROM system.chat_history_test_model', $sql);
+				$this->assertStringContainsString('LIMIT 50', $sql);
+				$this->assertStringNotContainsString('intent', $sql);
+			},
+			$response
+		);
+		$messages = $manager->getConversationMessages('conv-123', 50)->messages();
+		$this->assertSame(['role' => 'user', 'message' => 'Show me movies'], $messages[0]);
+		$this->assertSame(['role' => 'assistant', 'message' => 'Here are movies.'], $messages[1]);
+	}
+
+	public function testHistoryAndExclusionSnapshotShareOneBoundedQuery(): void {
+		$client = $this->createMock(HTTPClient::class);
+		$response = $this->createMock(Response::class);
+		$response->method('hasError')->willReturn(false);
+		$rows = [
+			['role' => 'excluded_ids:films', 'message' => '["99"]'],
+			['role' => 'excluded_ids:shows', 'message' => '["42"]'],
+			['role' => 'assistant', 'message' => 'Try these shows.'],
+			['role' => 'internal', 'message' => 'Not a conversation turn'],
+			['role' => 'user', 'message' => 'Find shows'],
+		];
+		$response->method('getResult')->willReturn(Struct::fromData([['data' => $rows]]));
+		$manager = $this->managerWithRequest(
+			$client,
+			function (string $sql): void {
+				$this->assertSame(
+					"SELECT role, message FROM system.chat_history_test_model WHERE conversation_uuid = 'conv-123' "
+					. 'ORDER BY created_at DESC, id DESC LIMIT 100',
+					$sql
+				);
+			},
+			$response
+		);
+		$history = $manager->getConversationMessages('conv-123', indexName: 'shows');
+		$this->assertSame(['42'], $history->excludedIds());
+		$this->assertSame("user: Find shows\nassistant: Try these shows.\n", $history->format());
+	}
+
+	public function testInitializeTableIncludesModelName(): void {
+		$client = $this->createMock(HTTPClient::class);
+		$client->expects($this->once())->method('sendRequest')->with(
+			$this->callback(
+				function (string $sql): bool {
+					$this->assertMatchesRegularExpression(
+						'/^CREATE TABLE IF NOT EXISTS system\\.chat_history_test_model\\s*'
+						. '\\(\\s*conversation_uuid string,\\s*`model_name` string,\\s*'
+						. 'created_at bigint,\\s*role string,\\s*'
+						. 'message text,\\s*ttl bigint\\s*\\)$/',
+						$sql
+					);
+					return true;
+				}
+			)
+		)->willReturn($this->successfulResponse());
+		new ConversationManager($client, 'test_model');
+	}
+
+	private function successfulResponse(): Response {
+		$response = $this->createMock(Response::class);
+		$response->method('hasError')->willReturn(false);
+		return $response;
+	}
+
+	private function managerWithRequest(
 		HTTPClient&MockObject $client,
 		callable $assertSql,
 		Response $response
 	): ConversationManager {
-		$initResponse = $this->createSuccessfulResponse();
+		$initResponse = $this->successfulResponse();
 		$requestNumber = 0;
-
-		$client->expects($this->exactly(2))
-			->method('sendRequest')
-			->willReturnCallback(
-				function (string $sql) use (&$requestNumber, $assertSql, $initResponse, $response): Response {
-					++$requestNumber;
-					if ($requestNumber === 1) {
-						$this->assertStringStartsWith(
-							'CREATE TABLE IF NOT EXISTS system.chat_history_test_model',
-							$sql
-						);
-
-						return $initResponse;
-					}
-
-					$this->assertTrue($assertSql($sql));
-
-					return $response;
-				}
-			);
-
-		return new ConversationManager($client, 'test_model');
-	}
-
-	private function createSuccessfulResponse(): Response {
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-
-		return $mockResponse;
-	}
-
-	/**
-	 * Validate INSERT SQL structure and values
-	 */
-	private function validateInsertSql(string $sql): bool {
-		$this->validateBasicSqlStructure($sql);
-		$this->validateValuesCount($sql);
-		$this->validateTableNameNotInValues($sql);
-		$this->validateQuotedStrings($sql);
-
-		return true;
-	}
-
-	/**
-	 * Validate basic SQL structure
-	 */
-	private function validateBasicSqlStructure(string $sql): void {
-		$this->assertStringStartsWith('INSERT INTO system.chat_history_test_model', $sql);
-		$this->assertStringContainsString(
-			'(conversation_uuid, `model_name`, created_at, role, message, tokens_used, intent, '
-			. 'search_query, exclude_query, excluded_ids, ttl)',
-			$sql
-		);
-		$this->assertStringContainsString('VALUES (', $sql);
-	}
-
-	/**
-	 * Validate that VALUES clause has exactly 11 values
-	 */
-	private function validateValuesCount(string $sql): void {
-		$valuesMatch = [];
-		if (!preg_match('/VALUES\s*\((.*)\)/', $sql, $valuesMatch)) {
-			return;
-		}
-
-		$values = $valuesMatch[1];
-		$valueArray = $this->parseValuesFromSql($values);
-
-		$valueCount = sizeof(array_filter($valueArray));
-		if ($valueCount !== 11) {
-			echo '[DEBUG SQL] ' . $sql . "\n";
-			echo "[DEBUG VALUE COUNT] $valueCount\n";
-			echo '[DEBUG VALUES] ' . print_r($valueArray, true) . "\n";
-		}
-		$this->assertEquals(
-			11,
-			$valueCount,
-			'VALUES clause should have exactly 11 values matching the column count'
-		);
-	}
-
-	/**
-	 * Parse values from SQL VALUES clause, handling quoted strings properly
-	 * @return array<int, string>
-	 */
-	private function parseValuesFromSql(string $values): array {
-		$valueArray = [];
-		$currentValue = '';
-		$inQuotes = false;
-		$quoteChar = '';
-
-		for ($i = 0; $i < strlen($values); $i++) {
-			$char = $values[$i];
-			if (!$inQuotes && ($char === "'" || $char === '"')) {
-				$inQuotes = true;
-				$quoteChar = $char;
-				$currentValue .= $char;
-			} elseif ($inQuotes && $char === $quoteChar) {
-				$inQuotes = false;
-				$currentValue .= $char;
-			} elseif (!$inQuotes && $char === ',') {
-				$valueArray[] = trim($currentValue);
-				$currentValue = '';
-			} else {
-				$currentValue .= $char;
-			}
-		}
-		$valueArray[] = trim($currentValue); // Add last value
-
-		return $valueArray;
-	}
-
-	/**
-	 * Validate that table name doesn't appear in VALUES clause
-	 */
-	private function validateTableNameNotInValues(string $sql): void {
-		$this->assertDoesNotMatchRegularExpression(
-			'/VALUES\s*\([^)]*system.chat_history_test_model[^)]*\)/',
-			$sql,
-			'Table name should not appear in VALUES clause'
-		);
-	}
-
-	/**
-	 * Validate quoted strings in VALUES clause
-	 */
-	private function validateQuotedStrings(string $sql): void {
-		$this->assertMatchesRegularExpression(
-			"/VALUES\s*\('[^']*'/",
-			$sql,
-			'First value should be a quoted string'
-		);
-	}
-
-
-	/**
-	 * Test saveMessage with all optional parameters generates valid SQL
-	 */
-	public function testSaveMessageWithAllParametersGeneratesValidInsertSql(): void {
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock successful response
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-
-		$conversationManager = $this->createConversationManagerWithRequestExpectation(
-			$mockClient,
-			function (string $sql): bool {
-				return $this->validateInsertSqlWithAllParameters($sql);
-			},
-			$mockResponse
-		);
-
-		$conversationManager->saveMessage(
-			'conv-with-all-params',
-			'model-with-all-params',
-			ConversationMessage::userWithExcludedIds(
-				'Message with all parameters',
-				'NEW',
-				'search query here',
-				'exclude query here',
-				['1', '2', '3']
-			),
-			100
-		);
-	}
-
-	/**
-	 * Validate INSERT SQL with all parameters
-	 */
-	private function validateInsertSqlWithAllParameters(string $sql): bool {
-		$this->validateBasicSqlStructure($sql);
-		$this->validateAllFieldsPresent($sql);
-		$this->validateValuesCount($sql);
-
-		return true;
-	}
-
-	/**
-	 * Validate that all expected fields are present in SQL
-	 */
-	private function validateAllFieldsPresent(string $sql): void {
-		$expectedFields = [
-		'conversation_uuid', '`model_name`', 'created_at', 'role', 'message',
-		'tokens_used', 'intent', 'search_query', 'exclude_query', 'excluded_ids', 'ttl',
-		];
-
-		foreach ($expectedFields as $field) {
-			$this->assertStringContainsString($field, $sql);
-		}
-	}
-
-	/**
-	 * Test that saveMessage properly handles special characters in SQL
-	 */
-	public function testSaveMessageHandlesSpecialCharactersInSql(): void {
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock successful response
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-
-		$conversationManager = $this->createConversationManagerWithRequestExpectation(
-			$mockClient,
-			function (string $sql): bool {
-				// Check that special characters are properly escaped
-				$this->assertStringContainsString("O\\'Reilly", $sql);
-				$this->assertStringContainsString('line\\nbreak', $sql);
-				$this->assertStringContainsString('quote\\"test', $sql);
-
-				// Validate that the SQL is still syntactically valid
-				$this->assertStringStartsWith('INSERT INTO system.chat_history_test_model', $sql);
-				$this->assertStringContainsString('VALUES (', $sql);
-
-				return true;
-			},
-			$mockResponse
-		);
-
-		$conversationManager->saveMessage(
-			'conv-123',
-			'model-456',
-			ConversationMessage::user("O'Reilly's book has a line\nbreak and quote\"test", 'NEW'),
-			150
-		);
-	}
-
-	/**
-	 * Test that getConversationMessages generates valid SELECT SQL
-	 */
-	public function testGetConversationMessagesGeneratesValidSelectSql(): void {
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock response with conversation data
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-				'data' => [
-					$this->createConversationRow('user', 'Hello'),
-					$this->createConversationRow('assistant', 'Hi there!'),
-				],
-				],
-				]
-			)
-		);
-
-		$conversationManager = $this->createConversationManagerWithRequestExpectation(
-			$mockClient,
-			function (string $sql): bool {
-				// Validate SELECT SQL structure
-				$this->assertStringStartsWith(
-					'SELECT role, message, intent, search_query, exclude_query, excluded_ids '
-					. 'FROM system.chat_history_test_model',
-					$sql
-				);
-				$this->assertStringContainsString("WHERE conversation_uuid = 'conv-123'", $sql);
-				$this->assertStringContainsString('ORDER BY created_at ASC, id ASC', $sql);
-				$this->assertStringContainsString('LIMIT 100', $sql);
-
-				return true;
-			},
-			$mockResponse
-		);
-
-			$result = $conversationManager->getConversationMessages('conv-123');
-			$this->assertEquals(
-				"user: Hello\nassistant: Hi there!\n",
-				$result->format()
-			);
-	}
-
-	/**
-	 * Test that latest search context is derived from conversation messages
-	 */
-	public function testLatestSearchContextUsesConversationMessagesSelectSql(): void {
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock response with search context data
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-				'data' => [
-					$this->createConversationRow(
-						'user',
-						'Show me movies',
-						'NEW',
-						'movies about space',
-						'Star Wars',
-						'[1,2,3]'
-					),
-				],
-				],
-				]
-			)
-		);
-
-		$conversationManager = $this->createConversationManagerWithRequestExpectation(
-			$mockClient,
-			function (string $sql): bool {
-				// Validate SELECT SQL structure for search context
-				$this->assertStringStartsWith(
-					'SELECT role, message, intent, search_query, exclude_query, excluded_ids '
-					. 'FROM system.chat_history_test_model',
-					$sql
-				);
-				$this->assertStringContainsString("WHERE conversation_uuid = 'conv-123'", $sql);
-				$this->assertStringContainsString('ORDER BY created_at ASC, id ASC', $sql);
-				$this->assertStringContainsString('LIMIT 100', $sql);
-
-				return true;
-			},
-			$mockResponse
-		);
-
-		$result = $conversationManager->getConversationMessages('conv-123')->latestSearchContext();
-		$this->assertIsArray($result);
-		$this->assertEquals('movies about space', $result['search_query']);
-	}
-
-	/**
-	 * Test that query generation history is built from conversation messages
-	 */
-	public function testQueryGenerationHistoryUsesConversationMessagesSelectSql(): void {
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock response with conversation data
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-		$mockResponse->method('getResult')->willReturn(
-			Struct::fromData(
-				[
-				[
-				'data' => [
-					$this->createConversationRow('user', 'Show me movies'),
-					$this->createConversationRow('assistant', 'Here are movies...'),
-				],
-				],
-				]
-			)
-		);
-
-		$conversationManager = $this->createConversationManagerWithRequestExpectation(
-			$mockClient,
-			function (string $sql): bool {
-				// Validate SELECT SQL structure
-				$this->assertStringStartsWith(
-					'SELECT role, message, intent, search_query, exclude_query, excluded_ids '
-					. 'FROM system.chat_history_test_model',
-					$sql
-				);
-				$this->assertStringContainsString("WHERE conversation_uuid = 'conv-123'", $sql);
-				$this->assertStringNotContainsString("AND intent != 'FOLLOW_UP'", $sql);
-				$this->assertStringContainsString('ORDER BY created_at ASC, id ASC', $sql);
-				$this->assertStringContainsString('LIMIT 50', $sql);
-
-				return true;
-			},
-			$mockResponse
-		);
-
-			$result = $conversationManager->getConversationMessages('conv-123', 50)->format();
-			$this->assertEquals("user: Show me movies\nassistant: Here are movies...\n", $result);
-	}
-
-	/**
-	 * Test that initializeTable generates valid CREATE TABLE SQL
-	 */
-	public function testInitializeTableGeneratesValidCreateTableSql(): void {
-		$mockClient = $this->createMock(HTTPClient::class);
-
-		// Mock successful response
-		$mockResponse = $this->createMock(Response::class);
-		$mockResponse->method('hasError')->willReturn(false);
-
-		$mockClient->expects($this->once())
-		->method('sendRequest')
-		->with(
-			$this->callback(
-				function ($sql) {
-					// Validate CREATE TABLE SQL structure
+		$client->expects($this->exactly(2))->method('sendRequest')->willReturnCallback(
+			function (string $sql) use (&$requestNumber, $assertSql, $initResponse, $response): Response {
+				++$requestNumber;
+				if ($requestNumber === 1) {
 					$this->assertStringStartsWith('CREATE TABLE IF NOT EXISTS system.chat_history_test_model', $sql);
-					$this->assertStringContainsString('conversation_uuid string', $sql);
-					$this->assertStringContainsString('`model_name` string', $sql);
-					$this->assertStringContainsString('created_at bigint', $sql);
-					$this->assertStringContainsString('role string', $sql);
-					$this->assertStringContainsString('message text', $sql);
-					$this->assertStringContainsString('tokens_used int', $sql);
-					$this->assertStringContainsString('intent string', $sql);
-					$this->assertStringContainsString('search_query text', $sql);
-					$this->assertStringContainsString('exclude_query text', $sql);
-					$this->assertStringContainsString('excluded_ids text', $sql);
-					$this->assertStringContainsString('ttl bigint', $sql);
-
-					return true;
+					return $initResponse;
 				}
-			)
-		)
-		->willReturn($mockResponse);
-
-		new ConversationManager($mockClient, 'test_model');
-	}
-
-	/**
-	 * @return array{role:string, message:string, intent:string, search_query:string,
-	 *   exclude_query:string, excluded_ids:string}
-	 */
-	private function createConversationRow(
-		string $role,
-		string $message,
-		string $intent = '',
-		string $searchQuery = '',
-		string $excludeQuery = '',
-		string $excludedIds = ''
-	): array {
-		return [
-			'role' => $role,
-			'message' => $message,
-			'intent' => $intent,
-			'search_query' => $searchQuery,
-			'exclude_query' => $excludeQuery,
-			'excluded_ids' => $excludedIds,
-		];
+				$assertSql($sql);
+				return $response;
+			}
+		);
+		return new ConversationManager($client, 'test_model');
 	}
 }

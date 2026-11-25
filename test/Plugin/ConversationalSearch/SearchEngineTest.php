@@ -636,7 +636,7 @@ class SearchEngineTest extends TestCase {
 					// Verify the exclusion SQL matches actual implementation
 					if (str_contains($sql, /** @lang manticore */ 'SELECT id, knn_dist() as knn_dist FROM test_table')
 						&& str_contains($sql, "WHERE knn(embedding, 15, 'exclude query')")
-						&& str_contains($sql, 'AND knn_dist < 0.75')
+						&& str_contains($sql, 'AND knn_dist < 0.70')
 					) {
 						return $exclusionResponse;
 					}
@@ -692,7 +692,7 @@ class SearchEngineTest extends TestCase {
 			$actualSql
 		);
 		$this->assertStringContainsString("WHERE knn(embedding_vector, 15, 'Stranger Things')", $actualSql);
-		$this->assertStringContainsString('AND knn_dist < 0.75', $actualSql);
+		$this->assertStringContainsString('AND knn_dist < 0.70', $actualSql);
 
 		// Verify results
 		$this->assertEquals([1156395647918669832], $result);

@@ -23,16 +23,25 @@ At query time `CALL CHAT` does this:
 1. Loads the chat model configuration.
 2. Loads conversation history for the provided conversation UUID, or creates a
    new UUID when none is provided.
-3. Inspects the target table and selects a `FLOAT_VECTOR` field.
-4. Routes the user message with the LLM:
-   - run a new search
-   - answer from previous search context
-   - or answer without search when retrieval is not needed
-5. Runs KNN search with the selected vector field.
-6. Builds the prompt context from the selected vector field's `from='...'`
-   source fields.
-7. Generates the final answer with the configured LLM.
-8. Stores the user and assistant messages in conversation history.
+3. Uses one structured LLM call to distinguish conversation unrelated to
+   indexed data (such as greetings, thanks, or casual small talk) from a search
+   request. For search requests, it rewrites the message and relevant history
+   into a standalone question and extracts any newly excluded item or category.
+   A greeting followed by an information request still searches; there is no
+   rejection route.
+4. For a conversational message, generates a brief reply using the configured
+   `custom_prompt` and bounded conversation history without inspecting the vector
+   field or retrieving documents, then saves both messages.
+   `search_query` is empty and `sources` is `[]`. Previously excluded IDs remain
+   unchanged.
+5. For a search request, loads previously excluded document IDs for this
+   conversation and table from the same bounded history query, adds IDs matched
+   by the new exclusion, and runs KNN
+   by default (or full-text plus KNN with `search_strategy='hybrid'`) using
+   `id NOT IN (...)`.
+6. Builds answer context from the current results, generates the response, and
+   stores the user and assistant messages and any newly accumulated exclusions.
+   `sources` reflects the current search, not a previous one.
 
 The `fields` argument in `CALL CHAT` is a historical name. It
 means "which `FLOAT_VECTOR` field to use for KNN", not "which fields to return".
@@ -120,7 +129,7 @@ Common options:
 | `api_key` | No | Provider API key passed to the `llm` extension |
 | `base_url` | No | Provider or proxy base URL |
 | `timeout` | No | LLM request timeout, `1..65536` |
-| `retrieval_limit` | No | Number of documents requested from KNN, `1..50`; default `5` |
+| `retrieval_limit` | No | Maximum number of retrieved documents, `1..50`; default `5` |
 | `max_document_length` | No | Per-document context limit; `0` disables truncation, `100..65536` truncates; default `2000` |
 
 Model names in `CREATE CHAT MODEL` may contain letters, numbers, and
@@ -221,6 +230,13 @@ When the fifth argument is provided, Buddy validates that the field exists and i
 a `FLOAT_VECTOR`. If it is omitted, Buddy detects the first `FLOAT_VECTOR` field
 from `SHOW CREATE TABLE`.
 
+Opt in to hybrid search with the sixth argument (leave the preceding optional
+arguments empty when they are not needed):
+
+```sql
+CALL CHAT('Find a 16x48 frame', 'docs', 'assistant', '', '', 'hybrid');
+```
+
 ## CALL Syntax
 
 ```sql
@@ -229,7 +245,8 @@ CALL CHAT(
     'table',
     'model_name',
     'conversation_uuid',
-    'vector_field'
+    'vector_field',
+    'search_strategy'
 );
 ```
 
@@ -242,6 +259,7 @@ Arguments are positional only:
 | 3 | `model_name` | Yes | chat model name |
 | 4 | `conversation_uuid` | No | Existing conversation id, or empty string |
 | 5 | `fields` / vector field | No | `FLOAT_VECTOR` field used in `knn(...)` |
+| 6 | `search_strategy` | No | `knn` (default) or `hybrid` |
 
 The table argument must be a plain table identifier, optionally qualified as
 `database.table`. The vector field argument must be a plain field identifier.
@@ -262,7 +280,8 @@ curl -s -X POST http://localhost:9308/search \
       "table": "docs",
       "model_name": "assistant",
       "conversation_uuid": "search-demo-1",
-      "vector_field": "embedding"
+      "vector_field": "embedding",
+      "search_strategy": "hybrid"
     }
   }'
 ```
@@ -281,6 +300,7 @@ Optional fields:
 |---|---|
 | `conversation_uuid` | Existing conversation id. If omitted or empty, Buddy creates a new one |
 | `vector_field` | `FLOAT_VECTOR` field used in `knn(...)` |
+| `search_strategy` | `knn` (default) or `hybrid` |
 
 `vector_field` is the HTTP JSON name for the fifth SQL `CALL CHAT` argument.
 The legacy JSON field name `fields` is accepted as an alias, but requests must
@@ -305,17 +325,65 @@ WHERE knn(<vector_field>, <k>, '<search query>')
 LIMIT <retrieval_limit>
 ```
 
+With `search_strategy='hybrid'`, the router produces a standalone question for
+KNN and a lexical plan in one LLM call. The plan has a short, distinctive anchor
+followed by at most three concrete identity or constraint terms from the current
+message and relevant history. Brand and product type remain separate unless
+they are an exact phrase; the router must not invent attributes or add generic
+shopping, availability, or sizing phrases (explicitly requested sizes are kept).
+The prompt also applies to other
+datasets without assuming a domain. Buddy keeps the anchor required in full-text
+search, makes the remaining terms optional for ranking,
+escapes both query languages, and combines full-text and vector candidates with
+reciprocal rank fusion:
+
+```sql
+SELECT *, hybrid_score() AS hybrid_score
+FROM <table>
+WHERE MATCH('"<primary anchor>" MAYBE ("<refinement>" | "<another refinement>")')
+  AND knn(<vector_field>, <k>, '<standalone question>')
+LIMIT <retrieval_limit> OPTION fusion_method='rrf'
+```
+
+`*`, `?`, and `%` are removed from generated lexical terms before `MATCH`, since
+wildcard operators cannot reliably be escaped as literal terms. A term containing
+only those characters is rejected; the standalone KNN question is unchanged.
+
+Hybrid search does not apply the KNN distance threshold: doing so could remove
+documents found only by full-text matching. `sources` includes `hybrid_score`
+in hybrid mode. Lexical terms are generated for each new search using the
+current message and relevant conversation history; they are not saved in the
+history table. Hybrid search does not perform additional research.
+
 Behavior:
 
 - `retrieval_limit` controls the final `LIMIT`.
-- The default KNN threshold is currently `0.8`.
-- If the conversation route includes an exclusion query, Buddy first finds
+- The default KNN-only threshold is currently `0.8`.
+- If the generated plan includes an exclusion query, Buddy finds
   matching IDs with `knn(<vector_field>, 15, '<exclude query>')` and threshold
-  `0.75`, then excludes those IDs from the main search.
-- The final `sources` include normal result fields and `knn_dist`.
+  `0.70`, then combines them with previously excluded IDs for this conversation
+  and table and filters them from the main search. This is a semantic nearest-
+  neighbor lookup capped at 15 candidates per exclusion, not a literal full-text
+  minus-word filter or an exhaustive scan of the table.
+- A rejection without a named subject (for example, "No, not these") still
+  searches for alternatives, but does not automatically exclude every previously
+  displayed source; those source IDs are not stored as an exclusion set.
+- The final `sources` include normal result fields and the score for the selected mode.
 - `FLOAT_VECTOR` columns are removed from `sources` to avoid returning large
   embedding payloads.
-- LLM context is built only from the source results.
+- LLM context is built only from the current source results and
+  the answer prompt is grounded in the history and retrieved context.
+- History stores message roles, text, and the selected chat model name plus
+  conversation ID, timestamps, and TTL; a separate role stores snapshots of
+  accumulated excluded IDs per table. A turn writes its messages and any updated
+  snapshot in one multi-row insert; concurrent turns for the same conversation
+  are not serialized.
+  The latest 100 history rows for the conversation are read in one query;
+  only user/assistant messages and the snapshot for the requested search index
+  are used. Other metadata rows also count toward the limit, so snapshots
+  outside that window are forgotten.
+  Existing tables with older search-context columns remain readable and writable;
+  Buddy does not drop or alter them.
 
 `max_document_length` applies per source document:
 
@@ -443,5 +511,5 @@ which text fields to use for LLM context.
 
 `Search query must contain at least one term`
 
-The routed standalone search query is empty. This usually means the input query
-was empty or the routing LLM returned invalid search text.
+The generated standalone search query is empty. This usually means the input
+query was empty or the LLM returned invalid search text.

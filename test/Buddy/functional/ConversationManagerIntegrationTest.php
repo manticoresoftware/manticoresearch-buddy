@@ -10,7 +10,6 @@
 */
 
 use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationManager;
-use Manticoresearch\Buddy\Base\Plugin\ConversationalSearch\ConversationMessage;
 use Manticoresearch\Buddy\Base\Plugin\PluginsAuthPermissions\ResourceTable;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchClientError;
 use Manticoresearch\Buddy\Core\Error\ManticoreSearchResponseError;
@@ -51,29 +50,13 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 * @throws ManticoreSearchResponseError
 	 */
 	public function testCompleteConversationFlowWithRealDatabase(): void {
-		// Save a user message
-		$this->saveUser(
+		$this->conversationManager->saveTurn(
 			'test-conversation-1',
-			'test-model-1',
+			'test_model',
 			'What is machine learning?',
-			50,
-			'NEW',
-			'machine learning information',
-			'',
-			[]
-		);
-
-		// Small delay to ensure different timestamps
-		sleep(1);
-
-		// Save an assistant response
-		$this->saveAssistant(
-			'test-conversation-1',
-			'test-model-1',
 			'Machine learning is a subset of artificial intelligence that focuses '
 			. 'on algorithms that can learn from data.',
-			75,
-			'ANSWER'
+			'docs'
 		);
 
 		// Retrieve conversation history
@@ -85,72 +68,36 @@ class ConversationManagerIntegrationTest extends TestCase {
 
 		$this->assertEquals($expectedHistory, $history);
 
-		// Test search context retrieval
-		$searchContext = $this->getLatestSearchContext('test-conversation-1');
-		$this->assertIsArray($searchContext);
-		$this->assertEquals('machine learning information', $searchContext['search_query']);
-		$this->assertEquals('', $searchContext['exclude_query']);
-		$this->assertEquals('[]', $searchContext['excluded_ids']); // Empty excluded IDs are stored as JSON
-
 		// Test query-generation history
 		$queryHistory = $this->getConversationHistoryForQueryGeneration('test-conversation-1');
 		$this->assertEquals($expectedHistory, $queryHistory);
 	}
 
 	/**
-	 * Test conversation with multiple exchanges and search context
+	 * Test conversation with multiple exchanges
 	 *
 	 * @throws ManticoreSearchClientError
 	 * @throws JsonException
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testMultipleConversationExchangesWithSearchContext(): void {
-		// First exchange with search context
-		$this->saveUser(
+	public function testMultipleConversationExchanges(): void {
+		// First exchange
+		$this->conversationManager->saveTurn(
 			'test-conversation-2',
-			'test-model-2',
+			'test_model',
 			'Show me movies about space',
-			30,
-			'NEW',
-			'movies about space',
-			'Star Wars',
-			['1', '2', '3']
-		);
-
-		$this->saveAssistant(
-			'test-conversation-2',
-			'test-model-2',
 			'Here are some great space movies: 2001: A Space Odyssey, Interstellar, Gravity...',
-			60,
-			'ANSWER'
+			'docs'
 		);
 
-		// Second exchange with different search context
-		$this->saveUser(
+		// Second exchange
+		$this->conversationManager->saveTurn(
 			'test-conversation-2',
-			'test-model-2',
+			'test_model',
 			'What about documentaries?',
-			25,
-			'NEW',
-			'documentaries about space',
-			'fiction movies',
-			['4', '5', '6']
-		);
-
-		$this->saveAssistant(
-			'test-conversation-2',
-			'test-model-2',
 			'Here are some space documentaries: Cosmos, The Farthest, Apollo 13...',
-			55,
-			'ANSWER'
+			'docs'
 		);
-
-		// Test that we get the latest search context
-		$searchContext = $this->getLatestSearchContext('test-conversation-2');
-		$this->assertNotNull($searchContext);
-		$this->assertEquals('documentaries about space', $searchContext['search_query']);
-		$this->assertEquals('fiction movies', $searchContext['exclude_query']);
-		$this->assertEquals('["4","5","6"]', $searchContext['excluded_ids']);
 
 		// Test complete history
 		$history = $this->getConversationHistory('test-conversation-2');
@@ -161,70 +108,37 @@ class ConversationManagerIntegrationTest extends TestCase {
 	}
 
 	/**
-	 * Test conversation with FOLLOW_UP intent history
+	 * Test follow-up questions remain available to the query generator
 	 *
 	 * @throws ManticoreSearchClientError
 	 * @throws JsonException
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testContentQuestionIntentFiltering(): void {
+	public function testFollowUpQuestionsRemainInHistory(): void {
 		// Regular search question
-		$this->saveUser(
+		$this->conversationManager->saveTurn(
 			'test-conversation-3',
-			'test-model-3',
+			'test_model',
 			'What are the best sci-fi movies?',
-			25,
-			'NEW',
-			'best sci-fi movies',
-			'',
-			[]
-		);
-
-		$this->saveAssistant(
-			'test-conversation-3',
-			'test-model-3',
 			'Here are some highly-rated sci-fi movies: Blade Runner 2049, Arrival, The Matrix...',
-			50,
-			'ANSWER'
+			'docs'
 		);
 
 		// Follow-up question should remain in query generation history.
-		$this->saveUser(
+		$this->conversationManager->saveTurn(
 			'test-conversation-3',
-			'test-model-3',
+			'test_model',
 			'Tell me more about Blade Runner 2049',
-			20,
-			'FOLLOW_UP',
-			'',
-			'',
-			[]
-		);
-
-		$this->saveAssistant(
-			'test-conversation-3',
-			'test-model-3',
 			'Blade Runner 2049 is a 2017 science fiction film directed by Denis Villeneuve...',
-			45,
-			'ANSWER'
+			'docs'
 		);
 
-		$this->saveUser(
+		$this->conversationManager->saveTurn(
 			'test-conversation-3',
-			'test-model-3',
+			'test_model',
 			'Who directed it?',
-			15,
-			'FOLLOW_UP',
-			'',
-			'',
-			[]
-		);
-
-		$this->saveAssistant(
-			'test-conversation-3',
-			'test-model-3',
 			'Denis Villeneuve directed Blade Runner 2049.',
-			30,
-			'FOLLOW_UP'
+			'docs'
 		);
 
 		// Test that complete history includes everything
@@ -245,11 +159,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$this->assertStringContainsString('What are the best sci-fi movies?', $queryHistory);
 		$this->assertStringContainsString('Tell me more about Blade Runner 2049', $queryHistory);
 		$this->assertStringContainsString('Who directed it?', $queryHistory);
-
-		// Test that search context is not affected by consecutive FOLLOW_UP turns.
-		$searchContext = $this->getLatestSearchContext('test-conversation-3');
-		$this->assertNotNull($searchContext);
-		$this->assertEquals('best sci-fi movies', $searchContext['search_query']);
 	}
 
 	/**
@@ -268,10 +177,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 			'',
 			$this->getConversationHistoryForQueryGeneration('non-existent-conversation')
 		);
-
-		// Test search context for non-existent conversation
-		$searchContext = $this->getLatestSearchContext('non-existent-conversation');
-		$this->assertNull($searchContext);
 	}
 
 	/**
@@ -286,16 +191,7 @@ class ConversationManagerIntegrationTest extends TestCase {
 		$specialMessage = "This message contains: quotes 'single' and \"double\", " .
 			"newlines\nand\ttabs, backslashes\\, and unicode: ñáéíóú 🚀";
 
-		$this->saveUser(
-			'test-conversation-4',
-			'test-model-4',
-			$specialMessage,
-			100,
-			'NEW',
-			'special characters test',
-			'',
-			[]
-		);
+		$this->conversationManager->saveTurn('test-conversation-4', 'test_model', $specialMessage, 'Noted.', 'docs');
 
 		// Retrieve and verify the message is preserved correctly
 		$history = $this->getConversationHistory('test-conversation-4');
@@ -307,34 +203,83 @@ class ConversationManagerIntegrationTest extends TestCase {
 	}
 
 	/**
-	 * Test conversation with JSON excluded IDs
+	 * Test conversation stores only messages
 	 *
 	 * @throws ManticoreSearchClientError
 	 * @throws JsonException
 	 * @throws ManticoreSearchResponseError
 	 */
-	public function testJsonExcludedIdsHandling(): void {
-		$excludedIds = ['10', '20', '30', '40', '50'];
-		$this->saveUser(
-			'test-conversation-5',
-			'test-model-5',
-			'Show me results excluding some items',
-			35,
-			'NEW',
-			'results excluding items',
-			'items to exclude',
-			$excludedIds
+	public function testConversationStoresOnlyMessages(): void {
+		$this->conversationManager->saveTurn(
+			'test-conversation-5', 'test_model', 'Show me results excluding some items', 'Here are results.', 'docs'
 		);
 
-		// Test search context retrieval with JSON
-		$searchContext = $this->getLatestSearchContext('test-conversation-5');
-		$this->assertIsArray($searchContext);
-		$this->assertEquals('results excluding items', $searchContext['search_query']);
-		$this->assertEquals('items to exclude', $searchContext['exclude_query']);
+		$this->assertSame(
+			"user: Show me results excluding some items\nassistant: Here are results.\n",
+			$this->getConversationHistory('test-conversation-5')
+		);
+	}
 
-		// Verify JSON is properly stored and retrieved
-		$retrievedIds = json_decode($searchContext['excluded_ids'], true);
-		$this->assertEquals($excludedIds, $retrievedIds);
+	/** @throws ManticoreSearchClientError|ManticoreSearchResponseError|JsonException */
+	public function testExcludedIdsPersistAcrossTurnsAndRemainScopedToTheTargetTable(): void {
+		$conversation = 'exclusion-integration';
+		$this->conversationManager->saveTurn(
+			$conversation, 'test_model', 'Recommend TV shows', 'Here are recommendations.', 'shows'
+		);
+		$this->conversationManager->saveTurn(
+			$conversation, 'test_model', 'Shows please', 'Here are shows', 'shows', ['12', '9007199254740993']
+		);
+		$this->conversationManager->saveTurn(
+			$conversation, 'test_model', 'Films please', 'Here are films', 'films', ['99']
+		);
+		$this->assertSame(
+			[], $this->conversationManager->getConversationMessages($conversation, 2, 'shows')->excludedIds()
+		);
+		$this->conversationManager->saveTurn(
+			$conversation, 'test_model', 'More shows', 'Here are more shows', 'shows', ['12', '9007199254740993', '43']
+		);
+
+		$this->assertSame(
+			['12', '9007199254740993', '43'],
+			$this->conversationManager->getConversationMessages($conversation, indexName: 'shows')->excludedIds()
+		);
+		$this->assertSame(
+			['99'],
+			$this->conversationManager->getConversationMessages($conversation, indexName: 'films')->excludedIds()
+		);
+		$this->assertSame(
+			[],
+			$this->conversationManager->getConversationMessages('another-conversation', indexName: 'shows')
+				->excludedIds()
+		);
+		$this->assertSame(
+			"user: Recommend TV shows\nassistant: Here are recommendations.\n"
+			. "user: Shows please\nassistant: Here are shows\n"
+			. "user: Films please\nassistant: Here are films\n"
+			. "user: More shows\nassistant: Here are more shows\n",
+			$this->getConversationHistory($conversation)
+		);
+		$this->conversationManager->saveTurn($conversation, 'test_model', 'Thanks', 'You are welcome.', 'shows');
+		$this->assertSame(
+			[], $this->conversationManager->getConversationMessages($conversation, 2, 'shows')->excludedIds()
+		);
+	}
+
+	public function testMessagesRecordTheirOwnModelName(): void {
+		$this->conversationManager->saveTurn('mixed-models', 'first-model', 'Hello', 'Hi', 'docs');
+		$this->conversationManager->saveTurn('mixed-models', 'second-model', 'Thanks', 'You are welcome.', 'docs');
+		$response = $this->client->sendRequest(
+			"SELECT role, `model_name` FROM system.chat_history_test_model WHERE conversation_uuid = 'mixed-models' "
+			. 'ORDER BY created_at ASC, id ASC'
+		);
+		$this->assertFalse($response->hasError());
+		/** @var array<int, array{data: list<array{role:string, model_name:string}>}> $result */
+		$result = $response->getResult();
+		$rows = $result[0]['data'];
+		$this->assertSame(['user', 'assistant', 'user', 'assistant'], array_column($rows, 'role'));
+		$this->assertSame(
+			['first-model', 'first-model', 'second-model', 'second-model'], array_column($rows, 'model_name')
+		);
 	}
 
 	/**
@@ -346,15 +291,8 @@ class ConversationManagerIntegrationTest extends TestCase {
 	 */
 	public function testTableCreationWithRealDatabase(): void {
 		// Verify table exists by trying to insert into it
-		$this->saveUser(
-			'test-conversation-6',
-			'test-model-6',
-			'Test message for table creation',
-			10,
-			'NEW',
-			'table creation test',
-			'',
-			[]
+		$this->conversationManager->saveTurn(
+			'test-conversation-6', 'test_model', 'Test message for table creation', 'Stored.', 'docs'
 		);
 
 		// Verify we can retrieve the message
@@ -371,15 +309,6 @@ class ConversationManagerIntegrationTest extends TestCase {
 	}
 
 	/**
-	 * @return array{search_query: string, exclude_query: string, excluded_ids: string}|null
-	 * @throws ManticoreSearchClientError
-	 * @throws ManticoreSearchResponseError
-	 */
-	private function getLatestSearchContext(string $conversationUuid): ?array {
-		return $this->conversationManager->getConversationMessages($conversationUuid)->latestSearchContext();
-	}
-
-	/**
 	 * @throws ManticoreSearchClientError
 	 * @throws ManticoreSearchResponseError
 	 */
@@ -387,50 +316,4 @@ class ConversationManagerIntegrationTest extends TestCase {
 		return $this->conversationManager->getConversationMessages($conversationUuid)->format();
 	}
 
-	/**
-	 * @param array<int, string> $excludedIds
-	 * @throws JsonException
-	 * @throws ManticoreSearchClientError
-	 */
-	private function saveUser(
-		string $conversationUuid,
-		string $modelName,
-		string $message,
-		int $tokensUsed,
-		string $intent,
-		string $searchQuery,
-		string $excludeQuery,
-		array $excludedIds
-	): void {
-		$this->conversationManager->saveMessage(
-			$conversationUuid,
-			$modelName,
-			ConversationMessage::userWithExcludedIds(
-				$message,
-				$intent,
-				$searchQuery,
-				$excludeQuery,
-				$excludedIds
-			),
-			$tokensUsed
-		);
-	}
-
-	/**
-	 * @throws ManticoreSearchClientError
-	 */
-	private function saveAssistant(
-		string $conversationUuid,
-		string $modelName,
-		string $message,
-		int $tokensUsed,
-		string $intent
-	): void {
-		$this->conversationManager->saveMessage(
-			$conversationUuid,
-			$modelName,
-			ConversationMessage::assistant($message, $intent),
-			$tokensUsed
-		);
-	}
 }
