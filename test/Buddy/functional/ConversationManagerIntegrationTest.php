@@ -277,7 +277,9 @@ class ConversationManagerIntegrationTest extends TestCase {
 			. 'ORDER BY created_at ASC, id ASC'
 		);
 		$this->assertFalse($response->hasError());
-		$rows = $response->getResult()[0]['data'];
+		/** @var array<int, array{data: list<array{role:string, model_name:string}>}> $result */
+		$result = $response->getResult();
+		$rows = $result[0]['data'];
 		$this->assertSame('first-model', $rows[0]['model_name']);
 		$this->assertSame('second-model', $rows[1]['model_name']);
 	}
