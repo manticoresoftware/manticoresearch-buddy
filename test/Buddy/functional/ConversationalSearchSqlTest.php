@@ -138,13 +138,18 @@ class ConversationalSearchSqlTest extends TestCase {
 		$handler = new Handler(Payload::fromRequest($request), $provider);
 		$handler->setManticoreClient(new Client('http://127.0.0.1:' . static::getListenHttpPort()));
 		$task = null;
-		/** @phpstan-ignore-next-line Swoole's coroutine run function exists in the test container. */
-		\Swoole\Coroutine\run(
-			static function () use ($handler, &$task): void {
-				$task = $handler->run();
-				$task->wait();
-			}
-		);
+		$hookFlags = \Swoole\Runtime::getHookFlags();
+		try {
+			/** @phpstan-ignore-next-line Swoole's coroutine run function exists in the test container. */
+			\Swoole\Coroutine\run(
+				static function () use ($handler, &$task): void {
+					$task = $handler->run();
+					$task->wait();
+				}
+			);
+		} finally {
+			\Swoole\Runtime::setHookFlags($hookFlags);
+		}
 		$this->assertInstanceOf(Task::class, $task);
 		$this->assertTrue($task->isSucceed(), $task->isSucceed() ? '' : $task->getError()->getResponseError());
 		$response = $task->getResult();
