@@ -11,9 +11,10 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Base\Lib\GlobalSchemaHandler;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
@@ -23,7 +24,7 @@ use RuntimeException;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class QueriesHandler extends BaseHandlerWithClient {
+class QueriesHandler extends GlobalSchemaHandler {
 	const COL_MAP = [
 		'connid' => 'id',
 		'last cmd' => 'query',
@@ -47,11 +48,11 @@ class QueriesHandler extends BaseHandlerWithClient {
 	 * @return Task
 	 * @throws RuntimeException
 	 */
-	public function run(): Task {
+	protected function runAuthorized(): Task {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = static function (
-			Client $manticoreClient,
+			SystemClient $manticoreClient,
 			array $tasks
 		): TaskResult {
 			// First, get response from the manticore
@@ -61,9 +62,11 @@ class QueriesHandler extends BaseHandlerWithClient {
 			return static::buildTaskResult($resp, $tasks);
 		};
 
+		// Global SCHEMA was checked by run(); reading internal session data
+		// must not require an additional READ grant from the caller.
 		return Task::create(
 			$taskFn,
-			[$this->manticoreClient, static::getTasksToAppend()]
+			[$this->manticoreClient->getSystemClient(), static::getTasksToAppend()]
 		)->run();
 	}
 
@@ -75,6 +78,13 @@ class QueriesHandler extends BaseHandlerWithClient {
 	 * @return TaskResult
 	 */
 	public static function buildTaskResult(Response $response, array $tasks): TaskResult {
+		if ($response->hasError() || $response->isRaw()
+			|| $response->hasMultipleRows() || !$response->hasData()
+		) {
+			throw GenericError::create($response->getError() ?: 'Failed to read server sessions')
+				->setResponseErrorCode(500);
+		}
+
 		/** @var array<array{id:int,protocol:string,host:string,query:string}> $data */
 		$data = $response->getData();
 		$newData = [];

@@ -11,9 +11,12 @@
 
 use Manticoresearch\Buddy\Base\Plugin\Show\Payload;
 use Manticoresearch\Buddy\Base\Plugin\Show\QueriesHandler as Handler;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Network\Request as NetRequest;
 
 use Manticoresearch\Buddy\Core\Tool\Buddy;
@@ -55,8 +58,18 @@ class ShowQueriesHandlerTest extends TestCase {
 		);
 		$serverUrl = self::setUpMockManticoreServer(false);
 		self::setBuddyVersion();
-		$manticoreClient = new HTTPClient($serverUrl);
-		$manticoreClient->setForceSync(true);
+		$systemClient = new SystemClient($serverUrl);
+		$systemClient->setForceSync(true);
+		$manticoreClient = $this->getMockBuilder(HTTPClient::class)
+			->disableOriginalConstructor()
+			->disableOriginalClone()
+			->getMock();
+		$manticoreClient->method('setAuthToken')->willReturnSelf();
+		$manticoreClient->method('clearDelegatedUser')->willReturnSelf();
+		$manticoreClient->method('sendRequest')->with('SELECT 1 AS buddy_auth_probe')->willReturn(
+			Response::fromBody('[{"total":1,"data":[{"buddy_auth_probe":1}],"error":"","warning":""}]')
+		);
+		$manticoreClient->method('getSystemClient')->willReturn($systemClient);
 		Payload::$type = 'queries';
 		$payload = Payload::fromRequest($request);
 
@@ -75,5 +88,16 @@ class ShowQueriesHandlerTest extends TestCase {
 		);
 
 		Swoole\Event::wait();
+	}
+
+	public function testSessionQueryErrorIsNotReportedAsSuccess(): void {
+		$response = Response::fromBody('{"error":"session query failed"}');
+		try {
+			Handler::buildTaskResult($response, []);
+			$this->fail('Expected the session query error to be propagated');
+		} catch (GenericError $e) {
+			$this->assertSame('session query failed', $e->getResponseError());
+			$this->assertSame(500, $e->getResponseErrorCode());
+		}
 	}
 }

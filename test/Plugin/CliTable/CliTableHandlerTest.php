@@ -14,6 +14,8 @@ use Manticoresearch\Buddy\Base\Plugin\Show\QueriesHandler as Handler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client as HTTPClient;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Endpoint as ManticoreEndpoint;
 use Manticoresearch\Buddy\Core\ManticoreSearch\RequestFormat;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Network\Request;
 use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\CoreTest\Trait\TestHTTPServerTrait;
@@ -52,8 +54,18 @@ class CliTableHandlerTest extends TestCase {
 
 		self::setBuddyVersion();
 		$serverUrl = self::setUpMockManticoreServer(false);
-		$manticoreClient = new HTTPClient($serverUrl);
-		$manticoreClient->setForceSync(true);
+		$systemClient = new SystemClient($serverUrl);
+		$systemClient->setForceSync(true);
+		$manticoreClient = $this->getMockBuilder(HTTPClient::class)
+			->disableOriginalConstructor()
+			->disableOriginalClone()
+			->getMock();
+		$manticoreClient->method('setAuthToken')->willReturnSelf();
+		$manticoreClient->method('clearDelegatedUser')->willReturnSelf();
+		$manticoreClient->method('sendRequest')->with('SELECT 1 AS buddy_auth_probe')->willReturn(
+			Response::fromBody('[{"total":1,"data":[{"buddy_auth_probe":1}],"error":"","warning":""}]')
+		);
+		$manticoreClient->method('getSystemClient')->willReturn($systemClient);
 		Payload::$type = 'queries';
 		$payload = Payload::fromRequest($request);
 		$handler = new Handler($payload);
