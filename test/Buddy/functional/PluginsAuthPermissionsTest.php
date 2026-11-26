@@ -203,7 +203,7 @@ JSON;
 				$this->assertSame('200', $response['status'], $response['body']);
 				/** @var array<array{data?:array<mixed>}> $result */
 				$result = json_decode($response['body'], true, 512, JSON_THROW_ON_ERROR);
-				$this->assertNotEmpty($result[0]['data']);
+				$this->assertNotEmpty($result[0]['data'] ?? []);
 			}
 
 			$this->assertMysqlOk(
