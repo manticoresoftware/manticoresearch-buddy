@@ -39,7 +39,9 @@ final class PluginsAuthPermissionsTest extends TestCase {
 ]}
 JSON;
 
+	private const string FIXTURE_PACKAGE = 'example/permission-test';
 	private static string $dataDir = '';
+	private static string $pluginDir = '';
 
 	protected static function initConfig(): void {
 		static::setManticoreConfigFile(static::$configFileName);
@@ -50,12 +52,19 @@ JSON;
 			'data_dir = ' . self::$dataDir . "\n",
 			$conf
 		);
+		self::$pluginDir = self::$dataDir . '/plugins';
+		$conf = str_replace(
+			'plugin_dir = /usr/local/lib/manticore',
+			'plugin_dir = ' . self::$pluginDir,
+			$conf
+		);
 		static::updateManticoreConf($conf);
 		static::applySearchdArgs();
 	}
 
 	protected static function startSearchd(): void {
 		self::checkManticorePathes();
+		self::preparePluginFixture();
 		file_put_contents(self::$dataDir . '/auth.json', self::ROOT_AUTH_JSON);
 		chmod(self::$dataDir . '/auth.json', 0600);
 
@@ -65,6 +74,30 @@ JSON;
 		system('searchd --config ' . static::$manticoreConfigFilePath);
 		self::$manticorePid = (int)trim((string)file_get_contents('/var/run/manticore-test/searchd.pid'));
 		self::waitForBuddyReady();
+	}
+
+	private static function preparePluginFixture(): void {
+		$fixture = self::$pluginDir . '/fixture';
+		$plugins = self::$pluginDir . '/buddy-plugins';
+		mkdir($fixture, 0755, true);
+		mkdir($plugins, 0755, true);
+		file_put_contents(
+			$fixture . '/composer.json',
+			'{"name":"example/permission-test","version":"1.0.0","type":"library"}'
+		);
+		// Local, inert package: installation and removal never need Packagist.
+		file_put_contents(
+			$plugins . '/composer.json',
+			json_encode(
+				[
+					'repositories' => [
+						['type' => 'path', 'url' => $fixture, 'options' => ['symlink' => false]],
+						['packagist.org' => false],
+					],
+				],
+				JSON_THROW_ON_ERROR
+			)
+		);
 	}
 
 	/**
@@ -135,7 +168,6 @@ JSON;
 		try {
 			$user = "'" . self::USERNAME . "'";
 			$this->assertMysqlOk($this->runRootSql("GRANT READ ON * TO $user"));
-			$this->assertMysqlOk($this->runRootSql("GRANT WRITE ON * TO $user"));
 			$commands = [
 				'SHOW BUDDY PLUGINS',
 				'SHOW QUERIES',
@@ -148,6 +180,11 @@ JSON;
 				$this->assertGlobalCommandDenied($command);
 			}
 
+			$this->assertMysqlOk($this->runRootSql("GRANT WRITE ON * TO $user"));
+			foreach ($commands as $command) {
+				$this->assertGlobalCommandDenied($command);
+			}
+
 			$this->assertMysqlOk($this->runRootSql("GRANT SCHEMA ON auth_scoped_table TO $user"));
 			// ADMIN can see other users' rules, but does not inherit their permissions.
 			$this->assertMysqlOk($this->runRootSql("GRANT ADMIN ON * TO $user"));
@@ -155,11 +192,18 @@ JSON;
 				$this->assertGlobalCommandDenied($command);
 			}
 
+			// SCHEMA alone must suffice, including for SHOW QUERIES.
+			foreach (['READ ON *', 'WRITE ON *', 'ADMIN ON *', 'SCHEMA ON auth_scoped_table'] as $grant) {
+				$this->assertMysqlOk($this->runRootSql("REVOKE $grant FROM $user"));
+			}
 			$this->assertMysqlOk($this->runRootSql("GRANT SCHEMA ON * TO $user"));
 			foreach (['SHOW BUDDY PLUGINS', 'SHOW QUERIES'] as $command) {
 				$this->assertMysqlOk($this->runUserSql($command));
 				$response = $this->runUserHttpSql($command);
 				$this->assertSame('200', $response['status'], $response['body']);
+				/** @var array<array{data?:array<mixed>}> $result */
+				$result = json_decode($response['body'], true, 512, JSON_THROW_ON_ERROR);
+				$this->assertNotEmpty($result[0]['data']);
 			}
 
 			$this->assertMysqlOk(
@@ -169,6 +213,65 @@ JSON;
 				$this->assertGlobalCommandDenied($command);
 			}
 		} finally {
+			$this->runRootSql("DROP USER '" . self::USERNAME . "'");
+		}
+	}
+
+	public function testPluginInstallAndRemoveRequireCurrentSchemaGrant(): void {
+		$this->runRootSql("DROP USER '" . self::USERNAME . "'");
+		$this->createUser();
+		$user = "'" . self::USERNAME . "'";
+		$package = self::FIXTURE_PACKAGE;
+		$installed = self::$pluginDir . '/buddy-plugins/vendor/' . $package . '/composer.json';
+
+		try {
+			$this->assertMysqlOk($this->runRootSql("GRANT READ ON * TO $user"));
+			$this->assertGlobalCommandDenied("CREATE BUDDY PLUGIN $package");
+			$this->assertFileDoesNotExist($installed);
+
+			$this->assertMysqlOk($this->runRootSql("GRANT SCHEMA ON * TO $user"));
+			$this->assertMysqlOk($this->runUserSql("CREATE BUDDY PLUGIN $package"));
+			$this->assertFileExists($installed);
+
+			$this->assertMysqlOk($this->runRootSql("REVOKE SCHEMA ON * FROM $user"));
+			$this->assertGlobalCommandDenied("DELETE BUDDY PLUGIN $package");
+			$this->assertFileExists($installed);
+
+			$this->assertMysqlOk($this->runRootSql("GRANT SCHEMA ON * TO $user"));
+			$this->assertMysqlOk($this->runUserSql("DELETE BUDDY PLUGIN $package"));
+			$this->assertFileDoesNotExist($installed);
+		} finally {
+			if (is_file($installed)) {
+				$this->runRootSql("DELETE BUDDY PLUGIN $package");
+			}
+			$this->runRootSql("DROP USER '" . self::USERNAME . "'");
+		}
+	}
+
+	public function testPluginEnableAndDisableRequireCurrentSchemaGrant(): void {
+		$this->runRootSql("DROP USER '" . self::USERNAME . "'");
+		$this->createUser();
+		$user = "'" . self::USERNAME . "'";
+		$package = 'manticoresoftware/buddy-plugin-test';
+
+		try {
+			$this->assertMysqlOk($this->runRootSql("GRANT READ ON * TO $user"));
+			$this->assertGlobalCommandDenied("DISABLE BUDDY PLUGIN $package");
+			$this->assertMysqlOk($this->runRootSql('TEST 0'));
+
+			$this->assertMysqlOk($this->runRootSql("GRANT SCHEMA ON * TO $user"));
+			$this->assertMysqlOk($this->runUserSql("DISABLE BUDDY PLUGIN $package"));
+			$this->assertNotSame(0, $this->runRootSql('TEST 0')['code']);
+
+			$this->assertMysqlOk($this->runRootSql("REVOKE SCHEMA ON * FROM $user"));
+			$this->assertGlobalCommandDenied("ENABLE BUDDY PLUGIN $package");
+			$this->assertNotSame(0, $this->runRootSql('TEST 0')['code']);
+
+			$this->assertMysqlOk($this->runRootSql("GRANT SCHEMA ON * TO $user"));
+			$this->assertMysqlOk($this->runUserSql("ENABLE BUDDY PLUGIN $package"));
+			$this->assertMysqlOk($this->runRootSql('TEST 0'));
+		} finally {
+			$this->runRootSql("ENABLE BUDDY PLUGIN $package");
 			$this->runRootSql("DROP USER '" . self::USERNAME . "'");
 		}
 	}

@@ -12,8 +12,9 @@
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Base\Lib\GlobalSchemaHandler;
-use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
+use Manticoresearch\Buddy\Core\Error\GenericError;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
+use Manticoresearch\Buddy\Core\ManticoreSearch\SystemClient;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
@@ -51,7 +52,7 @@ class QueriesHandler extends GlobalSchemaHandler {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = static function (
-			Client $manticoreClient,
+			SystemClient $manticoreClient,
 			array $tasks
 		): TaskResult {
 			// First, get response from the manticore
@@ -61,9 +62,11 @@ class QueriesHandler extends GlobalSchemaHandler {
 			return static::buildTaskResult($resp, $tasks);
 		};
 
+		// Global SCHEMA was checked by run(); reading internal session data
+		// must not require an additional READ grant from the caller.
 		return Task::create(
 			$taskFn,
-			[$this->manticoreClient, static::getTasksToAppend()]
+			[$this->manticoreClient->getSystemClient(), static::getTasksToAppend()]
 		)->run();
 	}
 
@@ -75,6 +78,13 @@ class QueriesHandler extends GlobalSchemaHandler {
 	 * @return TaskResult
 	 */
 	public static function buildTaskResult(Response $response, array $tasks): TaskResult {
+		if ($response->hasError() || $response->isRaw()
+			|| $response->hasMultipleRows() || !$response->hasData()
+		) {
+			throw GenericError::create($response->getError() ?: 'Failed to read server sessions')
+				->setResponseErrorCode(500);
+		}
+
 		/** @var array<array{id:int,protocol:string,host:string,query:string}> $data */
 		$data = $response->getData();
 		$newData = [];

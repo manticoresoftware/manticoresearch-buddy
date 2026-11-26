@@ -12,9 +12,11 @@
 namespace Manticoresearch\Buddy\Base\Lib;
 
 use Manticoresearch\Buddy\Core\Error\GenericError;
+use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
 use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Tool\ConfigManager;
+use Throwable;
 
 /**
  * Global operations implemented in Buddy cannot rely on authorization of a
@@ -28,7 +30,13 @@ abstract class GlobalSchemaHandler extends BaseHandlerWithClient {
 	}
 
 	final public function run(): Task {
-		if (!$this->hasUnrestrictedSchemaAccess()) {
+		try {
+			$allowed = $this->hasUnrestrictedSchemaAccess();
+		} catch (Throwable) {
+			// A failed authorization request must not execute the handler.
+			$allowed = false;
+		}
+		if (!$allowed) {
 			throw GenericError::create("Permission denied for user '{$this->requestUser}'")
 				->setResponseErrorCode(403);
 		}
@@ -44,7 +52,12 @@ abstract class GlobalSchemaHandler extends BaseHandlerWithClient {
 			$client = clone $this->manticoreClient;
 			$client->setAuthToken(null);
 			$client->clearDelegatedUser();
-			return !$client->sendRequest('SELECT 1')->hasError();
+			$response = $client->sendRequest('SELECT 1 AS buddy_auth_probe');
+			return self::isSuccessfulResult($response) && in_array(
+				$response->getData(),
+				[[['buddy_auth_probe' => 1]], [['buddy_auth_probe' => '1']]],
+				true
+			);
 		}
 		if ($this->requestUser === '') {
 			return false;
@@ -53,11 +66,16 @@ abstract class GlobalSchemaHandler extends BaseHandlerWithClient {
 		// Use the delegated client, never the system client. SHOW PERMISSIONS
 		// returns all users' rules for ADMIN, so match the original user.
 		$response = $this->manticoreClient->sendRequest('SHOW PERMISSIONS');
-		if ($response->hasError()) {
+		if (!self::isSuccessfulResult($response)) {
 			return false;
 		}
 
 		return $this->hasGlobalSchemaGrant($response->getData());
+	}
+
+	private static function isSuccessfulResult(Response $response): bool {
+		return !$response->hasError() && !$response->isRaw()
+			&& !$response->hasMultipleRows() && $response->hasData();
 	}
 
 	/** @param array<int|string,mixed> $rows */
