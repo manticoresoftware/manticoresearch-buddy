@@ -57,8 +57,13 @@ abstract class GlobalSchemaHandler extends BaseHandlerWithClient {
 			return false;
 		}
 
+		return $this->hasGlobalSchemaGrant($response->getData());
+	}
+
+	/** @param array<int|string,mixed> $rows */
+	private function hasGlobalSchemaGrant(array $rows): bool {
 		$allowed = false;
-		foreach ($response->getData() as $row) {
+		foreach ($rows as $row) {
 			if (!is_array($row)
 				|| !is_string($row['username'] ?? null)
 				|| !is_string($row['action'] ?? null)

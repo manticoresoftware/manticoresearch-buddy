@@ -11,9 +11,9 @@
 
 namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
+use Manticoresearch\Buddy\Base\Lib\GlobalSchemaHandler;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
-use Manticoresearch\Buddy\Base\Lib\GlobalSchemaHandler;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
