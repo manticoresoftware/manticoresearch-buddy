@@ -91,7 +91,8 @@ final class Handler extends BaseHandlerWithFlagCache {
 					$phrase,
 					$table,
 					$this->payload->forceBigrams,
-					$this->payload->distance
+					$this->payload->distance,
+					preserve: $this->payload->preserve
 				);
 				Buddy::debug("Fuzzy: variations for '$phrase' in '$table': " . json_encode($variations));
 				$this->mergeVariations($variations, $variationScores->toArray(), $words, $scoreMap);
