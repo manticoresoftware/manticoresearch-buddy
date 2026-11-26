@@ -82,6 +82,9 @@ class QueryProcessor {
 			}
 			$handler->{'set' . ucfirst($prop)}($value);
 		}
+		if ($handler instanceof GlobalSchemaHandler) {
+			$handler->setRequestUser($request->user ?? '');
+		}
 		return $handler;
 	}
 

@@ -10,7 +10,7 @@
 */
 namespace Manticoresearch\Buddy\Base\Plugin\Plugin;
 
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
+use Manticoresearch\Buddy\Base\Lib\GlobalSchemaHandler;
 use Manticoresearch\Buddy\Core\Plugin\Pluggable;
 use Manticoresearch\Buddy\Core\Process\BaseProcessor;
 use Manticoresearch\Buddy\Core\Task\Column;
@@ -20,7 +20,7 @@ use Manticoresearch\Buddy\Core\Tool\Buddy;
 use Manticoresearch\Buddy\Core\Tool\Strings;
 use RuntimeException;
 
-final class Handler extends BaseHandlerWithClient {
+final class Handler extends GlobalSchemaHandler {
 	/** @var Pluggable */
 	protected Pluggable $pluggable;
 
@@ -55,7 +55,7 @@ final class Handler extends BaseHandlerWithClient {
 	 * @return Task
 	 * @throws RuntimeException
 	 */
-	public function run(): Task {
+	protected function runAuthorized(): Task {
 		$taskFn = static function (Payload $payload): TaskResult {
 			$settings = $payload->getSettings();
 			$pluggable = new Pluggable($settings);

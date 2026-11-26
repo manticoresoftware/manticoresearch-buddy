@@ -13,7 +13,7 @@ namespace Manticoresearch\Buddy\Base\Plugin\Show;
 
 use Manticoresearch\Buddy\Core\ManticoreSearch\Client;
 use Manticoresearch\Buddy\Core\ManticoreSearch\Response;
-use Manticoresearch\Buddy\Core\Plugin\BaseHandlerWithClient;
+use Manticoresearch\Buddy\Base\Lib\GlobalSchemaHandler;
 use Manticoresearch\Buddy\Core\Task\Column;
 use Manticoresearch\Buddy\Core\Task\Task;
 use Manticoresearch\Buddy\Core\Task\TaskPool;
@@ -23,7 +23,7 @@ use RuntimeException;
 /**
  * This is the parent class to handle erroneous Manticore queries
  */
-class QueriesHandler extends BaseHandlerWithClient {
+class QueriesHandler extends GlobalSchemaHandler {
 	const COL_MAP = [
 		'connid' => 'id',
 		'last cmd' => 'query',
@@ -47,7 +47,7 @@ class QueriesHandler extends BaseHandlerWithClient {
 	 * @return Task
 	 * @throws RuntimeException
 	 */
-	public function run(): Task {
+	protected function runAuthorized(): Task {
 		// We run in a thread anyway but in case if we need blocking
 		// We just waiting for a thread to be done
 		$taskFn = static function (

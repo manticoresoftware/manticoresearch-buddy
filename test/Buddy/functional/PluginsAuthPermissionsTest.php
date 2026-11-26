@@ -128,6 +128,73 @@ JSON;
 		$this->cleanupQueueObjects($source, $view, $destination);
 	}
 
+	public function testGlobalSchemaCommandsRequireUnrestrictedSchema(): void {
+		$this->runRootSql("DROP USER '" . self::USERNAME . "'");
+		$this->createUser();
+
+		try {
+			$user = "'" . self::USERNAME . "'";
+			$this->assertMysqlOk($this->runRootSql("GRANT READ ON * TO $user"));
+			$this->assertMysqlOk($this->runRootSql("GRANT WRITE ON * TO $user"));
+			$commands = [
+				'SHOW BUDDY PLUGINS',
+				'SHOW QUERIES',
+				'CREATE BUDDY PLUGIN example/permission-test',
+				'DELETE BUDDY PLUGIN example/permission-test',
+				'ENABLE BUDDY PLUGIN example/permission-test',
+				'DISABLE BUDDY PLUGIN example/permission-test',
+			];
+			foreach ($commands as $command) {
+				$this->assertGlobalCommandDenied($command);
+			}
+
+			$this->assertMysqlOk($this->runRootSql("GRANT SCHEMA ON auth_scoped_table TO $user"));
+			// ADMIN can see other users' rules, but does not inherit their permissions.
+			$this->assertMysqlOk($this->runRootSql("GRANT ADMIN ON * TO $user"));
+			foreach ($commands as $command) {
+				$this->assertGlobalCommandDenied($command);
+			}
+
+			$this->assertMysqlOk($this->runRootSql("GRANT SCHEMA ON * TO $user"));
+			foreach (['SHOW BUDDY PLUGINS', 'SHOW QUERIES'] as $command) {
+				$this->assertMysqlOk($this->runUserSql($command));
+				$response = $this->runUserHttpSql($command);
+				$this->assertSame('200', $response['status'], $response['body']);
+			}
+
+			$this->assertMysqlOk(
+				$this->runRootSql("GRANT SCHEMA ON auth_denied_table TO $user WITH ALLOW 0")
+			);
+			foreach ($commands as $command) {
+				$this->assertGlobalCommandDenied($command);
+			}
+		} finally {
+			$this->runRootSql("DROP USER '" . self::USERNAME . "'");
+		}
+	}
+
+	private function assertGlobalCommandDenied(string $command): void {
+		$this->assertMysqlPermissionDenied($this->runUserSql($command));
+		$response = $this->runUserHttpSql($command);
+		$this->assertSame('403', $response['status'], $command . ': ' . $response['body']);
+		$this->assertStringContainsString('Permission denied', $response['body']);
+	}
+
+	/** @return array{status:string,body:string} */
+	private function runUserHttpSql(string $query): array {
+		$command = sprintf(
+			'curl --silent --show-error --max-time 15 --user %s --data-urlencode %s --write-out %s %s',
+			escapeshellarg(self::USERNAME . ':' . self::PASSWORD),
+			escapeshellarg('query=' . $query),
+			escapeshellarg("\n%{http_code}"),
+			escapeshellarg('http://127.0.0.1:' . static::getListenHttpPort() . '/sql?mode=raw')
+		);
+		exec($command, $output, $code);
+		$this->assertSame(0, $code, implode(PHP_EOL, $output));
+		$status = array_pop($output);
+		return ['status' => (string)$status, 'body' => implode(PHP_EOL, $output)];
+	}
+
 	/**
 	 * @return array<string,array{case:array{
 	 *   resource:string,
